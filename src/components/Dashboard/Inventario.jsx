@@ -134,8 +134,38 @@ function Inventario({ businessId, userRole = 'admin' }) {
         }
       }
 
-      // Generar código con formato PRD-0001, PRD-0002, etc.
-      return `PRD-${String(newCodeNumber).padStart(4, '0')}`;
+      // Generar código y verificar que no exista
+      let code = `PRD-${String(newCodeNumber).padStart(4, '0')}`;
+      let codeExists = true;
+      let attempts = 0;
+      const maxAttempts = 100;
+
+      while (codeExists && attempts < maxAttempts) {
+        // Verificar si el código ya existe
+        const { data: existingProduct } = await supabase
+          .from('products')
+          .select('id')
+          .eq('business_id', businessId)
+          .eq('code', code)
+          .maybeSingle();
+
+        if (!existingProduct) {
+          // Código disponible
+          codeExists = false;
+        } else {
+          // Código existe, incrementar y probar de nuevo
+          newCodeNumber++;
+          code = `PRD-${String(newCodeNumber).padStart(4, '0')}`;
+          attempts++;
+        }
+      }
+
+      if (attempts >= maxAttempts) {
+        // Si no encuentra código disponible después de 100 intentos, usar timestamp
+        return `PRD-${Date.now()}`;
+      }
+
+      return code;
     } catch (error) {
       // Si falla, usar timestamp como fallback
       return `PRD-${Date.now()}`;
