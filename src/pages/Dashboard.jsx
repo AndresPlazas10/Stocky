@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase/Client.jsx';
-import { getCurrentBusiness } from '../services/businessService.jsx';
-import { DashboardLayout } from '../components/Layout/DashboardLayout.jsx';
+import { DashboardLayout } from '../components/layout/DashboardLayout.jsx';
 import Home from '../components/Dashboard/Home.jsx';
 import Ventas from '../components/Dashboard/Ventas.jsx';
 import Compras from '../components/Dashboard/Compras.jsx';

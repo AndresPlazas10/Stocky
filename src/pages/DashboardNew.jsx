@@ -9,7 +9,7 @@ import {
   Download,
   Filter
 } from 'lucide-react';
-import { DashboardLayout } from '@/components/Layout/DashboardLayout';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { MetricCard, MetricsGrid } from '@/components/dashboard/MetricCard';
 import { ProductTable } from '@/components/dashboard/ProductTable';
 import { ProductDialog } from '@/components/dashboard/ProductDialog';
