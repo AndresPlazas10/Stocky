@@ -54,13 +54,13 @@ function Ventas({ businessId }) {
 
   // Función helper para obtener el nombre del vendedor
   const getVendedorName = (venta) => {
-    if (!venta.users) return '-';
+    if (!venta.employees) return '-';
     
-    if (venta.users.role === 'admin') {
+    if (venta.employees.role === 'owner') {
       return 'Administrador';
     }
     
-    return venta.users.full_name;
+    return venta.employees.full_name;
   };
 
   useEffect(() => {
@@ -89,7 +89,7 @@ function Ventas({ businessId }) {
       .from('sales')
       .select(`
         *,
-        users(full_name, role)
+        employees!inner(full_name, role, user_id)
       `)
       .eq('business_id', businessId)
       .order('created_at', { ascending: false })

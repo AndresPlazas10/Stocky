@@ -1,10 +1,31 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabase/Client.jsx';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { motion } from 'framer-motion';
-import { Store, Package, TrendingUp, Users, BarChart3, ShoppingCart, Coffee, Utensils, Zap, Check, ArrowRight, Menu, X, Shield } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../supabase/Client.jsx";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { motion } from "framer-motion";
+import {
+  Store,
+  Package,
+  TrendingUp,
+  Users,
+  BarChart3,
+  ShoppingCart,
+  Coffee,
+  Utensils,
+  Zap,
+  Check,
+  ArrowRight,
+  Menu,
+  X,
+  Shield,
+} from "lucide-react";
 
 function Home() {
   const navigate = useNavigate();
@@ -25,50 +46,55 @@ function Home() {
   const features = [
     {
       icon: Store,
-      title: 'Gestión de Inventario',
-      description: 'Control completo de tus productos, stock y movimientos en tiempo real.'
+      title: "Gestión de Inventario",
+      description:
+        "Control completo de tus productos, stock y movimientos en tiempo real.",
     },
     {
       icon: ShoppingCart,
-      title: 'Punto de Venta',
-      description: 'Sistema POS rápido y eficiente para procesar ventas en segundos.'
+      title: "Punto de Venta",
+      description:
+        "Sistema POS rápido y eficiente para procesar ventas en segundos.",
     },
     {
       icon: BarChart3,
-      title: 'Reportes Inteligentes',
-      description: 'Analiza tu negocio con reportes detallados y visualizaciones claras.'
+      title: "Reportes Inteligentes",
+      description:
+        "Analiza tu negocio con reportes detallados y visualizaciones claras.",
     },
     {
       icon: Users,
-      title: 'Multi-Usuario',
-      description: 'Gestiona empleados y permisos de acceso para tu equipo.'
+      title: "Multi-Usuario",
+      description: "Gestiona empleados y permisos de acceso para tu equipo.",
     },
     {
       icon: TrendingUp,
-      title: 'Analytics Avanzado',
-      description: 'Toma decisiones informadas con métricas de rendimiento en tiempo real.'
+      title: "Analytics Avanzado",
+      description:
+        "Toma decisiones informadas con métricas de rendimiento en tiempo real.",
     },
     {
       icon: Shield,
-      title: 'Seguro y Confiable',
-      description: 'Tus datos protegidos con la mejor infraestructura de seguridad.'
-    }
+      title: "Seguro y Confiable",
+      description:
+        "Tus datos protegidos con la mejor infraestructura de seguridad.",
+    },
   ];
 
   const benefits = [
-    'Control total de inventario',
-    'Ventas y facturación rápida',
-    'Reportes en tiempo real',
-    'Gestión de empleados',
-    'Acceso desde cualquier dispositivo',
-    'Soporte técnico 24/7'
+    "Control total de inventario",
+    "Ventas y facturación rápida",
+    "Reportes en tiempo real",
+    "Gestión de empleados",
+    "Acceso desde cualquier dispositivo",
+    "Soporte técnico 24/7",
   ];
 
   const stats = [
-    { value: '10K+', label: 'Usuarios Activos' },
-    { value: '500K+', label: 'Transacciones/mes' },
-    { value: '99.9%', label: 'Uptime' },
-    { value: '24/7', label: 'Soporte' }
+    { value: "10K+", label: "Usuarios Activos" },
+    { value: "500K+", label: "Transacciones/mes" },
+    { value: "99.9%", label: "Uptime" },
+    { value: "24/7", label: "Soporte" },
   ];
 
   return (
@@ -86,26 +112,34 @@ function Home() {
               <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
                 <Store className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-primary-900">Stockly</span>
+              <span className="text-xl font-bold text-primary-900">
+                Stockly
+              </span>
             </motion.div>
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-6">
-              <a href="#features" className="text-sm font-medium text-primary-700 hover:text-accent-600 transition-colors">
+              <a
+                href="#features"
+                className="text-sm font-medium text-primary-700 hover:text-accent-600 transition-colors"
+              >
                 Características
               </a>
-              <a href="#benefits" className="text-sm font-medium text-primary-700 hover:text-accent-600 transition-colors">
+              <a
+                href="#benefits"
+                className="text-sm font-medium text-primary-700 hover:text-accent-600 transition-colors"
+              >
                 Beneficios
               </a>
               <Button
                 variant="ghost"
-                onClick={() => navigate('/login')}
+                onClick={() => navigate("/login")}
                 className="text-primary-700"
               >
                 Iniciar Sesión
               </Button>
               <Button
-                onClick={() => navigate('/register')}
+                onClick={() => navigate("/register")}
                 className="gradient-primary text-white hover:opacity-90"
               >
                 Comenzar Gratis
@@ -117,7 +151,11 @@ function Home() {
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="md:hidden p-2 rounded-lg hover:bg-accent-100 transition-colors"
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {mobileMenuOpen ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Menu className="w-6 h-6" />
+              )}
             </button>
           </div>
         </div>
@@ -126,22 +164,35 @@ function Home() {
         {mobileMenuOpen && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
+            animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             className="md:hidden border-t glass-card"
           >
             <div className="container mx-auto px-4 py-4 flex flex-col gap-2">
-              <a href="#features" className="py-2 text-sm font-medium text-primary-700 hover:text-accent-600">
+              <a
+                href="#features"
+                className="py-2 text-sm font-medium text-primary-700 hover:text-accent-600"
+              >
                 Características
               </a>
-              <a href="#benefits" className="py-2 text-sm font-medium text-primary-700 hover:text-accent-600">
+              <a
+                href="#benefits"
+                className="py-2 text-sm font-medium text-primary-700 hover:text-accent-600"
+              >
                 Beneficios
               </a>
               <div className="flex flex-col gap-2 mt-2">
-                <Button variant="ghost" onClick={() => navigate('/login')} className="w-full">
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate("/login")}
+                  className="w-full"
+                >
                   Iniciar Sesión
                 </Button>
-                <Button onClick={() => navigate('/register')} className="w-full gradient-primary text-white">
+                <Button
+                  onClick={() => navigate("/register")}
+                  className="w-full gradient-primary text-white"
+                >
                   Comenzar Gratis
                 </Button>
               </div>
@@ -171,15 +222,15 @@ function Home() {
             </motion.div>
 
             <h1 className="text-hero text-primary-900 mb-6 animate-fade-in">
-              Gestiona tu negocio con{' '}
+              Gestiona tu negocio con{" Stockly "}
               <span className="bg-gradient-to-r from-accent-500 to-secondary-500 bg-clip-text text-transparent">
                 Stockly
               </span>
             </h1>
 
             <p className="text-xl text-primary-600 mb-8 max-w-2xl mx-auto animate-fade-in">
-              La solución completa para controlar inventario, ventas y reportes de tu restaurante o bar.
-              Simple, rápido y confiable.
+              La solución completa para controlar inventario, ventas y reportes
+              de tu restaurante o bar. Simple, rápido y confiable.
             </p>
 
             <motion.div
@@ -190,7 +241,7 @@ function Home() {
             >
               <Button
                 size="lg"
-                onClick={() => navigate('/register')}
+                onClick={() => navigate("/register")}
                 className="gradient-primary text-white hover:opacity-90 text-lg px-8 py-6 hover-lift"
               >
                 Comienza Gratis
@@ -199,7 +250,7 @@ function Home() {
               <Button
                 size="lg"
                 variant="outline"
-                onClick={() => navigate('/login')}
+                onClick={() => navigate("/login")}
                 className="border-2 border-accent-500 text-accent-700 hover:bg-accent-50 text-lg px-8 py-6"
               >
                 Ver Demo
@@ -215,7 +266,9 @@ function Home() {
             >
               {stats.map((stat, index) => (
                 <Card key={index} className="p-6 text-center hover-lift">
-                  <div className="text-3xl font-bold text-primary-900 mb-1">{stat.value}</div>
+                  <div className="text-3xl font-bold text-primary-900 mb-1">
+                    {stat.value}
+                  </div>
                   <div className="text-sm text-primary-600">{stat.label}</div>
                 </Card>
               ))}
@@ -237,7 +290,8 @@ function Home() {
               Todo lo que necesitas en un solo lugar
             </h2>
             <p className="text-lg text-primary-600 max-w-2xl mx-auto">
-              Stockly ofrece las herramientas esenciales para gestionar tu negocio de manera eficiente
+              Stockly ofrece las herramientas esenciales para gestionar tu
+              negocio de manera eficiente
             </p>
           </motion.div>
 
@@ -254,7 +308,9 @@ function Home() {
                   <div className="w-12 h-12 rounded-xl gradient-accent flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                     <feature.icon className="w-6 h-6 text-primary-900" />
                   </div>
-                  <h3 className="text-xl font-semibold text-primary-900 mb-2">{feature.title}</h3>
+                  <h3 className="text-xl font-semibold text-primary-900 mb-2">
+                    {feature.title}
+                  </h3>
                   <p className="text-primary-600">{feature.description}</p>
                 </Card>
               </motion.div>
@@ -276,8 +332,8 @@ function Home() {
                 ¿Por qué elegir Stockly?
               </h2>
               <p className="text-lg text-primary-600 mb-8">
-                Diseñado específicamente para restaurantes y bares, Stockly simplifica la gestión
-                diaria de tu negocio.
+                Diseñado específicamente para restaurantes y bares, Stockly
+                simplifica la gestión diaria de tu negocio.
               </p>
               <div className="space-y-4">
                 {benefits.map((benefit, index) => (
@@ -317,8 +373,12 @@ function Home() {
                       <Users className="w-5 h-5 text-accent-600" />
                     </div>
                     <div>
-                      <div className="text-sm text-primary-600">Gestión de Equipo</div>
-                      <div className="font-semibold text-primary-900">Control completo</div>
+                      <div className="text-sm text-primary-600">
+                        Gestión de Equipo
+                      </div>
+                      <div className="font-semibold text-primary-900">
+                        Control completo
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -327,7 +387,9 @@ function Home() {
                     </div>
                     <div>
                       <div className="text-sm text-primary-600">Inventario</div>
-                      <div className="font-semibold text-primary-900">En tiempo real</div>
+                      <div className="font-semibold text-primary-900">
+                        En tiempo real
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -351,12 +413,13 @@ function Home() {
               Comienza a gestionar tu negocio hoy
             </h2>
             <p className="text-xl mb-8 text-white/90">
-              Únete a miles de negocios que ya confían en Stockly para su gestión diaria
+              Únete a miles de negocios que ya confían en Stockly para su
+              gestión diaria
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
                 size="lg"
-                onClick={() => navigate('/register')}
+                onClick={() => navigate("/register")}
                 className="bg-white text-primary-900 hover:bg-white/90 text-lg px-8 py-6 hover-lift"
               >
                 Crear Cuenta Gratis
@@ -365,7 +428,7 @@ function Home() {
               <Button
                 size="lg"
                 variant="outline"
-                onClick={() => navigate('/login')}
+                onClick={() => navigate("/login")}
                 className="border-2 border-white text-white hover:bg-white/10 text-lg px-8 py-6"
               >
                 Iniciar Sesión
@@ -393,23 +456,57 @@ function Home() {
             <div>
               <h4 className="font-semibold text-white mb-4">Producto</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#features" className="hover:text-white transition-colors">Características</a></li>
-                <li><a href="#benefits" className="hover:text-white transition-colors">Beneficios</a></li>
+                <li>
+                  <a
+                    href="#features"
+                    className="hover:text-white transition-colors"
+                  >
+                    Características
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#benefits"
+                    className="hover:text-white transition-colors"
+                  >
+                    Beneficios
+                  </a>
+                </li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold text-white mb-4">Soporte</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">Documentación</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">API</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contacto</a></li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    Documentación
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    API
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    Contacto
+                  </a>
+                </li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold text-white mb-4">Legal</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">Privacidad</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Términos</a></li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    Privacidad
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white transition-colors">
+                    Términos
+                  </a>
+                </li>
               </ul>
             </div>
           </div>
