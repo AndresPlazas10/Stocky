@@ -97,9 +97,6 @@ function Home() {
               <a href="#benefits" className="text-sm font-medium text-primary-700 hover:text-accent-600 transition-colors">
                 Beneficios
               </a>
-              <a href="#pricing" className="text-sm font-medium text-primary-700 hover:text-accent-600 transition-colors">
-                Precios
-              </a>
               <Button
                 variant="ghost"
                 onClick={() => navigate('/login')}
@@ -139,9 +136,6 @@ function Home() {
               </a>
               <a href="#benefits" className="py-2 text-sm font-medium text-primary-700 hover:text-accent-600">
                 Beneficios
-              </a>
-              <a href="#pricing" className="py-2 text-sm font-medium text-primary-700 hover:text-accent-600">
-                Precios
               </a>
               <div className="flex flex-col gap-2 mt-2">
                 <Button variant="ghost" onClick={() => navigate('/login')} className="w-full">
@@ -316,23 +310,24 @@ function Home() {
                     <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center">
                       <BarChart3 className="w-8 h-8" />
                     </div>
-                    <div>
-                      <div className="text-3xl font-bold">+150%</div>
-                      <div className="text-sm text-white/70">Aumento en eficiencia</div>
-                    </div>
                   </div>
                   <div className="h-px bg-white/20"></div>
-                  <p className="text-white/90">
-                    "Stockly transformó la manera en que gestionamos nuestro restaurante. 
-                    Ahora tenemos control total del inventario y las ventas en tiempo real."
-                  </p>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
                       <Users className="w-5 h-5" />
                     </div>
                     <div>
-                      <div className="font-semibold">Carlos Méndez</div>
-                      <div className="text-sm text-white/70">Restaurante El Buen Sabor</div>
+                      <div className="text-sm opacity-80">Gestión de Equipo</div>
+                      <div className="font-semibold">Control completo</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                      <Package className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-sm opacity-80">Inventario</div>
+                      <div className="font-semibold">En tiempo real</div>
                     </div>
                   </div>
                 </div>
@@ -400,7 +395,6 @@ function Home() {
               <ul className="space-y-2 text-sm">
                 <li><a href="#features" className="hover:text-white transition-colors">Características</a></li>
                 <li><a href="#benefits" className="hover:text-white transition-colors">Beneficios</a></li>
-                <li><a href="#pricing" className="hover:text-white transition-colors">Precios</a></li>
               </ul>
             </div>
             <div>
