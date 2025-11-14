@@ -37,14 +37,17 @@ function Dashboard() {
 
       setUser(user);
 
-      // Verificar si el usuario tiene un negocio (es dueño)
+      // Verificar si el usuario tiene un negocio o es empleado
       const { data: business, error: businessError } = await supabase
         .from('businesses')
         .select('*')
         .eq('email', user.email)
         .single();
 
-      // Verificar si es empleado
+      
+      if (business) {
+      }
+
       const { data: employee, error: employeeError } = await supabase
         .from('employee_invitations')
         .select('id, business_id, role, is_approved')
@@ -52,55 +55,10 @@ function Dashboard() {
         .eq('is_approved', true)
         .single();
 
-      // Si es empleado con rol 'employee' (NO admin), redirigir al dashboard de empleados
-      if (!business && employee && employee.role === 'employee') {
+
+      // Si es empleado, redirigir al dashboard de empleados
+      if (!business && employee) {
         window.location.href = '/employee-dashboard';
-        return;
-      }
-
-      // Si es empleado con rol 'admin', cargar el negocio asociado
-      if (!business && employee && employee.role === 'admin') {
-        const { data: employeeBusiness, error: empBusinessError } = await supabase
-          .from('businesses')
-          .select('*')
-          .eq('id', employee.business_id)
-          .single();
-
-        if (empBusinessError || !employeeBusiness) {
-          await supabase.auth.signOut();
-          window.location.href = '/login';
-          alert('No se pudo cargar la información del negocio.');
-          return;
-        }
-
-        setBusiness(employeeBusiness);
-
-        // Verificar si el empleado admin existe en la tabla users
-        const { data: existingUser } = await supabase
-          .from('users')
-          .select('id')
-          .eq('id', user.id)
-          .single();
-
-        if (!existingUser) {
-          // Crear el registro del empleado admin en la tabla users
-          const { error: userCreateError } = await supabase
-            .from('users')
-            .insert([{
-              id: user.id,
-              business_id: employeeBusiness.id,
-              full_name: employee.full_name || 'Administrador',
-              email: user.email,
-              role: 'admin',
-              is_active: true
-            }]);
-
-          if (userCreateError && userCreateError.code !== '23505') {
-            console.error('Error al crear usuario:', userCreateError);
-          }
-        }
-
-        setLoading(false);
         return;
       }
 

@@ -214,14 +214,14 @@ function Home() {
               <span>Sistema POS para restaurantes y bares</span>
             </motion.div>
 
-            <h1 className="text-hero text-primary-900 mb-6 animate-fade-in">
-              Gestiona tu negocio con{" Stockly "}
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-primary-900 mb-6 animate-fade-in leading-tight">
+              Gestiona tu negocio con{" "}
               <span className="bg-gradient-to-r from-accent-500 to-secondary-500 bg-clip-text text-transparent">
                 Stockly
               </span>
             </h1>
 
-            <p className="text-xl text-primary-600 mb-8 max-w-2xl mx-auto animate-fade-in">
+            <p className="text-base sm:text-lg md:text-xl text-primary-600 mb-8 max-w-2xl mx-auto animate-fade-in px-4">
               La solución completa para controlar inventario, ventas y reportes
               de tu restaurante o bar. Simple, rápido y confiable.
             </p>
@@ -235,16 +235,16 @@ function Home() {
               <Button
                 size="lg"
                 onClick={() => navigate("/register")}
-                className="gradient-primary text-white hover:opacity-90 text-lg px-8 py-6 hover-lift"
+                className="gradient-primary text-white hover:opacity-90 text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 hover-lift w-full sm:w-auto"
               >
                 Comienza Gratis
-                <ArrowRight className="w-5 h-5 ml-2" />
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
                 onClick={() => navigate("/login")}
-                className="border-2 border-accent-500 text-accent-700 hover:bg-accent-50 text-lg px-8 py-6"
+                className="border-2 border-accent-500 text-accent-700 hover:bg-accent-50 text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto"
               >
                 Ver Demo
               </Button>
@@ -262,10 +262,10 @@ function Home() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-display text-primary-900 mb-4">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary-900 mb-4 px-4">
               Todo lo que necesitas en un solo lugar
             </h2>
-            <p className="text-lg text-primary-600 max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg text-primary-600 max-w-2xl mx-auto px-4">
               Stockly ofrece las herramientas esenciales para gestionar tu
               negocio de manera eficiente
             </p>
@@ -280,14 +280,14 @@ function Home() {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
               >
-                <Card className="p-6 h-full hover-lift group cursor-pointer">
-                  <div className="w-12 h-12 rounded-xl gradient-accent flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <feature.icon className="w-6 h-6 text-primary-900" />
+                <Card className="p-4 sm:p-6 h-full hover-lift group cursor-pointer">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl gradient-accent flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
+                    <feature.icon className="w-5 h-5 sm:w-6 sm:h-6 text-primary-900" />
                   </div>
-                  <h3 className="text-xl font-semibold text-primary-900 mb-2">
+                  <h3 className="text-lg sm:text-xl font-semibold text-primary-900 mb-2">
                     {feature.title}
                   </h3>
-                  <p className="text-primary-600">{feature.description}</p>
+                  <p className="text-sm sm:text-base text-primary-600">{feature.description}</p>
                 </Card>
               </motion.div>
             ))}
@@ -299,120 +299,138 @@ function Home() {
       <section id="benefits" className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="container mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-display text-primary-900 mb-6">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+            >
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary-900 mb-6">
                 ¿Por qué elegir Stockly?
               </h2>
-              <p className="text-lg text-primary-600 mb-8">
+              <p className="text-base sm:text-lg text-primary-600 mb-8">
                 Diseñado específicamente para restaurantes y bares, Stockly
                 simplifica la gestión diaria de tu negocio.
               </p>
               <div className="space-y-4">
                 {benefits.map((benefit, index) => (
-                  <div
+                  <motion.div
                     key={index}
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.1 }}
                     className="flex items-center gap-3"
                   >
                     <div className="w-6 h-6 rounded-full bg-accent-500 flex items-center justify-center flex-shrink-0">
                       <Check className="w-4 h-4 text-white" />
                     </div>
-                    <span className="text-primary-700">{benefit}</span>
-                  </div>
+                    <span className="text-sm sm:text-base text-primary-700">{benefit}</span>
+                  </motion.div>
                 ))}
               </div>
-            </div>
+            </motion.div>
 
-            <div className="relative">
-              <Card className="p-8">
-                <div className="space-y-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-2xl bg-accent-100 flex items-center justify-center">
-                      <BarChart3 className="w-8 h-8 text-accent-600" />
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="relative"
+            >
+              <Card className="p-4 sm:p-6 md:p-8">
+                <div className="space-y-4 sm:space-y-6">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-accent-100 flex items-center justify-center">
+                      <BarChart3 className="w-6 h-6 sm:w-8 sm:h-8 text-accent-600" />
                     </div>
                   </div>
                   <div className="h-px bg-primary-200"></div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-accent-100 flex items-center justify-center">
-                      <Users className="w-5 h-5 text-accent-600" />
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-accent-100 flex items-center justify-center">
+                      <Users className="w-4 h-4 sm:w-5 sm:h-5 text-accent-600" />
                     </div>
                     <div>
-                      <div className="text-sm text-primary-600">
+                      <div className="text-xs sm:text-sm text-primary-600">
                         Gestión de Equipo
                       </div>
-                      <div className="font-semibold text-primary-900">
+                      <div className="text-sm sm:text-base font-semibold text-primary-900">
                         Control completo
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-accent-100 flex items-center justify-center">
-                      <Package className="w-5 h-5 text-accent-600" />
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-accent-100 flex items-center justify-center">
+                      <Package className="w-4 h-4 sm:w-5 sm:h-5 text-accent-600" />
                     </div>
                     <div>
-                      <div className="text-sm text-primary-600">Inventario</div>
-                      <div className="font-semibold text-primary-900">
+                      <div className="text-xs sm:text-sm text-primary-600">Inventario</div>
+                      <div className="text-sm sm:text-base font-semibold text-primary-900">
                         En tiempo real
                       </div>
                     </div>
                   </div>
                 </div>
               </Card>
-            </div>
+            </motion.div>
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-primary-900 to-secondary-800 text-white relative overflow-hidden">
+      <section className="py-12 sm:py-16 md:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-primary-900 to-secondary-800 text-white relative overflow-hidden">
         <div className="container mx-auto text-center relative z-10">
-          <div className="max-w-3xl mx-auto">
-            <h2 className="text-display mb-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="max-w-3xl mx-auto"
+          >
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6">
               Comienza a gestionar tu negocio hoy
             </h2>
-            <p className="text-xl mb-8 text-white/90">
+            <p className="text-base sm:text-lg md:text-xl mb-6 sm:mb-8 text-white/90 px-4">
               Únete a miles de negocios que ya confían en Stockly para su
               gestión diaria
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
               <Button
                 size="lg"
                 onClick={() => navigate("/register")}
-                className="bg-white text-primary-900 hover:bg-white/90 text-lg px-8 py-6 hover-lift"
+                className="bg-white text-primary-900 hover:bg-white/90 text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 hover-lift w-full sm:w-auto"
               >
                 Crear Cuenta Gratis
-                <ArrowRight className="w-5 h-5 ml-2" />
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
                 onClick={() => navigate("/login")}
-                className="border-2 border-white text-white hover:bg-white/10 text-lg px-8 py-6"
+                className="border-2 border-white text-white hover:bg-white/10 text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto"
               >
                 Iniciar Sesión
               </Button>
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 sm:px-6 lg:px-8 bg-primary-950 text-white/70">
+      <footer className="py-8 sm:py-12 px-4 sm:px-6 lg:px-8 bg-primary-950 text-white/70">
         <div className="container mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-6 sm:mb-8">
+            <div className="col-span-2 md:col-span-1">
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
                 <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
                   <Store className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-lg font-bold text-white">Stockly</span>
+                <span className="text-base sm:text-lg font-bold text-white">Stockly</span>
               </div>
-              <p className="text-sm">
+              <p className="text-xs sm:text-sm">
                 Sistema POS completo para restaurantes y bares
               </p>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Producto</h4>
-              <ul className="space-y-2 text-sm">
+              <h4 className="font-semibold text-white mb-3 sm:mb-4 text-sm sm:text-base">Producto</h4>
+              <ul className="space-y-2 text-xs sm:text-sm">
                 <li>
                   <a
                     href="#features"
@@ -432,8 +450,8 @@ function Home() {
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Soporte</h4>
-              <ul className="space-y-2 text-sm">
+              <h4 className="font-semibold text-white mb-3 sm:mb-4 text-sm sm:text-base">Soporte</h4>
+              <ul className="space-y-2 text-xs sm:text-sm">
                 <li>
                   <a href="#" className="hover:text-white transition-colors">
                     Documentación
@@ -452,8 +470,8 @@ function Home() {
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Legal</h4>
-              <ul className="space-y-2 text-sm">
+              <h4 className="font-semibold text-white mb-3 sm:mb-4 text-sm sm:text-base">Legal</h4>
+              <ul className="space-y-2 text-xs sm:text-sm">
                 <li>
                   <a href="#" className="hover:text-white transition-colors">
                     Privacidad
@@ -467,8 +485,8 @@ function Home() {
               </ul>
             </div>
           </div>
-          <div className="pt-8 border-t border-white/10 text-center text-sm">
-            <p>© 2024 Stockly. Todos los derechos reservados.</p>
+          <div className="pt-6 sm:pt-8 border-t border-white/10 text-center text-xs sm:text-sm">
+            <p>© 2025 Stockly. Todos los derechos reservados.</p>
           </div>
         </div>
       </footer>

@@ -61,12 +61,6 @@ function EmployeeDashboard() {
         return;
       }
 
-      // Si el empleado tiene rol 'admin', redirigir al Dashboard principal
-      if (invitation.role === 'admin') {
-        window.location.href = '/dashboard';
-        return;
-      }
-
       // IMPORTANTE: Crear o actualizar registro en tabla employees
       // Esto es necesario para que las políticas RLS funcionen
       const { data: existingEmployee, error: employeeCheckError } = await supabase
