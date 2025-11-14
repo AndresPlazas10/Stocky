@@ -90,13 +90,6 @@ function Home() {
     "Soporte técnico 24/7",
   ];
 
-  const stats = [
-    { value: "10K+", label: "Usuarios Activos" },
-    { value: "500K+", label: "Transacciones/mes" },
-    { value: "99.9%", label: "Uptime" },
-    { value: "24/7", label: "Soporte" },
-  ];
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-background-50 via-background-100 to-accent-100">
       {/* Navbar */}
@@ -255,23 +248,6 @@ function Home() {
               >
                 Ver Demo
               </Button>
-            </motion.div>
-
-            {/* Stats */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="grid grid-cols-2 lg:grid-cols-4 gap-6 mt-16"
-            >
-              {stats.map((stat, index) => (
-                <Card key={index} className="p-6 text-center hover-lift">
-                  <div className="text-3xl font-bold text-primary-900 mb-1">
-                    {stat.value}
-                  </div>
-                  <div className="text-sm text-primary-600">{stat.label}</div>
-                </Card>
-              ))}
             </motion.div>
           </motion.div>
         </div>

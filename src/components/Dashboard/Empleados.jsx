@@ -9,7 +9,6 @@ import {
   Mail, 
   UserCheck, 
   Shield, 
-  Clock,
   CheckCircle,
   XCircle,
   Search
@@ -106,7 +105,7 @@ function Empleados({ businessId }) {
       // 2. Verificar que no exista en employee_invitations
       const { data: existingInvitation, error: invitationError } = await supabase
         .from('employee_invitations')
-        .select('id, is_approved')
+        .select('id')
         .eq('business_id', businessId)
         .eq('email', cleanEmail)
         .maybeSingle();
@@ -114,11 +113,7 @@ function Empleados({ businessId }) {
       if (invitationError) throw invitationError;
 
       if (existingInvitation) {
-        if (existingInvitation.is_approved) {
-          throw new Error('Este correo ya está asociado a un empleado aprobado');
-        } else {
-          throw new Error('Este correo ya tiene una invitación pendiente');
-        }
+        throw new Error('Este correo ya está asociado a un empleado');
       }
 
       // 3. Verificar que no exista en users (empleados activos)
@@ -144,7 +139,8 @@ function Empleados({ businessId }) {
             full_name: formData.full_name.trim(),
             email: cleanEmail,
             role: formData.role,
-            is_approved: false
+            is_approved: true,
+            approved_at: new Date().toISOString()
           }
         ])
         .select();
@@ -181,7 +177,7 @@ function Empleados({ businessId }) {
         throw new Error('Error al enviar la invitación por correo. Por favor verifica que el email esté configurado correctamente en Supabase.');
       }
 
-      setSuccess('Invitación enviada exitosamente. El empleado recibirá un correo con el enlace de acceso.');
+      setSuccess('✅ Invitación enviada exitosamente. El empleado puede acceder inmediatamente usando el enlace del correo.');
       setFormData({ full_name: '', email: '', role: 'employee' });
       setShowForm(false);
       
@@ -190,25 +186,6 @@ function Empleados({ businessId }) {
 
     } catch (error) {
       setError(error.message || 'Error al enviar la invitación');
-    }
-  };
-
-  const handleApprove = async (invitationId) => {
-    try {
-      const { error } = await supabase
-        .from('employee_invitations')
-        .update({ 
-          is_approved: true,
-          approved_at: new Date().toISOString()
-        })
-        .eq('id', invitationId);
-
-      if (error) throw error;
-
-      setSuccess('Empleado aprobado exitosamente');
-      await loadEmpleados();
-    } catch (error) {
-      setError('Error al aprobar empleado');
     }
   };
 
@@ -272,7 +249,6 @@ function Empleados({ businessId }) {
   const stats = {
     total: empleados.length,
     approved: empleados.filter(e => e.is_approved).length,
-    pending: empleados.filter(e => !e.is_approved).length,
     admins: empleados.filter(e => e.role === 'admin').length
   };
 
@@ -444,7 +420,7 @@ function Empleados({ businessId }) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-4"
+          className="grid grid-cols-1 md:grid-cols-3 gap-4"
         >
           <div className="bg-white rounded-xl shadow p-4 border border-gray-100">
             <div className="flex items-center gap-3">
@@ -465,19 +441,7 @@ function Empleados({ businessId }) {
               </div>
               <div>
                 <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
-                <div className="text-sm text-gray-600">Aprobados</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow p-4 border border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-100 rounded-lg">
-                <Clock className="w-6 h-6 text-amber-600" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-amber-600">{stats.pending}</div>
-                <div className="text-sm text-gray-600">Pendientes</div>
+                <div className="text-sm text-gray-600">Activos</div>
               </div>
             </div>
           </div>
@@ -602,18 +566,11 @@ function Empleados({ businessId }) {
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
-                        {empleado.is_approved ? (
-                          <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                            <CheckCircle className="w-4 h-4" />
-                            Aprobado
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">
-                            <Clock className="w-4 h-4" />
-                            Pendiente
-                          </span>
-                        )}
+                      <td className="px-6 py-4 text-center">
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                          <CheckCircle className="w-4 h-4" />
+                          Activo
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-gray-600 text-sm">
                         {new Date(empleado.invited_at).toLocaleDateString('es-ES', {
@@ -624,16 +581,6 @@ function Empleados({ businessId }) {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-2">
-                          {!empleado.is_approved && (
-                            <button
-                              onClick={() => handleApprove(empleado.id)}
-                              className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-lg transition-all duration-300 hover:scale-110 flex items-center gap-1 text-sm font-medium"
-                              title="Aprobar empleado"
-                            >
-                              <CheckCircle className="w-4 h-4" />
-                              Aprobar
-                            </button>
-                          )}
                           <button
                             onClick={() => handleDelete(empleado.id)}
                             className="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-all duration-300 hover:scale-110"
