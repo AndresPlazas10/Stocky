@@ -296,6 +296,56 @@ function Mesas({ businessId }) {
     }
   }, [loadOrderDetails, createNewOrder]);
 
+  // IMPORTANTE: Definir updateOrderTotal PRIMERO (otras funciones dependen de esta)
+  const updateOrderTotal = useCallback(async (orderId) => {
+    try {
+      // Calcular total desde el estado local (más rápido)
+      const total = orderItems.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
+
+      // Actualizar estado local primero (instantáneo)
+      setMesas(prevMesas => 
+        prevMesas.map(mesa => 
+          mesa.current_order_id === orderId 
+            ? { ...mesa, orders: { ...mesa.orders, total } }
+            : mesa
+        )
+      );
+
+      // Actualizar DB en background
+      await supabase
+        .from('orders')
+        .update({ total })
+        .eq('id', orderId);
+    } catch (error) {
+      console.error('Error updating order total:', error);
+    }
+  }, [orderItems]);
+
+  const removeItem = useCallback(async (itemId) => {
+    try {
+      const { error } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Actualización optimista: remover del estado local
+      setOrderItems(prevItems => prevItems.filter(item => item.id !== itemId));
+
+      await updateOrderTotal(selectedMesa.current_order_id);
+    } catch (error) {
+      console.error('Error in removeItem:', error);
+      setError('❌ No se pudo eliminar el producto. Por favor, intenta de nuevo.');
+      // Revertir solo los items si falla
+      const { data: freshItems } = await supabase
+        .from('order_items')
+        .select('*, products(name, code)')
+        .eq('order_id', selectedMesa.current_order_id);
+      if (freshItems) setOrderItems(freshItems);
+    }
+  }, [selectedMesa, updateOrderTotal]);
+
   const handleRefreshOrder = useCallback(async () => {
     if (!selectedMesa) return;
     
@@ -465,55 +515,6 @@ function Mesas({ businessId }) {
       if (freshItems) setOrderItems(freshItems);
     }
   }, [selectedMesa, updateOrderTotal, removeItem]);
-
-  const removeItem = useCallback(async (itemId) => {
-    try {
-      const { error } = await supabase
-        .from('order_items')
-        .delete()
-        .eq('id', itemId);
-
-      if (error) throw error;
-
-      // Actualización optimista: remover del estado local
-      setOrderItems(prevItems => prevItems.filter(item => item.id !== itemId));
-
-      await updateOrderTotal(selectedMesa.current_order_id);
-    } catch (error) {
-      console.error('Error in removeItem:', error);
-      setError('❌ No se pudo eliminar el producto. Por favor, intenta de nuevo.');
-      // Revertir solo los items si falla
-      const { data: freshItems } = await supabase
-        .from('order_items')
-        .select('*, products(name, code)')
-        .eq('order_id', selectedMesa.current_order_id);
-      if (freshItems) setOrderItems(freshItems);
-    }
-  }, [selectedMesa, updateOrderTotal]);
-
-  const updateOrderTotal = useCallback(async (orderId) => {
-    try {
-      // Calcular total desde el estado local (más rápido)
-      const total = orderItems.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
-
-      // Actualizar estado local primero (instantáneo)
-      setMesas(prevMesas => 
-        prevMesas.map(mesa => 
-          mesa.current_order_id === orderId 
-            ? { ...mesa, orders: { ...mesa.orders, total } }
-            : mesa
-        )
-      );
-
-      // Actualizar DB en background
-      await supabase
-        .from('orders')
-        .update({ total })
-        .eq('id', orderId);
-    } catch (error) {
-      console.error('Error updating order total:', error);
-    }
-  }, [orderItems]);
 
   const handleCloseModal = async () => {
     // Si la orden está vacía, eliminarla y liberar la mesa
