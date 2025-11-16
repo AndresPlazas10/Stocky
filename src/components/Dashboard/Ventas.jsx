@@ -62,24 +62,32 @@ function Ventas({ businessId }) {
   // Funciones de carga memoizadas
   const loadVentas = useCallback(async () => {
     try {
-      // Optimización: Cargar todo en paralelo con joins de Supabase
-      const [authResult, salesResult] = await Promise.all([
+      // Cargar datos en paralelo
+      const [authResult, salesResult, customersResult] = await Promise.all([
         supabase.auth.getUser(),
         supabase
           .from('sales')
-          .select(`
-            *,
-            customers(full_name, email, id_number)
-          `)
+          .select('*')
           .eq('business_id', businessId)
           .order('created_at', { ascending: false })
-          .limit(50)
+          .limit(50),
+        supabase
+          .from('customers')
+          .select('id, full_name, email, id_number')
+          .eq('business_id', businessId)
       ]);
 
       const { data: { user } } = authResult;
       const { data: salesData, error: salesError } = salesResult;
+      const { data: customersData } = customersResult;
 
       if (salesError) throw salesError;
+
+      // Crear mapa de clientes
+      const customersMap = new Map();
+      customersData?.forEach(customer => {
+        customersMap.set(customer.id, customer);
+      });
 
       // Verificar ownership y cargar empleados en paralelo
       const [businessResult, employeesResult] = await Promise.all([
@@ -97,7 +105,7 @@ function Ventas({ businessId }) {
       const { data: business } = businessResult;
       const { data: employeesData } = employeesResult;
 
-      // Crear mapa de empleados (más eficiente que find en cada iteración)
+      // Crear mapa de empleados
       const employeeMap = new Map();
       employeesData?.forEach(emp => {
         employeeMap.set(emp.user_id, {
@@ -106,9 +114,10 @@ function Ventas({ businessId }) {
         });
       });
 
-      // Combinar datos de manera optimizada
+      // Combinar datos manualmente
       const salesWithEmployees = salesData?.map(sale => ({
         ...sale,
+        customers: sale.customer_id ? customersMap.get(sale.customer_id) : null,
         employees: sale.user_id === business?.created_by
           ? { full_name: 'Administrador', role: 'owner' }
           : employeeMap.get(sale.user_id) || null
