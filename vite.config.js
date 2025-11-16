@@ -14,18 +14,9 @@ export default defineConfig({
     include: ['lucide-react'],
   },
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          // Solo separar los más grandes y estables
-          'vendor': ['@supabase/supabase-js', 'framer-motion', '@emailjs/browser'],
-        },
-      },
-    },
     chunkSizeWarningLimit: 1000,
     sourcemap: false,
     minify: 'esbuild',
-    target: 'es2015',
   },
   server: {
     port: 5173,

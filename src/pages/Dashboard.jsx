@@ -53,7 +53,7 @@ function Dashboard() {
         .select('id, business_id, role, is_approved')
         .eq('email', user.email)
         .eq('is_approved', true)
-        .single();
+        .maybeSingle();
 
 
       // Si es empleado, redirigir al dashboard de empleados
