@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../supabase/Client';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatNumber } from '../../utils/formatters.js';
@@ -32,11 +32,27 @@ export default function Facturas() {
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    loadData();
+  const loadFacturas = useCallback(async (businessId) => {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select(`
+        *,
+        invoice_items (
+          id,
+          product_name,
+          quantity,
+          unit_price,
+          total
+        )
+      `)
+      .eq('business_id', businessId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    setFacturas(data || []);
   }, []);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -119,103 +135,94 @@ export default function Facturas() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadFacturas]);
 
-  const loadFacturas = async (businessId) => {
-    const { data, error } = await supabase
-      .from('invoices')
-      .select(`
-        *,
-        invoice_items (
-          id,
-          product_name,
-          quantity,
-          unit_price,
-          total
-        )
-      `)
-      .eq('business_id', businessId)
-      .order('created_at', { ascending: false });
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-    if (error) throw error;
-    setFacturas(data || []);
-  };
+  // Cleanup de mensajes
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(''), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
 
-  const handleAddProduct = (producto) => {
-    // Validar que el producto tenga stock
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  const handleAddProduct = useCallback((producto) => {
     if (!producto.stock || producto.stock <= 0) {
       setError(`El producto "${producto.name}" no tiene stock disponible`);
       return;
     }
 
-    // Validar que el producto tenga precio
     if (!producto.sale_price || producto.sale_price <= 0) {
       setError(`El producto "${producto.name}" no tiene precio de venta configurado`);
       return;
     }
 
-    const existingItem = items.find(item => item.product_id === producto.id);
-    
-    if (existingItem) {
-      // Verificar que no se exceda el stock disponible
-      if (existingItem.quantity >= producto.stock) {
-        setError(`Stock insuficiente. Solo hay ${producto.stock} unidades de "${producto.name}"`);
-        return;
-      }
+    setItems(prevItems => {
+      const existingItem = prevItems.find(item => item.product_id === producto.id);
+      
+      if (existingItem) {
+        if (existingItem.quantity >= producto.stock) {
+          setError(`Stock insuficiente. Solo hay ${producto.stock} unidades de "${producto.name}"`);
+          return prevItems;
+        }
 
-      setItems(items.map(item =>
-        item.product_id === producto.id
-          ? { 
+        return prevItems.map(item =>
+          item.product_id === producto.id
+            ? { 
               ...item, 
               quantity: item.quantity + 1, 
               total: (item.quantity + 1) * item.unit_price,
-              max_stock: producto.stock // Guardar el stock máximo disponible
+              max_stock: producto.stock
             }
           : item
-      ));
-    } else {
-      setItems([...items, {
-        product_id: producto.id,
-        product_name: producto.name,
-        quantity: 1,
-        unit_price: producto.sale_price || 0,
-        total: producto.sale_price || 0,
-        max_stock: producto.stock // Guardar el stock máximo disponible
-      }]);
-    }
+        );
+      } else {
+        return [...prevItems, {
+          product_id: producto.id,
+          product_name: producto.name,
+          quantity: 1,
+          unit_price: producto.sale_price || 0,
+          total: producto.sale_price || 0,
+          max_stock: producto.stock
+        }];
+      }
+    });
     
     setSearchProduct('');
     setShowProductSearch(false);
-  };
+  }, []);
 
-  const handleUpdateQuantity = (productId, newQuantity) => {
+  const handleRemoveItem = useCallback((productId) => {
+    setItems(prevItems => prevItems.filter(item => item.product_id !== productId));
+  }, []);
+
+    const updateQuantity = useCallback((productId, newQuantity) => {
     if (newQuantity <= 0) {
-      setItems(items.filter(item => item.product_id !== productId));
+      handleRemoveItem(productId);
       return;
     }
 
-    // Validar que no se exceda el stock disponible
-    const item = items.find(i => i.product_id === productId);
-    if (item && item.max_stock && newQuantity > item.max_stock) {
-      setError(`Stock insuficiente. Solo hay ${item.max_stock} unidades disponibles de "${item.product_name}"`);
-      return;
-    }
-
-    setItems(items.map(item =>
+    setItems(prevItems => prevItems.map(item =>
       item.product_id === productId
         ? { ...item, quantity: newQuantity, total: newQuantity * item.unit_price }
         : item
     ));
-  };
+  }, [handleRemoveItem]);
 
-  const handleRemoveItem = (productId) => {
-    setItems(items.filter(item => item.product_id !== productId));
-  };
-
-  const calculateTotals = () => {
-    const total = items.reduce((sum, item) => sum + item.total, 0);
-    return { total };
-  };
+  // Memoizar cálculo de total
+  const totalFactura = useMemo(() => {
+    return items.reduce((sum, item) => sum + item.total, 0);
+  }, [items]);
 
   const handleCreateInvoice = async (e) => {
     e.preventDefault();
@@ -234,8 +241,7 @@ export default function Facturas() {
     }
 
     // Validar que el total sea mayor a 0
-    const { total } = calculateTotals();
-    if (total <= 0) {
+    if (totalFactura <= 0) {
       setError('El total de la factura debe ser mayor a 0');
       return;
     }
@@ -685,33 +691,26 @@ export default function Facturas() {
     return labels[method] || method;
   };
 
-  const getFilteredProducts = () => {
+  // Memoizar productos y facturas filtradas
+  const filteredProducts = useMemo(() => {
     if (!searchProduct.trim()) return [];
+    
+    const search = searchProduct.toLowerCase();
     return productos.filter(p =>
-      p.name.toLowerCase().includes(searchProduct.toLowerCase()) ||
-      (p.code && p.code.toLowerCase().includes(searchProduct.toLowerCase()))
+      p.name.toLowerCase().includes(search) ||
+      (p.code && p.code.toLowerCase().includes(search))
     ).slice(0, 5);
-  };
+  }, [productos, searchProduct]);
 
-  const getFilteredFacturas = () => {
-    let filtered = facturas;
-
-    if (searchTerm.trim()) {
-      filtered = filtered.filter(f =>
-        f.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        f.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    return filtered;
-  };
-
-  useEffect(() => {
-    if (error) setTimeout(() => setError(''), 5000);
-    if (success) setTimeout(() => setSuccess(''), 5000);
-  }, [error, success]);
-
-  const { total } = calculateTotals();
+  const filteredFacturas = useMemo(() => {
+    if (!searchTerm.trim()) return facturas;
+    
+    const search = searchTerm.toLowerCase();
+    return facturas.filter(f =>
+      f.invoice_number?.toLowerCase().includes(search) ||
+      f.customer_name?.toLowerCase().includes(search)
+    );
+  }, [facturas, searchTerm]);
 
   return (
     <div className="p-6">
@@ -949,7 +948,7 @@ export default function Facturas() {
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         {loading && !showForm ? (
           <div className="p-8 text-center text-gray-500">Cargando...</div>
-        ) : getFilteredFacturas().length === 0 ? (
+        ) : filteredFacturas.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
             No hay facturas para mostrar
           </div>
@@ -967,7 +966,7 @@ export default function Facturas() {
               </tr>
             </thead>
             <tbody>
-              {getFilteredFacturas().map(factura => (
+              {filteredFacturas.map(factura => (
                 <tr key={factura.id} className="border-t hover:bg-gray-50">
                   <td className="p-3 font-mono font-semibold">{factura.invoice_number}</td>
                   <td className="p-3">
