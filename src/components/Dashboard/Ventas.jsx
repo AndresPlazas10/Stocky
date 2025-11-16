@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
@@ -22,6 +22,13 @@ import {
   Calendar,
   CreditCard
 } from 'lucide-react';
+
+// Función helper pura fuera del componente (no se recrea en renders)
+const getVendedorName = (venta) => {
+  if (!venta.employees) return '-';
+  if (venta.employees.role === 'owner') return 'Administrador';
+  return venta.employees.full_name;
+};
 
 function Ventas({ businessId }) {
   const [ventas, setVentas] = useState([]);
@@ -52,24 +59,100 @@ function Ventas({ businessId }) {
   const [invoiceCustomerIdNumber, setInvoiceCustomerIdNumber] = useState('');
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
 
-  // Función helper para obtener el nombre del vendedor
-  const getVendedorName = (venta) => {
-    if (!venta.employees) return '-';
-    
-    if (venta.employees.role === 'owner') {
-      return 'Administrador';
-    }
-    
-    return venta.employees.full_name;
-  };
+  // Funciones de carga memoizadas
+  const loadVentas = useCallback(async () => {
+    try {
+      // Optimización: Cargar todo en paralelo con joins de Supabase
+      const [authResult, salesResult] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase
+          .from('sales')
+          .select(`
+            *,
+            customers(full_name, email, id_number)
+          `)
+          .eq('business_id', businessId)
+          .order('created_at', { ascending: false })
+          .limit(50)
+      ]);
 
-  useEffect(() => {
-    if (businessId) {
-      loadData();
+      const { data: { user } } = authResult;
+      const { data: salesData, error: salesError } = salesResult;
+
+      if (salesError) throw salesError;
+
+      // Verificar ownership y cargar empleados en paralelo
+      const [businessResult, employeesResult] = await Promise.all([
+        supabase
+          .from('businesses')
+          .select('created_by, name')
+          .eq('id', businessId)
+          .single(),
+        supabase
+          .from('employees')
+          .select('user_id, full_name, role')
+          .eq('business_id', businessId)
+      ]);
+
+      const { data: business } = businessResult;
+      const { data: employeesData } = employeesResult;
+
+      // Crear mapa de empleados (más eficiente que find en cada iteración)
+      const employeeMap = new Map();
+      employeesData?.forEach(emp => {
+        employeeMap.set(emp.user_id, {
+          full_name: emp.full_name || 'Usuario',
+          role: emp.role
+        });
+      });
+
+      // Combinar datos de manera optimizada
+      const salesWithEmployees = salesData?.map(sale => ({
+        ...sale,
+        employees: sale.user_id === business?.created_by
+          ? { full_name: 'Administrador', role: 'owner' }
+          : employeeMap.get(sale.user_id) || null
+      })) || [];
+
+      setVentas(salesWithEmployees);
+    } catch (error) {
+      console.error('Error loading ventas:', error);
+      setVentas([]);
     }
   }, [businessId]);
 
-  const loadData = async () => {
+  const loadProductos = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('business_id', businessId)
+      .eq('is_active', true)
+      .gt('stock', 0)
+      .order('name');
+
+    if (error) throw error;
+    setProductos(data || []);
+  }, [businessId]);
+
+  const loadClientes = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('business_id', businessId)
+        .order('full_name');
+
+      if (error) {
+        setClientes([]);
+        return;
+      }
+      setClientes(data || []);
+    } catch (err) {
+      setClientes([]);
+    }
+  }, [businessId]);
+
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       await Promise.all([
@@ -82,109 +165,27 @@ function Ventas({ businessId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadVentas, loadProductos, loadClientes]);
 
-  const loadVentas = async () => {
-    try {
-      // Obtener usuario autenticado
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // Verificar si el usuario es el dueño del negocio
-      const { data: business } = await supabase
-        .from('businesses')
-        .select('created_by, name')
-        .eq('id', businessId)
-        .single();
-
-      // Cargar ventas
-      const { data: salesData, error: salesError } = await supabase
-        .from('sales')
-        .select('*')
-        .eq('business_id', businessId)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (salesError) throw salesError;
-
-      // Cargar empleados con nombres
-      const { data: employeesData } = await supabase
-        .from('employees')
-        .select('user_id, full_name, role')
-        .eq('business_id', businessId);
-
-      // Crear mapa de user_id -> employee
-      const employeeMap = {};
-      employeesData?.forEach(emp => {
-        employeeMap[emp.user_id] = {
-          full_name: emp.full_name || 'Usuario',
-          role: emp.role
-        };
-      });
-
-      // Combinar datos - si el user_id es el owner, marcarlo como Administrador
-      const salesWithEmployees = salesData?.map(sale => {
-        // Si la venta fue hecha por el dueño del negocio
-        if (sale.user_id === business?.created_by) {
-          return {
-            ...sale,
-            employees: {
-              full_name: 'Administrador',
-              role: 'owner'
-            }
-          };
-        }
-        
-        // Si no, buscar en el mapa de empleados
-        return {
-          ...sale,
-          employees: employeeMap[sale.user_id] || null
-        };
-      }) || [];
-
-      setVentas(salesWithEmployees);
-    } catch (error) {
-      console.error('Error loading ventas:', error);
-      setVentas([]);
-    }
-  };
-
-  const loadProductos = async () => {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('business_id', businessId)
-      .eq('is_active', true)
-      .gt('stock', 0)
-      .order('name');
-
-    if (error) throw error;
-    setProductos(data || []);
-  };
-
-  const loadClientes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('business_id', businessId)
-        .order('full_name');
-
-      if (error) {
-        // Tabla customers no disponible
-        setClientes([]);
-        return;
-      }
-      setClientes(data || []);
-    } catch (err) {
-      // Clientes no disponibles
-      setClientes([]);
-    }
-  };
-
-  // Cargar datos del cliente cuando se selecciona
   useEffect(() => {
-    if (selectedCustomer && clientes.length > 0) {
-      const cliente = clientes.find(c => c.id === selectedCustomer);
+    if (businessId) {
+      loadData();
+    }
+  }, [businessId, loadData]);
+    }
+  };
+
+  // Memoizar mapa de clientes para acceso O(1)
+  const clientesMap = useMemo(() => {
+    const map = new Map();
+    clientes.forEach(c => map.set(c.id, c));
+    return map;
+  }, [clientes]);
+
+  // Cargar datos del cliente cuando se selecciona (optimizado)
+  useEffect(() => {
+    if (selectedCustomer && clientesMap.size > 0) {
+      const cliente = clientesMap.get(selectedCustomer);
       if (cliente) {
         setCustomerName(cliente.full_name || cliente.name || '');
         setCustomerEmail(cliente.email || '');
@@ -195,65 +196,70 @@ function Ventas({ businessId }) {
       setCustomerEmail('');
       setCustomerIdNumber('');
     }
-  }, [selectedCustomer, clientes]);
+  }, [selectedCustomer, clientesMap]);
 
-  const addToCart = (producto) => {
-    const existingItem = cart.find(item => item.product_id === producto.id);
-    
-    if (existingItem) {
-      // Verificar stock disponible
-      if (existingItem.quantity >= producto.stock) {
-        setError(`⚠️ Stock insuficiente. Solo hay ${producto.stock} unidades disponibles`);
-        return;
-      }
+  // Memoizar funciones del carrito
+  const addToCart = useCallback((producto) => {
+    setCart(prevCart => {
+      const existingItem = prevCart.find(item => item.product_id === producto.id);
       
-      setCart(cart.map(item =>
-        item.product_id === producto.id
-          ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.unit_price }
-          : item
-      ));
-    } else {
-      setCart([...cart, {
-        product_id: producto.id,
-        name: producto.name,
-        code: producto.code,
-        quantity: 1,
-        unit_price: producto.sale_price,
-        subtotal: producto.sale_price,
-        available_stock: producto.stock
-      }]);
-    }
+      if (existingItem) {
+        if (existingItem.quantity >= producto.stock) {
+          setError(`⚠️ Stock insuficiente. Solo hay ${producto.stock} unidades disponibles`);
+          return prevCart;
+        }
+        
+        return prevCart.map(item =>
+          item.product_id === producto.id
+            ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.unit_price }
+            : item
+        );
+      } else {
+        return [...prevCart, {
+          product_id: producto.id,
+          name: producto.name,
+          code: producto.code,
+          quantity: 1,
+          unit_price: producto.sale_price,
+          subtotal: producto.sale_price,
+          available_stock: producto.stock
+        }];
+      }
+    });
     setSearchProduct('');
-  };
+  }, []);
 
-  const removeFromCart = (productId) => {
-    setCart(cart.filter(item => item.product_id !== productId));
-  };
+  const removeFromCart = useCallback((productId) => {
+    setCart(prevCart => prevCart.filter(item => item.product_id !== productId));
+  }, []);
 
-  const updateQuantity = (productId, newQuantity) => {
+  const updateQuantity = useCallback((productId, newQuantity) => {
     if (newQuantity <= 0) {
       removeFromCart(productId);
       return;
     }
 
-    const item = cart.find(i => i.product_id === productId);
-    if (newQuantity > item.available_stock) {
-      setError(`⚠️ Stock insuficiente. Solo hay ${item.available_stock} unidades disponibles`);
-      return;
-    }
+    setCart(prevCart => {
+      const item = prevCart.find(i => i.product_id === productId);
+      if (newQuantity > item.available_stock) {
+        setError(`⚠️ Stock insuficiente. Solo hay ${item.available_stock} unidades disponibles`);
+        return prevCart;
+      }
 
-    setCart(cart.map(item =>
-      item.product_id === productId
-        ? { ...item, quantity: newQuantity, subtotal: newQuantity * item.unit_price }
-        : item
-    ));
-  };
+      return prevCart.map(item =>
+        item.product_id === productId
+          ? { ...item, quantity: newQuantity, subtotal: newQuantity * item.unit_price }
+          : item
+      );
+    });
+  }, [removeFromCart]);
 
-  const calculateTotal = () => {
+  // Memoizar cálculo de total
+  const total = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.subtotal, 0);
-  };
+  }, [cart]);
 
-  const processSale = async () => {
+  const processSale = useCallback(async () => {
     if (cart.length === 0) {
       setError('⚠️ El carrito está vacío. Agrega productos antes de procesar la venta.');
       return;
@@ -397,19 +403,14 @@ function Ventas({ businessId }) {
       //   }
       // }
 
-      const successMsg = `✅ Venta registrada exitosamente. Total: ${formatPrice(calculateTotal())}`;
+      const successMsg = `✅ Venta registrada exitosamente. Total: ${formatPrice(total)}`;
       
       setSuccess(successMsg);
-      setTimeout(() => setSuccess(null), 8000);
       
       // Limpiar el carrito y cerrar POS
       setCart([]);
       setSelectedCustomer('');
       setPaymentMethod('cash');
-      // setGenerateInvoice(false); // DESHABILITADO
-      // setCustomerEmail(''); // DESHABILITADO
-      // setCustomerIdNumber(''); // DESHABILITADO
-      // setCustomerName(''); // DESHABILITADO
       setShowPOS(false);
 
       // Recargar datos
@@ -420,15 +421,53 @@ function Ventas({ businessId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [cart, businessId, paymentMethod, selectedCustomer, total, loadData]);
 
-  const filteredProducts = productos.filter(p =>
-    p.name.toLowerCase().includes(searchProduct.toLowerCase()) ||
-    p.code?.toLowerCase().includes(searchProduct.toLowerCase())
-  );
+  // Memoizar productos filtrados
+  const filteredProducts = useMemo(() => {
+    if (!searchProduct.trim()) return productos;
+    
+    const search = searchProduct.toLowerCase();
+    return productos.filter(p =>
+      p.name.toLowerCase().includes(search) ||
+      p.code?.toLowerCase().includes(search)
+    );
+  }, [productos, searchProduct]);
+  // Cleanup de timers de mensajes
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(null), 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
 
-  // Abrir modal de facturación para una venta
-  const openInvoiceModal = async (venta) => {
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  // Memoizar función de modal de factura
+  const openInvoiceModal = useCallback(async (venta) => {
+    // Usar datos de customer ya cargados si están disponibles
+    if (venta.customers) {
+      setInvoiceCustomerName(venta.customers.full_name || '');
+      setInvoiceCustomerEmail(venta.customers.email || '');
+      setInvoiceCustomerIdNumber(venta.customers.id_number || '');
+    } else if (venta.customer_id && clientesMap.size > 0) {
+      const cliente = clientesMap.get(venta.customer_id);
+      if (cliente) {
+        setInvoiceCustomerName(cliente.full_name || '');
+        setInvoiceCustomerEmail(cliente.email || '');
+        setInvoiceCustomerIdNumber(cliente.id_number || '');
+      }
+    } else {
+      setInvoiceCustomerName('');
+      setInvoiceCustomerEmail('');
+      setInvoiceCustomerIdNumber('');
+    }
+
     // Cargar detalles de la venta
     const { data: saleDetails } = await supabase
       .from('sale_details')
@@ -439,43 +478,17 @@ function Ventas({ businessId }) {
       .eq('sale_id', venta.id);
     
     setSelectedSale({ ...venta, sale_details: saleDetails || [] });
-    
-    // Pre-cargar datos del cliente si existe (solo si la tabla customers existe)
-    if (venta.customer_id) {
-      try {
-        const { data: customerData } = await supabase
-          .from('customers')
-          .select('full_name, email, id_number')
-          .eq('id', venta.customer_id)
-          .single();
-        
-        if (customerData) {
-          setInvoiceCustomerName(customerData.full_name || '');
-          setInvoiceCustomerEmail(customerData.email || '');
-          setInvoiceCustomerIdNumber(customerData.id_number || '');
-        }
-      } catch (err) {
-        // Cliente no disponible
-      }
-    } else {
-      setInvoiceCustomerName('');
-      setInvoiceCustomerEmail('');
-      setInvoiceCustomerIdNumber('');
-    }
-    
     setShowInvoiceModal(true);
-  };
+  }, [clientesMap]);
 
-  // Generar factura desde una venta existente
-  const generateInvoiceFromSale = async () => {
+  // Generar factura desde una venta existente (memoizado)
+  const generateInvoiceFromSale = useCallback(async () => {
     if (!invoiceCustomerEmail || !invoiceCustomerEmail.includes('@')) {
       setError('⚠️ Debes ingresar un email válido para generar la factura');
-      setTimeout(() => setError(null), 5000);
       return;
     }
     if (!invoiceCustomerName) {
       setError('⚠️ Debes ingresar el nombre del cliente para generar la factura');
-      setTimeout(() => setError(null), 5000);
       return;
     }
 
@@ -499,9 +512,7 @@ function Ventas({ businessId }) {
 
       if (userError || !user) {
         setError('⚠️ Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 2000);
+        setTimeout(() => window.location.href = '/login', 2000);
         return;
       }
 
@@ -511,7 +522,6 @@ function Ventas({ businessId }) {
         .eq('user_id', user.id)
         .single();
 
-      // Calcular totales
       const total = selectedSale.total;
 
       // Generar número de factura
@@ -536,7 +546,7 @@ function Ventas({ businessId }) {
           subtotal: total,
           tax: 0,
           total,
-          status: 'pending', // Se actualizará a 'sent' si el email se envía
+          status: 'pending',
           issued_at: new Date().toISOString()
         })
         .select()
@@ -570,7 +580,6 @@ function Ventas({ businessId }) {
           items: invoiceItems
         });
 
-        // Actualizar estado a 'sent' si se envió exitosamente
         if (!emailResult.demo) {
           await supabase
             .from('invoices')
@@ -581,16 +590,13 @@ function Ventas({ businessId }) {
             .eq('id', invoice.id);
         }
 
-        if (emailResult.demo) {
-          setSuccess(`✅ Factura ${invoiceNumber} creada. ⚠️ Email NO enviado (configura EmailJS)`);
-        } else {
-          setSuccess(`✅ Factura ${invoiceNumber} generada y enviada a ${invoiceCustomerEmail}`);
-        }
-        setTimeout(() => setSuccess(null), 8000);
+        setSuccess(emailResult.demo 
+          ? `✅ Factura ${invoiceNumber} creada. ⚠️ Email NO enviado (configura EmailJS)`
+          : `✅ Factura ${invoiceNumber} generada y enviada a ${invoiceCustomerEmail}`
+        );
       } catch (emailError) {
         console.error('Error al enviar email:', emailError);
         setSuccess(`✅ Factura ${invoiceNumber} generada (⚠️ error al enviar email)`);
-        setTimeout(() => setSuccess(null), 8000);
       }
 
       // Cerrar modal y limpiar
@@ -602,11 +608,10 @@ function Ventas({ businessId }) {
 
     } catch (error) {
       setError('❌ ' + (error.message || 'No se pudo generar la factura. Por favor, intenta de nuevo.'));
-      setTimeout(() => setError(null), 5000);
     } finally {
       setGeneratingInvoice(false);
     }
-  };
+  }, [businessId, selectedSale, invoiceCustomerName, invoiceCustomerEmail, invoiceCustomerIdNumber]);
 
   if (loading && ventas.length === 0) {
     return (
