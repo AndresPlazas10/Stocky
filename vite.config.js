@@ -10,21 +10,32 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  optimizeDeps: {
+    include: ['lucide-react'],
+  },
   build: {
     rollupOptions: {
       output: {
         manualChunks(id) {
           // Evitar referencias circulares separando vendors de forma más granular
           if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+            // React core - crítico mantener junto
+            if (id.includes('react/') || id.includes('react-dom/') || id.includes('react-router')) {
               return 'react-vendor';
             }
+            // Supabase - separado por tamaño
             if (id.includes('@supabase')) {
               return 'supabase-vendor';
             }
-            if (id.includes('framer-motion') || id.includes('lucide-react')) {
-              return 'ui-vendor';
+            // lucide-react - separado para evitar tree-shaking issues
+            if (id.includes('lucide-react')) {
+              return 'lucide-vendor';
             }
+            // framer-motion - animaciones
+            if (id.includes('framer-motion')) {
+              return 'framer-vendor';
+            }
+            // Radix UI - componentes
             if (id.includes('@radix-ui')) {
               return 'radix-vendor';
             }
@@ -37,6 +48,10 @@ export default defineConfig({
     chunkSizeWarningLimit: 600,
     sourcemap: false,
     minify: 'esbuild',
+    target: 'esnext',
+    modulePreload: {
+      polyfill: false,
+    },
   },
   server: {
     port: 5173,
