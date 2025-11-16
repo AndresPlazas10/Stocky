@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client';
 import {
@@ -46,15 +46,15 @@ function Configuracion({ user, business, onBusinessUpdate }) {
     }
   }, [business]);
 
-  const handleBusinessChange = (e) => {
+  const handleBusinessChange = useCallback((e) => {
     const { name, value } = e.target;
     setBusinessData(prev => ({
       ...prev,
       [name]: value
     }));
-  };
+  }, []);
 
-  const handleUpdateBusiness = async (e) => {
+  const handleUpdateBusiness = useCallback(async (e) => {
     e.preventDefault();
     
     if (!businessData.name.trim()) {
@@ -97,9 +97,9 @@ function Configuracion({ user, business, onBusinessUpdate }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [businessData, business, onBusinessUpdate]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
@@ -107,7 +107,17 @@ function Configuracion({ user, business, onBusinessUpdate }) {
     } catch (error) {
       setError('No se pudo cerrar la sesión correctamente');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let errorTimer, successTimer;
+    if (error) errorTimer = setTimeout(() => setError(''), 5000);
+    if (success) successTimer = setTimeout(() => setSuccess(''), 5000);
+    return () => {
+      if (errorTimer) clearTimeout(errorTimer);
+      if (successTimer) clearTimeout(successTimer);
+    };
+  }, [error, success]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#C4DFE6]/20 via-white to-[#66A5AD]/10 p-4 md:p-6">
