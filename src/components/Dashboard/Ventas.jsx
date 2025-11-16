@@ -411,15 +411,15 @@ function Ventas({ businessId }) {
       setPaymentMethod('cash');
       setShowPOS(false);
 
-      // Recargar datos
-      await loadData();
+      // Recargar ventas inmediatamente
+      await loadVentas();
 
     } catch (error) {
       setError('❌ ' + (error.message || 'No se pudo procesar la venta. Por favor, intenta de nuevo.'));
     } finally {
       setLoading(false);
     }
-  }, [cart, businessId, paymentMethod, selectedCustomer, total, loadData]);
+  }, [cart, businessId, paymentMethod, selectedCustomer, total, loadVentas]);
 
   // Memoizar productos filtrados
   const filteredProducts = useMemo(() => {
