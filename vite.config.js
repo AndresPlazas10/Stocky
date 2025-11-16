@@ -23,6 +23,13 @@ export default defineConfig({
     },
   },
   build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'lucide': ['lucide-react'],
+        },
+      },
+    },
     chunkSizeWarningLimit: 1000,
     sourcemap: false,
     minify: 'terser',
@@ -31,9 +38,10 @@ export default defineConfig({
       compress: {
         drop_console: true,
         drop_debugger: true,
+        passes: 2,
       },
-      format: {
-        comments: false,
+      mangle: {
+        safari10: true,
       },
     },
   },
