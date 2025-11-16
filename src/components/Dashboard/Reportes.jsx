@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice, formatNumber } from '../../utils/formatters.js';
@@ -44,7 +44,7 @@ function Reportes({ businessId }) {
     }
   }, [businessId, selectedPeriod]);
 
-  const getDateRange = () => {
+  const getDateRange = useCallback(() => {
     const now = new Date();
     let startDate = new Date();
 
@@ -66,9 +66,9 @@ function Reportes({ businessId }) {
       start: startDate.toISOString(),
       end: now.toISOString()
     };
-  };
+  }, [selectedPeriod]);
 
-  const loadReportes = async () => {
+  const loadReportes = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -134,13 +134,14 @@ function Reportes({ businessId }) {
 
       if (facturasError) throw facturasError;
 
-      // 6. Top productos más vendidos
+      // 6. Top productos más vendidos y cálculo de ganancia real
       const { data: saleDetails, error: saleDetailsError } = await supabase
         .from('sale_details')
         .select(`
           quantity,
+          unit_price,
           sale_id,
-          products!inner(name),
+          products!inner(name, purchase_price),
           sales!inner(business_id, created_at)
         `)
         .eq('sales.business_id', businessId)
@@ -150,13 +151,22 @@ function Reportes({ businessId }) {
       if (saleDetailsError) throw saleDetailsError;
 
       const productMap = {};
+      let costoProductosVendidos = 0;
+
       saleDetails?.forEach(item => {
         const productName = item.products?.name || 'Producto sin nombre';
+        const purchasePrice = item.products?.purchase_price || 0;
+        const quantity = item.quantity || 0;
+
+        // Acumular para top productos
         if (productMap[productName]) {
-          productMap[productName] += item.quantity;
+          productMap[productName] += quantity;
         } else {
-          productMap[productName] = item.quantity;
+          productMap[productName] = quantity;
         }
+
+        // Calcular costo real de productos vendidos
+        costoProductosVendidos += purchasePrice * quantity;
       });
 
       const topProducts = Object.entries(productMap)
@@ -166,7 +176,8 @@ function Reportes({ businessId }) {
 
       setTopProductos(topProducts);
 
-      const gananciaBruta = totalVentas - totalCompras;
+      // Ganancia bruta = Ventas - Costo de productos vendidos
+      const gananciaBruta = totalVentas - costoProductosVendidos;
 
       setMetrics({
         totalVentas,
@@ -185,7 +196,13 @@ function Reportes({ businessId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [businessId, getDateRange]);
+
+  useEffect(() => {
+    if (businessId) {
+      loadReportes();
+    }
+  }, [businessId, selectedPeriod, loadReportes]);
 
   const getPeriodLabel = () => {
     switch (selectedPeriod) {

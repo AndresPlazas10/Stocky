@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice, formatNumber } from '../../utils/formatters.js';
@@ -47,56 +47,7 @@ function Mesas({ businessId }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [mesaToDelete, setMesaToDelete] = useState(null);
 
-  useEffect(() => {
-    if (businessId) {
-      loadData();
-      getCurrentUser();
-    }
-  }, [businessId]);
-
-  const getCurrentUser = async () => {
-    try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError) {
-        return;
-      }
-      
-      if (user) {
-        
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('id, role')
-          .eq('id', user.id)
-          .single();
-        
-        if (userError) {
-          // Usar el ID de auth.users si no existe en users
-          setCurrentUser({ id: user.id, role: 'admin' });
-        } else {
-          setCurrentUser(userData);
-        }
-      }
-    } catch (error) {
-    }
-  };
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      await Promise.all([
-        loadMesas(),
-        loadProductos(),
-        loadClientes()
-      ]);
-    } catch (error) {
-      setError('⚠️ No se pudo cargar la información de las mesas. Por favor, intenta recargar la página.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadMesas = async () => {
+  const loadMesas = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('tables')
@@ -128,9 +79,9 @@ function Mesas({ businessId }) {
     } catch (error) {
       console.error('Error al cargar mesas:', error);
     }
-  };
+  }, [businessId]);
 
-  const loadProductos = async () => {
+  const loadProductos = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('products')
@@ -152,9 +103,9 @@ function Mesas({ businessId }) {
     } catch (error) {
       console.error('Error al cargar productos:', error);
     }
-  };
+  }, [businessId]);
 
-  const loadClientes = async () => {
+  const loadClientes = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('customers')
@@ -173,7 +124,7 @@ function Mesas({ businessId }) {
       // Clientes no disponibles
       setClientes([]);
     }
-  };
+  }, [businessId]);
 
   const handleCreateTable = async (e) => {
     e.preventDefault();
@@ -389,25 +340,21 @@ function Mesas({ businessId }) {
           throw error;
         }
         
-        // Esperar un momento para que el trigger se ejecute
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Recargar el item completo con todos los datos calculados
+        // Actualización optimista: agregar al estado local inmediatamente
         if (newItem?.id) {
-          const { data: completeItem, error: fetchError } = await supabase
-            .from('order_items')
-            .select('*, products(name, code)')
-            .eq('id', newItem.id)
-            .single();
-          
-          if (fetchError) {
-            console.error('Error fetching complete item:', fetchError);
-            throw fetchError;
-          }
-          
-          if (completeItem) {
-            setOrderItems(prevItems => [...prevItems, completeItem]);
-          }
+          const optimisticItem = {
+            id: newItem.id,
+            order_id: selectedMesa.current_order_id,
+            product_id: producto.id,
+            quantity: qty,
+            price: parseFloat(precio),
+            subtotal: qty * parseFloat(precio),
+            products: {
+              name: producto.name,
+              code: producto.code
+            }
+          };
+          setOrderItems(prevItems => [...prevItems, optimisticItem]);
         }
       }
 
@@ -418,8 +365,12 @@ function Mesas({ businessId }) {
     } catch (error) {
       console.error('Error adding product:', error);
       setError('❌ No se pudo agregar el producto. Por favor, intenta de nuevo.');
-      // Si hay error, recargar para sincronizar
-      await loadOrderDetails(selectedMesa);
+      // Revertir solo los items si falla
+      const { data: freshItems } = await supabase
+        .from('order_items')
+        .select('*, products(name, code)')
+        .eq('order_id', selectedMesa.current_order_id);
+      if (freshItems) setOrderItems(freshItems);
     }
   };
 
@@ -430,39 +381,38 @@ function Mesas({ businessId }) {
         return;
       }
 
+      // Actualización optimista: actualizar estado local primero
+      setOrderItems(prevItems => 
+        prevItems.map(item => {
+          if (item.id === itemId) {
+            const newSubtotal = newQuantity * item.price;
+            return { ...item, quantity: newQuantity, subtotal: newSubtotal };
+          }
+          return item;
+        })
+      );
+
+      // Actualizar en base de datos en background
       const { error } = await supabase
         .from('order_items')
-        .update({ 
-          quantity: newQuantity
-          // subtotal se calcula automáticamente con trigger
-        })
+        .update({ quantity: newQuantity })
         .eq('id', itemId);
 
-      if (error) throw error;
-
-      // Recargar el item actualizado para obtener el subtotal correcto
-      const { data: updatedItem } = await supabase
-        .from('order_items')
-        .select('*, products(name, code)')
-        .eq('id', itemId)
-        .single();
-
-      // Actualización del estado local con datos frescos
-      if (updatedItem) {
-        setOrderItems(prevItems => 
-          prevItems.map(i => 
-            i.id === itemId 
-              ? updatedItem
-              : i
-          )
-        );
+      if (error) {
+        console.error('Error updating quantity:', error);
+        throw error;
       }
 
       await updateOrderTotal(selectedMesa.current_order_id);
     } catch (error) {
+      console.error('Error in updateItemQuantity:', error);
       setError('❌ No se pudo actualizar la cantidad. Por favor, intenta de nuevo.');
-      // Si hay error, recargar para sincronizar
-      await loadOrderDetails(selectedMesa);
+      // Revertir cambio optimista solo si falla
+      const { data: freshItems } = await supabase
+        .from('order_items')
+        .select('*, products(name, code)')
+        .eq('order_id', selectedMesa.current_order_id);
+      if (freshItems) setOrderItems(freshItems);
     }
   };
 
@@ -480,27 +430,23 @@ function Mesas({ businessId }) {
 
       await updateOrderTotal(selectedMesa.current_order_id);
     } catch (error) {
+      console.error('Error in removeItem:', error);
       setError('❌ No se pudo eliminar el producto. Por favor, intenta de nuevo.');
-      // Si hay error, recargar para sincronizar
-      await loadOrderDetails(selectedMesa);
+      // Revertir solo los items si falla
+      const { data: freshItems } = await supabase
+        .from('order_items')
+        .select('*, products(name, code)')
+        .eq('order_id', selectedMesa.current_order_id);
+      if (freshItems) setOrderItems(freshItems);
     }
   };
 
   const updateOrderTotal = async (orderId) => {
     try {
-      const { data: items } = await supabase
-        .from('order_items')
-        .select('subtotal')
-        .eq('order_id', orderId);
+      // Calcular total desde el estado local (más rápido)
+      const total = orderItems.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
 
-      const total = items?.reduce((sum, item) => sum + parseFloat(item.subtotal), 0) || 0;
-
-      await supabase
-        .from('orders')
-        .update({ total })
-        .eq('id', orderId);
-
-      // NO recargar todas las mesas, solo actualizar el estado local
+      // Actualizar estado local primero (instantáneo)
       setMesas(prevMesas => 
         prevMesas.map(mesa => 
           mesa.current_order_id === orderId 
@@ -508,6 +454,12 @@ function Mesas({ businessId }) {
             : mesa
         )
       );
+
+      // Actualizar DB en background
+      await supabase
+        .from('orders')
+        .update({ total })
+        .eq('id', orderId);
     } catch (error) {
       console.error('Error updating order total:', error);
     }
