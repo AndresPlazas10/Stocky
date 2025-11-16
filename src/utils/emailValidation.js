@@ -162,10 +162,13 @@ export const validateEmail = (email) => {
  * @returns {boolean}
  */
 export const isDevelopment = () => {
+  // En producción, import.meta.env.DEV es false y MODE es 'production'
   return import.meta.env.DEV || 
          import.meta.env.MODE === 'development' ||
-         window.location.hostname === 'localhost' ||
-         window.location.hostname === '127.0.0.1';
+         (typeof window !== 'undefined' && 
+          (window.location.hostname === 'localhost' ||
+           window.location.hostname === '127.0.0.1' ||
+           window.location.hostname.includes('.local')));
 };
 
 /**
@@ -196,6 +199,8 @@ export const shouldSendEmail = (email) => {
   if (isDevelopment()) {
     const testEmail = getTestEmail();
     
+    console.log(`🧪 [DEV MODE] Email redirigido: ${email} → ${testEmail}`);
+    
     return {
       shouldSend: true,
       testEmail,
@@ -204,6 +209,8 @@ export const shouldSendEmail = (email) => {
   }
 
   // En producción, enviar al email real si es válido
+  console.log(`📧 [PRODUCTION] Enviando email a: ${validation.normalized}`);
+  
   return {
     shouldSend: true,
     email: validation.normalized

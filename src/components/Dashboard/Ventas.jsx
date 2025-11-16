@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '../../supabase/Client.jsx';
-import { sendInvoiceEmail } from '../../utils/emailServiceSupabase.js';
+import { supabase } from '../../supabase/Client';
+import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatNumber } from '../../utils/formatters.js';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';

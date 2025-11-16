@@ -78,6 +78,13 @@ export const sendInvoiceEmailResend = async ({
 
     const targetEmail = sendDecision.testEmail || sendDecision.email;
     const isTestMode = !!sendDecision.testEmail;
+    
+    // Log para debugging
+    if (isTestMode) {
+      console.log(`🧪 [TEST MODE] Factura ${invoiceNumber} enviada a email de prueba`);
+    } else {
+      console.log(`✅ [PRODUCTION] Factura ${invoiceNumber} enviada a cliente`);
+    }
 
     // ✅ PASO 3: Formatear items
     const itemsHTML = items.map(item => `
@@ -177,7 +184,9 @@ export const sendInvoiceEmailResend = async ({
       body: JSON.stringify({
         from: import.meta.env.VITE_RESEND_FROM_EMAIL || 'Stockly <onboarding@resend.dev>',
         to: [targetEmail],
-        subject: `Factura ${invoiceNumber} - ${businessName}`,
+        subject: isTestMode 
+          ? `[TEST MODE] Factura ${invoiceNumber} - ${businessName}` 
+          : `Factura ${invoiceNumber} - ${businessName}`,
         html: htmlContent,
         text: `Factura ${invoiceNumber}\n\nCliente: ${customerName}\nTotal: $${total.toLocaleString('es-CO')}\n\nGracias por tu compra.`
       })
@@ -196,7 +205,11 @@ export const sendInvoiceEmailResend = async ({
       success: true
     });
 
-    console.log('✅ Email enviado con Resend:', data);
+    if (isTestMode) {
+      console.log(`✅ [TEST] Email enviado a ${targetEmail} (original: ${email})`);
+    } else {
+      console.log(`✅ [PROD] Email enviado con Resend a ${targetEmail}`);
+    }
 
     return {
       success: true,

@@ -2,9 +2,8 @@
  * 🎯 Servicio Unificado de Email
  * 
  * Detecta automáticamente qué proveedor usar según la configuración:
- * 1. Resend (si está configurado) - RECOMENDADO
- * 2. SendGrid (si está configurado)
- * 3. EmailJS (fallback actual)
+ * 1. Resend (si está configurado) - RECOMENDADO para producción
+ * 2. EmailJS (fallback) - Solo para desarrollo/testing
  * 
  * Uso:
  * import { sendInvoiceEmail } from './emailService';
@@ -12,28 +11,23 @@
  */
 
 import { sendInvoiceEmailResend, isResendConfigured } from './emailServiceResend';
-import { sendInvoiceEmailSendGrid, isSendGridConfigured } from './emailServiceSendGrid';
 import { sendInvoiceEmail as sendInvoiceEmailJS } from './emailServiceSupabase';
 
 /**
  * Envía factura usando el mejor proveedor disponible
- * Prioridad: Resend > SendGrid > EmailJS
+ * Prioridad: Resend > EmailJS
  */
 export const sendInvoiceEmail = async (params) => {
-  // 1. Intentar con Resend (mejor opción)
+  const provider = getEmailProvider();
+  
+  // 1. Intentar con Resend (mejor opción para producción)
   if (isResendConfigured()) {
-    console.log('📧 Usando Resend para envío de email...');
+    console.log(`📧 Usando ${provider} para envío de email...`);
     return await sendInvoiceEmailResend(params);
   }
 
-  // 2. Intentar con SendGrid
-  if (isSendGridConfigured()) {
-    console.log('📧 Usando SendGrid para envío de email...');
-    return await sendInvoiceEmailSendGrid(params);
-  }
-
-  // 3. Fallback a EmailJS (actual)
-  console.log('📧 Usando EmailJS para envío de email...');
+  // 2. Fallback a EmailJS
+  console.log(`⚠️ Usando ${provider} (fallback) - Configura Resend para mejor deliverability`);
   return await sendInvoiceEmailJS(params);
 };
 
@@ -42,7 +36,6 @@ export const sendInvoiceEmail = async (params) => {
  */
 export const getEmailProvider = () => {
   if (isResendConfigured()) return 'Resend';
-  if (isSendGridConfigured()) return 'SendGrid';
   return 'EmailJS';
 };
 
@@ -51,6 +44,5 @@ export const getEmailProvider = () => {
  */
 export const isEmailServiceConfigured = () => {
   return isResendConfigured() || 
-         isSendGridConfigured() || 
          !!(import.meta.env.VITE_EMAILJS_PUBLIC_KEY);
 };

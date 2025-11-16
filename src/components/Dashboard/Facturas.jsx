@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../supabase/Client.jsx';
-import { sendInvoiceEmail } from '../../utils/emailServiceSupabase.js';
+import { supabase } from '../../supabase/Client';
+import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatNumber } from '../../utils/formatters.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XCircle, AlertTriangle } from 'lucide-react';
