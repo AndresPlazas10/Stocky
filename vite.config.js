@@ -16,42 +16,16 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          // Evitar referencias circulares separando vendors de forma más granular
-          if (id.includes('node_modules')) {
-            // React core - crítico mantener junto
-            if (id.includes('react/') || id.includes('react-dom/') || id.includes('react-router')) {
-              return 'react-vendor';
-            }
-            // Supabase - separado por tamaño
-            if (id.includes('@supabase')) {
-              return 'supabase-vendor';
-            }
-            // lucide-react - separado para evitar tree-shaking issues
-            if (id.includes('lucide-react')) {
-              return 'lucide-vendor';
-            }
-            // framer-motion - animaciones
-            if (id.includes('framer-motion')) {
-              return 'framer-vendor';
-            }
-            // Radix UI - componentes
-            if (id.includes('@radix-ui')) {
-              return 'radix-vendor';
-            }
-            // Otros vendors en chunk separado
-            return 'vendor';
-          }
+        manualChunks: {
+          // Solo separar los más grandes y estables
+          'vendor': ['@supabase/supabase-js', 'framer-motion', '@emailjs/browser'],
         },
       },
     },
-    chunkSizeWarningLimit: 600,
+    chunkSizeWarningLimit: 1000,
     sourcemap: false,
     minify: 'esbuild',
-    target: 'esnext',
-    modulePreload: {
-      polyfill: false,
-    },
+    target: 'es2015',
   },
   server: {
     port: 5173,
