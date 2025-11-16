@@ -1,22 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 function Clientes({ businessId }) {
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Aquí cargarás los clientes desde Supabase
-    loadClientes();
-  }, [businessId]);
-
-  const loadClientes = async () => {
+  const loadClientes = useCallback(async () => {
     try {
       // TODO: Implementar consulta a Supabase
       setLoading(false);
     } catch (error) {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    // Aquí cargarás los clientes desde Supabase
+    loadClientes();
+  }, [businessId, loadClientes]);
 
   return (
     <section className="section-content">
