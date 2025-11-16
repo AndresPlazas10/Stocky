@@ -16,7 +16,13 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 1000,
     sourcemap: false,
-    minify: 'esbuild',
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
   },
   server: {
     port: 5173,
