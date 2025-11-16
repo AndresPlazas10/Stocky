@@ -23,30 +23,10 @@ export default defineConfig({
     },
   },
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-supabase': ['@supabase/supabase-js'],
-          'vendor-ui': ['framer-motion', 'lucide-react', '@emailjs/browser'],
-          'vendor-radix': ['@radix-ui/react-avatar', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
-        },
-      },
-    },
     chunkSizeWarningLimit: 1000,
     sourcemap: false,
-    minify: 'terser',
-    target: 'es2020',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-        passes: 2,
-      },
-      mangle: {
-        safari10: true,
-      },
-    },
+    minify: false,
+    target: 'esnext',
   },
   server: {
     port: 5173,
