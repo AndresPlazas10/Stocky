@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice } from '../../utils/formatters.js';
@@ -37,25 +37,7 @@ function Compras({ businessId }) {
   const [notes, setNotes] = useState('');
   const [cart, setCart] = useState([]);
 
-  useEffect(() => {
-    if (businessId) {
-      loadCompras();
-      loadProductos();
-      loadProveedores();
-    }
-  }, [businessId]);
-
-  useEffect(() => {
-    if (success || error) {
-      const timer = setTimeout(() => {
-        setSuccess('');
-        setError('');
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [success, error]);
-
-  const loadCompras = async () => {
+  const loadCompras = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('purchases')
@@ -75,9 +57,9 @@ function Compras({ businessId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [businessId]);
 
-  const loadProductos = async () => {
+  const loadProductos = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('products')
@@ -90,9 +72,9 @@ function Compras({ businessId }) {
     } catch (error) {
       console.error('Error loading products:', error);
     }
-  };
+  }, [businessId]);
 
-  const loadProveedores = async () => {
+  const loadProveedores = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('suppliers')
@@ -104,69 +86,73 @@ function Compras({ businessId }) {
     } catch (error) {
       console.error('Error loading suppliers:', error);
     }
-  };
+  }, [businessId]);
 
-  const addToCart = (productId) => {
-    const producto = productos.find(p => p.id === productId);
-    if (!producto) return;
+  useEffect(() => {
+    if (businessId) {
+      loadCompras();
+      loadProductos();
+      loadProveedores();
+    }
+  }, [businessId, loadCompras, loadProductos, loadProveedores]);
 
-    const existingItem = cart.find(item => item.product_id === productId);
-    if (existingItem) {
-      setCart(cart.map(item =>
-        item.product_id === productId
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
-      ));
-    } else {
-      const producto = productos.find(p => p.id === productId);
+  useEffect(() => {
+    if (success || error) {
+      const timer = setTimeout(() => {
+        setSuccess('');
+        setError('');
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [success, error]);
+
+  const addToCart = useCallback((producto) => {
+    setCart(prevCart => {
+      const existing = prevCart.find(item => item.product_id === producto.id);
       
-      // Usar purchase_price, o si no existe usar 70% del sale_price como estimación
-      let precioCompra = producto.purchase_price || 0;
-      if (precioCompra === 0 && producto.sale_price > 0) {
-        precioCompra = producto.sale_price * 0.7; // 70% del precio de venta
+      if (existing) {
+        return prevCart.map(item =>
+          item.product_id === producto.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
       }
       
-      setCart([...cart, {
-        product_id: productId,
+      return [...prevCart, {
+        product_id: producto.id,
         product_name: producto.name,
         quantity: 1,
-        unit_price: precioCompra
-      }]);
-      
-      // Mostrar advertencia si el precio es 0
-      if (precioCompra === 0) {
-        setError(`⚠️ "${producto.name}" no tiene precio configurado. Edita el precio en el carrito.`);
-      }
-    }
-  };
+        unit_price: producto.purchase_price || 0
+      }];
+    });
+  }, []);
 
-  const removeFromCart = (productId) => {
-    setCart(cart.filter(item => item.product_id !== productId));
-  };
+  const removeFromCart = useCallback((productId) => {
+    setCart(prevCart => prevCart.filter(item => item.product_id !== productId));
+  }, []);
 
-  const updateQuantity = (productId, quantity) => {
-    if (quantity < 1) return;
-    setCart(cart.map(item =>
+  const updateQuantity = useCallback((productId, newQuantity) => {
+    setCart(prevCart => prevCart.map(item =>
       item.product_id === productId
-        ? { ...item, quantity: parseInt(quantity) }
+        ? { ...item, quantity: parseInt(newQuantity) || 0 }
         : item
     ));
-  };
+  }, []);
 
-  const updatePrice = (productId, price) => {
-    if (price < 0) return;
-    setCart(cart.map(item =>
+  const updatePrice = useCallback((productId, newPrice) => {
+    setCart(prevCart => prevCart.map(item =>
       item.product_id === productId
-        ? { ...item, unit_price: parseFloat(price) }
+        ? { ...item, unit_price: parseFloat(newPrice) || 0 }
         : item
     ));
-  };
+  }, []);
 
-  const calculateTotal = () => {
+  // Memoizar cálculo de total
+  const total = useMemo(() => {
     return cart.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
-  };
+  }, [cart]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
 
     if (!supplierId) {
@@ -238,7 +224,7 @@ function Compras({ businessId }) {
       console.error('Error completo:', error);
       setError('❌ Error al registrar la compra: ' + error.message);
     }
-  };
+  }, [businessId, cart, supplierId, paymentMethod, notes, productos, loadCompras, loadProductos]);
 
   const resetForm = () => {
     setSupplierId('');
@@ -247,7 +233,7 @@ function Compras({ businessId }) {
     setCart([]);
   };
 
-  const viewDetails = async (purchase) => {
+  const viewDetails = useCallback(async (purchase) => {
     setSelectedPurchase(purchase);
     try {
       const { data, error } = await supabase
@@ -264,13 +250,19 @@ function Compras({ businessId }) {
     } catch (error) {
       setError('Error al cargar los detalles');
     }
-  };
+  }, []);
 
-  const filteredCompras = compras.filter(compra =>
-    compra.supplier?.business_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    compra.supplier?.contact_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    formatPrice(compra.total).includes(searchTerm)
-  );
+  // Memoizar compras filtradas
+  const filteredCompras = useMemo(() => {
+    if (!searchTerm.trim()) return compras;
+    
+    const search = searchTerm.toLowerCase();
+    return compras.filter(compra =>
+      compra.supplier?.business_name?.toLowerCase().includes(search) ||
+      compra.supplier?.contact_name?.toLowerCase().includes(search) ||
+      compra.payment_method?.toLowerCase().includes(search)
+    );
+  }, [compras, searchTerm]);
 
   if (loading) {
     return (
