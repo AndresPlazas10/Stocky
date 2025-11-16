@@ -87,7 +87,7 @@ function Ventas({ businessId }) {
           .from('businesses')
           .select('created_by, name')
           .eq('id', businessId)
-          .single(),
+          .maybeSingle(),
         supabase
           .from('employees')
           .select('user_id, full_name, role')
@@ -296,14 +296,14 @@ function Ventas({ businessId }) {
         .from('users')
         .select('id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       // Obtener employee_id para la factura
       const { data: employee } = await supabase
         .from('employees')
         .select('id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       // 1. Crear la venta principal
       const { data: sale, error: saleError } = await supabase
@@ -316,7 +316,7 @@ function Ventas({ businessId }) {
           customer_id: selectedCustomer || null
         }])
         .select()
-        .single();      if (saleError) throw saleError;
+        .maybeSingle();      if (saleError) throw saleError;
 
       // 2. Crear los detalles de venta
       const saleDetails = cart.map(item => ({
@@ -363,7 +363,7 @@ function Ventas({ businessId }) {
       //       issued_at: new Date().toISOString()
       //     })
       //     .select()
-      //     .single();
+      //     .maybeSingle();
 
       //   if (invoiceError) throw invoiceError;
 
@@ -518,7 +518,7 @@ function Ventas({ businessId }) {
         .from('employees')
         .select('id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       const total = selectedSale.total;
 
@@ -548,7 +548,7 @@ function Ventas({ businessId }) {
           issued_at: new Date().toISOString()
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (invoiceError) throw invoiceError;
 

@@ -12,4 +12,15 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error('Faltan variables de entorno de Supabase. Verifica la configuración en Vercel.');
 }
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+  global: {
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+  },
+});

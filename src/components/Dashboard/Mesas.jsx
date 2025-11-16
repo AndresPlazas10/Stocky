@@ -61,7 +61,7 @@ function Mesas({ businessId }) {
           .from('users')
           .select('id, role')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
         
         if (userError) {
           // Usar el ID de auth.users si no existe en users
@@ -235,7 +235,7 @@ function Mesas({ businessId }) {
           total: 0
         }])
         .select()
-        .single();
+        .maybeSingle();
 
       if (orderError) {
         setError(`❌ No se pudo crear la orden: ${orderError.message || 'Error desconocido'}`);
@@ -278,7 +278,7 @@ function Mesas({ businessId }) {
           )
         `)
         .eq('id', mesa.current_order_id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         throw error;
@@ -360,7 +360,7 @@ function Mesas({ businessId }) {
           .from('order_items')
           .select('*, products(name, code)')
           .eq('id', existingItem.id)
-          .single();
+          .maybeSingle();
         
         // Actualización optimista del estado local con datos frescos
         setOrderItems(prevItems => 
@@ -382,7 +382,7 @@ function Mesas({ businessId }) {
             // subtotal se calcula automáticamente con trigger
           }])
           .select('id')
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.error('Error inserting item:', error);
@@ -562,7 +562,7 @@ function Mesas({ businessId }) {
           )
         `)
         .eq('id', selectedMesa.current_order_id)
-        .single();
+        .maybeSingle();
 
       if (!orderData || orderData.order_items.length === 0) {
         setError('⚠️ No hay productos en la orden para cerrar');
@@ -580,7 +580,7 @@ function Mesas({ businessId }) {
           payment_method: paymentMethod
         }])
         .select()
-        .single();
+        .maybeSingle();
 
       if (saleError) {
         throw new Error('Error al crear la venta');

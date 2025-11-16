@@ -74,13 +74,14 @@ function Dashboard() {
       setBusiness(business);
 
       // Verificar si el administrador existe en la tabla users, si no, crearlo
-      const { data: existingUser } = await supabase
+      const { data: existingUser, error: checkError } = await supabase
         .from('users')
         .select('id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (!existingUser) {
+      // PGRST116 significa que no hay filas, es esperado
+      if (!existingUser && (!checkError || checkError.code === 'PGRST116')) {
         // Crear el registro del administrador en la tabla users
         const { error: userCreateError } = await supabase
           .from('users')

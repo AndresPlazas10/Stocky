@@ -203,7 +203,7 @@ function Empleados({ businessId }) {
         .from('employee_invitations')
         .select('email')
         .eq('id', employeeToDelete)
-        .single();
+        .maybeSingle();
 
       if (invitation) {
         // Eliminar de la tabla users

@@ -176,7 +176,7 @@ function Compras({ businessId }) {
           notes: notes || null
         }])
         .select()
-        .single();
+        .maybeSingle();
 
       if (purchaseError) {
         console.error('Error al insertar compra:', purchaseError);

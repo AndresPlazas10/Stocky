@@ -78,7 +78,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
         })
         .eq('id', business.id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (updateError) throw updateError;
 

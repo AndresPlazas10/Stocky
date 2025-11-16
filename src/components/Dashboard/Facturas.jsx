@@ -73,7 +73,7 @@ export default function Facturas() {
         .from('users')
         .select('business_id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (userRecord) {
         businessId = userRecord.business_id;
@@ -85,7 +85,7 @@ export default function Facturas() {
           .from('employees')
           .select('id, business_id')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
         if (employee) {
           businessId = employee.business_id;
@@ -268,7 +268,7 @@ export default function Facturas() {
         .from('users')
         .select('business_id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (userRecord) {
         businessId = userRecord.business_id;
@@ -280,7 +280,7 @@ export default function Facturas() {
           .from('employees')
           .select('id, business_id')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
         if (employee) {
           businessId = employee.business_id;
@@ -298,7 +298,7 @@ export default function Facturas() {
           .from('products')
           .select('stock, name')
           .eq('id', item.product_id)
-          .single();
+          .maybeSingle();
 
         if (stockError) throw new Error(`Error al verificar stock del producto ${item.product_name}`);
         
@@ -322,7 +322,7 @@ export default function Facturas() {
             .from('customers')
             .select('full_name, email, id_number')
             .eq('id', selectedCliente)
-            .single();
+            .maybeSingle();
 
           if (cliente) {
             customerData = {
@@ -359,7 +359,7 @@ export default function Facturas() {
           issued_at: new Date().toISOString()
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (invoiceError) throw new Error('Error al crear factura: ' + invoiceError.message);
 
@@ -478,7 +478,7 @@ export default function Facturas() {
           )
         `)
         .eq('id', facturaId)
-        .single();
+        .maybeSingle();
 
       if (facturaError) throw new Error('Error al obtener factura: ' + facturaError.message);
 
@@ -538,7 +538,7 @@ export default function Facturas() {
         .from('users')
         .select('business_id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
       
       let businessId = userRecord?.business_id;
       
@@ -547,7 +547,7 @@ export default function Facturas() {
           .from('employees')
           .select('business_id')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
         businessId = employee?.business_id;
       }
       
@@ -635,7 +635,7 @@ export default function Facturas() {
         .from('users')
         .select('business_id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
       
       let businessId = userRecord?.business_id;
       
@@ -644,7 +644,7 @@ export default function Facturas() {
           .from('employees')
           .select('business_id')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
         businessId = employee?.business_id;
       }
       

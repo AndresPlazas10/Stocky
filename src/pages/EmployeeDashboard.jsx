@@ -68,7 +68,7 @@ function EmployeeDashboard() {
         .select('*')
         .eq('user_id', user.id)
         .eq('business_id', invitation.business_id)
-        .single();
+        .maybeSingle();
 
 
       if (!existingEmployee) {
@@ -81,7 +81,7 @@ function EmployeeDashboard() {
             full_name: invitation.full_name
           }])
           .select()
-          .single();
+          .maybeSingle();
 
 
         if (employeeCreateError) {
@@ -96,7 +96,7 @@ function EmployeeDashboard() {
         .from('businesses')
         .select('*')
         .eq('id', invitation.business_id)
-        .single();
+        .maybeSingle();
 
 
       if (businessError || !businessData) {
@@ -110,7 +110,7 @@ function EmployeeDashboard() {
         .from('users')
         .select('id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (!existingUser) {
         // Crear el registro del empleado en la tabla users

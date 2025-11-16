@@ -29,7 +29,7 @@ function EmployeeAccess() {
         .from('employee_invitations')
         .select('*, businesses(name, tax_id)')
         .eq('email', user.email)
-        .single();
+        .maybeSingle();
 
       if (invitationError || !invitation) {
         setError('No se encontró una invitación para este correo.');

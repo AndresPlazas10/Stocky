@@ -216,7 +216,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
             is_active: true
           }])
           .select()
-          .single();
+          .maybeSingle();
         
         if (insertError) {
           if (insertError.code === '23505') {
