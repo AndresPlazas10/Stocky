@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client';
 import { 
@@ -40,13 +40,7 @@ function Proveedores({ businessId }) {
     notes: ''
   });
 
-  useEffect(() => {
-    if (businessId) {
-      loadProveedores();
-    }
-  }, [businessId]);
-
-  const loadProveedores = async () => {
+  const loadProveedores = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -62,9 +56,15 @@ function Proveedores({ businessId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [businessId]);
 
-  const handleSubmit = async (e) => {
+  useEffect(() => {
+    if (businessId) {
+      loadProveedores();
+    }
+  }, [businessId, loadProveedores]);
+
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     
     if (!formData.business_name.trim()) {
@@ -120,9 +120,9 @@ function Proveedores({ businessId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [businessId, formData, editingSupplier, loadProveedores]);
 
-  const handleEdit = (supplier) => {
+  const handleEdit = useCallback((supplier) => {
     setEditingSupplier(supplier);
     setFormData({
       business_name: supplier.business_name || '',
@@ -134,14 +134,14 @@ function Proveedores({ businessId }) {
       notes: supplier.notes || ''
     });
     setShowModal(true);
-  };
+  }, []);
 
-  const handleDelete = async (supplierId) => {
+  const handleDelete = useCallback((supplierId) => {
     setSupplierToDelete(supplierId);
     setShowDeleteModal(true);
-  };
+  }, []);
 
-  const confirmDelete = async () => {
+  const confirmDelete = useCallback(async () => {
     if (!supplierToDelete) return;
 
     try {
@@ -169,12 +169,12 @@ function Proveedores({ businessId }) {
       setShowDeleteModal(false);
       setSupplierToDelete(null);
     }
-  };
+  }, [supplierToDelete, loadProveedores]);
 
-  const cancelDelete = () => {
+  const cancelDelete = useCallback(() => {
     setShowDeleteModal(false);
     setSupplierToDelete(null);
-  };
+  }, []);
 
   const resetForm = () => {
     setFormData({
@@ -198,17 +198,28 @@ function Proveedores({ businessId }) {
   };
 
   useEffect(() => {
-    if (error) setTimeout(() => setError(''), 5000);
-    if (success) setTimeout(() => setSuccess(''), 5000);
+    let errorTimer, successTimer;
+    if (error) errorTimer = setTimeout(() => setError(''), 5000);
+    if (success) successTimer = setTimeout(() => setSuccess(''), 5000);
+    return () => {
+      if (errorTimer) clearTimeout(errorTimer);
+      if (successTimer) clearTimeout(successTimer);
+    };
   }, [error, success]);
 
-  // Filtrar proveedores
-  const filteredProveedores = proveedores.filter(proveedor => 
-    proveedor.business_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    proveedor.contact_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    proveedor.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    proveedor.nit?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Memoizar proveedores filtrados
+  const filteredProveedores = useMemo(() => {
+    if (!searchTerm.trim()) return proveedores;
+    const search = searchTerm.toLowerCase();
+    return proveedores.filter(proveedor => 
+      proveedor.business_name?.toLowerCase().includes(search) ||
+      proveedor.contact_name?.toLowerCase().includes(search) ||
+      proveedor.email?.toLowerCase().includes(search) ||
+      proveedor.nit?.toLowerCase().includes(search)
+    );
+  }, [proveedores, searchTerm]);
+
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#C4DFE6]/20 via-white to-[#66A5AD]/10 p-4 md:p-6">
