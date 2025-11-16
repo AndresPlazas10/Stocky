@@ -209,16 +209,7 @@ function Mesas({ businessId }) {
     }
   }, [businessId, newTableNumber, loadMesas]);
 
-  const handleOpenTable = useCallback(async (mesa) => {
-    if (mesa.status === 'occupied' && mesa.current_order_id) {
-      // Cargar la orden actual
-      await loadOrderDetails(mesa);
-    } else {
-      // Crear nueva orden
-      await createNewOrder(mesa);
-    }
-  }, [loadOrderDetails, createNewOrder]);
-
+  // IMPORTANTE: Definir estas funciones ANTES de handleOpenTable
   const createNewOrder = useCallback(async (mesa) => {
     try {
       setError(null);
@@ -294,6 +285,16 @@ function Mesas({ businessId }) {
       setError('❌ No se pudieron cargar los detalles de la orden. Por favor, intenta de nuevo.');
     }
   }, []);
+
+  const handleOpenTable = useCallback(async (mesa) => {
+    if (mesa.status === 'occupied' && mesa.current_order_id) {
+      // Cargar la orden actual
+      await loadOrderDetails(mesa);
+    } else {
+      // Crear nueva orden
+      await createNewOrder(mesa);
+    }
+  }, [loadOrderDetails, createNewOrder]);
 
   const handleRefreshOrder = useCallback(async () => {
     if (!selectedMesa) return;
