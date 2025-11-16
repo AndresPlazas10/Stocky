@@ -3,9 +3,9 @@ import { supabase } from '../../supabase/Client';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatNumber } from '../../utils/formatters.js';
 import { motion, AnimatePresence } from 'framer-motion';
-import { XCircle, AlertTriangle } from 'lucide-react';
+import { XCircle, AlertTriangle, Trash2 } from 'lucide-react';
 
-export default function Facturas() {
+export default function Facturas({ userRole = 'admin' }) {
   const [facturas, setFacturas] = useState([]);
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -24,6 +24,10 @@ export default function Facturas() {
   // Estados del modal de cancelación
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [invoiceToCancel, setInvoiceToCancel] = useState(null);
+  
+  // Estados del modal de eliminación (solo admin)
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState(null);
   
   // Búsqueda de productos
   const [searchProduct, setSearchProduct] = useState('');
@@ -666,6 +670,80 @@ export default function Facturas() {
     }
   };
 
+  // Funciones de eliminación (solo admin)
+  const handleDeleteInvoice = (invoiceId) => {
+    setInvoiceToDelete(invoiceId);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteInvoice = async () => {
+    if (!invoiceToDelete) return;
+
+    setLoading(true);
+    setError('');
+    
+    try {
+      // Eliminar items de factura primero (cascade debería hacerlo automático)
+      const { error: itemsError } = await supabase
+        .from('invoice_items')
+        .delete()
+        .eq('invoice_id', invoiceToDelete);
+
+      if (itemsError) throw new Error('Error al eliminar items: ' + itemsError.message);
+
+      // Eliminar la factura
+      const { error: deleteError } = await supabase
+        .from('invoices')
+        .delete()
+        .eq('id', invoiceToDelete);
+
+      if (deleteError) throw new Error('Error al eliminar factura: ' + deleteError.message);
+
+      setSuccess('✅ Factura eliminada exitosamente');
+      setTimeout(() => setSuccess(''), 4000);
+
+      // Recargar facturas
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: userRecord } = await supabase
+        .from('users')
+        .select('business_id')
+        .eq('id', user.id)
+        .maybeSingle();
+      
+      let businessId = userRecord?.business_id;
+      
+      if (!businessId) {
+        const { data: employee } = await supabase
+          .from('employees')
+          .select('business_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        businessId = employee?.business_id;
+      }
+      
+      if (businessId) {
+        await loadFacturas(businessId);
+      }
+
+      setShowDeleteModal(false);
+      setInvoiceToDelete(null);
+
+    } catch (error) {
+      console.error('Error al eliminar factura:', error);
+      setError(error.message || 'Error desconocido al eliminar factura');
+      setTimeout(() => setError(''), 8000);
+      setShowDeleteModal(false);
+      setInvoiceToDelete(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setInvoiceToDelete(null);
+  };
+
   const cancelCancelInvoice = () => {
     setShowCancelModal(false);
     setInvoiceToCancel(null);
@@ -1018,6 +1096,16 @@ export default function Facturas() {
                           >
                             ❌ Cancelar
                           </button>
+                          {userRole === 'admin' && (
+                            <button
+                              onClick={() => handleDeleteInvoice(factura.id)}
+                              disabled={loading}
+                              className="px-2 py-1 bg-gray-700 text-white rounded hover:bg-gray-800 disabled:bg-gray-400 text-sm flex items-center gap-1"
+                              title="Eliminar factura permanentemente"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </>
                       )}
                       {factura.status === 'sent' && (
@@ -1033,13 +1121,47 @@ export default function Facturas() {
                               Reenviar
                             </button>
                           )}
+                          {userRole === 'admin' && (
+                            <button
+                              onClick={() => handleDeleteInvoice(factura.id)}
+                              disabled={loading}
+                              className="mt-1 px-2 py-1 bg-gray-700 text-white rounded hover:bg-gray-800 disabled:bg-gray-400 text-xs flex items-center gap-1"
+                              title="Eliminar factura"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
                       )}
                       {factura.status === 'validated' && (
-                        <span className="text-sm text-gray-500">✓ Validada</span>
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-sm text-gray-500">✓ Validada</span>
+                          {userRole === 'admin' && (
+                            <button
+                              onClick={() => handleDeleteInvoice(factura.id)}
+                              disabled={loading}
+                              className="mt-1 px-2 py-1 bg-gray-700 text-white rounded hover:bg-gray-800 disabled:bg-gray-400 text-xs flex items-center gap-1"
+                              title="Eliminar factura"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                       )}
                       {factura.status === 'cancelled' && (
-                        <span className="text-sm text-gray-500">Cancelada</span>
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-sm text-gray-500">Cancelada</span>
+                          {userRole === 'admin' && (
+                            <button
+                              onClick={() => handleDeleteInvoice(factura.id)}
+                              disabled={loading}
+                              className="mt-1 px-2 py-1 bg-gray-700 text-white rounded hover:bg-gray-800 disabled:bg-gray-400 text-xs flex items-center gap-1"
+                              title="Eliminar factura"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </td>
@@ -1099,6 +1221,63 @@ export default function Facturas() {
                   >
                     <XCircle className="w-4 h-4" />
                     {loading ? 'Cancelando...' : 'Cancelar Factura'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de confirmación de eliminación de factura (solo admin) */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={cancelDelete}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md bg-white rounded-xl shadow-2xl"
+            >
+              <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4 rounded-t-xl">
+                <div className="flex items-center gap-3 text-white">
+                  <Trash2 className="w-6 h-6" />
+                  <h3 className="text-xl font-bold">Eliminar Factura</h3>
+                </div>
+              </div>
+              
+              <div className="p-6 space-y-4">
+                <p className="text-gray-700 font-semibold">
+                  ⚠️ ¿Estás seguro de eliminar esta factura permanentemente?
+                </p>
+                
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-800">
+                    <strong>Esta acción no se puede deshacer.</strong> La factura será eliminada del sistema de forma permanente.
+                  </p>
+                </div>
+                
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={cancelDelete}
+                    className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={confirmDeleteInvoice}
+                    disabled={loading}
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {loading ? 'Eliminando...' : 'Eliminar Definitivamente'}
                   </button>
                 </div>
               </div>
