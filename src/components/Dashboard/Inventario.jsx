@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice, formatNumber } from '../../utils/formatters.js';
@@ -50,21 +50,46 @@ function Inventario({ businessId, userRole = 'admin' }) {
   });
   const [generatedCode, setGeneratedCode] = useState('');
 
-  useEffect(() => {
-    if (businessId) {
-      loadProductos();
-      loadProveedores();
+  // Memoizar funciones de carga
+  const loadProductos = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          *,
+          supplier:suppliers(id, business_name, contact_name)
+        `)
+        .eq('business_id', businessId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      setProductos(data || []);
+    } catch (error) {
+      setError('Error al cargar el inventario');
+    } finally {
+      setLoading(false);
     }
   }, [businessId]);
 
-  useEffect(() => {
-    // Generar código cuando se abre el formulario
-    if (showForm && businessId && !loading) {
-      generateAndSetCode();
-    }
-  }, [showForm, businessId, loading]);
+  const loadProveedores = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('id, business_name, contact_name')
+        .eq('business_id', businessId)
+        .order('business_name', { ascending: true });
 
-  const generateAndSetCode = async () => {
+      if (error) throw error;
+      setProveedores(data || []);
+    } catch (error) {
+      console.error('Error loading proveedores:', error);
+    }
+  }, [businessId]);
+
+  // Unificar generación de código (reemplaza generateAndSetCode y generateProductCode)
+  const generateProductCode = useCallback(async () => {
     try {
       // Obtener TODOS los códigos existentes
       const { data: allProducts } = await supabase
@@ -106,46 +131,38 @@ function Inventario({ businessId, userRole = 'admin' }) {
       setGeneratedCode(newCode);
     } catch (error) {
       console.error('Error generating code:', error);
-      // Fallback con timestamp
       setGeneratedCode(`PRD-${Date.now()}`);
     }
-  };
+  }, [businessId]);
 
-  const loadProductos = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          supplier:suppliers(id, business_name, contact_name)
-        `)
-        .eq('business_id', businessId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      setProductos(data || []);
-    } catch (error) {
-      setError('Error al cargar el inventario');
-    } finally {
-      setLoading(false);
+  // useEffects optimizados
+  useEffect(() => {
+    if (businessId) {
+      loadProductos();
+      loadProveedores();
     }
-  };
+  }, [businessId, loadProductos, loadProveedores]);
 
-  const loadProveedores = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('id, business_name, contact_name')
-        .eq('business_id', businessId)
-        .order('business_name', { ascending: true });
-
-      if (error) throw error;
-      setProveedores(data || []);
-    } catch (error) {
+  useEffect(() => {
+    if (showForm && businessId) {
+      generateProductCode();
     }
-  };
+  }, [showForm, businessId, generateProductCode]);
+
+  // Cleanup de mensajes
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
+
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -155,43 +172,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
     }));
   };
 
-  const generateProductCode = async () => {
-    try {
-      // Obtener TODOS los códigos existentes para este negocio
-      const { data, error } = await supabase
-        .from('products')
-        .select('code')
-        .eq('business_id', businessId)
-        .like('code', 'PRD-%');
-
-      if (error && error.code !== 'PGRST116') throw error;
-
-      // Encontrar el número máximo
-      let maxNumber = 0;
-      
-      if (data && data.length > 0) {
-        data.forEach(product => {
-          const match = product.code.match(/PRD-(\d+)/);
-          if (match) {
-            const num = parseInt(match[1]);
-            if (num > maxNumber) {
-              maxNumber = num;
-            }
-          }
-        });
-      }
-
-      // Generar el siguiente número
-      const nextNumber = maxNumber + 1;
-      return `PRD-${String(nextNumber).padStart(4, '0')}`;
-    } catch (error) {
-      console.error('Error generating code:', error);
-      // Si falla, usar timestamp como fallback
-      return `PRD-${Date.now()}`;
-    }
-  };
-
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
@@ -279,14 +260,14 @@ function Inventario({ businessId, userRole = 'admin' }) {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [businessId, formData, generatedCode, loadProductos]);
 
-  const handleDelete = async (productId) => {
+  const handleDelete = useCallback(async (productId) => {
     setProductToDelete(productId);
     setShowDeleteModal(true);
-  };
+  }, []);
 
-  const confirmDelete = async () => {
+  const confirmDelete = useCallback(async () => {
     if (!productToDelete) return;
 
     try {
@@ -296,7 +277,6 @@ function Inventario({ businessId, userRole = 'admin' }) {
         .eq('id', productToDelete);
 
       if (error) {
-        // Si hay error de foreign key, mostrar modal de desactivación
         if (error.code === '23503') {
           setShowDeleteModal(false);
           setShowDeactivateModal(true);
@@ -314,9 +294,9 @@ function Inventario({ businessId, userRole = 'admin' }) {
       setShowDeleteModal(false);
       setProductToDelete(null);
     }
-  };
+  }, [productToDelete, loadProductos]);
 
-  const confirmDeactivate = async () => {
+  const confirmDeactivate = useCallback(async () => {
     if (!productToDelete) return;
 
     try {
@@ -336,15 +316,15 @@ function Inventario({ businessId, userRole = 'admin' }) {
       setShowDeactivateModal(false);
       setProductToDelete(null);
     }
-  };
+  }, [productToDelete, loadProductos]);
 
-  const cancelDelete = () => {
+  const cancelDelete = useCallback(() => {
     setShowDeleteModal(false);
     setShowDeactivateModal(false);
     setProductToDelete(null);
-  };
+  }, []);
 
-  const toggleActive = async (productId, currentStatus) => {
+  const toggleActive = useCallback(async (productId, currentStatus) => {
     try {
       const { error } = await supabase
         .from('products')
@@ -358,7 +338,14 @@ function Inventario({ businessId, userRole = 'admin' }) {
     } catch (error) {
       setError('❌ Error al actualizar el estado del producto');
     }
-  };
+  }, [loadProductos]);
+
+  // Helper para clases de badge de stock (memoizado)
+  const getStockBadgeClass = useCallback((stock, minStock) => {
+    if (stock <= minStock) return 'bg-red-100 text-red-800';
+    if (stock <= minStock * 2) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-green-100 text-green-800';
+  }, []);
 
   if (loading && productos.length === 0) {
     return (
@@ -757,13 +744,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                         {formatPrice(producto.sale_price)}
                       </td>
                       <td className="px-6 py-4">
-                        <Badge className={`${
-                          producto.stock <= producto.min_stock 
-                            ? 'bg-red-100 text-red-800' 
-                            : producto.stock <= producto.min_stock * 2
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-green-100 text-green-800'
-                        }`}>
+                        <Badge className={getStockBadgeClass(producto.stock, producto.min_stock)}>
                           {producto.stock}
                         </Badge>
                       </td>
