@@ -58,7 +58,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
         .from('products')
         .select(`
           *,
-          supplier:suppliers(id, business_name, contact_name)
+          supplier:suppliers!left(id, business_name, contact_name)
         `)
         .eq('business_id', businessId)
         .order('created_at', { ascending: false });
