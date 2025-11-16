@@ -106,7 +106,7 @@ function Home() {
                 <Store className="w-6 h-6 text-white" />
               </div>
               <span className="text-xl font-bold text-primary-900">
-                Stockly
+                Stocky
               </span>
             </motion.div>
 
@@ -215,9 +215,9 @@ function Home() {
             </motion.div>
 
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-primary-900 mb-6 animate-fade-in leading-tight">
-              Gestiona tu negocio con{" Stockly"}
+              Gestiona tu negocio con{" Stocky"}
               <span className="bg-gradient-to-r from-accent-500 to-secondary-500 bg-clip-text text-transparent">
-                Stockly
+                Stocky
               </span>
             </h1>
 
@@ -266,7 +266,7 @@ function Home() {
               Todo lo que necesitas en un solo lugar
             </h2>
             <p className="text-base sm:text-lg text-primary-600 max-w-2xl mx-auto px-4">
-              Stockly ofrece las herramientas esenciales para gestionar tu
+              Stocky ofrece las herramientas esenciales para gestionar tu
               negocio de manera eficiente
             </p>
           </motion.div>
@@ -305,10 +305,10 @@ function Home() {
               viewport={{ once: true }}
             >
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary-900 mb-6">
-                ¿Por qué elegir Stockly?
+                ¿Por qué elegir Stocky?
               </h2>
               <p className="text-base sm:text-lg text-primary-600 mb-8">
-                Diseñado específicamente para restaurantes y bares, Stockly
+                Diseñado específicamente para restaurantes y bares, Stocky
                 simplifica la gestión diaria de tu negocio.
               </p>
               <div className="space-y-4">
@@ -388,7 +388,7 @@ function Home() {
               Comienza a gestionar tu negocio hoy
             </h2>
             <p className="text-base sm:text-lg md:text-xl mb-6 sm:mb-8 text-white/90 px-4">
-              Únete a miles de negocios que ya confían en Stockly para su
+              Únete a miles de negocios que ya confían en Stocky para su
               gestión diaria
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
@@ -422,7 +422,7 @@ function Home() {
                 <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
                   <Store className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-base sm:text-lg font-bold text-white">Stockly</span>
+                <span className="text-base sm:text-lg font-bold text-white">Stocky</span>
               </div>
               <p className="text-xs sm:text-sm">
                 Sistema POS completo para restaurantes y bares
@@ -486,7 +486,7 @@ function Home() {
             </div>
           </div>
           <div className="pt-6 sm:pt-8 border-t border-white/10 text-center text-xs sm:text-sm">
-            <p>© 2025 Stockly. Todos los derechos reservados.</p>
+            <p>© 2025 Stocky. Todos los derechos reservados.</p>
           </div>
         </div>
       </footer>
