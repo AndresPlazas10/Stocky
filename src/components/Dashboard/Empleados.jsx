@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
 import { 
@@ -32,13 +32,7 @@ function Empleados({ businessId }) {
     role: 'employee'
   });
 
-  useEffect(() => {
-    if (businessId) {
-      loadEmpleados();
-    }
-  }, [businessId]);
-
-  const loadEmpleados = async () => {
+  const loadEmpleados = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -55,7 +49,13 @@ function Empleados({ businessId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [businessId]);
+
+  useEffect(() => {
+    if (businessId) {
+      loadEmpleados();
+    }
+  }, [businessId, loadEmpleados]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -65,7 +65,7 @@ function Empleados({ businessId }) {
     }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
@@ -187,14 +187,14 @@ function Empleados({ businessId }) {
     } catch (error) {
       setError(error.message || 'Error al enviar la invitación');
     }
-  };
+  }, [businessId, formData, loadEmpleados]);
 
-  const handleDelete = async (invitationId) => {
+  const handleDelete = useCallback((invitationId) => {
     setEmployeeToDelete(invitationId);
     setShowDeleteModal(true);
-  };
+  }, []);
 
-  const confirmDelete = async () => {
+  const confirmDelete = useCallback(async () => {
     if (!employeeToDelete) return;
 
     try {
@@ -231,28 +231,28 @@ function Empleados({ businessId }) {
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
     }
-  };
+  }, [employeeToDelete, businessId, loadEmpleados]);
 
-  const cancelDelete = () => {
+  const cancelDelete = useCallback(() => {
     setShowDeleteModal(false);
     setEmployeeToDelete(null);
-  };
+  }, []);
 
-  // Filtrar empleados
-  const filteredEmpleados = empleados.filter(empleado =>
-    empleado.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    empleado.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    empleado.role?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Memoizar empleados filtrados
+  const filteredEmpleados = useMemo(() => {
+    if (!searchTerm.trim()) return empleados;
+    const search = searchTerm.toLowerCase();
+    return empleados.filter(empleado =>
+      empleado.full_name?.toLowerCase().includes(search) ||
+      empleado.email?.toLowerCase().includes(search) ||
+      empleado.role?.toLowerCase().includes(search)
+    );
+  }, [empleados, searchTerm]);
 
-  // Estadísticas
-  const stats = {
+  // Memoizar estadísticas
+  const stats = useMemo(() => ({
     total: empleados.length,
-    approved: empleados.filter(e => e.is_approved).length,
-    admins: empleados.filter(e => e.role === 'admin').length
-  };
-
-  return (
+    approved: empleados.filter(e => e.is_approved).length,\n    admins: empleados.filter(e => e.role === 'admin').length\n  }), [empleados]);\n\n  useEffect(() => {\n    let errorTimer, successTimer;\n    if (error) errorTimer = setTimeout(() => setError(null), 5000);\n    if (success) successTimer = setTimeout(() => setSuccess(null), 5000);\n    return () => {\n      if (errorTimer) clearTimeout(errorTimer);\n      if (successTimer) clearTimeout(successTimer);\n    };\n  }, [error, success]);\n\n  return (
     <div className="min-h-screen bg-gradient-to-br from-[#C4DFE6]/20 via-white to-[#66A5AD]/10 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         
