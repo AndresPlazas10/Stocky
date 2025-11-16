@@ -69,7 +69,7 @@ function Ventas({ businessId }) {
           .from('sales')
           .select(`
             *,
-            customers!left(full_name, email, id_number)
+            customer:customers(full_name, email, id_number)
           `)
           .eq('business_id', businessId)
           .order('created_at', { ascending: false })
@@ -471,7 +471,7 @@ function Ventas({ businessId }) {
       .from('sale_details')
       .select(`
         *,
-        products!left(name)
+        products(name)
       `)
       .eq('sale_id', venta.id);
     
@@ -499,7 +499,7 @@ function Ventas({ businessId }) {
         .from('sale_details')
         .select(`
           *,
-          products!left(name)
+          products(name)
         `)
         .eq('sale_id', selectedSale.id);
 
@@ -1034,7 +1034,7 @@ function Ventas({ businessId }) {
                               // Cargar detalles de la venta
                               const { data: saleDetails } = await supabase
                                 .from('sale_details')
-                                .select('*, products!left(name)')
+                                .select('*, products(name)')
                                 .eq('sale_id', venta.id);
                               
                               setSelectedSale({ ...venta, sale_details: saleDetails || [] });

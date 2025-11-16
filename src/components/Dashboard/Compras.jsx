@@ -43,7 +43,7 @@ function Compras({ businessId }) {
         .from('purchases')
         .select(`
           *,
-          supplier:suppliers!left(business_name, contact_name)
+          supplier:suppliers(business_name, contact_name)
         `)
         .eq('business_id', businessId)
         .order('created_at', { ascending: false });
@@ -240,7 +240,7 @@ function Compras({ businessId }) {
         .from('purchase_details')
         .select(`
           *,
-          product:products!left(name, code, purchase_price)
+          product:products(name, code, purchase_price)
         `)
         .eq('purchase_id', purchase.id);
 
