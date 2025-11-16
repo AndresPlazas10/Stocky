@@ -25,14 +25,8 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 1000,
     sourcemap: false,
-    minify: 'terser',
-    target: 'es2020',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-      },
-    },
+    minify: false,
+    target: 'esnext',
   },
   server: {
     port: 5173,
