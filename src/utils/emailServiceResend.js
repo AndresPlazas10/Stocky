@@ -174,21 +174,23 @@ export const sendInvoiceEmailResend = async ({
       </html>
     `;
 
-    // ✅ PASO 5: Enviar con Resend API (usando fetch)
-    const response = await fetch('https://api.resend.com/emails', {
+    // ✅ PASO 5: Enviar con Resend API (a través de Vercel Function para evitar CORS)
+    const apiUrl = import.meta.env.DEV 
+      ? 'http://localhost:3000/api/send-email'  // Desarrollo local
+      : '/api/send-email';  // Producción en Vercel
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_RESEND_API_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        from: import.meta.env.VITE_RESEND_FROM_EMAIL || 'Stockly <onboarding@resend.dev>',
-        to: [targetEmail],
-        subject: isTestMode 
-          ? `[TEST MODE] Factura ${invoiceNumber} - ${businessName}` 
-          : `Factura ${invoiceNumber} - ${businessName}`,
-        html: htmlContent,
-        text: `Factura ${invoiceNumber}\n\nCliente: ${customerName}\nTotal: $${total.toLocaleString('es-CO')}\n\nGracias por tu compra.`
+        email: targetEmail,
+        invoiceNumber,
+        customerName,
+        total,
+        items,
+        businessName
       })
     });
 
