@@ -252,7 +252,21 @@ function Empleados({ businessId }) {
   // Memoizar estadísticas
   const stats = useMemo(() => ({
     total: empleados.length,
-    approved: empleados.filter(e => e.is_approved).length,\n    admins: empleados.filter(e => e.role === 'admin').length\n  }), [empleados]);\n\n  useEffect(() => {\n    let errorTimer, successTimer;\n    if (error) errorTimer = setTimeout(() => setError(null), 5000);\n    if (success) successTimer = setTimeout(() => setSuccess(null), 5000);\n    return () => {\n      if (errorTimer) clearTimeout(errorTimer);\n      if (successTimer) clearTimeout(successTimer);\n    };\n  }, [error, success]);\n\n  return (
+    approved: empleados.filter(e => e.is_approved).length,
+    admins: empleados.filter(e => e.role === 'admin').length
+  }), [empleados]);
+
+  useEffect(() => {
+    let errorTimer, successTimer;
+    if (error) errorTimer = setTimeout(() => setError(null), 5000);
+    if (success) successTimer = setTimeout(() => setSuccess(null), 5000);
+    return () => {
+      if (errorTimer) clearTimeout(errorTimer);
+      if (successTimer) clearTimeout(successTimer);
+    };
+  }, [error, success]);
+
+  return (
     <div className="min-h-screen bg-gradient-to-br from-[#C4DFE6]/20 via-white to-[#66A5AD]/10 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         

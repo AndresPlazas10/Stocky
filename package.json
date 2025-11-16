@@ -33,7 +33,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "clean": "rm -rf dist node_modules",
-    "reinstall": "npm run clean && npm install"
+    "reinstall": "npm run clean && npm install",
+    "analyze": "vite build --mode analyze",
+    "check": "npm run lint && npm run build"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
