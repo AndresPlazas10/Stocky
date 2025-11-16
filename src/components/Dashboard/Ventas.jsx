@@ -69,7 +69,7 @@ function Ventas({ businessId }) {
           .from('sales')
           .select(`
             *,
-            customer:customers(full_name, email, id_number)
+            customers(full_name, email, id_number)
           `)
           .eq('business_id', businessId)
           .order('created_at', { ascending: false })
@@ -312,7 +312,7 @@ function Ventas({ businessId }) {
           business_id: businessId,
           user_id: user?.id || null, // Rastrear quién hizo la venta
           payment_method: paymentMethod,
-          total: calculateTotal(),
+          total: total,
           customer_id: selectedCustomer || null
         }])
         .select()
@@ -896,7 +896,7 @@ function Ventas({ businessId }) {
                     <DollarSign className="w-6 h-6" />
                     <span className="text-lg font-semibold">Total:</span>
                   </div>
-                  <span className="text-3xl font-bold">{formatPrice(calculateTotal())}</span>
+                  <span className="text-3xl font-bold">{formatPrice(total)}</span>
                 </div>
               </Card>
 

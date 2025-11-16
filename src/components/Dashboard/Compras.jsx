@@ -568,7 +568,7 @@ function Compras({ businessId }) {
                     </div>
                     <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
                       <span className="text-lg font-semibold text-gray-700">Total:</span>
-                      <span className="text-2xl font-bold text-green-600">{formatPrice(calculateTotal())}</span>
+                      <span className="text-2xl font-bold text-green-600">{formatPrice(total)}</span>
                     </div>
                   </div>
                 )}
