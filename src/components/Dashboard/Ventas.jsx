@@ -172,8 +172,6 @@ function Ventas({ businessId }) {
       loadData();
     }
   }, [businessId, loadData]);
-    }
-  };
 
   // Memoizar mapa de clientes para acceso O(1)
   const clientesMap = useMemo(() => {

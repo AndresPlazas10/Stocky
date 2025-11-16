@@ -21,5 +21,15 @@ export default defineConfig({
       },
     },
     chunkSizeWarningLimit: 600,
+    sourcemap: false,
+    minify: 'esbuild', // Usar esbuild en lugar de terser
+  },
+  server: {
+    port: 5173,
+    strictPort: false,
+  },
+  preview: {
+    port: 4173,
+    strictPort: false,
   },
 })
