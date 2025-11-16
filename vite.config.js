@@ -26,7 +26,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'lucide': ['lucide-react'],
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-ui': ['framer-motion', 'lucide-react', '@emailjs/browser'],
+          'vendor-radix': ['@radix-ui/react-avatar', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
         },
       },
     },
