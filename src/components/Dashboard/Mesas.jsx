@@ -47,6 +47,33 @@ function Mesas({ businessId }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [mesaToDelete, setMesaToDelete] = useState(null);
 
+  const getCurrentUser = useCallback(async () => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        return;
+      }
+      
+      if (user) {
+        
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('id, role')
+          .eq('id', user.id)
+          .single();
+        
+        if (userError) {
+          // Usar el ID de auth.users si no existe en users
+          setCurrentUser({ id: user.id, role: 'admin' });
+        } else {
+          setCurrentUser(userData);
+        }
+      }
+    } catch (error) {
+    }
+  }, []);
+
   const loadMesas = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -126,7 +153,29 @@ function Mesas({ businessId }) {
     }
   }, [businessId]);
 
-  const handleCreateTable = async (e) => {
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      await Promise.all([
+        loadMesas(),
+        loadProductos(),
+        loadClientes()
+      ]);
+    } catch (error) {
+      setError('⚠️ No se pudo cargar la información de las mesas. Por favor, intenta recargar la página.');
+    } finally {
+      setLoading(false);
+    }
+  }, [loadMesas, loadProductos, loadClientes]);
+
+  useEffect(() => {
+    if (businessId) {
+      loadData();
+      getCurrentUser();
+    }
+  }, [businessId, loadData, getCurrentUser]);
+
+  const handleCreateTable = useCallback(async (e) => {
     e.preventDefault();
     setError(null);
 
@@ -158,9 +207,9 @@ function Mesas({ businessId }) {
     } catch (error) {
       setError('❌ Error al crear la mesa: ' + error.message);
     }
-  };
+  }, [businessId, newTableNumber, loadMesas]);
 
-  const handleOpenTable = async (mesa) => {
+  const handleOpenTable = useCallback(async (mesa) => {
     if (mesa.status === 'occupied' && mesa.current_order_id) {
       // Cargar la orden actual
       await loadOrderDetails(mesa);
@@ -168,9 +217,9 @@ function Mesas({ businessId }) {
       // Crear nueva orden
       await createNewOrder(mesa);
     }
-  };
+  }, [loadOrderDetails, createNewOrder]);
 
-  const createNewOrder = async (mesa) => {
+  const createNewOrder = useCallback(async (mesa) => {
     try {
       setError(null);
 
@@ -214,9 +263,9 @@ function Mesas({ businessId }) {
     } catch (error) {
       setError('❌ No se pudo abrir la mesa. Por favor, intenta de nuevo.');
     }
-  };
+  }, [businessId, currentUser, loadMesas]);
 
-  const loadOrderDetails = async (mesa) => {
+  const loadOrderDetails = useCallback(async (mesa) => {
     try {
 
       const { data: order, error } = await supabase
@@ -244,9 +293,9 @@ function Mesas({ businessId }) {
     } catch (error) {
       setError('❌ No se pudieron cargar los detalles de la orden. Por favor, intenta de nuevo.');
     }
-  };
+  }, []);
 
-  const handleRefreshOrder = async () => {
+  const handleRefreshOrder = useCallback(async () => {
     if (!selectedMesa) return;
     
     try {
@@ -268,9 +317,9 @@ function Mesas({ businessId }) {
       console.error('Error saving order:', error);
       setError('❌ No se pudo guardar la orden');
     }
-  };
+  }, [selectedMesa, updateOrderTotal, loadMesas]);
 
-  const addProductToOrder = async (producto) => {
+  const addProductToOrder = useCallback(async (producto) => {
     try {
       if (!selectedMesa?.current_order_id) return;
 
@@ -372,9 +421,9 @@ function Mesas({ businessId }) {
         .eq('order_id', selectedMesa.current_order_id);
       if (freshItems) setOrderItems(freshItems);
     }
-  };
+  }, [selectedMesa, orderItems, quantityToAdd, updateOrderTotal]);
 
-  const updateItemQuantity = async (itemId, newQuantity) => {
+  const updateItemQuantity = useCallback(async (itemId, newQuantity) => {
     try {
       if (newQuantity <= 0) {
         await removeItem(itemId);
@@ -414,9 +463,9 @@ function Mesas({ businessId }) {
         .eq('order_id', selectedMesa.current_order_id);
       if (freshItems) setOrderItems(freshItems);
     }
-  };
+  }, [selectedMesa, updateOrderTotal, removeItem]);
 
-  const removeItem = async (itemId) => {
+  const removeItem = useCallback(async (itemId) => {
     try {
       const { error } = await supabase
         .from('order_items')
@@ -439,9 +488,9 @@ function Mesas({ businessId }) {
         .eq('order_id', selectedMesa.current_order_id);
       if (freshItems) setOrderItems(freshItems);
     }
-  };
+  }, [selectedMesa, updateOrderTotal]);
 
-  const updateOrderTotal = async (orderId) => {
+  const updateOrderTotal = useCallback(async (orderId) => {
     try {
       // Calcular total desde el estado local (más rápido)
       const total = orderItems.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
@@ -463,7 +512,7 @@ function Mesas({ businessId }) {
     } catch (error) {
       console.error('Error updating order total:', error);
     }
-  };
+  }, [orderItems]);
 
   const handleCloseModal = async () => {
     // Si la orden está vacía, eliminarla y liberar la mesa
@@ -644,22 +693,29 @@ function Mesas({ businessId }) {
     }
   };
 
-  const getFilteredProducts = () => {
+  const filteredProducts = useMemo(() => {
     if (!searchProduct.trim()) return [];
-    
-    
-    const filtered = productos.filter(p =>
-      p.name.toLowerCase().includes(searchProduct.toLowerCase()) ||
-      p.code.toLowerCase().includes(searchProduct.toLowerCase())
+    const search = searchProduct.toLowerCase();
+    return productos.filter(p =>
+      p.name.toLowerCase().includes(search) ||
+      p.code.toLowerCase().includes(search)
     ).slice(0, 5);
-    
-    
-    return filtered;
-  };
+  }, [searchProduct, productos]);
 
-  const calculateOrderTotal = () => {
+  const orderTotal = useMemo(() => {
     return orderItems.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
-  };
+  }, [orderItems]);
+
+  useEffect(() => {
+    let errorTimer, successTimer;
+    if (error) errorTimer = setTimeout(() => setError(null), 5000);
+    if (success) successTimer = setTimeout(() => setSuccess(null), 5000);
+    return () => {
+      if (errorTimer) clearTimeout(errorTimer);
+      if (successTimer) clearTimeout(successTimer);
+    };
+  }, [error, success]);
+
 
   if (loading) return <div className="loading">Cargando mesas...</div>;
 
@@ -919,14 +975,14 @@ function Mesas({ businessId }) {
                     />
                     
                     <AnimatePresence>
-                      {searchProduct && getFilteredProducts().length > 0 && (
+                      {searchProduct && filteredProducts.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
                           className="mt-2 border-2 border-accent-200 rounded-2xl overflow-hidden max-h-60 overflow-y-auto shadow-lg"
                         >
-                          {getFilteredProducts().map((producto, index) => (
+                          {filteredProducts.map((producto, index) => (
                             <motion.div
                               key={producto.id}
                               initial={{ opacity: 0 }}
@@ -1027,7 +1083,7 @@ function Mesas({ businessId }) {
                     <div>
                       <p className="text-sm text-primary-600 mb-1">Total a pagar</p>
                       <h3 className="text-3xl font-bold text-primary-900">
-                        {formatPrice(calculateOrderTotal())}
+                        {formatPrice(orderTotal)}
                       </h3>
                     </div>
                     <div className="flex gap-3">
@@ -1082,7 +1138,7 @@ function Mesas({ businessId }) {
                   <div className="bg-accent-50 rounded-2xl p-6 text-center border-2 border-accent-200">
                     <p className="text-sm text-primary-600 mb-2">Total a pagar</p>
                     <h3 className="text-4xl font-bold text-primary-900">
-                      {formatPrice(calculateOrderTotal())}
+                      {formatPrice(orderTotal)}
                     </h3>
                   </div>
 
