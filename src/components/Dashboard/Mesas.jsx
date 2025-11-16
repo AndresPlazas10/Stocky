@@ -340,7 +340,7 @@ function Mesas({ businessId }) {
       // Revertir solo los items si falla
       const { data: freshItems } = await supabase
         .from('order_items')
-        .select('*, products(name, code)')
+        .select('*, products!left(name, code)')
         .eq('order_id', selectedMesa.current_order_id);
       if (freshItems) setOrderItems(freshItems);
     }
@@ -409,7 +409,7 @@ function Mesas({ businessId }) {
         // Recargar el item actualizado para obtener el subtotal correcto
         const { data: updatedItem } = await supabase
           .from('order_items')
-          .select('*, products(name, code)')
+          .select('*, products!left(name, code)')
           .eq('id', existingItem.id)
           .maybeSingle();
         
@@ -468,7 +468,7 @@ function Mesas({ businessId }) {
       // Revertir solo los items si falla
       const { data: freshItems } = await supabase
         .from('order_items')
-        .select('*, products(name, code)')
+        .select('*, products!left(name, code)')
         .eq('order_id', selectedMesa.current_order_id);
       if (freshItems) setOrderItems(freshItems);
     }
@@ -510,7 +510,7 @@ function Mesas({ businessId }) {
       // Revertir cambio optimista solo si falla
       const { data: freshItems } = await supabase
         .from('order_items')
-        .select('*, products(name, code)')
+        .select('*, products!left(name, code)')
         .eq('order_id', selectedMesa.current_order_id);
       if (freshItems) setOrderItems(freshItems);
     }
