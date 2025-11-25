@@ -261,8 +261,8 @@ function Empleados({ businessId }) {
     }
   }, [businessId, formData, loadEmpleados]);
 
-  const handleDelete = useCallback((invitationId) => {
-    setEmployeeToDelete(invitationId);
+  const handleDelete = useCallback((empleado) => {
+    setEmployeeToDelete(empleado);
     setShowDeleteModal(true);
   }, []);
 
@@ -270,33 +270,47 @@ function Empleados({ businessId }) {
     if (!employeeToDelete) return;
 
     try {
-      // Obtener datos de la invitación
-      const { data: invitation } = await supabase
-        .from('employee_invitations')
-        .select('username, is_approved')
-        .eq('id', employeeToDelete)
-        .maybeSingle();
+      if (employeeToDelete.status === 'active') {
+        // Es un empleado activo - eliminar de la tabla employees
+        const { error: empError } = await supabase
+          .from('employees')
+          .delete()
+          .eq('id', employeeToDelete.id)
+          .eq('business_id', businessId);
 
-      if (invitation) {
-        // Si ya fue aprobada, también eliminar el empleado
-        if (invitation.is_approved && invitation.username) {
-          await supabase
-            .from('employees')
-            .delete()
-            .eq('username', invitation.username)
-            .eq('business_id', businessId);
+        if (empError) {
+          console.error('Error al eliminar empleado:', empError);
+          throw new Error('Error al eliminar el empleado');
         }
+
+        // Intentar eliminar el usuario de Auth (requiere service role)
+        // Esto solo funciona si tienes permisos de admin
+        if (employeeToDelete.user_id) {
+          const { error: authError } = await supabase.auth.admin.deleteUser(
+            employeeToDelete.user_id
+          ).catch(err => {
+            console.warn('No se pudo eliminar el usuario de Auth:', err);
+            return { error: null }; // Ignorar error de Auth
+          });
+        }
+
+        setSuccess('✅ Empleado eliminado exitosamente');
+      } else {
+        // Es una invitación pendiente - eliminar de employee_invitations
+        const { error: invError } = await supabase
+          .from('employee_invitations')
+          .delete()
+          .eq('id', employeeToDelete.id)
+          .eq('business_id', businessId);
+
+        if (invError) {
+          console.error('Error al eliminar invitación:', invError);
+          throw new Error('Error al eliminar la invitación');
+        }
+
+        setSuccess('✅ Invitación eliminada exitosamente');
       }
 
-      // Eliminar la invitación
-      const { error } = await supabase
-        .from('employee_invitations')
-        .delete()
-        .eq('id', employeeToDelete);
-
-      if (error) throw error;
-
-      setSuccess('✅ Invitación eliminada exitosamente');
       await loadEmpleados();
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
@@ -657,7 +671,7 @@ function Empleados({ businessId }) {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <button
-                            onClick={() => handleDelete(empleado.id)}
+                            onClick={() => handleDelete(empleado)}
                             className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
                           >
                             <Trash2 className="w-4 h-4" />
