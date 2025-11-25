@@ -88,10 +88,11 @@ function Register() {
       }
 
       // Generar email automáticamente basado en username
-      // Reemplazar guiones bajos por puntos para que Gmail lo acepte
-      const cleanEmail = `${cleanUsername.replace(/_/g, '.')}@gmail.com`;
+      // Usar dominio local para evitar validación de Supabase
+      const cleanEmail = `${cleanUsername}@stockly.local`;
 
       console.log('🚀 Iniciando registro de negocio...');
+      console.log('📧 Email generado:', cleanEmail);
 
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: cleanEmail,
