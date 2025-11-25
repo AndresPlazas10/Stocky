@@ -39,15 +39,41 @@ function Empleados({ businessId }) {
   const loadEmpleados = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // Cargar empleados activos (aprobados)
+      const { data: activeEmployees, error: empError } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('business_id', businessId)
+        .order('created_at', { ascending: false });
+
+      if (empError) throw empError;
+
+      // Cargar invitaciones pendientes
+      const { data: pendingInvites, error: invError } = await supabase
         .from('employee_invitations')
         .select('*')
         .eq('business_id', businessId)
+        .eq('is_approved', false)
         .order('invited_at', { ascending: false });
 
-      if (error) throw error;
+      if (invError) throw invError;
+
+      // Combinar empleados activos con invitaciones pendientes
+      const combined = [
+        ...(activeEmployees || []).map(emp => ({
+          ...emp,
+          is_active: true,
+          status: 'active'
+        })),
+        ...(pendingInvites || []).map(inv => ({
+          ...inv,
+          is_active: false,
+          status: 'pending'
+        }))
+      ];
       
-      setEmpleados(data || []);
+      setEmpleados(combined);
     } catch (error) {
       console.error('Error al cargar empleados:', error);
       setError('Error al cargar la lista de empleados');
@@ -311,8 +337,8 @@ function Empleados({ businessId }) {
   // Memoizar estadísticas
   const stats = useMemo(() => ({
     total: empleados.length,
-    approved: empleados.filter(e => e.is_approved).length,
-    pending: empleados.filter(e => !e.is_approved).length
+    approved: empleados.filter(e => e.status === 'active').length,
+    pending: empleados.filter(e => e.status === 'pending').length
   }), [empleados]);
 
   useEffect(() => {
@@ -614,7 +640,7 @@ function Empleados({ businessId }) {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          {empleado.is_approved ? (
+                          {empleado.status === 'active' ? (
                             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                               <CheckCircle className="w-3 h-3" />
                               Activo
