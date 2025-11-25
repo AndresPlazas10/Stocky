@@ -170,8 +170,8 @@ function Empleados({ businessId }) {
         throw new Error('No puedes usar el nombre de usuario del negocio');
       }
 
-      // Generar email automáticamente
-      const cleanEmail = `${cleanUsername.replace(/_/g, '.')}@gmail.com`;
+      // Generar email automáticamente (mismo patrón que propietarios)
+      const cleanEmail = `${cleanUsername}@stockly-app.com`;
 
       // Crear cuenta de Supabase Auth directamente
       const { data: authData, error: authError } = await supabase.auth.signUp({
