@@ -88,8 +88,8 @@ function Register() {
       }
 
       // Generar email automáticamente basado en username
-      // Usar dominio local para evitar validación de Supabase
-      const cleanEmail = `${cleanUsername}@stockly.local`;
+      // Usar dominio .com para evitar rechazo de validadores estrictos
+      const cleanEmail = `${cleanUsername}@stockly-app.com`;
 
       console.log('🚀 Iniciando registro de negocio...');
       console.log('📧 Email generado:', cleanEmail);
