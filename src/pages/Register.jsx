@@ -139,8 +139,18 @@ function Register() {
 
       if (businessError) {
         console.error('❌ Error al crear negocio:', businessError);
+        console.error('📋 Detalles del error:', {
+          code: businessError.code,
+          message: businessError.message,
+          details: businessError.details,
+          hint: businessError.hint
+        });
+        
+        // Eliminar el usuario de Auth para evitar usuarios huérfanos
+        await supabase.auth.admin.deleteUser(authData.user.id).catch(console.error);
         await supabase.auth.signOut();
-        throw new Error('Error al crear el negocio. Por favor intenta de nuevo.');
+        
+        throw new Error(`Error al crear el negocio: ${businessError.message || 'Verifica las políticas RLS en Supabase'}`);
       }
 
       console.log('✅ Negocio creado:', businessData.id);
