@@ -91,8 +91,10 @@ const EmployeeAccess = () => {
         return;
       }
 
-      // Generar email automáticamente
-      const cleanEmail = `${cleanUsername.replace(/_/g, '.')}@gmail.com`;
+      // Generar email automáticamente (mismo patrón que propietarios)
+      const cleanEmail = `${cleanUsername}@stockly-app.com`;
+
+      console.log('📧 Email generado para empleado:', cleanEmail);
 
       // Verificar si ya existe una cuenta con ese username
       const { data: existingBusiness } = await supabase
