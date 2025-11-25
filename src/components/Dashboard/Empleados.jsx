@@ -272,6 +272,20 @@ function Empleados({ businessId }) {
     try {
       if (employeeToDelete.status === 'active') {
         // Es un empleado activo - eliminar de la tabla employees
+        
+        // Primero eliminar el usuario de Auth usando la función SQL
+        if (employeeToDelete.user_id) {
+          const { error: authError } = await supabase.rpc('delete_auth_user', {
+            user_id_to_delete: employeeToDelete.user_id
+          });
+
+          if (authError) {
+            console.error('Error al eliminar usuario de Auth:', authError);
+            // Continuar aunque falle (el admin puede eliminarlo manualmente)
+          }
+        }
+
+        // Luego eliminar el registro de employees
         const { error: empError } = await supabase
           .from('employees')
           .delete()
@@ -281,17 +295,6 @@ function Empleados({ businessId }) {
         if (empError) {
           console.error('Error al eliminar empleado:', empError);
           throw new Error('Error al eliminar el empleado');
-        }
-
-        // Intentar eliminar el usuario de Auth (requiere service role)
-        // Esto solo funciona si tienes permisos de admin
-        if (employeeToDelete.user_id) {
-          const { error: authError } = await supabase.auth.admin.deleteUser(
-            employeeToDelete.user_id
-          ).catch(err => {
-            console.warn('No se pudo eliminar el usuario de Auth:', err);
-            return { error: null }; // Ignorar error de Auth
-          });
         }
 
         setSuccess('✅ Empleado eliminado exitosamente');
