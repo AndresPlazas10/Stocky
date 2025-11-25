@@ -6,16 +6,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { motion } from 'framer-motion';
-import { Store, Mail, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Store, User, Lock, ArrowLeft, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [formData, setFormData] = useState({
+    username: '',
+    password: ''
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  // Cerrar sesión al cargar el componente
   useEffect(() => {
     const initAuth = async () => {
       await supabase.auth.signOut();
@@ -23,62 +25,85 @@ function Login() {
     initAuth();
   }, []);
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setSuccess(false);
 
     try {
-      const cleanEmail = email.trim().toLowerCase();
+      const { username, password } = formData;
       
-      if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-        throw new Error('Por favor ingresa un correo electrónico válido');
+      if (!username || !password) {
+        throw new Error('Por favor ingresa usuario y contraseña');
       }
 
-      const { data: hasAccess, error: checkError } = await supabase
-        .rpc('check_email_has_access', { user_email: cleanEmail });
+      // Primero buscar en businesses (propietarios)
+      const { data: business, error: businessError } = await supabase
+        .from('businesses')
+        .select('email')
+        .eq('username', username.trim())
+        .maybeSingle();
 
-      if (checkError) {
-        throw new Error('Error al verificar permisos');
+      let emailToUse = null;
+
+      if (business) {
+        // Es un propietario
+        emailToUse = business.email;
+      } else {
+        // Buscar en employees (empleados)
+        const { data: employee, error: employeeError } = await supabase
+          .from('employees')
+          .select('email')
+          .eq('username', username.trim())
+          .maybeSingle();
+
+        if (employee) {
+          emailToUse = employee.email;
+        }
       }
 
-      if (!hasAccess) {
-        throw new Error('Este correo no tiene permisos de acceso. Registra tu negocio primero o solicita una invitación de empleado.');
+      if (!emailToUse) {
+        throw new Error('Usuario no encontrado');
       }
-      
-      // Usar variable de entorno o detectar automáticamente
-      const redirectUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-      
-      const { error } = await supabase.auth.signInWithOtp({
-        email: cleanEmail,
-        options: {
-          emailRedirectTo: `${redirectUrl}/dashboard`,
-        },
+
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: emailToUse,
+        password: password
       });
 
-      if (error) {
-        throw new Error(error.message || 'Error al enviar el enlace de inicio de sesión');
+      if (signInError) {
+        throw new Error('Usuario o contraseña incorrectos');
+      }
+
+      // Determinar si es propietario o empleado para redireccionar
+      if (business) {
+        window.location.href = '/dashboard';
+      } else {
+        window.location.href = '/employee-dashboard';
       }
       
-      setSuccess(true);
-    } catch (error) {
-      setError(error.message);
-    } finally {
+    } catch (err) {
+      setError(err.message);
       setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-      {/* Animated gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-background-50 via-background-100 to-accent-100">
-        <div className="absolute top-0 -left-4 w-72 h-72 bg-accent-300/30 rounded-full mix-blend-multiply filter blur-xl animate-blob"></div>
-        <div className="absolute top-0 -right-4 w-72 h-72 bg-primary-300/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000"></div>
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-secondary-300/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-indigo-100">
+        <div className="absolute top-0 -left-4 w-72 h-72 bg-indigo-300/30 rounded-full mix-blend-multiply filter blur-xl animate-blob"></div>
+        <div className="absolute top-0 -right-4 w-72 h-72 bg-blue-300/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000"></div>
+        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-purple-300/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000"></div>
       </div>
 
-      {/* Back Button */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -86,7 +111,7 @@ function Login() {
       >
         <Button
           variant="ghost"
-          className="glass-card border-0 text-primary-700 hover:bg-white/50"
+          className="bg-white/80 backdrop-blur-sm border-0 text-indigo-700 hover:bg-white shadow-md"
           onClick={() => navigate('/')}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -100,31 +125,25 @@ function Login() {
         transition={{ duration: 0.5 }}
         className="w-full max-w-md relative z-10"
       >
-        <Card className="glass-card border-white/30 shadow-2xl overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-white/10 pointer-events-none"></div>
-          
-          <CardHeader className="space-y-4 text-center pb-8 relative">
-            <div className="flex justify-center">
-              <div className="gradient-primary p-6 rounded-3xl shadow-2xl">
-                <Store className="h-14 w-14 text-white drop-shadow-md" />
-              </div>
+        <Card className="bg-white/90 backdrop-blur-xl border-2 border-white/50 shadow-2xl">
+          <CardHeader className="space-y-3 pb-6">
+            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <Store className="w-8 h-8 text-white" />
             </div>
-            <div>
-              <CardTitle className="text-3xl font-bold text-primary-900 mb-2">
-                Iniciar sesión
-              </CardTitle>
-              <CardDescription className="text-base text-primary-600">
-                Ingresa tu correo para recibir un enlace mágico de acceso
-              </CardDescription>
-            </div>
+            <CardTitle className="text-3xl font-bold text-center bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              Iniciar Sesión
+            </CardTitle>
+            <CardDescription className="text-center text-base text-gray-600">
+              Ingresa tus credenciales para acceder
+            </CardDescription>
           </CardHeader>
 
-          <CardContent className="space-y-6">
+          <CardContent>
             {error && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-destructive/10 border-2 border-destructive/20 rounded-xl p-4 flex items-start gap-3"
+                className="bg-destructive/10 border-2 border-destructive/20 rounded-xl p-4 flex items-start gap-3 mb-6"
                 role="alert"
                 aria-live="assertive"
               >
@@ -132,93 +151,93 @@ function Login() {
                 <p className="text-sm text-destructive">{error}</p>
               </motion.div>
             )}
-            
-            {success && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-accent-50 border-2 border-accent-200 rounded-xl p-4 flex items-start gap-3"
-                role="alert"
-                aria-live="polite"
-              >
-                <CheckCircle2 className="h-5 w-5 text-accent-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold text-accent-700 mb-1">¡Enlace enviado!</p>
-                  <p className="text-sm text-primary-600">
-                    Revisa tu correo y haz clic en el enlace para acceder.
-                  </p>
-                </div>
-              </motion.div>
-            )}
-            
-            <form onSubmit={handleLogin} className="space-y-4">
+
+            <form onSubmit={handleLogin} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-base">
-                  Correo electrónico
+                <Label htmlFor="username" className="text-base font-semibold text-gray-700">
+                  Usuario
                 </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="tu@correo.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 h-12 text-base"
+                    id="username"
+                    name="username"
+                    type="text"
+                    placeholder="Tu nombre de usuario"
+                    value={formData.username}
+                    onChange={handleChange}
+                    className="pl-10 h-12 text-base border-2 border-gray-200 focus:border-indigo-400"
                     required
-                    disabled={loading || success}
-                    aria-label="Correo electrónico"
+                    autoComplete="username"
                   />
                 </div>
               </div>
 
-              <Button 
-                type="submit" 
-                className="w-full h-12 text-base gradient-primary text-white hover:opacity-90"
-                disabled={loading || success}
-                size="lg"
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-base font-semibold text-gray-700">
+                  Contraseña
+                </Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Tu contraseña"
+                    value={formData.password}
+                    onChange={handleChange}
+                    className="pl-10 pr-10 h-12 text-base border-2 border-gray-200 focus:border-indigo-400"
+                    required
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-indigo-700 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full h-12 text-base font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg transition-all duration-300"
+                disabled={loading}
               >
-                {loading ? 'Enviando...' : success ? 'Enlace enviado ✓' : 'Enviar enlace mágico'}
+                {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
               </Button>
             </form>
 
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-card text-muted-foreground">
-                  ¿No tienes cuenta?
-                </span>
-              </div>
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-600">
+                ¿No tienes cuenta?{' '}
+                <button
+                  onClick={() => navigate('/register')}
+                  className="font-semibold text-indigo-600 hover:text-indigo-700 transition-colors"
+                >
+                  Registrar negocio
+                </button>
+              </p>
             </div>
-
-            <Button
-              variant="outline"
-              className="w-full h-12 text-base border-2 border-accent-300 text-accent-700 hover:bg-accent-50"
-              onClick={() => navigate('/register')}
-            >
-              Crear cuenta nueva
-            </Button>
           </CardContent>
         </Card>
-
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="text-center mt-6 text-primary-600 text-sm font-medium"
-        >
-          Al iniciar sesión, aceptas nuestros términos y condiciones
-        </motion.p>
       </motion.div>
-      
-      <style jsx>{`
+
+      <style>{`
         @keyframes blob {
-          0% { transform: translate(0px, 0px) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-          100% { transform: translate(0px, 0px) scale(1); }
+          0%, 100% {
+            transform: translate(0, 0) scale(1);
+          }
+          25% {
+            transform: translate(20px, -50px) scale(1.1);
+          }
+          50% {
+            transform: translate(-20px, 20px) scale(0.9);
+          }
+          75% {
+            transform: translate(50px, 50px) scale(1.05);
+          }
         }
         .animate-blob {
           animation: blob 7s infinite;

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatNumber } from '../../utils/formatters.js';
+import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -25,12 +26,12 @@ import {
 
 // Función helper pura fuera del componente (no se recrea en renders)
 const getVendedorName = (venta) => {
-  if (!venta.employees) return '-';
-  if (venta.employees.role === 'owner') return 'Administrador';
-  return venta.employees.full_name;
+  if (!venta.employees) return 'Vendedor desconocido';
+  if (venta.employees.role === 'owner' || venta.employees.role === 'admin') return 'Administrador';
+  return venta.employees.full_name || 'Vendedor desconocido';
 };
 
-function Ventas({ businessId }) {
+function Ventas({ businessId, userRole = 'admin' }) {
   const [ventas, setVentas] = useState([]);
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -38,6 +39,10 @@ function Ventas({ businessId }) {
   const [showPOS, setShowPOS] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  
+  // Estados para modal de eliminación de venta (solo admin)
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [saleToDelete, setSaleToDelete] = useState(null);
 
   // Estado del carrito de venta
   const [cart, setCart] = useState([]);
@@ -115,17 +120,29 @@ function Ventas({ businessId }) {
       });
 
       // Combinar datos manualmente
-      const salesWithEmployees = salesData?.map(sale => ({
-        ...sale,
-        customers: sale.customer_id ? customersMap.get(sale.customer_id) : null,
-        employees: sale.user_id === business?.created_by
-          ? { full_name: 'Administrador', role: 'owner' }
-          : employeeMap.get(sale.user_id) || null
-      })) || [];
+      const salesWithEmployees = salesData?.map(sale => {
+        const employee = employeeMap.get(sale.user_id);
+        const userId = String(sale.user_id || '').trim();
+        const createdBy = String(business?.created_by || '').trim();
+        const currentUserId = String(user?.id || '').trim();
+        
+        // Es owner si: created_by coincide O es el usuario actual y userRole es admin
+        const isOwner = userId === createdBy || (userId === currentUserId && userRole === 'admin');
+        const isAdmin = employee?.role === 'admin';
+        
+        return {
+          ...sale,
+          customers: sale.customer_id ? customersMap.get(sale.customer_id) : null,
+          employees: isOwner
+            ? { full_name: 'Administrador', role: 'owner' }
+            : isAdmin
+            ? { full_name: 'Administrador', role: 'admin' }
+            : employee || { full_name: 'Vendedor desconocido', role: 'employee' }
+        };
+      }) || [];
 
       setVentas(salesWithEmployees);
     } catch (error) {
-      console.error('Error loading ventas:', error);
       setVentas([]);
     }
   }, [businessId]);
@@ -181,6 +198,80 @@ function Ventas({ businessId }) {
       loadData();
     }
   }, [businessId, loadData]);
+
+  // 🔥 TIEMPO REAL: Suscripción a cambios en ventas
+  useRealtimeSubscription('sales', {
+    filter: { business_id: businessId },
+    enabled: !!businessId,
+    onInsert: async (newSale) => {
+      // Cargar employee y customer data
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('created_by')
+        .eq('id', businessId)
+        .single();
+
+      const { data: employeesData } = await supabase
+        .from('employees')
+        .select('user_id, full_name, role')
+        .eq('business_id', businessId);
+
+      const employeeMap = new Map();
+      employeesData?.forEach(emp => {
+        employeeMap.set(emp.user_id, { full_name: emp.full_name || 'Usuario', role: emp.role });
+      });
+
+      const employee = employeeMap.get(newSale.user_id);
+      const userId = String(newSale.user_id || '').trim();
+      const createdBy = String(business?.created_by || '').trim();
+      const currentUserId = String(user?.id || '').trim();
+      
+      // Es owner si: created_by coincide O es el usuario actual y userRole es admin
+      const isOwner = userId === createdBy || (userId === currentUserId && userRole === 'admin');
+      const isAdmin = employee?.role === 'admin';
+      
+      const saleWithDetails = {
+        ...newSale,
+        employees: isOwner
+          ? { full_name: 'Administrador', role: 'owner' }
+          : isAdmin
+          ? { full_name: 'Administrador', role: 'admin' }
+          : employee || { full_name: 'Vendedor desconocido', role: 'employee' },
+        customers: newSale.customer_id ? clientesMap.get(newSale.customer_id) : null
+      };
+
+      // Verificar si la venta ya existe antes de agregarla
+      setVentas(prev => {
+        const exists = prev.some(v => v.id === newSale.id);
+        if (exists) {
+          return prev;
+        }
+        return [saleWithDetails, ...prev];
+      });
+      
+      setSuccess('✨ Nueva venta registrada');
+      setTimeout(() => setSuccess(null), 3000);
+    },
+    onUpdate: (updatedSale) => {
+      setVentas(prev => prev.map(v => v.id === updatedSale.id ? { ...v, ...updatedSale } : v));
+    },
+    onDelete: (deletedSale) => {
+      setVentas(prev => prev.filter(v => v.id !== deletedSale.id));
+    }
+  });
+
+  // 🔥 TIEMPO REAL: Suscripción a cambios en productos (para stock)
+  useRealtimeSubscription('products', {
+    filter: { business_id: businessId },
+    enabled: !!businessId,
+    onUpdate: (updatedProduct) => {
+      setProductos(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+    },
+    onDelete: (deletedProduct) => {
+      setProductos(prev => prev.filter(p => p.id !== deletedProduct.id));
+    }
+  });
 
   // Memoizar mapa de clientes para acceso O(1)
   const clientesMap = useMemo(() => {
@@ -430,6 +521,59 @@ function Ventas({ businessId }) {
     }
   }, [cart, businessId, paymentMethod, selectedCustomer, total, loadVentas]);
 
+  // Funciones de eliminación de venta (solo admin)
+  const handleDeleteSale = (saleId) => {
+    setSaleToDelete(saleId);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteSale = async () => {
+    if (!saleToDelete) return;
+
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Eliminar detalles de venta primero
+      const { error: detailsError } = await supabase
+        .from('sale_details')
+        .delete()
+        .eq('sale_id', saleToDelete);
+
+      if (detailsError) throw new Error('Error al eliminar detalles: ' + detailsError.message);
+
+      // Eliminar la venta
+      const { error: deleteError } = await supabase
+        .from('sales')
+        .delete()
+        .eq('id', saleToDelete);
+
+      if (deleteError) throw new Error('Error al eliminar venta: ' + deleteError.message);
+
+      setSuccess('✅ Venta eliminada exitosamente');
+      setTimeout(() => setSuccess(null), 4000);
+
+      // Recargar ventas
+      await loadVentas();
+
+      setShowDeleteModal(false);
+      setSaleToDelete(null);
+
+    } catch (error) {
+      setError('❌ ' + (error.message || 'Error al eliminar la venta'));
+      setTimeout(() => setError(null), 8000);
+      setShowDeleteModal(false);
+      setSaleToDelete(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setSaleToDelete(null);
+  };
+
   // Memoizar productos filtrados
   const filteredProducts = useMemo(() => {
     if (!searchProduct.trim()) return productos;
@@ -602,7 +746,6 @@ function Ventas({ businessId }) {
           : `✅ Factura ${invoiceNumber} generada y enviada a ${invoiceCustomerEmail}`
         );
       } catch (emailError) {
-        console.error('Error al enviar email:', emailError);
         setSuccess(`✅ Factura ${invoiceNumber} generada (⚠️ error al enviar email)`);
       }
 
@@ -622,47 +765,47 @@ function Ventas({ businessId }) {
 
   if (loading && ventas.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#C4DFE6] to-white">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-light-bg-primary to-white">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#003B46] mx-auto mb-4"></div>
-          <p className="text-[#07575B] font-medium">Cargando ventas...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#edb886] mx-auto mb-4"></div>
+          <p className="text-secondary-600 font-medium">Cargando ventas...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#C4DFE6] to-white p-6">
+    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary to-white p-6">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <Card className="bg-gradient-to-r from-[#003B46] to-[#07575B] text-white shadow-xl rounded-2xl border-none mb-6">
-          <div className="p-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                <ShoppingCart className="w-8 h-8" />
+        <Card className="gradient-primary text-white shadow-xl rounded-2xl border-none mb-6">
+          <div className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="p-2 sm:p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                <ShoppingCart className="w-6 h-6 sm:w-8 sm:h-8" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold">Ventas</h1>
-                <p className="text-white/80 mt-1">Sistema de punto de venta</p>
+                <h1 className="text-2xl sm:text-3xl font-bold">Ventas</h1>
+                <p className="text-white/80 mt-1 text-sm sm:text-base">Sistema de punto de venta</p>
               </div>
             </div>
             <Button
               onClick={() => setShowPOS(!showPOS)}
-              className="bg-white text-[#003B46] hover:bg-white/90 transition-all duration-300 shadow-lg font-semibold px-6 py-3 rounded-xl flex items-center gap-2"
+              className="w-full sm:w-auto gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-xl flex items-center justify-center gap-2 text-sm sm:text-base"
             >
               {showPOS ? (
                 <>
-                  <Receipt className="w-5 h-5" />
-                  Ver Historial
+                  <Receipt className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="whitespace-nowrap">Ver Historial</span>
                 </>
               ) : (
                 <>
-                  <Plus className="w-5 h-5" />
-                  Nueva Venta
+                  <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="whitespace-nowrap">Nueva Venta</span>
                 </>
               )}
             </Button>
@@ -709,23 +852,23 @@ function Ventas({ businessId }) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="grid lg:grid-cols-2 gap-6"
+          className="grid xl:grid-cols-2 gap-4 sm:gap-6"
         >
           {/* Panel izquierdo - Productos */}
           <Card className="shadow-xl rounded-2xl bg-white border-none">
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-gradient-to-r from-[#003B46] to-[#07575B] rounded-lg">
+                <div className="p-2 gradient-primary rounded-lg">
                   <Search className="w-5 h-5 text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-[#003B46]">Productos</h3>
+                <h3 className="text-xl font-bold text-accent-600">Productos</h3>
               </div>
               
               <div className="relative mb-6">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <Input
                   type="text"
-                  className="pl-10 h-12 rounded-xl border-gray-300 focus:border-[#003B46] focus:ring-[#003B46]"
+                  className="pl-10 h-12 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
                   placeholder="Buscar producto por nombre o código..."
                   value={searchProduct}
                   onChange={(e) => setSearchProduct(e.target.value)}
@@ -750,9 +893,9 @@ function Ventas({ businessId }) {
                         className="hover:shadow-lg transition-all duration-300 rounded-xl border-gray-200 bg-gradient-to-br from-white to-gray-50"
                         onClick={() => addToCart(producto)}
                       >
-                        <div className="p-4 flex items-center justify-between">
+                        <div className="p-3 sm:p-4 flex items-center justify-between">
                           <div className="flex-1">
-                            <p className="font-bold text-[#003B46] text-lg">{producto.name}</p>
+                            <p className="font-bold text-accent-600 text-lg">{producto.name}</p>
                             <p className="text-sm text-gray-500 mt-1">Código: {producto.code}</p>
                             <Badge 
                               className={`mt-2 ${
@@ -767,10 +910,10 @@ function Ventas({ businessId }) {
                             </Badge>
                           </div>
                           <div className="text-right ml-4">
-                            <p className="text-2xl font-bold text-[#07575B]">
+                            <p className="text-2xl font-bold text-secondary-600">
                               {formatPrice(producto.sale_price)}
                             </p>
-                            <Plus className="w-6 h-6 text-[#003B46] mt-2 ml-auto" />
+                            <Plus className="w-6 h-6 text-accent-600 mt-2 ml-auto" />
                           </div>
                         </div>
                       </Card>
@@ -783,12 +926,12 @@ function Ventas({ businessId }) {
 
           {/* Panel derecho - Carrito */}
           <Card className="shadow-xl rounded-2xl bg-white border-none">
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-gradient-to-r from-[#003B46] to-[#07575B] rounded-lg">
+                <div className="p-2 gradient-primary rounded-lg">
                   <ShoppingCart className="w-5 h-5 text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-[#003B46]">Carrito de Venta</h3>
+                <h3 className="text-xl font-bold text-accent-600">Carrito de Venta</h3>
               </div>
               
               <div className="space-y-4 mb-6">
@@ -800,7 +943,7 @@ function Ventas({ businessId }) {
                   <select
                     value={selectedCustomer}
                     onChange={(e) => setSelectedCustomer(e.target.value)}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#003B46] focus:ring-[#003B46] transition-all duration-300"
+                    className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#edb886] focus:ring-[#edb886] transition-all duration-300"
                   >
                     <option value="">Venta general</option>
                     {clientes.map(cliente => (
@@ -819,7 +962,7 @@ function Ventas({ businessId }) {
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#003B46] focus:ring-[#003B46] transition-all duration-300"
+                    className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#edb886] focus:ring-[#edb886] transition-all duration-300"
                   >
                     <option value="cash">💵 Efectivo</option>
                     <option value="card">💳 Tarjeta</option>
@@ -854,7 +997,7 @@ function Ventas({ businessId }) {
                           <div className="p-3">
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
-                                <p className="font-bold text-[#003B46]">{item.name}</p>
+                                <p className="font-bold text-accent-600">{item.name}</p>
                                 <p className="text-xs text-gray-500">{item.code}</p>
                               </div>
                               <Button
@@ -878,7 +1021,7 @@ function Ventas({ businessId }) {
                                   onChange={(e) => updateQuantity(item.product_id, parseInt(e.target.value) || 0)}
                                   min="1"
                                   max={item.available_stock}
-                                  className="w-12 text-center border-none focus:outline-none focus:ring-0 font-bold text-[#003B46]"
+                                  className="w-12 text-center border-none focus:outline-none focus:ring-0 font-bold text-accent-600"
                                 />
                                 <button
                                   onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
@@ -887,7 +1030,7 @@ function Ventas({ businessId }) {
                                   +
                                 </button>
                               </div>
-                              <p className="text-lg font-bold text-[#07575B]">
+                              <p className="text-lg font-bold text-secondary-600">
                                 {formatPrice(item.subtotal)}
                               </p>
                             </div>
@@ -899,7 +1042,7 @@ function Ventas({ businessId }) {
                 </div>
               </div>
 
-              <Card className="bg-gradient-to-r from-[#003B46] to-[#07575B] text-white shadow-lg rounded-xl border-none mb-4">
+              <Card className="gradient-primary text-white shadow-lg rounded-xl border-none mb-4">
                 <div className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <DollarSign className="w-6 h-6" />
@@ -912,7 +1055,7 @@ function Ventas({ businessId }) {
               <Button
                 onClick={processSale}
                 disabled={cart.length === 0 || loading}
-                className="w-full h-14 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold text-lg rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                className="w-full h-12 sm:h-14 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold text-base sm:text-lg rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 sm:gap-3"
               >
                 {loading ? (
                   <>
@@ -944,126 +1087,130 @@ function Ventas({ businessId }) {
               </div>
             </Card>
           ) : (
-            <Card className="shadow-xl rounded-2xl bg-white border-none overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gradient-to-r from-[#003B46] to-[#07575B] text-white">
-                      <th className="px-6 py-4 text-left font-semibold">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4" />
-                          Fecha
+            <div className="space-y-4">
+              {/* Vista de tarjetas en móvil y desktop */}
+              <div className="grid grid-cols-1 gap-4">
+                {ventas.map((venta, index) => (
+                  <motion.div
+                    key={venta.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                  >
+                    <Card className="shadow-lg rounded-2xl bg-white border-2 border-accent-100 hover:border-primary-300 hover:shadow-xl transition-all duration-300">
+                      <CardContent className="p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          {/* Información principal */}
+                          <div className="flex-1 space-y-3">
+                            {/* Fecha y hora */}
+                            <div className="flex items-center gap-2 text-accent-600">
+                              <Calendar className="w-4 h-4 shrink-0" />
+                              <span className="text-sm font-medium">
+                                {new Date(venta.created_at + 'Z').toLocaleString('es-CO', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  timeZone: 'America/Bogota'
+                                })}
+                              </span>
+                            </div>
+
+                            {/* Cliente y Vendedor */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div className="flex items-center gap-2">
+                                <User className="w-4 h-4 text-primary-600 shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-xs text-accent-500 uppercase tracking-wide">Cliente</p>
+                                  <p className="text-sm font-semibold text-primary-900 truncate">
+                                    {venta.customers?.full_name || 'Venta general'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <User className="w-4 h-4 text-accent-600 shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-xs text-accent-500 uppercase tracking-wide">Vendedor</p>
+                                  <p className="text-sm font-medium text-gray-700 truncate">
+                                    {getVendedorName(venta)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Método de pago */}
+                            <div className="flex items-center gap-2">
+                              <CreditCard className="w-4 h-4 text-accent-600 shrink-0" />
+                              <Badge 
+                                className={`${
+                                  venta.payment_method === 'cash' 
+                                    ? 'bg-green-100 text-green-800 border-green-200' 
+                                    : venta.payment_method === 'card'
+                                    ? 'bg-blue-100 text-blue-800 border-blue-200'
+                                    : venta.payment_method === 'transfer'
+                                    ? 'bg-purple-100 text-purple-800 border-purple-200'
+                                    : 'bg-orange-100 text-orange-800 border-orange-200'
+                                } border`}
+                              >
+                                {venta.payment_method === 'cash' && '💵 Efectivo'}
+                                {venta.payment_method === 'card' && '💳 Tarjeta'}
+                                {venta.payment_method === 'transfer' && '🏦 Transferencia'}
+                                {venta.payment_method === 'mixed' && '🔀 Mixto'}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          {/* Total y Acciones */}
+                          <div className="flex flex-col sm:items-end gap-3 sm:border-l sm:border-accent-200 sm:pl-6">
+                            {/* Total */}
+                            <div className="text-left sm:text-right">
+                              <p className="text-xs text-accent-500 uppercase tracking-wide mb-1">Total</p>
+                              <p className="text-2xl sm:text-3xl font-bold text-primary-900">
+                                {formatPrice(venta.total)}
+                              </p>
+                            </div>
+
+                            {/* Botones de acción */}
+                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                              <Button
+                                onClick={async () => {
+                                  // Cargar detalles de la venta
+                                  const { data: saleDetails } = await supabase
+                                    .from('sale_details')
+                                    .select('*, products(name)')
+                                    .eq('sale_id', venta.id);
+                                  
+                                  setSelectedSale({ ...venta, sale_details: saleDetails || [] });
+                                  setInvoiceCustomerName(venta.customers?.full_name || '');
+                                  setInvoiceCustomerEmail(venta.customers?.email || '');
+                                  setInvoiceCustomerIdNumber(venta.customers?.id_number || '');
+                                  setShowInvoiceModal(true);
+                                }}
+                                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
+                              >
+                                <FileText className="w-4 h-4" />
+                                <span className="text-sm">Factura</span>
+                              </Button>
+                              {userRole === 'admin' && (
+                                <Button
+                                  onClick={() => handleDeleteSale(venta.id)}
+                                  className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
+                                  title="Eliminar venta"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  <span className="text-sm sm:hidden lg:inline">Eliminar</span>
+                                </Button>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </th>
-                      <th className="px-6 py-4 text-left font-semibold">
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4" />
-                          Cliente
-                        </div>
-                      </th>
-                      <th className="px-6 py-4 text-left font-semibold">
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4" />
-                          Vendedor
-                        </div>
-                      </th>
-                      <th className="px-6 py-4 text-left font-semibold">
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="w-4 h-4" />
-                          Total
-                        </div>
-                      </th>
-                      <th className="px-6 py-4 text-left font-semibold">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="w-4 h-4" />
-                          Método de Pago
-                        </div>
-                      </th>
-                      <th className="px-6 py-4 text-left font-semibold">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4" />
-                          Acciones
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ventas.map((venta, index) => (
-                      <motion.tr
-                        key={venta.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: index * 0.05 }}
-                        className="border-b border-gray-100 hover:bg-gradient-to-r hover:from-[#C4DFE6]/20 hover:to-transparent transition-all duration-300"
-                      >
-                        <td className="px-6 py-4 text-sm text-gray-700">
-                          {new Date(venta.created_at + 'Z').toLocaleString('es-CO', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            timeZone: 'America/Bogota'
-                          })}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-sm font-medium text-gray-800">
-                            {venta.customers?.full_name || 'Venta general'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-700">
-                          {getVendedorName(venta)}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-lg font-bold text-[#07575B]">
-                            {formatPrice(venta.total)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <Badge 
-                            className={`${
-                              venta.payment_method === 'cash' 
-                                ? 'bg-green-100 text-green-800' 
-                                : venta.payment_method === 'card'
-                                ? 'bg-blue-100 text-blue-800'
-                                : venta.payment_method === 'transfer'
-                                ? 'bg-purple-100 text-purple-800'
-                                : 'bg-orange-100 text-orange-800'
-                            }`}
-                          >
-                            {venta.payment_method === 'cash' && '💵 Efectivo'}
-                            {venta.payment_method === 'card' && '💳 Tarjeta'}
-                            {venta.payment_method === 'transfer' && '🏦 Transferencia'}
-                            {venta.payment_method === 'mixed' && '🔀 Mixto'}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4">
-                          <Button
-                            onClick={async () => {
-                              // Cargar detalles de la venta
-                              const { data: saleDetails } = await supabase
-                                .from('sale_details')
-                                .select('*, products(name)')
-                                .eq('sale_id', venta.id);
-                              
-                              setSelectedSale({ ...venta, sale_details: saleDetails || [] });
-                              setInvoiceCustomerName(venta.customers?.full_name || '');
-                              setInvoiceCustomerEmail(venta.customers?.email || '');
-                              setInvoiceCustomerIdNumber(venta.customers?.id_number || '');
-                              setShowInvoiceModal(true);
-                            }}
-                            className="bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg px-4 py-2 flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg"
-                          >
-                            <FileText className="w-4 h-4" />
-                            Generar Factura
-                          </Button>
-                        </td>
-                      </motion.tr>
-                    ))}
-                  </tbody>
-                </table>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
               </div>
-            </Card>
+            </div>
           )}
         </motion.div>
       )}
@@ -1221,6 +1368,63 @@ function Ventas({ businessId }) {
                   </div>
                 </div>
               </Card>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de confirmación de eliminación de venta (solo admin) */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={cancelDelete}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md bg-white rounded-2xl shadow-2xl"
+            >
+              <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4 rounded-t-2xl">
+                <div className="flex items-center gap-3 text-white">
+                  <Trash2 className="w-6 h-6" />
+                  <h3 className="text-xl font-bold">Eliminar Venta</h3>
+                </div>
+              </div>
+              
+              <div className="p-6 space-y-4">
+                <p className="text-gray-700 font-semibold">
+                  ⚠️ ¿Estás seguro de eliminar esta venta permanentemente?
+                </p>
+                
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-800">
+                    <strong>Esta acción no se puede deshacer.</strong> La venta y todos sus detalles serán eliminados del sistema de forma permanente.
+                  </p>
+                </div>
+                
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={cancelDelete}
+                    className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={confirmDeleteSale}
+                    disabled={loading}
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {loading ? 'Eliminando...' : 'Eliminar Definitivamente'}
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </motion.div>
         )}

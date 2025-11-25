@@ -30,7 +30,7 @@ export function MobileHeader({
         </motion.button>
 
         {/* Logo/Nombre del negocio */}
-        <h1 className="text-lg font-bold text-[#003B46] truncate flex-1 text-center px-2">
+        <h1 className="text-lg font-bold text-accent-600 truncate flex-1 text-center px-2">
           {businessName}
         </h1>
 

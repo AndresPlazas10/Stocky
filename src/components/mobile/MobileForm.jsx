@@ -39,7 +39,7 @@ export function MobileInput({
             transition-all duration-200
             ${error 
               ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-200' 
-              : 'border-gray-300 focus:border-[#003B46] focus:ring-2 focus:ring-[#003B46]/20'
+              : 'border-gray-300 focus:border-[#edb886] focus:ring-2 focus:ring-[#edb886]/20'
             }
             placeholder:text-gray-400
             disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
@@ -82,7 +82,7 @@ export function MobileTextarea({ label, error, helperText, rows = 4, ...props })
           resize-none
           ${error 
             ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-200' 
-            : 'border-gray-300 focus:border-[#003B46] focus:ring-2 focus:ring-[#003B46]/20'
+            : 'border-gray-300 focus:border-[#edb886] focus:ring-2 focus:ring-[#edb886]/20'
           }
           placeholder:text-gray-400
           disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
@@ -122,7 +122,7 @@ export function MobileSelect({ label, error, helperText, options = [], ...props 
           transition-all duration-200
           ${error 
             ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-200' 
-            : 'border-gray-300 focus:border-[#003B46] focus:ring-2 focus:ring-[#003B46]/20'
+            : 'border-gray-300 focus:border-[#edb886] focus:ring-2 focus:ring-[#edb886]/20'
           }
           disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
         `}
@@ -161,7 +161,7 @@ export function MobileButton({
   ...props 
 }) {
   const variants = {
-    primary: "bg-[#003B46] hover:bg-[#002831] text-white shadow-sm active:shadow-md",
+    primary: "bg-accent-500 hover:bg-accent-700 text-white shadow-sm active:shadow-md",
     secondary: "bg-white hover:bg-gray-50 text-gray-900 border border-gray-300 active:border-gray-400",
     danger: "bg-red-600 hover:bg-red-700 text-white shadow-sm active:shadow-md",
     ghost: "bg-transparent hover:bg-gray-100 text-gray-700 active:bg-gray-200",

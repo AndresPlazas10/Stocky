@@ -30,7 +30,7 @@ const menuItems = [
   { icon: Settings, label: 'Configuración', section: 'configuracion' },
 ];
 
-export function Sidebar({ activeSection, onSectionChange, businessName, businessLogo, onLogoChange }) {
+export const Sidebar = React.memo(function Sidebar({ activeSection, onSectionChange, businessName, businessLogo, onLogoChange }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -54,7 +54,6 @@ export function Sidebar({ activeSection, onSectionChange, businessName, business
       const reader = new FileReader();
       reader.onloadend = () => {
         const logoUrl = reader.result;
-        localStorage.setItem('businessLogo', logoUrl);
         
         if (onLogoChange) {
           onLogoChange(logoUrl);
@@ -67,7 +66,6 @@ export function Sidebar({ activeSection, onSectionChange, businessName, business
   };
 
   const handleRemoveLogo = () => {
-    localStorage.removeItem('businessLogo');
     if (onLogoChange) {
       onLogoChange(null);
     }
@@ -264,4 +262,4 @@ export function Sidebar({ activeSection, onSectionChange, businessName, business
       </AnimatePresence>
     </>
   );
-}
+});

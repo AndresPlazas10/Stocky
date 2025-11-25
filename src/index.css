@@ -1,66 +1,66 @@
 @import "tailwindcss";
 
 :root {
-  /* Paleta de colores oficial de Stockly */
-  --color-primary: #003B46;        /* Primario oscuro */
-  --color-secondary: #07575B;      /* Secundario */
-  --color-accent: #66A5AD;         /* Acento */
-  --color-background: #C4DFE6;     /* Fondo claro */
+  /* Paleta de colores Indigo/Purple */
+  --color-primary: #4f46e5;        /* Indigo 600 */
+  --color-secondary: #7c3aed;      /* Purple 600 */
+  --color-accent: #6366f1;         /* Indigo 500 */
+  --color-background: #eef2ff;     /* Indigo 50 */
   
   /* Sistema de colores semántico para shadcn/ui */
   --background: 0 0% 100%;
-  --foreground: 188 100% 14%;
+  --foreground: 222 47% 11%;
   --card: 0 0% 100%;
-  --card-foreground: 188 100% 14%;
+  --card-foreground: 222 47% 11%;
   --popover: 0 0% 100%;
-  --popover-foreground: 188 100% 14%;
-  --primary: 188 100% 14%;         /* #003B46 */
+  --popover-foreground: 222 47% 11%;
+  --primary: 239 84% 67%;          /* Indigo 500 */
   --primary-foreground: 0 0% 100%;
-  --secondary: 185 88% 19%;        /* #07575B */
+  --secondary: 262 83% 58%;        /* Purple 600 */
   --secondary-foreground: 0 0% 100%;
-  --muted: 186 25% 88%;            /* #C4DFE6 variante */
-  --muted-foreground: 185 50% 35%;
-  --accent: 186 25% 54%;           /* #66A5AD */
-  --accent-foreground: 188 100% 14%;
+  --muted: 239 68% 97%;            /* Indigo 50 */
+  --muted-foreground: 215 16% 47%;
+  --accent: 239 84% 67%;           /* Indigo 500 */
+  --accent-foreground: 222 47% 11%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 98%;
-  --border: 186 25% 82%;
-  --input: 186 25% 82%;
-  --ring: 186 25% 54%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 239 84% 67%;
   --radius: 1rem;
   
   /* Sombras personalizadas */
-  --shadow-sm: 0 1px 2px 0 rgb(0 59 70 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 59 70 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 59 70 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 59 70 / 0.15);
+  --shadow-sm: 0 1px 2px 0 rgb(79 70 229 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(79 70 229 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(79 70 229 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(79 70 229 / 0.15);
   
   /* Gradientes corporativos */
-  --gradient-primary: linear-gradient(135deg, #003B46 0%, #07575B 100%);
-  --gradient-accent: linear-gradient(135deg, #66A5AD 0%, #C4DFE6 100%);
-  --gradient-hero: linear-gradient(135deg, #003B46 0%, #07575B 50%, #66A5AD 100%);
+  --gradient-primary: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  --gradient-accent: linear-gradient(135deg, #6366f1 0%, #a78bfa 100%);
+  --gradient-hero: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #a78bfa 100%);
 }
 
 .dark {
-  --background: 188 100% 8%;
+  --background: 222 47% 8%;
   --foreground: 210 40% 98%;
-  --card: 188 100% 10%;
+  --card: 222 47% 10%;
   --card-foreground: 210 40% 98%;
-  --popover: 188 100% 10%;
+  --popover: 222 47% 10%;
   --popover-foreground: 210 40% 98%;
-  --primary: 186 25% 54%;
-  --primary-foreground: 188 100% 14%;
-  --secondary: 185 88% 19%;
+  --primary: 239 84% 67%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 262 83% 58%;
   --secondary-foreground: 210 40% 98%;
-  --muted: 188 100% 15%;
+  --muted: 222 47% 15%;
   --muted-foreground: 215 20% 65%;
-  --accent: 186 25% 54%;
+  --accent: 239 84% 67%;
   --accent-foreground: 210 40% 98%;
   --destructive: 0 62% 50%;
   --destructive-foreground: 210 40% 98%;
-  --border: 188 100% 20%;
-  --input: 188 100% 18%;
-  --ring: 186 25% 54%;
+  --border: 222 47% 20%;
+  --input: 222 47% 18%;
+  --ring: 239 84% 67%;
 }
 
 * {
@@ -92,8 +92,8 @@ body {
 /* Patrón de fondo sutil */
 .bg-grid-pattern {
   background-image: 
-    linear-gradient(to right, rgba(0, 59, 70, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 59, 70, 0.05) 1px, transparent 1px);
+    linear-gradient(to right, rgba(79, 70, 229, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(79, 70, 229, 0.05) 1px, transparent 1px);
   background-size: 20px 20px;
 }
 

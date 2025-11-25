@@ -40,64 +40,32 @@ function EmployeeDashboard() {
         return;
       }
 
-      // Buscar la invitación del empleado (SIN el JOIN a businesses todavía)
-      const { data: invitation, error: invitationError } = await supabase
-        .from('employee_invitations')
+      // Buscar el empleado directamente en la tabla employees
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('employees')
         .select('*')
-        .eq('email', user.email)
-        .eq('is_approved', true)
+        .eq('user_id', user.id)
         .maybeSingle();
 
-
-      if (invitationError) {
+      if (employeeError) {
+        console.error('Error al verificar empleado:', employeeError);
         setError('Error al verificar permisos de empleado');
         setLoading(false);
         return;
       }
 
-      if (!invitation) {
-        setError('No tienes permisos de empleado. Este correo no tiene una invitación aprobada.');
+      if (!employeeData) {
+        setError('No tienes permisos de empleado. Tu usuario no está registrado como empleado.');
         setLoading(false);
         return;
       }
 
-      // IMPORTANTE: Crear o actualizar registro en tabla employees
-      // Esto es necesario para que las políticas RLS funcionen
-      const { data: existingEmployee, error: employeeCheckError } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('business_id', invitation.business_id)
-        .maybeSingle();
-
-
-      if (!existingEmployee) {
-        const { data: newEmployee, error: employeeCreateError } = await supabase
-          .from('employees')
-          .insert([{
-            user_id: user.id,
-            business_id: invitation.business_id,
-            role: invitation.role,
-            full_name: invitation.full_name
-          }])
-          .select()
-          .maybeSingle();
-
-
-        if (employeeCreateError) {
-          setError('Error al configurar permisos de empleado');
-          setLoading(false);
-          return;
-        }
-      }
-
-      // AHORA sí podemos obtener el negocio (después de crear el registro en employees)
+      // Obtener el negocio
       const { data: businessData, error: businessError } = await supabase
         .from('businesses')
         .select('*')
-        .eq('id', invitation.business_id)
+        .eq('id', employeeData.business_id)
         .maybeSingle();
-
 
       if (businessError || !businessData) {
         setError('Error al cargar información del negocio');
@@ -105,49 +73,42 @@ function EmployeeDashboard() {
         return;
       }
 
-      // Verificar si el empleado existe en la tabla users, si no, crearlo
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (!existingUser) {
-        // Crear el registro del empleado en la tabla users
-        const { error: userCreateError } = await supabase
-          .from('users')
-          .insert([{
-            id: user.id,
-            business_id: invitation.business_id,
-            full_name: invitation.full_name,
-            email: user.email,
-            role: invitation.role,
-            is_active: true
-          }]);
-
-        if (userCreateError) {
-        }
-      }
-
-
       setEmployee({
         email: user.email,
-        fullName: invitation.full_name, // Guardar el nombre completo de la invitación
-        role: invitation.role,
-        invitationId: invitation.id
+        fullName: employeeData.full_name,
+        role: employeeData.role,
+        username: employeeData.username
       });
       setBusiness(businessData);
       setLoading(false);
 
     } catch (err) {
+      console.error('Error en checkEmployeeAuth:', err);
       setError('Error al cargar información del empleado');
       setLoading(false);
     }
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    window.location.href = '/';
+    try {
+      // Limpiar el estado local primero
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Cerrar sesión en Supabase con scope global
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
+      
+      if (error) {
+        console.error('Error al cerrar sesión:', error);
+      }
+      
+      // Redirigir siempre, incluso si hay error
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Error inesperado al cerrar sesión:', error);
+      // Forzar redirección de todas formas
+      window.location.href = '/';
+    }
   };
 
   const menuItems = [
@@ -187,9 +148,6 @@ function EmployeeDashboard() {
                     <span className="text-sm text-blue-700 font-medium">Negocio</span>
                   </div>
                   <p className="text-lg font-bold text-blue-800 pl-8">{business?.name}</p>
-                  {business?.tax_id && (
-                    <p className="text-sm text-blue-600 pl-8">{business.tax_id}</p>
-                  )}
                 </div>
               </div>
             </motion.div>
@@ -216,9 +174,9 @@ function EmployeeDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#C4DFE6]/20 via-white to-[#66A5AD]/10 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#66A5AD] border-t-transparent"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent"></div>
           <p className="text-gray-600">Cargando...</p>
         </div>
       </div>
@@ -227,7 +185,7 @@ function EmployeeDashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#C4DFE6]/20 via-white to-[#66A5AD]/10 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full border border-gray-100">
           <div className="text-center">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -237,7 +195,7 @@ function EmployeeDashboard() {
             <p className="text-gray-600 mb-6">{error}</p>
             <button 
               onClick={handleSignOut}
-              className="px-6 py-3 bg-gradient-to-r from-[#003B46] to-[#07575B] text-white rounded-xl font-semibold hover:shadow-lg transition-all"
+              className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all"
             >
               Volver al inicio
             </button>
@@ -248,18 +206,19 @@ function EmployeeDashboard() {
   }
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-[#C4DFE6]/20 via-white to-[#66A5AD]/10 overflow-hidden">
+    <div className="flex h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 overflow-hidden">
       {/* Sidebar */}
       <motion.aside
         initial={{ x: -300 }}
         animate={{ x: 0 }}
         className={`
           fixed md:static inset-y-0 left-0 z-50
-          w-72 bg-gradient-to-b from-[#003B46] to-[#07575B] text-white
+          w-72 text-white
           transform transition-transform duration-300 ease-in-out
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
           flex flex-col shadow-2xl
         `}
+        style={{ background: 'linear-gradient(to bottom, #4f46e5, #7c3aed)' }}
       >
         {/* Header del Sidebar */}
         <div className="p-6 border-b border-white/10">
@@ -270,9 +229,6 @@ function EmployeeDashboard() {
               </div>
               <div>
                 <h2 className="font-bold text-lg">{business?.name}</h2>
-                {business?.tax_id && (
-                  <p className="text-xs text-white/60">{business.tax_id}</p>
-                )}
               </div>
             </div>
             <button
@@ -310,10 +266,11 @@ function EmployeeDashboard() {
                   w-full flex items-center gap-3 px-4 py-3 rounded-xl
                   font-medium transition-all duration-200
                   ${isActive 
-                    ? 'bg-white text-[#003B46] shadow-lg' 
-                    : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    ? 'bg-white shadow-lg' 
+                    : 'text-white/90 hover:bg-white/20 hover:text-white'
                   }
                 `}
+                style={isActive ? { color: '#4f46e5' } : {}}
               >
                 <Icon className="w-5 h-5" />
                 <span>{item.label}</span>
@@ -333,7 +290,7 @@ function EmployeeDashboard() {
           
           <button
             onClick={handleSignOut}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500/20 hover:bg-red-500/30 text-white rounded-xl font-medium transition-all"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium transition-all shadow-lg"
           >
             <LogOut className="w-5 h-5" />
             Cerrar Sesión

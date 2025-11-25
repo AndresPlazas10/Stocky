@@ -222,7 +222,7 @@ function Proveedores({ businessId }) {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#C4DFE6]/20 via-white to-[#66A5AD]/10 p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#ffe498]/10 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         
         {/* Header */}
@@ -233,7 +233,7 @@ function Proveedores({ businessId }) {
         >
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-gradient-to-br from-[#003B46] to-[#07575B] rounded-xl">
+              <div className="p-3 bg-gradient-to-br from-accent-500 to-secondary-500 rounded-xl">
                 <Building2 className="w-8 h-8 text-white" />
               </div>
               <div>
@@ -247,7 +247,7 @@ function Proveedores({ businessId }) {
                 resetForm();
                 setShowModal(true);
               }}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#003B46] to-[#07575B] text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300"
+              className="flex items-center gap-2 px-6 py-3 gradient-primary text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300"
             >
               <Plus className="w-5 h-5" />
               Nuevo Proveedor
@@ -297,13 +297,13 @@ function Proveedores({ businessId }) {
                 placeholder="Buscar por empresa, contacto, email o NIT..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#66A5AD] focus:border-transparent transition-all"
+                className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
               />
             </div>
             
             <div className="flex gap-4">
-              <div className="px-6 py-3 bg-gradient-to-br from-[#003B46]/10 to-[#66A5AD]/10 rounded-xl">
-                <div className="text-2xl font-bold text-[#003B46]">{proveedores.length}</div>
+              <div className="px-6 py-3 bg-gradient-to-br from-accent-500/10 to-[#ffe498]/10 rounded-xl">
+                <div className="text-2xl font-bold text-accent-600">{proveedores.length}</div>
                 <div className="text-sm text-gray-600">Total Proveedores</div>
               </div>
             </div>
@@ -320,14 +320,14 @@ function Proveedores({ businessId }) {
           {loading && proveedores.length === 0 ? (
             <div className="flex items-center justify-center py-20">
               <div className="flex flex-col items-center gap-4">
-                <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#66A5AD] border-t-transparent"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#ffe498] border-t-transparent"></div>
                 <p className="text-gray-600">Cargando proveedores...</p>
               </div>
             </div>
           ) : proveedores.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 px-6">
-              <div className="p-6 bg-gradient-to-br from-[#003B46]/10 to-[#66A5AD]/10 rounded-full mb-6">
-                <Package className="w-16 h-16 text-[#003B46]" />
+              <div className="p-6 bg-gradient-to-br from-accent-500/10 to-[#ffe498]/10 rounded-full mb-6">
+                <Package className="w-16 h-16 text-accent-600" />
               </div>
               <h3 className="text-2xl font-bold text-gray-800 mb-2">No hay proveedores registrados</h3>
               <p className="text-gray-600 mb-6 text-center max-w-md">
@@ -338,7 +338,7 @@ function Proveedores({ businessId }) {
                   resetForm();
                   setShowModal(true);
                 }}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#003B46] to-[#07575B] text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all"
+                className="flex items-center gap-2 px-6 py-3 gradient-primary text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all"
               >
                 <Plus className="w-5 h-5" />
                 Agregar Primer Proveedor
@@ -351,106 +351,143 @@ function Proveedores({ businessId }) {
               <p className="text-gray-600">Intenta con otros términos de búsqueda</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gradient-to-r from-[#003B46] to-[#07575B] text-white">
-                    <th className="px-6 py-4 text-left text-sm font-semibold">Empresa</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold">Contacto</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold">Email</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold">Teléfono</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold">NIT</th>
-                    <th className="px-6 py-4 text-center text-sm font-semibold">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredProveedores.map((proveedor, index) => (
-                    <motion.tr
-                      key={proveedor.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      className="hover:bg-gradient-to-r hover:from-[#C4DFE6]/10 hover:to-transparent transition-all duration-300"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-gradient-to-br from-[#003B46]/10 to-[#66A5AD]/10 rounded-lg">
-                            <Building2 className="w-5 h-5 text-[#003B46]" />
+            <div className="space-y-4">
+              {/* Vista de tarjetas */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {filteredProveedores.map((proveedor, index) => (
+                  <motion.div
+                    key={proveedor.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <div className="bg-white rounded-2xl shadow-lg border-2 border-accent-100 hover:border-primary-300 hover:shadow-xl transition-all duration-300">
+                      <div className="p-4 sm:p-6">
+                        {/* Header con empresa */}
+                        <div className="flex items-start justify-between gap-4 mb-4 pb-4 border-b border-accent-200">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <div className="p-3 bg-gradient-to-br from-primary-100 to-accent-100 rounded-xl shrink-0">
+                              <Building2 className="w-6 h-6 text-primary-700" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-lg font-bold text-primary-900 mb-1 break-words">
+                                {proveedor.business_name}
+                              </h3>
+                              {proveedor.nit && (
+                                <div className="inline-flex items-center gap-1 px-2 py-1 bg-accent-100 text-accent-700 rounded-lg text-xs font-medium">
+                                  <FileText className="w-3 h-3" />
+                                  NIT: {proveedor.nit}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div>
-                            <div className="font-semibold text-gray-800">{proveedor.business_name}</div>
-                            {proveedor.notes && (
-                              <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                                <FileText className="w-3 h-3" />
-                                {proveedor.notes.substring(0, 30)}{proveedor.notes.length > 30 ? '...' : ''}
+
+                          {/* Acciones */}
+                          <div className="flex gap-2 shrink-0">
+                            <button
+                              onClick={() => handleEdit(proveedor)}
+                              className="p-2 hover:bg-blue-50 text-blue-600 rounded-xl transition-all duration-300 hover:scale-110"
+                              title="Editar proveedor"
+                            >
+                              <Edit2 className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(proveedor.id)}
+                              className="p-2 hover:bg-red-50 text-red-600 rounded-xl transition-all duration-300 hover:scale-110"
+                              title="Eliminar proveedor"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Información de contacto */}
+                        <div className="space-y-3">
+                          {/* Contacto */}
+                          {proveedor.contact_name && (
+                            <div className="flex items-center gap-3">
+                              <User className="w-4 h-4 text-accent-600 shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-accent-500 uppercase tracking-wide">Contacto</p>
+                                <p className="text-sm font-medium text-gray-700 truncate">
+                                  {proveedor.contact_name}
+                                </p>
                               </div>
-                            )}
-                          </div>
+                            </div>
+                          )}
+
+                          {/* Email */}
+                          {proveedor.email && (
+                            <div className="flex items-center gap-3">
+                              <Mail className="w-4 h-4 text-accent-600 shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-accent-500 uppercase tracking-wide">Email</p>
+                                <a 
+                                  href={`mailto:${proveedor.email}`} 
+                                  className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors truncate block"
+                                >
+                                  {proveedor.email}
+                                </a>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Teléfono */}
+                          {proveedor.phone && (
+                            <div className="flex items-center gap-3">
+                              <Phone className="w-4 h-4 text-accent-600 shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-accent-500 uppercase tracking-wide">Teléfono</p>
+                                <a 
+                                  href={`tel:${proveedor.phone}`}
+                                  className="text-sm font-medium text-gray-700 hover:text-primary-700 transition-colors"
+                                >
+                                  {proveedor.phone}
+                                </a>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Dirección */}
+                          {proveedor.address && (
+                            <div className="flex items-start gap-3">
+                              <MapPin className="w-4 h-4 text-accent-600 shrink-0 mt-0.5" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-accent-500 uppercase tracking-wide">Dirección</p>
+                                <p className="text-sm font-medium text-gray-700 break-words">
+                                  {proveedor.address}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Notas */}
+                          {proveedor.notes && (
+                            <div className="flex items-start gap-3 pt-3 border-t border-accent-100">
+                              <FileText className="w-4 h-4 text-accent-600 shrink-0 mt-0.5" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-accent-500 uppercase tracking-wide">Notas</p>
+                                <p className="text-sm text-gray-600 break-words">
+                                  {proveedor.notes}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Mensaje si no hay información */}
+                          {!proveedor.contact_name && !proveedor.email && !proveedor.phone && !proveedor.address && !proveedor.notes && (
+                            <div className="text-center py-4">
+                              <p className="text-sm text-gray-400 italic">
+                                No hay información de contacto adicional
+                              </p>
+                            </div>
+                          )}
                         </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {proveedor.contact_name ? (
-                          <div className="flex items-center gap-2 text-gray-700">
-                            <User className="w-4 h-4 text-gray-400" />
-                            {proveedor.contact_name}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        {proveedor.email ? (
-                          <div className="flex items-center gap-2 text-gray-700">
-                            <Mail className="w-4 h-4 text-gray-400" />
-                            <a href={`mailto:${proveedor.email}`} className="hover:text-[#003B46] transition-colors">
-                              {proveedor.email}
-                            </a>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        {proveedor.phone ? (
-                          <div className="flex items-center gap-2 text-gray-700">
-                            <Phone className="w-4 h-4 text-gray-400" />
-                            {proveedor.phone}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        {proveedor.nit ? (
-                          <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium">
-                            {proveedor.nit}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleEdit(proveedor)}
-                            className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg transition-all duration-300 hover:scale-110"
-                            title="Editar proveedor"
-                          >
-                            <Edit2 className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(proveedor.id)}
-                            className="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-all duration-300 hover:scale-110"
-                            title="Eliminar proveedor"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
             </div>
           )}
         </motion.div>
@@ -474,7 +511,7 @@ function Proveedores({ businessId }) {
               className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden"
             >
               {/* Header del modal */}
-              <div className="bg-gradient-to-r from-[#003B46] to-[#07575B] text-white p-6">
+              <div className="gradient-primary text-white p-6">
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
                     {editingSupplier ? (
@@ -501,7 +538,7 @@ function Proveedores({ businessId }) {
                   {/* Nombre de la empresa */}
                   <div>
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                      <Building2 className="w-4 h-4 text-[#003B46]" />
+                      <Building2 className="w-4 h-4 text-accent-600" />
                       Nombre de la Empresa *
                     </label>
                     <input
@@ -511,7 +548,7 @@ function Proveedores({ businessId }) {
                       onChange={handleChange}
                       placeholder="Ej: Distribuidora ABC S.A.S"
                       required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#66A5AD] focus:border-transparent transition-all"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
                     />
                   </div>
 
@@ -519,7 +556,7 @@ function Proveedores({ businessId }) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                        <User className="w-4 h-4 text-[#003B46]" />
+                        <User className="w-4 h-4 text-accent-600" />
                         Persona de Contacto
                       </label>
                       <input
@@ -528,13 +565,13 @@ function Proveedores({ businessId }) {
                         value={formData.contact_name}
                         onChange={handleChange}
                         placeholder="Ej: Juan Pérez"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#66A5AD] focus:border-transparent transition-all"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
                       />
                     </div>
 
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                        <FileText className="w-4 h-4 text-[#003B46]" />
+                        <FileText className="w-4 h-4 text-accent-600" />
                         NIT
                       </label>
                       <input
@@ -543,7 +580,7 @@ function Proveedores({ businessId }) {
                         value={formData.nit}
                         onChange={handleChange}
                         placeholder="123456789-0"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#66A5AD] focus:border-transparent transition-all"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
                       />
                     </div>
                   </div>
@@ -552,7 +589,7 @@ function Proveedores({ businessId }) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                        <Mail className="w-4 h-4 text-[#003B46]" />
+                        <Mail className="w-4 h-4 text-accent-600" />
                         Email
                       </label>
                       <input
@@ -561,13 +598,13 @@ function Proveedores({ businessId }) {
                         value={formData.email}
                         onChange={handleChange}
                         placeholder="contacto@empresa.com"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#66A5AD] focus:border-transparent transition-all"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
                       />
                     </div>
 
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                        <Phone className="w-4 h-4 text-[#003B46]" />
+                        <Phone className="w-4 h-4 text-accent-600" />
                         Teléfono
                       </label>
                       <input
@@ -576,7 +613,7 @@ function Proveedores({ businessId }) {
                         value={formData.phone}
                         onChange={handleChange}
                         placeholder="+57 300 123 4567"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#66A5AD] focus:border-transparent transition-all"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
                       />
                     </div>
                   </div>
@@ -584,7 +621,7 @@ function Proveedores({ businessId }) {
                   {/* Dirección */}
                   <div>
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                      <MapPin className="w-4 h-4 text-[#003B46]" />
+                      <MapPin className="w-4 h-4 text-accent-600" />
                       Dirección
                     </label>
                     <input
@@ -593,14 +630,14 @@ function Proveedores({ businessId }) {
                       value={formData.address}
                       onChange={handleChange}
                       placeholder="Calle 123 #45-67, Bogotá"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#66A5AD] focus:border-transparent transition-all"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
                     />
                   </div>
 
                   {/* Notas */}
                   <div>
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                      <FileText className="w-4 h-4 text-[#003B46]" />
+                      <FileText className="w-4 h-4 text-accent-600" />
                       Notas
                     </label>
                     <textarea
@@ -609,7 +646,7 @@ function Proveedores({ businessId }) {
                       onChange={handleChange}
                       placeholder="Información adicional sobre el proveedor, términos de pago, etc..."
                       rows="3"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#66A5AD] focus:border-transparent transition-all resize-none"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all resize-none"
                     />
                   </div>
                 </div>
@@ -630,7 +667,7 @@ function Proveedores({ businessId }) {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-[#003B46] to-[#07575B] hover:from-[#07575B] hover:to-[#003B46] text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="flex-1 px-6 py-3 gradient-primary hover:from-[#f1c691] hover:to-[#edb886] text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {loading ? (
                       <>

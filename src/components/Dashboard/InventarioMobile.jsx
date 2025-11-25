@@ -159,7 +159,7 @@ function InventarioMobile({ businessId }) {
         {!isMobile && (
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 bg-[#003B46] text-white rounded-lg hover:bg-[#002831] transition-colors flex items-center gap-2"
+            className="px-4 py-2 bg-accent-500 text-white rounded-lg hover:bg-accent-700 transition-colors flex items-center gap-2"
           >
             <Plus size={20} />
             Añadir producto

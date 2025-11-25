@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice } from '../../utils/formatters.js';
+import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -21,6 +22,13 @@ import {
   Search
 } from 'lucide-react';
 
+// Función helper para obtener el nombre del responsable
+const getResponsableName = (compra) => {
+  if (!compra.employees) return 'Responsable desconocido';
+  if (compra.employees.role === 'owner' || compra.employees.role === 'admin') return 'Administrador';
+  return compra.employees.full_name || 'Responsable desconocido';
+};
+
 function Compras({ businessId }) {
   const [compras, setCompras] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,20 +47,64 @@ function Compras({ businessId }) {
 
   const loadCompras = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('purchases')
-        .select(`
-          *,
-          supplier:suppliers(business_name, contact_name)
-        `)
-        .eq('business_id', businessId)
-        .order('created_at', { ascending: false });
+      // Cargar compras y business en paralelo
+      const [purchasesResult, businessResult] = await Promise.all([
+        supabase
+          .from('purchases')
+          .select(`
+            *,
+            supplier:suppliers(business_name, contact_name)
+          `)
+          .eq('business_id', businessId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('businesses')
+          .select('created_by')
+          .eq('id', businessId)
+          .maybeSingle()
+      ]);
 
-      if (error) throw error;
+      const { data: purchasesData, error: purchasesError } = purchasesResult;
+      const { data: business } = businessResult;
+
+      if (purchasesError) throw purchasesError;
+
+      // Cargar empleados
+      const { data: employeesData } = await supabase
+        .from('employees')
+        .select('user_id, full_name, role')
+        .eq('business_id', businessId);
+
+      // Crear mapa de empleados
+      const employeeMap = new Map();
+      employeesData?.forEach(emp => {
+        employeeMap.set(emp.user_id, {
+          full_name: emp.full_name || 'Usuario',
+          role: emp.role
+        });
+      });
+
+      // Combinar datos con información del empleado
+      const purchasesWithEmployees = purchasesData?.map(purchase => {
+        const employee = employeeMap.get(purchase.user_id);
+        // Comparación estricta con trim por si acaso
+        const userId = String(purchase.user_id || '').trim();
+        const createdBy = String(business?.created_by || '').trim();
+        const isOwner = userId === createdBy;
+        const isAdmin = employee?.role === 'admin';
+        
+        return {
+          ...purchase,
+          employees: isOwner
+            ? { full_name: 'Administrador', role: 'owner' }
+            : isAdmin
+            ? { full_name: 'Administrador', role: 'admin' }
+            : employee || { full_name: 'Responsable desconocido', role: 'employee' }
+        };
+      }) || [];
       
-      setCompras(data || []);
+      setCompras(purchasesWithEmployees);
     } catch (error) {
-      console.error('Error al cargar compras:', error);
       setError('Error al cargar las compras');
     } finally {
       setLoading(false);
@@ -70,7 +122,7 @@ function Compras({ businessId }) {
       if (error) throw error;
       setProductos(data || []);
     } catch (error) {
-      console.error('Error loading products:', error);
+      // Error silencioso
     }
   }, [businessId]);
 
@@ -84,7 +136,7 @@ function Compras({ businessId }) {
       if (error) throw error;
       setProveedores(data || []);
     } catch (error) {
-      console.error('Error loading suppliers:', error);
+      // Error silencioso
     }
   }, [businessId]);
 
@@ -95,6 +147,91 @@ function Compras({ businessId }) {
       loadProveedores();
     }
   }, [businessId, loadCompras, loadProductos, loadProveedores]);
+
+  // 🔥 TIEMPO REAL: Suscripción a cambios en compras
+  useRealtimeSubscription('purchases', {
+    filter: { business_id: businessId },
+    enabled: !!businessId,
+    onInsert: async (newPurchase) => {
+      // Cargar datos del proveedor, business y empleados
+      const [supplierResult, businessResult, employeesResult] = await Promise.all([
+        supabase
+          .from('suppliers')
+          .select('business_name, contact_name')
+          .eq('id', newPurchase.supplier_id)
+          .single(),
+        supabase
+          .from('businesses')
+          .select('created_by')
+          .eq('id', businessId)
+          .single(),
+        supabase
+          .from('employees')
+          .select('user_id, full_name, role')
+          .eq('business_id', businessId)
+      ]);
+
+      const { data: supplier } = supplierResult;
+      const { data: business } = businessResult;
+      const { data: employeesData } = employeesResult;
+
+      // Crear mapa de empleados
+      const employeeMap = new Map();
+      employeesData?.forEach(emp => {
+        employeeMap.set(emp.user_id, { full_name: emp.full_name || 'Usuario', role: emp.role });
+      });
+
+      const employee = employeeMap.get(newPurchase.user_id);
+      const isOwner = newPurchase.user_id === business?.created_by;
+      const isAdmin = employee?.role === 'admin';
+      
+      const purchaseWithDetails = {
+        ...newPurchase,
+        supplier,
+        employees: isOwner
+          ? { full_name: 'Administrador', role: 'owner' }
+          : isAdmin
+          ? { full_name: 'Administrador', role: 'admin' }
+          : employee || { full_name: 'Responsable desconocido', role: 'employee' }
+      };
+      
+      // Verificar si la compra ya existe antes de agregarla
+      setCompras(prev => {
+        const exists = prev.some(c => c.id === newPurchase.id);
+        if (exists) {
+          return prev;
+        }
+        return [purchaseWithDetails, ...prev];
+      });
+      
+      setSuccess('✨ Nueva compra registrada');
+      setTimeout(() => setSuccess(''), 3000);
+    },
+    onUpdate: (updatedPurchase) => {
+      setCompras(prev => prev.map(c => c.id === updatedPurchase.id ? { ...c, ...updatedPurchase } : c));
+    },
+    onDelete: (deletedPurchase) => {
+      setCompras(prev => prev.filter(c => c.id !== deletedPurchase.id));
+    }
+  });
+
+  // 🔥 TIEMPO REAL: Suscripción a cambios en productos (para stock)
+  useRealtimeSubscription('products', {
+    filter: { business_id: businessId },
+    enabled: !!businessId,
+    onUpdate: (updatedProduct) => {
+      setProductos(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+    },
+    onInsert: (newProduct) => {
+      setProductos(prev => {
+        const exists = prev.some(p => p.id === newProduct.id);
+        if (exists) {
+          return prev;
+        }
+        return [newProduct, ...prev];
+      });
+    }
+  });
 
   useEffect(() => {
     if (success || error) {
@@ -166,11 +303,24 @@ function Compras({ businessId }) {
     }
 
     try {
+      // Obtener el usuario actual autenticado
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        setError('⚠️ Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+        return;
+      }
+
+      // Para evitar problemas de permisos, simplemente validamos que el usuario esté autenticado
+      // El usuario autenticado puede registrar compras en el negocio activo
+      console.log('✅ Usuario autenticado:', user.id, 'Business:', businessId);
+
       // Insertar compra (el total se calculará automáticamente por trigger)
       const { data: purchase, error: purchaseError } = await supabase
         .from('purchases')
         .insert([{
           business_id: businessId,
+          user_id: user.id,
           supplier_id: supplierId,
           payment_method: paymentMethod,
           notes: notes || null
@@ -179,11 +329,10 @@ function Compras({ businessId }) {
         .maybeSingle();
 
       if (purchaseError) {
-        console.error('Error al insertar compra:', purchaseError);
         throw purchaseError;
       }
 
-      // Insertar detalles de compra (el trigger calculará el total automáticamente)
+      // Insertar detalles de compra (solo purchase_id, product_id y quantity)
       const purchaseDetails = cart.map(item => ({
         purchase_id: purchase.id,
         product_id: item.product_id,
@@ -195,7 +344,6 @@ function Compras({ businessId }) {
         .insert(purchaseDetails);
 
       if (detailsError) {
-        console.error('Error al insertar detalles:', detailsError);
         throw detailsError;
       }
 
@@ -221,7 +369,6 @@ function Compras({ businessId }) {
       loadCompras();
       loadProductos();
     } catch (error) {
-      console.error('Error completo:', error);
       setError('❌ Error al registrar la compra: ' + error.message);
     }
   }, [businessId, cart, supplierId, paymentMethod, notes, productos, loadCompras, loadProductos]);
@@ -268,7 +415,7 @@ function Compras({ businessId }) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#003B46] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#edb886] mx-auto mb-4"></div>
           <p className="text-gray-600">Cargando compras...</p>
         </div>
       </div>
@@ -276,30 +423,30 @@ function Compras({ businessId }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#C4DFE6] to-white p-6">
+    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary to-white p-6">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <Card className="bg-gradient-to-r from-[#003B46] to-[#07575B] text-white shadow-xl rounded-2xl border-none mb-6">
-          <div className="p-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                <ShoppingBag className="w-8 h-8" />
+        <Card className="gradient-primary text-white shadow-xl rounded-2xl border-none mb-6">
+          <div className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="p-2 sm:p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                <ShoppingBag className="w-6 h-6 sm:w-8 sm:h-8" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold">Compras</h1>
-                <p className="text-white/80 mt-1">Gestión de compras a proveedores</p>
+                <h1 className="text-2xl sm:text-3xl font-bold">Compras</h1>
+                <p className="text-white/80 mt-1 text-sm sm:text-base">Gestión de compras a proveedores</p>
               </div>
             </div>
             <Button
               onClick={() => setShowModal(true)}
-              className="bg-white text-[#003B46] hover:bg-white/90 transition-all duration-300 shadow-lg font-semibold px-6 py-3 rounded-xl flex items-center gap-2"
+              className="w-full sm:w-auto gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-xl flex items-center justify-center gap-2 text-sm sm:text-base"
             >
-              <Plus className="w-5 h-5" />
-              Nueva Compra
+              <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span>Nueva Compra</span>
             </Button>
           </div>
         </Card>
@@ -341,7 +488,7 @@ function Compras({ businessId }) {
             placeholder="Buscar por proveedor o monto..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-12 rounded-xl border-gray-300 focus:border-[#003B46] focus:ring-[#003B46]"
+            className="pl-10 h-12 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
           />
         </div>
       </Card>
@@ -361,7 +508,7 @@ function Compras({ businessId }) {
             </div>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredCompras.map((compra, index) => (
               <motion.div
                 key={compra.id}
@@ -370,7 +517,7 @@ function Compras({ businessId }) {
                 transition={{ duration: 0.3, delay: index * 0.05 }}
               >
                 <Card className="shadow-lg rounded-2xl bg-white border-none hover:shadow-xl transition-all duration-300 overflow-hidden">
-                  <div className="bg-gradient-to-r from-[#003B46] to-[#07575B] text-white p-4">
+                  <div className="gradient-primary text-white p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-white/20 rounded-lg">
@@ -415,7 +562,7 @@ function Compras({ businessId }) {
 
                     <Button
                       onClick={() => viewDetails(compra)}
-                      className="w-full h-10 bg-gradient-to-r from-[#003B46] to-[#07575B] text-white hover:shadow-lg transition-all duration-300 rounded-xl flex items-center justify-center gap-2"
+                      className="w-full h-10 gradient-primary text-white hover:shadow-lg transition-all duration-300 rounded-xl flex items-center justify-center gap-2"
                     >
                       <Eye className="w-4 h-4" />
                       Ver Detalles
@@ -444,9 +591,9 @@ function Compras({ businessId }) {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+              className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-[95vw] sm:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto"
             >
-              <div className="sticky top-0 bg-gradient-to-r from-[#003B46] to-[#07575B] text-white p-6 rounded-t-2xl flex items-center justify-between z-10">
+              <div className="sticky top-0 gradient-primary text-white p-4 sm:p-6 rounded-t-xl sm:rounded-t-2xl flex items-center justify-between z-10">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/20 rounded-lg">
                     <Plus className="w-6 h-6" />
@@ -461,7 +608,7 @@ function Compras({ businessId }) {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                 {/* Proveedor */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
@@ -472,7 +619,7 @@ function Compras({ businessId }) {
                     value={supplierId}
                     onChange={(e) => setSupplierId(e.target.value)}
                     required
-                    className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#003B46] focus:ring-1 focus:ring-[#003B46] outline-none"
+                    className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#edb886] focus:ring-1 focus:ring-[#edb886] outline-none"
                   >
                     <option value="">Seleccionar proveedor</option>
                     {proveedores.map(proveedor => (
@@ -492,7 +639,7 @@ function Compras({ businessId }) {
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#003B46] focus:ring-1 focus:ring-[#003B46] outline-none"
+                    className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#edb886] focus:ring-1 focus:ring-[#edb886] outline-none"
                   >
                     <option value="efectivo">Efectivo</option>
                     <option value="tarjeta">Tarjeta</option>
@@ -510,11 +657,14 @@ function Compras({ businessId }) {
                     value=""
                     onChange={(e) => {
                       if (e.target.value) {
-                        addToCart(e.target.value);
+                        const producto = productos.find(p => p.id === e.target.value);
+                        if (producto) {
+                          addToCart(producto);
+                        }
                         e.target.value = '';
                       }
                     }}
-                    className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#003B46] focus:ring-1 focus:ring-[#003B46] outline-none"
+                    className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#edb886] focus:ring-1 focus:ring-[#edb886] outline-none"
                   >
                     <option value="">Seleccionar producto...</option>
                     {productos.map(producto => (
@@ -582,7 +732,7 @@ function Compras({ businessId }) {
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     rows="3"
-                    className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:border-[#003B46] focus:ring-1 focus:ring-[#003B46] outline-none"
+                    className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:border-[#edb886] focus:ring-1 focus:ring-[#edb886] outline-none"
                     placeholder="Observaciones adicionales..."
                   />
                 </div>
@@ -629,7 +779,7 @@ function Compras({ businessId }) {
               onClick={(e) => e.stopPropagation()}
               className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
             >
-              <div className="sticky top-0 bg-gradient-to-r from-[#003B46] to-[#07575B] text-white p-6 rounded-t-2xl flex items-center justify-between z-10">
+              <div className="sticky top-0 gradient-primary text-white p-6 rounded-t-2xl flex items-center justify-between z-10">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/20 rounded-lg">
                     <Eye className="w-6 h-6" />

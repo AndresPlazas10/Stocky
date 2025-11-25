@@ -34,7 +34,7 @@ const predefinedAvatars = [
   { id: 10, emoji: '👨‍🎤', name: 'Músico', gradient: 'from-yellow-500 to-yellow-600' },
 ];
 
-export function Navbar({ userName = "Admin", userEmail = "admin@stockly.com", userRole = "Administrador", businessId, onSignOut }) {
+export const Navbar = React.memo(function Navbar({ userName = "Admin", userEmail = "admin@stockly.com", userRole = "Administrador", businessId, onSignOut }) {
   const [selectedAvatar, setSelectedAvatar] = useState(() => {
     const saved = localStorage.getItem('userAvatar');
     return saved ? JSON.parse(saved) : predefinedAvatars[0];
@@ -274,4 +274,4 @@ export function Navbar({ userName = "Admin", userEmail = "admin@stockly.com", us
       </AnimatePresence>
     </>
   );
-}
+});

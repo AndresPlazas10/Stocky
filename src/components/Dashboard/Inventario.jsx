@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice, formatNumber } from '../../utils/formatters.js';
+import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -84,48 +85,47 @@ function Inventario({ businessId, userRole = 'admin' }) {
       if (error) throw error;
       setProveedores(data || []);
     } catch (error) {
-      console.error('Error loading proveedores:', error);
+      // Error silencioso
     }
   }, [businessId]);
 
   // Unificar generación de código (reemplaza generateAndSetCode y generateProductCode)
   const generateProductCode = useCallback(async () => {
     try {
-      // Obtener TODOS los códigos existentes
-      const { data: allProducts } = await supabase
+      // Optimización: Obtener solo el último producto creado para inferir el siguiente código
+      // en lugar de descargar todos los productos
+      const { data: lastProduct } = await supabase
         .from('products')
         .select('code')
-        .eq('business_id', businessId);
+        .eq('business_id', businessId)
+        .ilike('code', 'PRD-%')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
       
-      // Crear un Set con todos los códigos existentes para búsqueda rápida
-      const existingCodes = new Set();
-      let maxNumber = 0;
+      let nextNumber = 1;
       
-      if (allProducts && allProducts.length > 0) {
-        allProducts.forEach(product => {
-          if (product.code) {
-            existingCodes.add(product.code);
-            if (product.code.startsWith('PRD-')) {
-              const match = product.code.match(/PRD-(\d+)/);
-              if (match) {
-                const num = parseInt(match[1]);
-                if (num > maxNumber) {
-                  maxNumber = num;
-                }
-              }
-            }
-          }
-        });
+      if (lastProduct && lastProduct.code) {
+        const match = lastProduct.code.match(/PRD-(\d+)/);
+        if (match) {
+          nextNumber = parseInt(match[1]) + 1;
+        }
       }
       
-      // Generar código empezando desde maxNumber + 1
-      let nextNumber = maxNumber + 1;
       let newCode = `PRD-${String(nextNumber).padStart(4, '0')}`;
       
-      // Verificar que no exista, si existe incrementar hasta encontrar uno libre
-      while (existingCodes.has(newCode)) {
-        nextNumber++;
-        newCode = `PRD-${String(nextNumber).padStart(4, '0')}`;
+      // Verificar si existe (por si acaso hubo concurrencia)
+      const { data: existing } = await supabase
+        .from('products')
+        .select('id')
+        .eq('business_id', businessId)
+        .eq('code', newCode)
+        .maybeSingle();
+        
+      if (existing) {
+         // Si existe, intentar con el siguiente + random para evitar loop infinito
+         nextNumber++;
+         newCode = `PRD-${String(nextNumber).padStart(4, '0')}`;
       }
       
       setGeneratedCode(newCode);
@@ -163,6 +163,42 @@ function Inventario({ businessId, userRole = 'admin' }) {
       return () => clearTimeout(timer);
     }
   }, [error]);
+
+  // 🔥 TIEMPO REAL: Suscripción a cambios en productos
+  useRealtimeSubscription('products', {
+    filter: { business_id: businessId },
+    enabled: !!businessId,
+    onInsert: async (newProduct) => {
+      // Cargar supplier data
+      let productWithSupplier = newProduct;
+      if (newProduct.supplier_id) {
+        const { data: supplier } = await supabase
+          .from('suppliers')
+          .select('id, business_name, contact_name')
+          .eq('id', newProduct.supplier_id)
+          .single();
+        productWithSupplier = { ...newProduct, supplier };
+      }
+      
+      // Verificar si el producto ya existe antes de agregarlo
+      setProductos(prev => {
+        const exists = prev.some(p => p.id === newProduct.id);
+        if (exists) {
+          return prev;
+        }
+        return [productWithSupplier, ...prev];
+      });
+      
+      setSuccess('✨ Nuevo producto agregado');
+      setTimeout(() => setSuccess(null), 3000);
+    },
+    onUpdate: (updatedProduct) => {
+      setProductos(prev => prev.map(p => p.id === updatedProduct.id ? { ...p, ...updatedProduct } : p));
+    },
+    onDelete: (deletedProduct) => {
+      setProductos(prev => prev.filter(p => p.id !== deletedProduct.id));
+    }
+  });
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -349,32 +385,32 @@ function Inventario({ businessId, userRole = 'admin' }) {
 
   if (loading && productos.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#C4DFE6] to-white">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-light-bg-primary to-white">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#003B46] mx-auto mb-4"></div>
-          <p className="text-[#07575B] font-medium">Cargando inventario...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#edb886] mx-auto mb-4"></div>
+          <p className="text-secondary-600 font-medium">Cargando inventario...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#C4DFE6] to-white p-6">
+    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary to-white p-6">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <Card className="bg-gradient-to-r from-[#003B46] to-[#07575B] text-white shadow-xl rounded-2xl border-none mb-6">
-          <div className="p-6 flex items-center justify-between">
+        <Card className="gradient-primary text-white shadow-xl rounded-2xl border-none mb-6">
+          <div className="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
                 <Package className="w-8 h-8" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold">Inventario</h1>
-                <p className="text-white/80 mt-1">
+                <h1 className="text-2xl sm:text-3xl font-bold">Inventario</h1>
+                <p className="text-white/80 mt-1 text-sm sm:text-base">
                   {userRole === 'admin' ? 'Gestión de productos y stock' : 'Consulta de productos y stock'}
                 </p>
               </div>
@@ -382,7 +418,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
             {userRole === 'admin' && (
               <Button
                 onClick={() => setShowForm(!showForm)}
-                className="bg-white text-[#003B46] hover:bg-white/90 transition-all duration-300 shadow-lg font-semibold px-6 py-3 rounded-xl flex items-center gap-2"
+                className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 sm:px-6 py-3 rounded-xl flex items-center gap-2 w-full sm:w-auto justify-center whitespace-nowrap"
               >
                 {showForm ? (
                   <>
@@ -445,7 +481,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
             transition={{ duration: 0.3 }}
           >
             <Card className="shadow-xl rounded-2xl bg-white border-none mb-6">
-              <div className="bg-gradient-to-r from-[#003B46] to-[#07575B] text-white p-6 rounded-t-2xl">
+              <div className="gradient-primary text-white p-6 rounded-t-2xl">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/20 rounded-lg">
                     <Plus className="w-6 h-6" />
@@ -468,7 +504,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       value={formData.name}
                       onChange={handleChange}
                       required
-                      className="h-11 rounded-xl border-gray-300 focus:border-[#003B46] focus:ring-[#003B46]"
+                      className="h-11 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
                     />
                   </div>
 
@@ -482,7 +518,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       value={formData.category}
                       onChange={handleChange}
                       required
-                      className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#003B46] focus:ring-[#003B46] transition-all duration-300"
+                      className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#edb886] focus:ring-[#edb886] transition-all duration-300"
                     >
                       <option value="">Seleccionar categoría</option>
                       <option value="Bebidas Alcohólicas">Bebidas Alcohólicas</option>
@@ -512,7 +548,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       value={formData.purchase_price}
                       onChange={handleChange}
                       required
-                      className="h-11 rounded-xl border-gray-300 focus:border-[#003B46] focus:ring-[#003B46]"
+                      className="h-11 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
                     />
                   </div>
 
@@ -530,7 +566,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       value={formData.sale_price}
                       onChange={handleChange}
                       required
-                      className="h-11 rounded-xl border-gray-300 focus:border-[#003B46] focus:ring-[#003B46]"
+                      className="h-11 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
                     />
                   </div>
                 </div>
@@ -549,7 +585,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       value={formData.stock}
                       onChange={handleChange}
                       required
-                      className="h-11 rounded-xl border-gray-300 focus:border-[#003B46] focus:ring-[#003B46]"
+                      className="h-11 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
                     />
                   </div>
 
@@ -565,7 +601,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       placeholder="0" 
                       value={formData.min_stock}
                       onChange={handleChange}
-                      className="h-11 rounded-xl border-gray-300 focus:border-[#003B46] focus:ring-[#003B46]"
+                      className="h-11 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
                     />
                     <p className="text-xs text-gray-500 mt-1">Alerta cuando el stock baje de este nivel</p>
                   </div>
@@ -578,7 +614,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       name="unit"
                       value={formData.unit}
                       onChange={handleChange}
-                      className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#003B46] focus:ring-[#003B46] transition-all duration-300"
+                      className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#edb886] focus:ring-[#edb886] transition-all duration-300"
                     >
                       <option value="unit">Unidad</option>
                       <option value="kg">Kilogramo</option>
@@ -597,7 +633,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                     name="supplier_id"
                     value={formData.supplier_id}
                     onChange={handleChange}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#003B46] focus:ring-[#003B46] transition-all duration-300"
+                    className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#edb886] focus:ring-[#edb886] transition-all duration-300"
                   >
                     <option value="">Sin proveedor</option>
                     {proveedores.map(prov => (
@@ -614,7 +650,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                     name="is_active"
                     checked={formData.is_active}
                     onChange={handleChange}
-                    className="w-5 h-5 rounded border-gray-300 text-[#003B46] focus:ring-[#003B46]"
+                    className="w-5 h-5 rounded border-gray-300 text-accent-600 focus:ring-[#edb886]"
                   />
                   <label className="text-sm font-medium text-gray-700">
                     Producto activo
@@ -643,7 +679,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
         {loading ? (
           <Card className="shadow-xl rounded-2xl bg-white border-none p-12">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#003B46] mx-auto mb-4"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#edb886] mx-auto mb-4"></div>
               <p className="text-gray-600">Cargando inventario...</p>
             </div>
           </Card>
@@ -656,145 +692,151 @@ function Inventario({ businessId, userRole = 'admin' }) {
             </div>
           </Card>
         ) : (
-          <Card className="shadow-xl rounded-2xl bg-white border-none overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gradient-to-r from-[#003B46] to-[#07575B] text-white">
-                    <th className="px-6 py-4 text-left font-semibold">
-                      <div className="flex items-center gap-2">
-                        <Tag className="w-4 h-4" />
-                        Código
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-left font-semibold">
-                      <div className="flex items-center gap-2">
-                        <Box className="w-4 h-4" />
-                        Nombre
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-left font-semibold">
-                      <div className="flex items-center gap-2">
-                        <BarChart3 className="w-4 h-4" />
-                        Categoría
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-left font-semibold">
-                      <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4" />
-                        Proveedor
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-left font-semibold">
-                      <div className="flex items-center gap-2">
-                        <TrendingDown className="w-4 h-4" />
-                        P. Compra
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-left font-semibold">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4" />
-                        P. Venta
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-left font-semibold">
-                      <div className="flex items-center gap-2">
-                        <Package className="w-4 h-4" />
-                        Stock
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-left font-semibold">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4" />
-                        Min.
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-left font-semibold">Unidad</th>
-                    <th className="px-6 py-4 text-left font-semibold">Estado</th>
-                    <th className="px-6 py-4 text-left font-semibold">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productos.map((producto, index) => (
-                    <motion.tr
-                      key={producto.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: index * 0.02 }}
-                      className={`border-b border-gray-100 hover:bg-gradient-to-r hover:from-[#C4DFE6]/20 hover:to-transparent transition-all duration-300 ${
-                        producto.stock <= producto.min_stock ? 'bg-red-50/50' : ''
-                      }`}
-                    >
-                      <td className="px-6 py-4 text-sm text-gray-700">
-                        {producto.code || '-'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-bold text-[#003B46]">{producto.name}</span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-700">
-                        {producto.category || '-'}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-700">
-                        {producto.supplier ? (producto.supplier.business_name || producto.supplier.contact_name || '-') : '-'}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-gray-700">
-                        {formatPrice(producto.purchase_price)}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-green-600">
-                        {formatPrice(producto.sale_price)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <Badge className={getStockBadgeClass(producto.stock, producto.min_stock)}>
-                          {producto.stock}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-700">
-                        {producto.min_stock}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-700">
-                        {producto.unit}
-                      </td>
-                      <td className="px-6 py-4">
-                        {userRole === 'admin' ? (
-                          <Button
-                            onClick={() => toggleActive(producto.id, producto.is_active)}
-                            className={`h-9 px-4 rounded-lg font-medium text-sm transition-all duration-300 ${
+          <div className="space-y-4">
+            {/* Vista de tarjetas */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {productos.map((producto, index) => (
+                <motion.div
+                  key={producto.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.02 }}
+                >
+                  <Card className={`shadow-lg rounded-2xl bg-white border-2 hover:shadow-xl transition-all duration-300 ${
+                    producto.stock <= producto.min_stock 
+                      ? 'border-red-300 bg-red-50/30' 
+                      : 'border-accent-100 hover:border-primary-300'
+                  }`}>
+                    <div className="p-4 sm:p-6">
+                      {/* Header con nombre y código */}
+                      <div className="flex items-start justify-between gap-4 mb-4 pb-4 border-b border-accent-200">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Box className="w-5 h-5 text-primary-600 shrink-0" />
+                            <h3 className="text-lg font-bold text-primary-900 truncate">
+                              {producto.name}
+                            </h3>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge className="bg-accent-100 text-accent-700 border border-accent-200">
+                              <Tag className="w-3 h-3 mr-1" />
+                              {producto.code || 'Sin código'}
+                            </Badge>
+                            {producto.category && (
+                              <Badge className="bg-blue-100 text-blue-700 border border-blue-200">
+                                <BarChart3 className="w-3 h-3 mr-1" />
+                                {producto.category}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Estado */}
+                        <div className="shrink-0">
+                          {userRole === 'admin' ? (
+                            <Button
+                              onClick={() => toggleActive(producto.id, producto.is_active)}
+                              className={`h-9 px-3 rounded-xl font-medium text-xs transition-all duration-300 ${
+                                producto.is_active
+                                  ? 'bg-green-100 hover:bg-green-200 text-green-800 border-none'
+                                  : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-none'
+                              }`}
+                            >
+                              {producto.is_active ? '✓ Activo' : '✗ Inactivo'}
+                            </Button>
+                          ) : (
+                            <Badge className={`${
                               producto.is_active
-                                ? 'bg-green-100 hover:bg-green-200 text-green-800 border-none'
-                                : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-none'
-                            }`}
-                          >
-                            {producto.is_active ? '✓ Activo' : '✗ Inactivo'}
-                          </Button>
-                        ) : (
-                          <Badge className={`${
-                            producto.is_active
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {producto.is_active ? '✓ Activo' : '✗ Inactivo'}
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        {userRole === 'admin' ? (
+                                ? 'bg-green-100 text-green-800 border-green-200'
+                                : 'bg-gray-100 text-gray-800 border-gray-200'
+                            } border`}>
+                              {producto.is_active ? '✓ Activo' : '✗ Inactivo'}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Grid de información */}
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        {/* Proveedor */}
+                        <div className="col-span-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Building2 className="w-4 h-4 text-accent-600" />
+                            <span className="text-xs text-accent-500 uppercase tracking-wide">Proveedor</span>
+                          </div>
+                          <p className="text-sm font-medium text-gray-700 truncate">
+                            {producto.supplier ? (producto.supplier.business_name || producto.supplier.contact_name || 'Sin proveedor') : 'Sin proveedor'}
+                          </p>
+                        </div>
+
+                        {/* Precio de Compra */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <TrendingDown className="w-4 h-4 text-orange-600" />
+                            <span className="text-xs text-accent-500 uppercase tracking-wide">P. Compra</span>
+                          </div>
+                          <p className="text-base font-bold text-orange-600">
+                            {formatPrice(producto.purchase_price)}
+                          </p>
+                        </div>
+
+                        {/* Precio de Venta */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <TrendingUp className="w-4 h-4 text-green-600" />
+                            <span className="text-xs text-accent-500 uppercase tracking-wide">P. Venta</span>
+                          </div>
+                          <p className="text-base font-bold text-green-600">
+                            {formatPrice(producto.sale_price)}
+                          </p>
+                        </div>
+
+                        {/* Stock */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Package className="w-4 h-4 text-primary-600" />
+                            <span className="text-xs text-accent-500 uppercase tracking-wide">Stock</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge className={getStockBadgeClass(producto.stock, producto.min_stock)}>
+                              {producto.stock} {producto.unit}
+                            </Badge>
+                            {producto.stock <= producto.min_stock && (
+                              <AlertTriangle className="w-4 h-4 text-red-500 animate-pulse" />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Mínimo */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <AlertTriangle className="w-4 h-4 text-accent-600" />
+                            <span className="text-xs text-accent-500 uppercase tracking-wide">Mínimo</span>
+                          </div>
+                          <p className="text-sm font-medium text-gray-700">
+                            {producto.min_stock} {producto.unit}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Acciones */}
+                      {userRole === 'admin' && (
+                        <div className="pt-4 border-t border-accent-200">
                           <Button
                             onClick={() => handleDelete(producto.id)}
-                            className="h-9 px-4 bg-red-100 hover:bg-red-200 text-red-600 font-medium rounded-lg border-none transition-all duration-300 flex items-center gap-2"
+                            className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg"
                           >
                             <Trash2 className="w-4 h-4" />
-                            Eliminar
+                            <span className="text-sm">Eliminar Producto</span>
                           </Button>
-                        ) : (
-                          <span className="text-sm text-gray-400 italic">Solo admin</span>
-                        )}
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                </motion.div>
+              ))}
             </div>
-          </Card>
+          </div>
         )}
       </motion.div>
 
