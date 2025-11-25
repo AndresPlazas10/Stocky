@@ -45,34 +45,11 @@ function Login() {
         throw new Error('Por favor ingresa usuario y contraseña');
       }
 
-      // Primero buscar en businesses (propietarios)
-      const { data: business, error: businessError } = await supabase
-        .from('businesses')
-        .select('email')
-        .eq('username', username.trim())
-        .maybeSingle();
+      // Generar el email basado en el username (igual que en el registro)
+      const cleanUsername = username.trim().toLowerCase();
+      const emailToUse = `${cleanUsername}@stockly-app.com`;
 
-      let emailToUse = null;
-
-      if (business) {
-        // Es un propietario
-        emailToUse = business.email;
-      } else {
-        // Buscar en employees (empleados)
-        const { data: employee, error: employeeError } = await supabase
-          .from('employees')
-          .select('email')
-          .eq('username', username.trim())
-          .maybeSingle();
-
-        if (employee) {
-          emailToUse = employee.email;
-        }
-      }
-
-      if (!emailToUse) {
-        throw new Error('Usuario no encontrado');
-      }
+      console.log('🔐 Intentando login con:', emailToUse);
 
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: emailToUse,
@@ -80,13 +57,25 @@ function Login() {
       });
 
       if (signInError) {
+        console.error('❌ Error de login:', signInError);
         throw new Error('Usuario o contraseña incorrectos');
       }
 
-      // Determinar si es propietario o empleado para redireccionar
+      console.log('✅ Login exitoso:', data.user.id);
+
+      // Verificar si es propietario de un negocio
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('created_by', data.user.id)
+        .maybeSingle();
+
+      // Redireccionar según el rol
       if (business) {
+        console.log('👔 Redirigiendo a dashboard de propietario');
         window.location.href = '/dashboard';
       } else {
+        console.log('👨‍💼 Redirigiendo a dashboard de empleado');
         window.location.href = '/employee-dashboard';
       }
       
