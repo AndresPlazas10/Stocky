@@ -236,7 +236,7 @@ function Reportes({ businessId }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#C4DFE6]/20 via-white to-[#66A5AD]/10 p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#ffe498]/10 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         
         {/* Header */}
@@ -247,7 +247,7 @@ function Reportes({ businessId }) {
         >
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-gradient-to-br from-[#003B46] to-[#07575B] rounded-xl">
+              <div className="p-3 bg-gradient-to-br from-accent-500 to-secondary-500 rounded-xl">
                 <BarChart3 className="w-8 h-8 text-white" />
               </div>
               <div>
@@ -261,7 +261,7 @@ function Reportes({ businessId }) {
               <select
                 value={selectedPeriod}
                 onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#66A5AD] focus:border-transparent transition-all bg-white font-medium"
+                className="px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all bg-white font-medium"
               >
                 <option value="today">Hoy</option>
                 <option value="week">Última Semana</option>
@@ -289,7 +289,7 @@ function Reportes({ businessId }) {
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="flex flex-col items-center gap-4">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#66A5AD] border-t-transparent"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#ffe498] border-t-transparent"></div>
               <p className="text-gray-600">Cargando reportes...</p>
             </div>
           </div>
@@ -300,47 +300,47 @@ function Reportes({ businessId }) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
             >
               {/* Ventas Totales */}
               <motion.div
                 whileHover={{ scale: 1.02 }}
-                className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white shadow-lg"
+                className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-5 sm:p-6 text-white shadow-lg hover:shadow-xl transition-all"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                    <DollarSign className="w-8 h-8" />
+                <div className="flex items-start justify-between mb-3 sm:mb-4">
+                  <div className="p-2.5 sm:p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                    <DollarSign className="w-6 h-6 sm:w-8 sm:h-8" />
                   </div>
-                  <div className="flex items-center gap-1 text-sm bg-white/20 px-2 py-1 rounded-lg">
-                    <TrendingUp className="w-4 h-4" />
+                  <div className="flex items-center gap-1 text-xs sm:text-sm bg-white/20 px-2 py-1 rounded-lg">
+                    <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
                     Ventas
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm opacity-90">Total Ventas</p>
-                  <p className="text-3xl font-bold">{formatPrice(metrics.totalVentas)}</p>
-                  <p className="text-sm opacity-80">{metrics.cantidadVentas} transacciones</p>
+                  <p className="text-xs sm:text-sm opacity-90">Total Ventas</p>
+                  <p className="text-2xl sm:text-3xl font-bold truncate">{formatPrice(metrics.totalVentas)}</p>
+                  <p className="text-xs sm:text-sm opacity-80">{metrics.cantidadVentas} transacciones</p>
                 </div>
               </motion.div>
 
               {/* Compras Totales */}
               <motion.div
                 whileHover={{ scale: 1.02 }}
-                className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg"
+                className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 sm:p-6 text-white shadow-lg hover:shadow-xl transition-all"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                    <ShoppingCart className="w-8 h-8" />
+                <div className="flex items-start justify-between mb-3 sm:mb-4">
+                  <div className="p-2.5 sm:p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                    <ShoppingCart className="w-6 h-6 sm:w-8 sm:h-8" />
                   </div>
-                  <div className="flex items-center gap-1 text-sm bg-white/20 px-2 py-1 rounded-lg">
-                    <TrendingDown className="w-4 h-4" />
+                  <div className="flex items-center gap-1 text-xs sm:text-sm bg-white/20 px-2 py-1 rounded-lg">
+                    <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4" />
                     Compras
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm opacity-90">Total Compras</p>
-                  <p className="text-3xl font-bold">{formatPrice(metrics.totalCompras)}</p>
-                  <p className="text-sm opacity-80">{metrics.cantidadCompras} compras</p>
+                  <p className="text-xs sm:text-sm opacity-90">Total Compras</p>
+                  <p className="text-2xl sm:text-3xl font-bold truncate">{formatPrice(metrics.totalCompras)}</p>
+                  <p className="text-xs sm:text-sm opacity-80">{metrics.cantidadCompras} compras</p>
                 </div>
               </motion.div>
 
@@ -351,21 +351,21 @@ function Reportes({ businessId }) {
                   metrics.gananciaBruta >= 0 
                     ? 'from-purple-500 to-purple-600' 
                     : 'from-red-500 to-red-600'
-                } rounded-2xl p-6 text-white shadow-lg`}
+                } rounded-2xl p-5 sm:p-6 text-white shadow-lg hover:shadow-xl transition-all`}
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                    <TrendingUp className="w-8 h-8" />
+                <div className="flex items-start justify-between mb-3 sm:mb-4">
+                  <div className="p-2.5 sm:p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                    <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8" />
                   </div>
-                  <div className="flex items-center gap-1 text-sm bg-white/20 px-2 py-1 rounded-lg">
-                    {metrics.gananciaBruta >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                  <div className="flex items-center gap-1 text-xs sm:text-sm bg-white/20 px-2 py-1 rounded-lg">
+                    {metrics.gananciaBruta >= 0 ? <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" /> : <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4" />}
                     {metrics.gananciaBruta >= 0 ? 'Ganancia' : 'Pérdida'}
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm opacity-90">Ganancia Bruta</p>
-                  <p className="text-3xl font-bold">{formatPrice(metrics.gananciaBruta)}</p>
-                  <p className="text-sm opacity-80">
+                  <p className="text-xs sm:text-sm opacity-90">Ganancia Bruta</p>
+                  <p className="text-2xl sm:text-3xl font-bold truncate">{formatPrice(metrics.gananciaBruta)}</p>
+                  <p className="text-xs sm:text-sm opacity-80">
                     {metrics.gananciaBruta >= 0 ? 'Positivo ✓' : 'Negativo ⚠'}
                   </p>
                 </div>
@@ -374,21 +374,21 @@ function Reportes({ businessId }) {
               {/* Facturas */}
               <motion.div
                 whileHover={{ scale: 1.02 }}
-                className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-6 text-white shadow-lg"
+                className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-5 sm:p-6 text-white shadow-lg hover:shadow-xl transition-all"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                    <FileText className="w-8 h-8" />
+                <div className="flex items-start justify-between mb-3 sm:mb-4">
+                  <div className="p-2.5 sm:p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                    <FileText className="w-6 h-6 sm:w-8 sm:h-8" />
                   </div>
-                  <div className="flex items-center gap-1 text-sm bg-white/20 px-2 py-1 rounded-lg">
-                    <Calendar className="w-4 h-4" />
+                  <div className="flex items-center gap-1 text-xs sm:text-sm bg-white/20 px-2 py-1 rounded-lg">
+                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
                     {getPeriodLabel()}
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm opacity-90">Facturas Generadas</p>
-                  <p className="text-3xl font-bold">{metrics.totalFacturas}</p>
-                  <p className="text-sm opacity-80">En este período</p>
+                  <p className="text-xs sm:text-sm opacity-90">Facturas Generadas</p>
+                  <p className="text-2xl sm:text-3xl font-bold">{metrics.totalFacturas}</p>
+                  <p className="text-xs sm:text-sm opacity-80">En este período</p>
                 </div>
               </motion.div>
             </motion.div>
@@ -403,8 +403,8 @@ function Reportes({ businessId }) {
               {/* Productos Activos */}
               <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-gradient-to-br from-[#003B46]/10 to-[#66A5AD]/10 rounded-xl">
-                    <Package className="w-8 h-8 text-[#003B46]" />
+                  <div className="p-3 bg-gradient-to-br from-accent-500/10 to-[#ffe498]/10 rounded-xl">
+                    <Package className="w-8 h-8 text-accent-600" />
                   </div>
                   <div className="text-right">
                     <p className="text-3xl font-bold text-gray-800">{metrics.productosStock}</p>
@@ -412,7 +412,7 @@ function Reportes({ businessId }) {
                 </div>
                 <p className="text-gray-600 font-medium">Productos Activos</p>
                 <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-[#003B46] to-[#66A5AD]" style={{ width: '100%' }}></div>
+                  <div className="h-full bg-gradient-to-r from-accent-500 to-[#ffe498]" style={{ width: '100%' }}></div>
                 </div>
               </div>
 
@@ -477,7 +477,7 @@ function Reportes({ businessId }) {
             >
               {/* Top 5 Productos */}
               <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-                <div className="bg-gradient-to-r from-[#003B46] to-[#07575B] text-white p-6">
+                <div className="gradient-primary text-white p-6">
                   <div className="flex items-center gap-3">
                     <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
                       <Award className="w-6 h-6" />
@@ -528,7 +528,7 @@ function Reportes({ businessId }) {
 
               {/* Métodos de Pago */}
               <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-                <div className="bg-gradient-to-r from-[#003B46] to-[#07575B] text-white p-6">
+                <div className="gradient-primary text-white p-6">
                   <div className="flex items-center gap-3">
                     <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
                       <CreditCard className="w-6 h-6" />

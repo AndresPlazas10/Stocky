@@ -63,7 +63,7 @@ export function MobileCard({
  * Card de estadística para móvil
  * Diseño vertical compacto
  */
-export function MobileStatCard({ icon: Icon, label, value, trend, color = "text-[#003B46]" }) {
+export function MobileStatCard({ icon: Icon, label, value, trend, color = "text-accent-600" }) {
   return (
     <MobileCard className="min-h-[100px]">
       <div className="flex items-start gap-3">

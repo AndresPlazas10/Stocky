@@ -43,18 +43,18 @@ serve(async (req) => {
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
-            <td style="background: linear-gradient(135deg, #003B46 0%, #07575B 100%); padding: 30px; text-align: center;">
+            <td style="background: linear-gradient(135deg, #edb886 0%, #f1c691 100%); padding: 30px; text-align: center;">
               <h1 style="color: white; margin: 0; font-size: 28px;">${businessName}</h1>
-              <p style="color: #C4DFE6; margin: 10px 0 0 0; font-size: 16px;">Factura #${invoiceNumber}</p>
+              <p style="color: #f9f9f1; margin: 10px 0 0 0; font-size: 16px;">Factura #${invoiceNumber}</p>
             </td>
           </tr>
           <tr>
             <td style="padding: 30px; background-color: #ffffff;">
-              <h2 style="color: #003B46; margin-top: 0;">Hola ${customerName},</h2>
+              <h2 style="color: #edb886; margin-top: 0;">Hola ${customerName},</h2>
               <p style="color: #666; font-size: 16px;">Gracias por tu compra. Aquí está el detalle de tu factura:</p>
               <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                 <thead>
-                  <tr style="background-color: #003B46; color: white;">
+                  <tr style="background-color: #edb886; color: white;">
                     <th style="padding: 12px 8px; text-align: left;">Producto</th>
                     <th style="padding: 12px 8px; text-align: center;">Cant.</th>
                     <th style="padding: 12px 8px; text-align: right;">Precio</th>
@@ -66,7 +66,7 @@ serve(async (req) => {
                 </tbody>
               </table>
               <div style="background-color: #f0f0f0; padding: 15px; border-radius: 5px; margin-top: 20px;">
-                <p style="margin: 0; font-size: 20px; font-weight: bold; color: #003B46; text-align: right;">
+                <p style="margin: 0; font-size: 20px; font-weight: bold; color: #edb886; text-align: right;">
                   Total: $${total.toLocaleString('es-CO')}
                 </p>
               </div>

@@ -16,9 +16,9 @@ export function FloatingActionButton({
   variant = "primary" // primary | secondary | accent
 }) {
   const variants = {
-    primary: "bg-[#003B46] hover:bg-[#002831] text-white shadow-[#003B46]/30",
-    secondary: "bg-[#07575B] hover:bg-[#054449] text-white shadow-[#07575B]/30",
-    accent: "bg-[#66A5AD] hover:bg-[#5694a0] text-white shadow-[#66A5AD]/30",
+    primary: "bg-accent-500 hover:bg-accent-700 text-white shadow-accent-500/30",
+    secondary: "bg-secondary-500 hover:bg-secondary-600 text-white shadow-secondary-500/30",
+    accent: "bg-soft-500 hover:bg-soft-600 text-white shadow-soft-500/30",
   };
 
   return (

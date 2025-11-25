@@ -32,7 +32,7 @@ export function MobileBottomNav({ currentView, onNavigate }) {
               className={`
                 relative flex flex-col items-center justify-center gap-0.5
                 transition-colors duration-200
-                ${isActive ? 'text-[#003B46]' : 'text-gray-500'}
+                ${isActive ? 'text-accent-600' : 'text-gray-500'}
                 active:bg-gray-50
               `}
             >
@@ -40,7 +40,7 @@ export function MobileBottomNav({ currentView, onNavigate }) {
               {isActive && (
                 <motion.div
                   layoutId="bottomNavIndicator"
-                  className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-1 bg-[#003B46] rounded-full"
+                  className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-1 bg-accent-500 rounded-full"
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                 />
               )}

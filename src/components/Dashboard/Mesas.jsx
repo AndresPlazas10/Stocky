@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice, formatNumber } from '../../utils/formatters.js';
+import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -128,7 +129,7 @@ function Mesas({ businessId }) {
       
       setProductos(data || []);
     } catch (error) {
-      console.error('Error al cargar productos:', error);
+      // Error silencioso
     }
   }, [businessId]);
 
@@ -174,6 +175,106 @@ function Mesas({ businessId }) {
       getCurrentUser();
     }
   }, [businessId, loadData, getCurrentUser]);
+
+  // Callbacks memoizados para Realtime
+  const handleTableInsert = useCallback((newTable) => {
+    console.log('INSERT detectado:', newTable);
+    setMesas(prev => {
+      const exists = prev.some(m => m.id === newTable.id);
+      if (exists) {
+        return prev;
+      }
+      return [...prev, newTable].sort((a, b) => a.table_number - b.table_number);
+    });
+    setSuccess(`✨ Nueva mesa #${newTable.table_number} agregada`);
+    setTimeout(() => setSuccess(null), 3000);
+  }, []);
+
+  const handleTableUpdate = useCallback((updatedTable) => {
+    console.log('UPDATE detectado:', updatedTable);
+    setMesas(prev => prev.map(m => m.id === updatedTable.id ? updatedTable : m));
+    // Si estamos viendo esta mesa, actualizar sus detalles
+    setSelectedMesa(prev => {
+      if (prev?.id === updatedTable.id) {
+        return { ...prev, ...updatedTable };
+      }
+      return prev;
+    });
+  }, []);
+
+  const handleTableDelete = useCallback((deletedTable) => {
+    console.log('DELETE detectado:', deletedTable);
+    setMesas(prev => {
+      const filtered = prev.filter(m => m.id !== deletedTable.id);
+      console.log('Mesas antes:', prev.length, 'Mesas después:', filtered.length);
+      return filtered;
+    });
+    setSelectedMesa(prev => {
+      if (prev?.id === deletedTable.id) {
+        setShowOrderDetails(false);
+        return null;
+      }
+      return prev;
+    });
+  }, []);
+
+  // 🔥 TIEMPO REAL: Suscripción a cambios en mesas
+  useRealtimeSubscription('tables', {
+    filter: { business_id: businessId },
+    enabled: !!businessId,
+    onInsert: handleTableInsert,
+    onUpdate: handleTableUpdate,
+    onDelete: handleTableDelete
+  });
+
+  // 🔥 TIEMPO REAL: Suscripción a cambios en órdenes
+  useRealtimeSubscription('orders', {
+    filter: { business_id: businessId },
+    enabled: !!businessId && !!selectedMesa,
+    onUpdate: async (updatedOrder) => {
+      // Si es la orden actual, recargar los items
+      if (selectedMesa?.current_order_id === updatedOrder.id) {
+        const { data: items } = await supabase
+          .from('order_items')
+          .select('*, products(name, code)')
+          .eq('order_id', updatedOrder.id);
+        
+        if (items) {
+          setOrderItems(items);
+        }
+      }
+    }
+  });
+
+  // 🔥 TIEMPO REAL: Suscripción a cambios en items de orden
+  useRealtimeSubscription('order_items', {
+    enabled: !!businessId && !!selectedMesa?.current_order_id,
+    filter: { order_id: selectedMesa?.current_order_id },
+    onInsert: async (newItem) => {
+      // Cargar el producto relacionado
+      const { data: product } = await supabase
+        .from('products')
+        .select('name, code')
+        .eq('id', newItem.product_id)
+        .single();
+      
+      setOrderItems(prev => {
+        const exists = prev.some(item => item.id === newItem.id);
+        if (exists) {
+          return prev;
+        }
+        return [...prev, { ...newItem, products: product }];
+      });
+    },
+    onUpdate: (updatedItem) => {
+      setOrderItems(prev => prev.map(item => 
+        item.id === updatedItem.id ? { ...item, ...updatedItem } : item
+      ));
+    },
+    onDelete: (deletedItem) => {
+      setOrderItems(prev => prev.filter(item => item.id !== deletedItem.id));
+    }
+  });
 
   const handleCreateTable = useCallback(async (e) => {
     e.preventDefault();
@@ -317,7 +418,7 @@ function Mesas({ businessId }) {
         .update({ total })
         .eq('id', orderId);
     } catch (error) {
-      console.error('Error updating order total:', error);
+      // Error silencioso
     }
   }, [orderItems]);
 
@@ -739,10 +840,9 @@ function Mesas({ businessId }) {
             </CardTitle>
             <Button 
               onClick={() => setShowAddForm(!showAddForm)}
-              className="gradient-primary text-white hover:opacity-90"
-              size="lg"
+              className="gradient-primary text-white hover:opacity-90 text-sm sm:text-base px-3 sm:px-4 h-9 sm:h-11"
             >
-              <Plus className="w-5 h-5 mr-2" />
+              <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" />
               Agregar Mesa
             </Button>
           </div>
@@ -787,7 +887,7 @@ function Mesas({ businessId }) {
               >
                 <Card className="border-accent-200 bg-accent-50/30">
                   <CardContent className="pt-6">
-                    <form onSubmit={handleCreateTable} className="flex gap-4 items-end">
+                    <form onSubmit={handleCreateTable} className="flex flex-col sm:flex-row gap-4 sm:items-end">
                       <div className="flex-1">
                         <label className="block text-sm font-semibold text-primary-700 mb-2">
                           Número de Mesa *
@@ -802,25 +902,27 @@ function Mesas({ businessId }) {
                           required
                         />
                       </div>
-                      <Button 
-                        type="submit" 
-                        className="gradient-primary text-white hover:opacity-90 h-12"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Crear Mesa
-                      </Button>
-                      <Button 
-                        type="button" 
-                        variant="outline"
-                        className="border-2 border-accent-300 text-accent-700 hover:bg-accent-50 h-12"
-                        onClick={() => {
-                          setShowAddForm(false);
-                          setNewTableNumber('');
-                        }}
-                      >
-                        <X className="w-4 h-4 mr-2" />
-                        Cancelar
-                      </Button>
+                      <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                        <Button 
+                          type="submit" 
+                          className="gradient-primary text-white hover:opacity-90 h-12 w-full sm:w-auto"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Crear Mesa
+                        </Button>
+                        <Button 
+                          type="button" 
+                          variant="outline"
+                          className="border-2 border-accent-300 text-accent-700 hover:bg-accent-50 h-12 w-full sm:w-auto"
+                          onClick={() => {
+                            setShowAddForm(false);
+                            setNewTableNumber('');
+                          }}
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Cancelar
+                        </Button>
+                      </div>
                     </form>
                   </CardContent>
                 </Card>
@@ -933,15 +1035,15 @@ function Mesas({ businessId }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
+              className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full my-8"
             >
-              <Card className="border-0 h-full flex flex-col">
+              <Card className="border-0 flex flex-col max-h-[85vh]">
                 <CardHeader className="border-b border-accent-100 bg-gradient-to-r from-primary-50 to-accent-50 shrink-0">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-2xl font-bold text-primary-900 flex items-center gap-3">
@@ -1027,48 +1129,61 @@ function Mesas({ businessId }) {
                           >
                             <Card className="border-accent-200 hover:shadow-md transition-shadow">
                               <CardContent className="pt-4">
-                                <div className="flex items-center justify-between gap-4">
-                                  <div className="flex-1">
-                                    <h4 className="font-semibold text-primary-900">{item.products?.name}</h4>
-                                    <p className="text-sm text-accent-600">{formatPrice(parseFloat(item.price))} c/u</p>
+                                <div className="flex flex-col gap-3">
+                                  {/* Nombre y precio - Siempre visible completo */}
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className="font-semibold text-primary-900 text-sm sm:text-base leading-tight">
+                                        {item.products?.name}
+                                      </h4>
+                                      <p className="text-xs sm:text-sm text-accent-600 mt-1">
+                                        {formatPrice(parseFloat(item.price))} c/u
+                                      </p>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      <p className="text-base sm:text-lg font-bold text-primary-900">
+                                        {formatPrice(parseFloat(item.subtotal))}
+                                      </p>
+                                    </div>
                                   </div>
                                   
-                                  <div className="flex items-center gap-2">
+                                  {/* Controles - Cantidad y eliminar */}
+                                  <div className="flex items-center justify-between pt-2 border-t border-accent-100">
+                                    <div className="flex items-center gap-2 sm:gap-3">
+                                      <span className="text-xs sm:text-sm text-accent-600 font-medium">Cantidad:</span>
+                                      <div className="flex items-center gap-1 sm:gap-2">
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => updateItemQuantity(item.id, item.quantity - 1)}
+                                          className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50"
+                                        >
+                                          -
+                                        </Button>
+                                        <span className="w-10 sm:w-12 text-center font-bold text-primary-900">
+                                          {item.quantity}
+                                        </span>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
+                                          className="h-8 w-8 p-0 border-green-300 text-green-600 hover:bg-green-50"
+                                        >
+                                          +
+                                        </Button>
+                                      </div>
+                                    </div>
+
                                     <Button
                                       size="sm"
-                                      variant="outline"
-                                      onClick={() => updateItemQuantity(item.id, item.quantity - 1)}
-                                      className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50"
+                                      variant="ghost"
+                                      onClick={() => removeItem(item.id)}
+                                      className="h-9 px-3 hover:bg-red-100 hover:text-red-600 text-xs sm:text-sm"
                                     >
-                                      -
-                                    </Button>
-                                    <span className="w-12 text-center font-bold text-primary-900">
-                                      {item.quantity}
-                                    </span>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
-                                      className="h-8 w-8 p-0 border-green-300 text-green-600 hover:bg-green-50"
-                                    >
-                                      +
+                                      <Trash2 className="w-4 h-4 mr-1.5" />
+                                      Eliminar
                                     </Button>
                                   </div>
-
-                                  <div className="text-right min-w-[100px]">
-                                    <p className="text-lg font-bold text-primary-900">
-                                      {formatPrice(parseFloat(item.subtotal))}
-                                    </p>
-                                  </div>
-
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => removeItem(item.id)}
-                                    className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
                                 </div>
                               </CardContent>
                             </Card>
@@ -1080,19 +1195,19 @@ function Mesas({ businessId }) {
                 </CardContent>
 
                 {/* Total y acciones */}
-                <div className="border-t-2 border-accent-200 bg-accent-50/30 p-6 shrink-0">
-                  <div className="flex items-center justify-between">
+                <div className="border-t-2 border-accent-200 bg-accent-50/30 p-4 sm:p-6 shrink-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
                       <p className="text-sm text-primary-600 mb-1">Total a pagar</p>
-                      <h3 className="text-3xl font-bold text-primary-900">
+                      <h3 className="text-2xl sm:text-3xl font-bold text-primary-900">
                         {formatPrice(orderTotal)}
                       </h3>
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                       <Button
                         onClick={handleRefreshOrder}
                         variant="outline"
-                        className="border-2 border-accent-300 text-accent-700 hover:bg-accent-50 h-12 px-6"
+                        className="border-2 border-accent-300 text-accent-700 hover:bg-accent-50 h-12 px-6 w-full sm:w-auto"
                       >
                         <Save className="w-5 h-5 mr-2" />
                         Guardar
@@ -1100,7 +1215,7 @@ function Mesas({ businessId }) {
                       <Button
                         onClick={handleCloseOrder}
                         disabled={orderItems.length === 0}
-                        className="gradient-primary text-white hover:opacity-90 h-12 px-8 text-lg"
+                        className="gradient-primary text-white hover:opacity-90 h-12 px-8 text-lg w-full sm:w-auto"
                       >
                         <CheckCircle2 className="w-5 h-5 mr-2" />
                         Cerrar Orden

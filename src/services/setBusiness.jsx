@@ -4,7 +4,6 @@ import { supabase } from '../supabase/Client.jsx';
  * Crea un nuevo negocio en la tabla businesses
  * @param {Object} businessData - Datos del negocio
  * @param {string} businessData.name - Nombre del negocio (requerido)
- * @param {string} businessData.tax_id - NIT/RUT del negocio (requerido, único)
  * @param {string} businessData.address - Dirección del negocio (opcional)
  * @param {string} businessData.phone - Teléfono del negocio (opcional)
  * @param {string} businessData.email - Email del negocio (opcional)
@@ -13,8 +12,8 @@ import { supabase } from '../supabase/Client.jsx';
 export async function setBusiness(businessData) {
   try {
     // Validar campos requeridos
-    if (!businessData.name || !businessData.tax_id) {
-      throw new Error('El nombre y el NIT/RUT son campos requeridos');
+    if (!businessData.name) {
+      throw new Error('El nombre del negocio es requerido');
     }
 
     // Obtener el usuario actual autenticado
@@ -43,28 +42,12 @@ export async function setBusiness(businessData) {
       }
     }
 
-    // Validar si ya existe un negocio con el mismo tax_id
-    const { data: existingTaxId, error: taxIdError } = await supabase
-      .from('businesses')
-      .select('id, tax_id')
-      .eq('tax_id', businessData.tax_id)
-      .single();
-
-    if (taxIdError && taxIdError.code !== 'PGRST116') {
-      throw taxIdError;
-    }
-
-    if (existingTaxId) {
-      throw new Error('Ya existe un negocio registrado con este NIT/RUT');
-    }
-
     // Insertar el negocio en la tabla businesses
     const { data, error } = await supabase
       .from('businesses')
       .insert([
         {
           name: businessData.name,
-          tax_id: businessData.tax_id,
           address: businessData.address || null,
           phone: businessData.phone || null,
           email: businessData.email || null,

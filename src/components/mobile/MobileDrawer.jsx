@@ -1,4 +1,4 @@
-import { X, Home, ShoppingCart, Package, FileText, Users, Truck, Settings, LogOut, ChevronRight } from 'lucide-react';
+import { X, Home, ShoppingCart, ShoppingBag, Package, FileText, Users, Truck, BarChart3, Settings, LogOut, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 /**
@@ -8,27 +8,28 @@ import { motion, AnimatePresence } from 'framer-motion';
  * - Gestos de swipe para cerrar
  * - Navegación completa del dashboard
  */
-export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userName, businessName }) {
+export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userName, businessName, onSignOut }) {
   const menuSections = [
     {
       title: 'Principal',
       items: [
         { id: 'home', icon: Home, label: 'Inicio', color: 'text-blue-600' },
         { id: 'ventas', icon: ShoppingCart, label: 'Ventas', color: 'text-green-600' },
+        { id: 'compras', icon: ShoppingBag, label: 'Compras', color: 'text-amber-600' },
         { id: 'inventario', icon: Package, label: 'Inventario', color: 'text-purple-600' },
       ]
     },
     {
       title: 'Gestión',
       items: [
-        { id: 'facturas', icon: FileText, label: 'Facturas', color: 'text-orange-600' },
-        { id: 'clientes', icon: Users, label: 'Clientes', color: 'text-pink-600' },
         { id: 'proveedores', icon: Truck, label: 'Proveedores', color: 'text-indigo-600' },
+        { id: 'empleados', icon: Users, label: 'Empleados', color: 'text-cyan-600' },
       ]
     },
     {
       title: 'Sistema',
       items: [
+        { id: 'reportes', icon: BarChart3, label: 'Reportes', color: 'text-teal-600' },
         { id: 'configuracion', icon: Settings, label: 'Configuración', color: 'text-gray-600' },
       ]
     }
@@ -70,7 +71,7 @@ export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userNam
             className="fixed top-0 left-0 bottom-0 w-72 bg-white z-50 shadow-2xl flex flex-col sm:hidden"
           >
             {/* Header del drawer */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-[#003B46] to-[#07575B]">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 gradient-primary">
               <div className="flex-1">
                 <h2 className="text-white font-bold text-lg">{businessName || 'Stockly'}</h2>
                 <p className="text-white/80 text-sm">{userName || 'Usuario'}</p>
@@ -104,7 +105,7 @@ export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userNam
                             w-full flex items-center gap-3 px-3 py-3 rounded-lg
                             transition-all duration-200
                             ${isActive 
-                              ? 'bg-[#003B46]/10 text-[#003B46] font-semibold' 
+                              ? 'bg-accent-500/10 text-accent-600 font-semibold' 
                               : 'text-gray-700 hover:bg-gray-100'
                             }
                           `}
@@ -116,7 +117,7 @@ export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userNam
                           />
                           <span className="flex-1 text-left text-sm">{item.label}</span>
                           {isActive && (
-                            <ChevronRight size={16} className="text-[#003B46]" />
+                            <ChevronRight size={16} className="text-accent-600" />
                           )}
                         </button>
                       );
@@ -129,6 +130,7 @@ export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userNam
             {/* Footer con logout */}
             <div className="border-t border-gray-200 p-4">
               <button
+                onClick={onSignOut}
                 className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
               >
                 <LogOut size={20} />

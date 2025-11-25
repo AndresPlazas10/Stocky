@@ -41,23 +41,18 @@ export function DashboardLayout({
           onNavigate={onSectionChange}
           userName={userName}
           businessName={businessName}
+          onSignOut={onSignOut}
         />
 
-        {/* Contenido principal con padding para header y bottom nav */}
+        {/* Contenido principal con padding solo para header */}
         <motion.main
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
-          className="flex-1 overflow-y-auto pt-14 pb-16 px-4"
+          className="flex-1 overflow-y-auto pt-14 px-4 pb-6"
         >
           {children}
         </motion.main>
-
-        {/* Navegación inferior */}
-        <MobileBottomNav
-          currentView={activeSection}
-          onNavigate={onSectionChange}
-        />
       </div>
     );
   }

@@ -1,12 +1,12 @@
 # Guía de Estilos Modernos - Stockly
 
-## Sistema de Diseño Aplicado
+## Paleta de Colores
 
-### Colores
-- **Primary**: #003B46 (Azul petróleo oscuro)
-- **Secondary**: #07575B (Verde azulado)
-- **Accent**: #66A5AD (Azul claro)
-- **Background**: #C4DFE6 (Fondo claro)
+- **Primary**: #edb886 (Peach cálido)
+- **Secondary**: #f1c691 (Dorado suave)
+- **Accent**: #ffe498 (Amarillo suave)
+- **Neutral**: #b9a58d (Beige neutro)
+- **Background**: #f9f9f1 (Crema cálido)
 
 ### Componentes Creados
 

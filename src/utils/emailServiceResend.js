@@ -117,9 +117,9 @@ export const sendInvoiceEmailResend = async ({
           
           <!-- Header -->
           <tr>
-            <td style="background: linear-gradient(135deg, #003B46 0%, #07575B 100%); padding: 40px 20px; text-align: center;">
+            <td style="background: linear-gradient(135deg, #edb886 0%, #f1c691 100%); padding: 40px 20px; text-align: center;">
               <h1 style="color: white; margin: 0; font-size: 28px;">${businessName}</h1>
-              <p style="color: #C4DFE6; margin: 10px 0 0 0;">Factura Electrónica</p>
+              <p style="color: #f9f9f1; margin: 10px 0 0 0;">Factura Electrónica</p>
             </td>
           </tr>
 
@@ -140,15 +140,15 @@ export const sendInvoiceEmailResend = async ({
                 </tr>
                 <tr>
                   <td style="padding: 5px;"><strong>Total:</strong></td>
-                  <td style="padding: 5px; text-align: right; color: #003B46; font-size: 20px; font-weight: bold;">$${total.toLocaleString('es-CO')}</td>
+                  <td style="padding: 5px; text-align: right; color: #edb886; font-size: 20px; font-weight: bold;">$${total.toLocaleString('es-CO')}</td>
                 </tr>
               </table>
 
               <!-- Items Table -->
-              <h2 style="color: #003B46; font-size: 18px; margin: 30px 0 15px 0;">Detalle de Productos</h2>
+              <h2 style="color: #edb886; font-size: 18px; margin: 30px 0 15px 0;">Detalle de Productos</h2>
               <table width="100%" style="border-collapse: collapse;">
                 <thead>
-                  <tr style="background-color: #003B46; color: white;">
+                  <tr style="background-color: #edb886; color: white;">
                     <th style="padding: 12px 8px; text-align: left;">Producto</th>
                     <th style="padding: 12px 8px; text-align: center;">Cant.</th>
                     <th style="padding: 12px 8px; text-align: right;">Precio</th>

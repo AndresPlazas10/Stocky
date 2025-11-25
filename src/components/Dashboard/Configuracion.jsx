@@ -8,7 +8,6 @@ import {
   Mail,
   Phone,
   MapPin,
-  FileText,
   Edit2,
   Save,
   X,
@@ -28,7 +27,6 @@ function Configuracion({ user, business, onBusinessUpdate }) {
   
   const [businessData, setBusinessData] = useState({
     name: '',
-    tax_id: '',
     email: '',
     phone: '',
     address: ''
@@ -38,7 +36,6 @@ function Configuracion({ user, business, onBusinessUpdate }) {
     if (business) {
       setBusinessData({
         name: business.name || '',
-        tax_id: business.tax_id || '',
         email: business.email || '',
         phone: business.phone || '',
         address: business.address || ''
@@ -71,7 +68,6 @@ function Configuracion({ user, business, onBusinessUpdate }) {
         .from('businesses')
         .update({
           name: businessData.name,
-          tax_id: businessData.tax_id,
           email: businessData.email,
           phone: businessData.phone,
           address: businessData.address
@@ -120,7 +116,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
   }, [error, success]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#C4DFE6]/20 via-white to-[#66A5AD]/10 p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#ffe498]/10 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         
         {/* Header */}
@@ -130,7 +126,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
           className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100"
         >
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-gradient-to-br from-[#003B46] to-[#07575B] rounded-xl">
+            <div className="p-3 bg-gradient-to-br from-accent-500 to-secondary-500 rounded-xl">
               <Settings className="w-8 h-8 text-white" />
             </div>
             <div>
@@ -174,7 +170,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
           transition={{ delay: 0.1 }}
           className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
         >
-          <div className="bg-gradient-to-r from-[#003B46] to-[#07575B] text-white p-6">
+          <div className="gradient-primary text-white p-6">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
                 <User className="w-6 h-6" />
@@ -190,7 +186,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
                 <div className="flex items-center gap-3 mb-2">
-                  <Mail className="w-5 h-5 text-[#003B46]" />
+                  <Mail className="w-5 h-5 text-accent-600" />
                   <span className="text-sm text-gray-600 font-medium">Email</span>
                 </div>
                 <p className="text-lg font-semibold text-gray-800 pl-8">{user?.email}</p>
@@ -198,7 +194,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
 
               <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
                 <div className="flex items-center gap-3 mb-2">
-                  <Shield className="w-5 h-5 text-[#003B46]" />
+                  <Shield className="w-5 h-5 text-accent-600" />
                   <span className="text-sm text-gray-600 font-medium">ID de Usuario</span>
                 </div>
                 <p className="text-sm font-mono text-gray-600 pl-8 break-all">{user?.id?.substring(0, 30)}...</p>
@@ -222,7 +218,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
           transition={{ delay: 0.2 }}
           className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
         >
-          <div className="bg-gradient-to-r from-[#003B46] to-[#07575B] text-white p-6">
+          <div className="gradient-primary text-white p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
@@ -251,7 +247,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
                   <div className="flex items-center gap-3 mb-2">
-                    <Building2 className="w-5 h-5 text-[#003B46]" />
+                    <Building2 className="w-5 h-5 text-accent-600" />
                     <span className="text-sm text-gray-600 font-medium">Nombre del Negocio</span>
                   </div>
                   <p className="text-lg font-semibold text-gray-800 pl-8">{business?.name}</p>
@@ -259,15 +255,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
 
                 <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
                   <div className="flex items-center gap-3 mb-2">
-                    <FileText className="w-5 h-5 text-[#003B46]" />
-                    <span className="text-sm text-gray-600 font-medium">NIT/RUT</span>
-                  </div>
-                  <p className="text-lg font-semibold text-gray-800 pl-8">{business?.tax_id || 'No especificado'}</p>
-                </div>
-
-                <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Mail className="w-5 h-5 text-[#003B46]" />
+                    <Mail className="w-5 h-5 text-accent-600" />
                     <span className="text-sm text-gray-600 font-medium">Email</span>
                   </div>
                   <p className="text-lg font-semibold text-gray-800 pl-8">{business?.email || 'No especificado'}</p>
@@ -275,7 +263,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
 
                 <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
                   <div className="flex items-center gap-3 mb-2">
-                    <Phone className="w-5 h-5 text-[#003B46]" />
+                    <Phone className="w-5 h-5 text-accent-600" />
                     <span className="text-sm text-gray-600 font-medium">Teléfono</span>
                   </div>
                   <p className="text-lg font-semibold text-gray-800 pl-8">{business?.phone || 'No especificado'}</p>
@@ -284,7 +272,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                 {business?.address && (
                   <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100 md:col-span-2">
                     <div className="flex items-center gap-3 mb-2">
-                      <MapPin className="w-5 h-5 text-[#003B46]" />
+                      <MapPin className="w-5 h-5 text-accent-600" />
                       <span className="text-sm text-gray-600 font-medium">Dirección</span>
                     </div>
                     <p className="text-lg font-semibold text-gray-800 pl-8">{business.address}</p>
@@ -296,7 +284,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                      <Building2 className="w-4 h-4 text-[#003B46]" />
+                      <Building2 className="w-4 h-4 text-accent-600" />
                       Nombre del Negocio *
                     </label>
                     <input
@@ -305,29 +293,14 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                       value={businessData.name}
                       onChange={handleBusinessChange}
                       required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#66A5AD] focus:border-transparent transition-all"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
                       placeholder="Mi Negocio S.A.S"
                     />
                   </div>
 
                   <div>
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                      <FileText className="w-4 h-4 text-[#003B46]" />
-                      NIT/RUT
-                    </label>
-                    <input
-                      type="text"
-                      name="tax_id"
-                      value={businessData.tax_id}
-                      onChange={handleBusinessChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#66A5AD] focus:border-transparent transition-all"
-                      placeholder="123456789-0"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                      <Mail className="w-4 h-4 text-[#003B46]" />
+                      <Mail className="w-4 h-4 text-accent-600" />
                       Email
                     </label>
                     <input
@@ -335,14 +308,14 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                       name="email"
                       value={businessData.email}
                       onChange={handleBusinessChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#66A5AD] focus:border-transparent transition-all"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
                       placeholder="contacto@negocio.com"
                     />
                   </div>
 
                   <div>
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                      <Phone className="w-4 h-4 text-[#003B46]" />
+                      <Phone className="w-4 h-4 text-accent-600" />
                       Teléfono
                     </label>
                     <input
@@ -350,14 +323,14 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                       name="phone"
                       value={businessData.phone}
                       onChange={handleBusinessChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#66A5AD] focus:border-transparent transition-all"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
                       placeholder="+57 300 123 4567"
                     />
                   </div>
 
                   <div className="md:col-span-2">
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                      <MapPin className="w-4 h-4 text-[#003B46]" />
+                      <MapPin className="w-4 h-4 text-accent-600" />
                       Dirección
                     </label>
                     <textarea
@@ -365,7 +338,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                       value={businessData.address}
                       onChange={handleBusinessChange}
                       rows="3"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#66A5AD] focus:border-transparent transition-all resize-none"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all resize-none"
                       placeholder="Calle 123 #45-67, Ciudad"
                     />
                   </div>
@@ -375,7 +348,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#003B46] to-[#07575B] hover:from-[#07575B] hover:to-[#003B46] text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+                    className="flex items-center gap-2 px-6 py-3 gradient-primary hover:from-[#f1c691] hover:to-[#edb886] text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
                   >
                     {loading ? (
                       <>
@@ -395,7 +368,6 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                       setEditingBusiness(false);
                       setBusinessData({
                         name: business?.name || '',
-                        tax_id: business?.tax_id || '',
                         email: business?.email || '',
                         phone: business?.phone || '',
                         address: business?.address || ''
@@ -420,7 +392,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
           transition={{ delay: 0.3 }}
           className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
         >
-          <div className="bg-gradient-to-r from-[#003B46] to-[#07575B] text-white p-6">
+          <div className="gradient-primary text-white p-6">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
                 <Info className="w-6 h-6" />

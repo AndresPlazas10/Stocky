@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../../supabase/Client';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatNumber } from '../../utils/formatters.js';
@@ -12,6 +12,9 @@ export default function Facturas({ userRole = 'admin' }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  // Refs
+  const formRef = useRef(null);
   
   // Estados del formulario
   const [showForm, setShowForm] = useState(false);
@@ -159,6 +162,15 @@ export default function Facturas({ userRole = 'admin' }) {
       return () => clearTimeout(timer);
     }
   }, [error]);
+
+  // Scroll al formulario cuando se abre (especialmente útil en móvil)
+  useEffect(() => {
+    if (showForm && formRef.current) {
+      setTimeout(() => {
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [showForm]);
 
   const handleAddProduct = useCallback((producto) => {
     if (!producto.stock || producto.stock <= 0) {
@@ -355,9 +367,9 @@ export default function Facturas({ userRole = 'admin' }) {
           invoice_number: invoiceNumber,
           ...customerData,
           payment_method: paymentMethod,
-          subtotal: total,
+          subtotal: totalFactura,
           tax: 0,
-          total,
+          total: totalFactura,
           notes,
           status: 'pending',
           issued_at: new Date().toISOString()
@@ -397,7 +409,6 @@ export default function Facturas({ userRole = 'admin' }) {
       }
 
       if (stockErrors.length > 0) {
-        console.warn('Errores al reducir stock:', stockErrors);
         // No lanzar error, la factura ya fue creada
       }
 
@@ -431,7 +442,6 @@ export default function Facturas({ userRole = 'admin' }) {
             setSuccess(`✅ Factura ${invoiceNumber} creada y enviada a ${customerData.customer_email}`);
           }
         } catch (emailError) {
-          console.error('Error al enviar email:', emailError);
           setSuccess(`✅ Factura ${invoiceNumber} creada (⚠️ error al enviar email: ${emailError.message})`);
         }
       } else if (!customerData.customer_email) {
@@ -791,12 +801,12 @@ export default function Facturas({ userRole = 'admin' }) {
   }, [facturas, searchTerm]);
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex justify-between items-center">
-        <h2 className="text-2xl font-bold">📄 Facturación Electrónica</h2>
+    <div className="p-4 sm:p-6">
+      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h2 className="text-xl sm:text-2xl font-bold">📄 Facturación Electrónica</h2>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          className="bg-accent-600 text-white px-4 py-2 rounded-lg hover:bg-accent-500 w-full sm:w-auto whitespace-nowrap transition-colors"
         >
           {showForm ? '❌ Cancelar' : '➕ Nueva Factura'}
         </button>
@@ -815,11 +825,11 @@ export default function Facturas({ userRole = 'admin' }) {
       )}
 
       {showForm && (
-        <div className="mb-6 bg-white p-6 rounded-lg shadow-md">
+        <div ref={formRef} className="mb-6 bg-white p-6 rounded-lg shadow-md">
           <h3 className="text-xl font-semibold mb-4">Nueva Factura</h3>
           
           <form onSubmit={handleCreateInvoice}>
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Cliente</label>
                 <select
@@ -867,9 +877,9 @@ export default function Facturas({ userRole = 'admin' }) {
                   className="w-full p-2 border rounded-lg"
                 />
                 
-                {showProductSearch && getFilteredProducts().length > 0 && (
+                {showProductSearch && filteredProducts.length > 0 && (
                   <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {getFilteredProducts().map(producto => (
+                    {filteredProducts.map(producto => (
                       <div
                         key={producto.id}
                         onClick={() => handleAddProduct(producto)}
@@ -912,7 +922,7 @@ export default function Facturas({ userRole = 'admin' }) {
                             <div className="flex items-center justify-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => handleUpdateQuantity(item.product_id, item.quantity - 1)}
+                                onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
                                 className="bg-gray-200 px-2 py-1 rounded hover:bg-gray-300 text-sm"
                                 title="Disminuir cantidad"
                               >
@@ -921,7 +931,7 @@ export default function Facturas({ userRole = 'admin' }) {
                               <input
                                 type="number"
                                 value={item.quantity}
-                                onChange={(e) => handleUpdateQuantity(item.product_id, parseFloat(e.target.value) || 0)}
+                                onChange={(e) => updateQuantity(item.product_id, parseFloat(e.target.value) || 0)}
                                 className="w-16 p-1 border rounded text-center"
                                 min="0.01"
                                 max={item.max_stock || 99999}
@@ -929,7 +939,7 @@ export default function Facturas({ userRole = 'admin' }) {
                               />
                               <button
                                 type="button"
-                                onClick={() => handleUpdateQuantity(item.product_id, item.quantity + 1)}
+                                onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
                                 className="bg-gray-200 px-2 py-1 rounded hover:bg-gray-300 text-sm"
                                 title="Aumentar cantidad"
                               >
@@ -955,7 +965,7 @@ export default function Facturas({ userRole = 'admin' }) {
                     <tfoot className="bg-gray-50 font-semibold">
                       <tr className="border-t-2">
                         <td colSpan="3" className="p-3 text-right text-lg">Total a pagar:</td>
-                        <td className="p-3 text-right text-xl text-blue-600">{formatPrice(total)}</td>
+                        <td className="p-3 text-right text-xl text-blue-600">{formatPrice(totalFactura)}</td>
                         <td></td>
                       </tr>
                     </tfoot>
@@ -1008,7 +1018,7 @@ export default function Facturas({ userRole = 'admin' }) {
 
       {/* Filtros */}
       <div className="mb-4 bg-white p-4 rounded-lg shadow-md">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div>
             <label className="block text-sm font-medium mb-2">Buscar</label>
             <input
@@ -1031,25 +1041,106 @@ export default function Facturas({ userRole = 'admin' }) {
             No hay facturas para mostrar
           </div>
         ) : (
-          <table className="w-full">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="p-3 text-left">N° Factura</th>
-                <th className="p-3 text-left">Cliente</th>
-                <th className="p-3 text-left">Fecha</th>
-                <th className="p-3 text-right">Total</th>
-                <th className="p-3 text-left">Pago</th>
-                <th className="p-3 text-left">Estado</th>
-                <th className="p-3 text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            {/* Vista móvil - Cards */}
+            <div className="block sm:hidden divide-y">
               {filteredFacturas.map(factura => (
-                <tr key={factura.id} className="border-t hover:bg-gray-50">
-                  <td className="p-3 font-mono font-semibold">{factura.invoice_number}</td>
-                  <td className="p-3">
-                    <div>{factura.customer_name}</div>
-                    {factura.customer_id_number && (
+                <div key={factura.id} className="p-4 hover:bg-gray-50">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="font-mono font-semibold text-sm">{factura.invoice_number}</div>
+                      <div className="text-sm font-medium">{factura.customer_name}</div>
+                      {factura.customer_id_number && (
+                        <div className="text-xs text-gray-600">{factura.customer_id_number}</div>
+                      )}
+                    </div>
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      factura.status === 'validated' ? 'bg-green-100' :
+                      factura.status === 'sent' ? 'bg-blue-100' :
+                      factura.status === 'cancelled' ? 'bg-red-100' :
+                      'bg-yellow-100'
+                    }`}>
+                      {getStatusBadge(factura.status)}
+                    </span>
+                  </div>
+                  
+                  <div className="text-xs text-gray-600 mb-2">
+                    {new Date(factura.issued_at).toLocaleDateString('es-CO', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                  
+                  <div className="flex justify-between items-center mb-3">
+                    <div className="text-sm">{getPaymentMethodLabel(factura.payment_method)}</div>
+                    <div className="text-base font-semibold">{formatPrice(factura.total)}</div>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {factura.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => handleSendToClient(factura.id)}
+                          disabled={loading}
+                          className="flex-1 px-3 py-1.5 bg-accent-600 text-white rounded hover:bg-accent-500 disabled:bg-gray-400 text-xs transition-colors"
+                        >
+                          📧 Enviar
+                        </button>
+                        <button
+                          onClick={() => handleCancelInvoice(factura.id)}
+                          disabled={loading}
+                          className="flex-1 px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 text-xs"
+                        >
+                          ❌ Cancelar
+                        </button>
+                        {userRole === 'admin' && (
+                          <button
+                            onClick={() => handleDeleteInvoice(factura.id)}
+                            disabled={loading}
+                            className="px-3 py-1.5 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:bg-gray-400 text-xs"
+                          >
+                            🗑️
+                          </button>
+                        )}
+                      </>
+                    )}
+                    {factura.status === 'sent' && (
+                      <button
+                        onClick={() => handleSendToClient(factura.id)}
+                        disabled={loading}
+                        className="flex-1 px-3 py-1.5 bg-accent-600 text-white rounded hover:bg-accent-500 disabled:bg-gray-400 text-xs transition-colors"
+                      >
+                        📧 Reenviar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Vista desktop - Tabla */}
+            <table className="w-full hidden sm:table">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="p-3 text-left">N° Factura</th>
+                  <th className="p-3 text-left">Cliente</th>
+                  <th className="p-3 text-left">Fecha</th>
+                  <th className="p-3 text-right">Total</th>
+                  <th className="p-3 text-left">Pago</th>
+                  <th className="p-3 text-left">Estado</th>
+                  <th className="p-3 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredFacturas.map(factura => (
+                  <tr key={factura.id} className="border-t hover:bg-gray-50">
+                    <td className="p-3 font-mono font-semibold">{factura.invoice_number}</td>
+                    <td className="p-3">
+                      <div>{factura.customer_name}</div>
+                      {factura.customer_id_number && (
                       <div className="text-sm text-gray-600">{factura.customer_id_number}</div>
                     )}
                   </td>
@@ -1083,10 +1174,10 @@ export default function Facturas({ userRole = 'admin' }) {
                           <button
                             onClick={() => handleSendToClient(factura.id)}
                             disabled={loading}
-                            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                            className="px-3 py-1 bg-accent-600 text-white rounded hover:bg-accent-500 disabled:bg-gray-400 text-sm transition-colors"
                             title="Enviar factura al cliente por email"
                           >
-                            � Enviar
+                            📧 Enviar
                           </button>
                           <button
                             onClick={() => handleCancelInvoice(factura.id)}
@@ -1115,7 +1206,7 @@ export default function Facturas({ userRole = 'admin' }) {
                             <button
                               onClick={() => handleSendToClient(factura.id)}
                               disabled={loading}
-                              className="text-xs text-blue-600 hover:underline"
+                              className="text-xs text-[#d89b6f] hover:underline transition-colors"
                               title="Reenviar factura"
                             >
                               Reenviar
@@ -1169,6 +1260,7 @@ export default function Facturas({ userRole = 'admin' }) {
               ))}
             </tbody>
           </table>
+          </>
         )}
       </div>
 
