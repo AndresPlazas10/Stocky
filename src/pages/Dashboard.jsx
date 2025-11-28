@@ -126,10 +126,10 @@ function Dashboard() {
       }
 
       const { data: employee } = await supabase
-        .from('employee_invitations')
-        .select('id, business_id, role, is_approved')
-        .eq('email', user.email)
-        .eq('is_approved', true)
+        .from('employees')
+        .select('id, business_id, role, is_active')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
         .maybeSingle();
 
 

@@ -147,7 +147,7 @@ function Register() {
         });
         
         // Eliminar el usuario de Auth para evitar usuarios huérfanos
-        await supabase.auth.admin.deleteUser(authData.user.id).catch(console.error);
+        await supabase.auth.signOut().catch(console.error);
         await supabase.auth.signOut();
         
         throw new Error(`Error al crear el negocio: ${businessError.message || 'Verifica las políticas RLS en Supabase'}`);

@@ -203,26 +203,6 @@ function Empleados({ businessId }) {
         throw new Error('Email confirmation debe estar desactivado en Supabase');
       }
 
-      // Crear invitación aprobada (solo para registro histórico)
-      const { data: invitationData, error: createInvitationError } = await supabase
-        .from('employee_invitations')
-        .insert([
-          {
-            business_id: businessId,
-            full_name: formData.full_name.trim(),
-            username: cleanUsername,
-            role: formData.role,
-            is_approved: true,
-            approved_at: new Date().toISOString()
-          }
-        ])
-        .select();
-
-      if (createInvitationError) {
-        console.error('Error al crear invitación:', createInvitationError);
-        // Continuar aunque falle la invitación
-      }
-
       // Crear registro de empleado
       const { error: createEmployeeError } = await supabase
         .from('employees')

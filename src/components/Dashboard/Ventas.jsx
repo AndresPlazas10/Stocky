@@ -26,9 +26,11 @@ import {
 
 // Función helper pura fuera del componente (no se recrea en renders)
 const getVendedorName = (venta) => {
-  if (!venta.employees) return 'Vendedor desconocido';
+  // Prioridad: seller_name guardado en la venta
+  if (venta?.seller_name) return venta.seller_name;
+  if (!venta.employees) return 'Empleado';
   if (venta.employees.role === 'owner' || venta.employees.role === 'admin') return 'Administrador';
-  return venta.employees.full_name || 'Vendedor desconocido';
+  return venta.employees.full_name || 'Empleado';
 };
 
 function Ventas({ businessId, userRole = 'admin' }) {
@@ -110,6 +112,19 @@ function Ventas({ businessId, userRole = 'admin' }) {
       const { data: business } = businessResult;
       const { data: employeesData } = employeesResult;
 
+      // Fallback: cargar info básica de usuarios para mostrar email/username si falta nombre de empleado
+      const userIds = (salesData || []).map(s => s.user_id).filter(Boolean);
+      let usersMap = new Map();
+      if (userIds.length > 0) {
+        const { data: usersData } = await supabase
+          .from('users')
+          .select('id, email, username, full_name')
+          .in('id', userIds);
+        usersData?.forEach(u => {
+          usersMap.set(u.id, { email: u.email, username: u.username, full_name: u.full_name });
+        });
+      }
+
       // Crear mapa de empleados
       const employeeMap = new Map();
       employeesData?.forEach(emp => {
@@ -130,6 +145,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
         const isOwner = userId === createdBy || (userId === currentUserId && userRole === 'admin');
         const isAdmin = employee?.role === 'admin';
         
+        const fallbackUser = usersMap.get(sale.user_id);
         return {
           ...sale,
           customers: sale.customer_id ? customersMap.get(sale.customer_id) : null,
@@ -137,7 +153,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
             ? { full_name: 'Administrador', role: 'owner' }
             : isAdmin
             ? { full_name: 'Administrador', role: 'admin' }
-            : employee || { full_name: 'Vendedor desconocido', role: 'employee' }
+            : employee || { full_name: (fallbackUser?.full_name || fallbackUser?.username || fallbackUser?.email || 'Empleado'), role: 'employee' }
         };
       }) || [];
 
