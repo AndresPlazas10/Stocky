@@ -230,9 +230,17 @@ function Mesas({ businessId }) {
   // 🔥 TIEMPO REAL: Suscripción a cambios en órdenes
   useRealtimeSubscription('orders', {
     filter: { business_id: businessId },
-    enabled: !!businessId && !!selectedMesa,
+    enabled: !!businessId,
     onUpdate: async (updatedOrder) => {
-      // Si es la orden actual, recargar los items
+      // Actualizar la mesa correspondiente en el estado global
+      setMesas(prev => prev.map(mesa => {
+        if (mesa.current_order_id === updatedOrder.id) {
+          return { ...mesa, orders: { ...mesa.orders, ...updatedOrder } };
+        }
+        return mesa;
+      }));
+      
+      // Si es la orden actualmente abierta, recargar los items
       if (selectedMesa?.current_order_id === updatedOrder.id) {
         const { data: items } = await supabase
           .from('order_items')
@@ -246,34 +254,66 @@ function Mesas({ businessId }) {
     }
   });
 
-  // 🔥 TIEMPO REAL: Suscripción a cambios en items de orden
-  useRealtimeSubscription('order_items', {
-    enabled: !!businessId && !!selectedMesa?.current_order_id,
-    filter: { order_id: selectedMesa?.current_order_id },
-    onInsert: async (newItem) => {
-      // Cargar el producto relacionado
-      const { data: product } = await supabase
-        .from('products')
-        .select('name, code')
-        .eq('id', newItem.product_id)
-        .single();
+  // 🔥 TIEMPO REAL: Suscripción a cambios en items de orden (NIVEL NEGOCIO)
+  // Callback para manejar cambios en order_items
+  const handleOrderItemChange = useCallback(async (item, eventType) => {
+    // Obtener el order_id del item
+    const orderId = item.order_id;
+    
+    // Usar función de actualización de estado para evitar problemas de stale state
+    setMesas(prevMesas => {
+      // Encontrar la mesa asociada a esta orden
+      const mesaAfectada = prevMesas.find(m => m.current_order_id === orderId);
+      if (!mesaAfectada) return prevMesas;
       
-      setOrderItems(prev => {
-        const exists = prev.some(item => item.id === newItem.id);
-        if (exists) {
-          return prev;
-        }
-        return [...prev, { ...newItem, products: product }];
-      });
-    },
-    onUpdate: (updatedItem) => {
-      setOrderItems(prev => prev.map(item => 
-        item.id === updatedItem.id ? { ...item, ...updatedItem } : item
-      ));
-    },
-    onDelete: (deletedItem) => {
-      setOrderItems(prev => prev.filter(item => item.id !== deletedItem.id));
-    }
+      // Recargar los detalles de la orden para actualizar el total (async)
+      supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (
+            id,
+            quantity,
+            price,
+            subtotal,
+            products (name)
+          )
+        `)
+        .eq('id', orderId)
+        .single()
+        .then(({ data: updatedOrder }) => {
+          if (updatedOrder) {
+            // Actualizar el estado de mesas
+            setMesas(prev => prev.map(mesa => {
+              if (mesa.id === mesaAfectada.id) {
+                return { ...mesa, orders: updatedOrder };
+              }
+              return mesa;
+            }));
+            
+            // Si esta es la mesa abierta actualmente, actualizar también orderItems
+            setSelectedMesa(prevSelected => {
+              if (prevSelected?.id === mesaAfectada.id) {
+                setOrderItems(updatedOrder.order_items || []);
+                return { ...prevSelected, orders: updatedOrder };
+              }
+              return prevSelected;
+            });
+          }
+        });
+      
+      return prevMesas;
+    });
+  }, []);
+
+  // Suscripción a order_items a nivel de negocio (sin filtrar por order_id específico)
+  // Nota: RLS automáticamente filtra por business_id del usuario autenticado
+  useRealtimeSubscription('order_items', {
+    enabled: !!businessId,
+    filter: {}, // RLS se encarga del filtrado por business_id
+    onInsert: (newItem) => handleOrderItemChange(newItem, 'INSERT'),
+    onUpdate: (updatedItem) => handleOrderItemChange(updatedItem, 'UPDATE'),
+    onDelete: (deletedItem) => handleOrderItemChange(deletedItem, 'DELETE')
   });
 
   const handleCreateTable = useCallback(async (e) => {
@@ -673,6 +713,29 @@ function Mesas({ businessId }) {
       }
 
       // 1. Crear la venta con el método de pago y cliente seleccionados
+      // Determinar nombre del vendedor
+      let sellerName = 'Administrador';
+      try {
+        const { data: emp } = await supabase
+          .from('employees')
+          .select('full_name, role')
+          .eq('business_id', businessId)
+          .eq('user_id', orderData.user_id)
+          .maybeSingle();
+        if (emp?.role === 'admin' || emp?.role === 'owner') {
+          sellerName = 'Administrador';
+        } else if (emp?.full_name) {
+          sellerName = emp.full_name;
+        } else {
+          const { data: usr } = await supabase
+            .from('users')
+            .select('full_name, username, email')
+            .eq('id', orderData.user_id)
+            .maybeSingle();
+          sellerName = usr?.full_name || usr?.username || usr?.email || 'Empleado';
+        }
+      } catch {}
+
       const { data: sale, error: saleError} = await supabase
         .from('sales')
         .insert([{
@@ -680,7 +743,8 @@ function Mesas({ businessId }) {
           user_id: orderData.user_id,
           customer_id: selectedCustomer || null,
           total: orderData.total,
-          payment_method: paymentMethod
+          payment_method: paymentMethod,
+          seller_name: sellerName
         }])
         .select()
         .maybeSingle();

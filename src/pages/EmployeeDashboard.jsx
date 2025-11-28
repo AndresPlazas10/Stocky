@@ -60,6 +60,13 @@ function EmployeeDashboard() {
         return;
       }
 
+      // Validar que el empleado tenga business_id
+      if (!employeeData.business_id) {
+        setError('Tu cuenta de empleado no tiene un negocio asignado.');
+        setLoading(false);
+        return;
+      }
+
       // Obtener el negocio
       const { data: businessData, error: businessError } = await supabase
         .from('businesses')
@@ -68,6 +75,7 @@ function EmployeeDashboard() {
         .maybeSingle();
 
       if (businessError || !businessData) {
+        console.error('Error al cargar negocio:', businessError);
         setError('Error al cargar información del negocio');
         setLoading(false);
         return;

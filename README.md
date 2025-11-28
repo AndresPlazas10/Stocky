@@ -1041,6 +1041,35 @@ npm run build
 
 ---
 
+## 🆕 Actualización: Sincronización en Tiempo Real (Nov 2025)
+
+### ⚡ Nueva Funcionalidad
+
+Se implementó **sincronización en tiempo real** para la gestión de mesas. Ahora, cuando un usuario realiza cambios en una orden (agregar productos, modificar cantidades, eliminar items), **todos los usuarios del mismo negocio ven los cambios instantáneamente** sin necesidad de refrescar la página.
+
+### 🎯 Beneficios
+
+- ✅ **Colaboración en tiempo real**: Múltiples empleados pueden trabajar simultáneamente
+- ✅ **Datos siempre actualizados**: Elimina confusiones por información desactualizada
+- ✅ **Mejor experiencia**: Sin necesidad de refrescar manualmente
+- ✅ **Prevención de conflictos**: Todos ven el mismo estado en tiempo real
+
+### 📋 Para Aplicar Esta Actualización
+
+Si ya tienes el proyecto desplegado, sigue estos pasos:
+
+1. **Actualiza el código** (pull del repositorio)
+2. **Ejecuta el script SQL**: `docs/sql/add_realtime_policies.sql` en tu proyecto de Supabase
+3. **Habilita Realtime**: En Supabase Dashboard → Database → Replication, activa:
+   - `order_items`
+   - `sale_details`
+4. **Verifica**: Prueba con 2 cuentas simultáneamente
+
+📖 **Documentación completa**: Ver [SOLUCION_REALTIME.md](./SOLUCION_REALTIME.md)  
+✅ **Guía paso a paso**: Ver [CHECKLIST_VERIFICACION.md](./CHECKLIST_VERIFICACION.md)
+
+---
+
 ## 🤝 Contribuir
 
 Las contribuciones son bienvenidas. Por favor:
