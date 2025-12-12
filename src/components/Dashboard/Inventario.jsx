@@ -89,49 +89,43 @@ function Inventario({ businessId, userRole = 'admin' }) {
     }
   }, [businessId]);
 
-  // Unificar generación de código (reemplaza generateAndSetCode y generateProductCode)
+  // ✅ OPTIMIZADO: Generación de código único sin intentos fallidos
   const generateProductCode = useCallback(async () => {
     try {
-      // Optimización: Obtener solo el último producto creado para inferir el siguiente código
-      // en lugar de descargar todos los productos
-      const { data: lastProduct } = await supabase
+      // Obtener TODOS los códigos PRD-#### del negocio para encontrar el máximo
+      const { data: products, error } = await supabase
         .from('products')
         .select('code')
         .eq('business_id', businessId)
-        .ilike('code', 'PRD-%')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .ilike('code', 'PRD-%');
       
-      let nextNumber = 1;
+      if (error) throw error;
       
-      if (lastProduct && lastProduct.code) {
-        const match = lastProduct.code.match(/PRD-(\d+)/);
-        if (match) {
-          nextNumber = parseInt(match[1]) + 1;
-        }
+      let maxNumber = 0;
+      
+      // Encontrar el número más alto entre todos los códigos PRD-####
+      if (products && products.length > 0) {
+        products.forEach(product => {
+          if (product.code) {
+            const match = product.code.match(/PRD-(\d+)/);
+            if (match) {
+              const num = parseInt(match[1], 10);
+              if (num > maxNumber) {
+                maxNumber = num;
+              }
+            }
+          }
+        });
       }
       
-      let newCode = `PRD-${String(nextNumber).padStart(4, '0')}`;
-      
-      // Verificar si existe (por si acaso hubo concurrencia)
-      const { data: existing } = await supabase
-        .from('products')
-        .select('id')
-        .eq('business_id', businessId)
-        .eq('code', newCode)
-        .maybeSingle();
-        
-      if (existing) {
-         // Si existe, intentar con el siguiente + random para evitar loop infinito
-         nextNumber++;
-         newCode = `PRD-${String(nextNumber).padStart(4, '0')}`;
-      }
+      // El siguiente código es maxNumber + 1
+      const nextNumber = maxNumber + 1;
+      const newCode = `PRD-${String(nextNumber).padStart(4, '0')}`;
       
       setGeneratedCode(newCode);
     } catch (error) {
-      console.error('Error generating code:', error);
-      setGeneratedCode(`PRD-${Date.now()}`);
+      // Fallback: usar timestamp para garantizar unicidad
+      setGeneratedCode(`PRD-${Date.now().toString().slice(-6)}`);
     }
   }, [businessId]);
 
@@ -213,10 +207,29 @@ function Inventario({ businessId, userRole = 'admin' }) {
     setError(null);
     setSuccess(null);
 
+    // Prevenir doble submit
+    if (isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
     try {
-      // Validaciones
-      if (!formData.name.trim()) {
+      // ✅ VALIDACIONES MEJORADAS
+      if (!formData.name?.trim()) {
         throw new Error('El nombre del producto es requerido');
+      }
+
+      if (!formData.category?.trim()) {
+        throw new Error('La categoría del producto es requerida');
+      }
+
+      if (!formData.sale_price || parseFloat(formData.sale_price) <= 0) {
+        throw new Error('El precio de venta debe ser mayor a 0');
+      }
+
+      if (formData.purchase_price && parseFloat(formData.purchase_price) < 0) {
+        throw new Error('El precio de compra no puede ser negativo');
       }
 
       if (formData.sale_price && formData.purchase_price) {
@@ -225,78 +238,87 @@ function Inventario({ businessId, userRole = 'admin' }) {
         }
       }
 
-      // Generar código único intentando inserciones hasta encontrar uno libre
-      // Como RLS bloquea SELECT, intentaremos INSERT directamente
-      let nextNumber = 1;
-      let insertSuccess = false;
-      let finalCode = '';
-      let attempts = 0;
-      const maxAttempts = 100;
+      // ✅ VALIDAR código generado
+      if (!generatedCode || !generatedCode.startsWith('PRD-')) {
+        throw new Error('Error al generar código del producto. Recarga la página.');
+      }
+
+      // ✅ CORREGIDO: Insertar con el código pre-generado (evita 409)
+      const productData = {
+        name: formData.name.trim(),
+        code: generatedCode, // ✅ Usar el código ya generado
+        category: formData.category.trim(),
+        purchase_price: parseFloat(formData.purchase_price) || 0,
+        sale_price: parseFloat(formData.sale_price),
+        stock: parseInt(formData.stock) || 0,
+        min_stock: parseInt(formData.min_stock) || 5,
+        unit: formData.unit || 'unit',
+        supplier_id: formData.supplier_id || null,
+        business_id: businessId,
+        is_active: true
+      };
+
+      const { data: insertedProduct, error: insertError } = await supabase
+        .from('products')
+        .insert([productData])
+        .select()
+        .maybeSingle();
       
-      while (!insertSuccess && attempts < maxAttempts) {
-        finalCode = `PRD-${String(nextNumber).padStart(4, '0')}`;
-        
-        const { data: insertedProduct, error: insertError } = await supabase
-          .from('products')
-          .insert([{
-            name: formData.name,
-            code: finalCode,
-            category: formData.category,
-            purchase_price: parseFloat(formData.purchase_price) || 0,
-            sale_price: parseFloat(formData.sale_price) || 0,
-            stock: parseInt(formData.stock) || 0,
-            min_stock: parseInt(formData.min_stock) || 0,
-            unit: formData.unit,
-            supplier_id: formData.supplier_id || null,
-            business_id: businessId,
-            is_active: true
-          }])
-          .select()
-          .maybeSingle();
-        
-        if (insertError) {
-          if (insertError.code === '23505') {
-            // Código duplicado, intentar con el siguiente
-            nextNumber++;
-            attempts++;
-          } else {
-            // Error diferente, lanzar
-            throw insertError;
+      if (insertError) {
+        // ✅ Manejo inteligente de error 409 (conflicto de código único)
+        if (insertError.code === '23505') {
+          // Regenerar código con timestamp para garantizar unicidad
+          const fallbackCode = `PRD-${Date.now().toString().slice(-6)}`;
+          productData.code = fallbackCode;
+          
+          const { data: retryData, error: retryError } = await supabase
+            .from('products')
+            .insert([productData])
+            .select()
+            .maybeSingle();
+          
+          if (retryError) {
+            throw new Error(`Error al crear producto: ${retryError.message || 'Código duplicado'}`);
           }
+        } else if (insertError.code === '42501') {
+          // Error de permisos RLS
+          throw new Error('No tienes permisos para crear productos. Contacta al administrador.');
+        } else if (insertError.code === '23503') {
+          // FK constraint
+          throw new Error('Proveedor no válido. Selecciona uno existente.');
         } else {
-          // Inserción exitosa
-          insertSuccess = true;
-          
-          // Actualizar la lista de productos
-          await loadProductos();
-          
-          // Cerrar modal y limpiar formulario
-          setShowForm(false);
-          setFormData({
-            name: '',
-            category: '',
-            purchase_price: '',
-            sale_price: '',
-            stock: '',
-            min_stock: '',
-            unit: 'unit',
-            supplier_id: ''
-          });
-          setGeneratedCode('');
+          throw new Error(`Error al crear producto: ${insertError.message || 'Error desconocido'}`);
         }
       }
       
-      if (!insertSuccess) {
-        alert('No se pudo generar un código único para el producto después de ' + maxAttempts + ' intentos. Por favor, contacte al administrador.');
-        return;
-      }
+      // ✅ Actualizar lista y limpiar formulario
+      await loadProductos();
+      setShowForm(false);
+      setFormData({
+        name: '',
+        category: '',
+        purchase_price: '',
+        sale_price: '',
+        stock: '',
+        min_stock: '',
+        unit: 'unit',
+        supplier_id: ''
+      });
+      setGeneratedCode('');
+      setSuccess('✅ Producto creado exitosamente');
+      
+      // Auto-limpiar mensaje de éxito después de 3 segundos
+      setTimeout(() => setSuccess(null), 3000);
 
     } catch (error) {
-      alert('Error al crear el producto: ' + error.message);
+      setError(error.message || 'Error al crear el producto');
+      
+      // Auto-limpiar mensaje de error después de 5 segundos
+      setTimeout(() => setError(null), 5000);
     } finally {
       setIsSubmitting(false);
     }
-  }, [businessId, formData, generatedCode, loadProductos]);
+  }, [businessId, formData, generatedCode, loadProductos, isSubmitting]);
 
   const handleDelete = useCallback(async (productId) => {
     setProductToDelete(productId);

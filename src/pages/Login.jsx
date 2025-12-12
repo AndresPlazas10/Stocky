@@ -49,7 +49,7 @@ function Login() {
       const cleanUsername = username.trim().toLowerCase();
       const emailToUse = `${cleanUsername}@stockly-app.com`;
 
-      console.log('🔐 Intentando login con:', emailToUse);
+      // Intentando login
 
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: emailToUse,
@@ -57,11 +57,11 @@ function Login() {
       });
 
       if (signInError) {
-        console.error('❌ Error de login:', signInError);
+        // Error de login
         throw new Error('Usuario o contraseña incorrectos');
       }
 
-      console.log('✅ Login exitoso:', data.user.id);
+      // Login exitoso
 
       // Verificar si es propietario de un negocio
       const { data: business } = await supabase
@@ -72,10 +72,10 @@ function Login() {
 
       // Redireccionar según el rol
       if (business) {
-        console.log('👔 Redirigiendo a dashboard de propietario');
+        // Redirigiendo a dashboard de propietario
         window.location.href = '/dashboard';
       } else {
-        console.log('👨‍💼 Redirigiendo a dashboard de empleado');
+        // Redirigiendo a dashboard de empleado
         window.location.href = '/employee-dashboard';
       }
       

@@ -47,7 +47,7 @@ export const Sidebar = React.memo(function Sidebar({ activeSection, onSectionCha
     
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        alert('El archivo es muy grande. Máximo 2MB.');
+        setError('El archivo es muy grande. Máximo 2MB.');
         return;
       }
       

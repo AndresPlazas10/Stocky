@@ -32,7 +32,6 @@ export const sendInvoiceEmail = async ({
     const validation = validateEmail(email);
     
     if (!validation.valid) {
-      console.warn('⚠️ Email inválido:', validation.error);
       logEmailAttempt({
         email,
         type: 'invoice',
@@ -52,7 +51,6 @@ export const sendInvoiceEmail = async ({
     const sendDecision = shouldSendEmail(email);
     
     if (!sendDecision.shouldSend) {
-      console.warn('⚠️ Email no enviado:', sendDecision.reason);
       logEmailAttempt({
         email,
         type: 'invoice',
@@ -78,7 +76,6 @@ export const sendInvoiceEmail = async ({
                               import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 
     if (!emailJSConfigured) {
-      console.warn('⚠️ EmailJS no está configurado. Usando modo demo.');
       logEmailAttempt({
         email: targetEmail,
         type: 'invoice',
@@ -126,8 +123,6 @@ export const sendInvoiceEmail = async ({
       ? `Email de testing enviado a ${targetEmail} (original: ${email})`
       : `Email enviado exitosamente a ${targetEmail}`;
     
-    console.log('✅', successMessage, response);
-    
     logEmailAttempt({
       email: targetEmail,
       type: 'invoice',
@@ -146,8 +141,6 @@ export const sendInvoiceEmail = async ({
     };
 
   } catch (error) {
-    console.error('❌ Error al enviar email:', error);
-    
     // ✅ Log del error
     logEmailAttempt({
       email,

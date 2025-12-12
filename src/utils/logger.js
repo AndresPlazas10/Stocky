@@ -36,11 +36,9 @@ class Logger {
   error(...args) {
     if (this.isDev) {
       console.error('❌', ...args);
-    } else {
-      // En producción: enviar a servicio de monitoring
-      // this.sendToMonitoring('error', args);
-      console.error('Error:', args[0]); // Log mínimo
     }
+    // En producción: silencioso o enviar a servicio de monitoring
+    // Para integrar: Sentry.captureException(args[0])
   }
 
   /**

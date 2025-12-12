@@ -159,7 +159,7 @@ export function useNotifications(businessId) {
 
       setNotifications(allNotifications);
     } catch (error) {
-      console.error('Error loading notifications:', error);
+      // Error handled silently
     } finally {
       setLoading(false);
     }

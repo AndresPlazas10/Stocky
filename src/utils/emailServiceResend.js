@@ -78,13 +78,6 @@ export const sendInvoiceEmailResend = async ({
 
     const targetEmail = sendDecision.testEmail || sendDecision.email;
     const isTestMode = !!sendDecision.testEmail;
-    
-    // Log para debugging
-    if (isTestMode) {
-      console.log(`🧪 [TEST MODE] Factura ${invoiceNumber} enviada a email de prueba`);
-    } else {
-      console.log(`✅ [PRODUCTION] Factura ${invoiceNumber} enviada a cliente`);
-    }
 
     // ✅ PASO 3: Formatear items
     const itemsHTML = items.map(item => `
@@ -209,8 +202,6 @@ export const sendInvoiceEmailResend = async ({
 
     if (isTestMode) {
       console.log(`✅ [TEST] Email enviado a ${targetEmail} (original: ${email})`);
-    } else {
-      console.log(`✅ [PROD] Email enviado con Resend a ${targetEmail}`);
     }
 
     return {
@@ -222,8 +213,6 @@ export const sendInvoiceEmailResend = async ({
     };
 
   } catch (error) {
-    console.error('❌ Error al enviar con Resend:', error);
-    
     logEmailAttempt({
       email,
       type: 'invoice',

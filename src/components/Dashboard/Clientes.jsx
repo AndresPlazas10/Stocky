@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../supabase/Client.jsx';
 
 function Clientes({ businessId }) {
+  // NOTA: Tabla 'customers' fue eliminada de la base de datos
+  // Este componente ahora solo muestra información
   const [clientes, setClientes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -18,21 +20,9 @@ function Clientes({ businessId }) {
   });
 
   const loadClientes = useCallback(async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('business_id', businessId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setClientes(data || []);
-    } catch (error) {
-      setError('Error al cargar clientes');
-    } finally {
-      setLoading(false);
-    }
+    // Tabla customers eliminada - no hacer nada
+    setLoading(false);
+    setClientes([]);
   }, [businessId]);
 
   useEffect(() => {
@@ -68,41 +58,9 @@ function Clientes({ businessId }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.full_name.trim()) {
-      setError('El nombre es obligatorio');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const { error } = await supabase
-        .from('customers')
-        .insert([{
-          business_id: businessId,
-          full_name: formData.full_name.trim(),
-          id_number: formData.id_number.trim() || null,
-          email: formData.email.trim() || null,
-          phone: formData.phone.trim() || null,
-          address: formData.address.trim() || null
-        }]);
-
-      if (error) throw error;
-
-      setSuccess('✅ Cliente registrado exitosamente');
-      setFormData({
-        full_name: '',
-        id_number: '',
-        email: '',
-        phone: '',
-        address: ''
-      });
-      setShowForm(false);
-      loadClientes();
-    } catch (error) {
-      setError('Error al registrar cliente: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
+    // Tabla customers eliminada - mostrar mensaje
+    setError('⚠️ La gestión de clientes no está disponible actualmente.');
+    setShowForm(false);
   };
 
   const handleChange = (e) => {

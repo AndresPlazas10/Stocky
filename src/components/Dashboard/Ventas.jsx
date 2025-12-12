@@ -41,6 +41,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [showPOS, setShowPOS] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
   
   // Estados para modal de eliminación de venta (solo admin)
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -70,31 +71,20 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const loadVentas = useCallback(async () => {
     try {
       // Cargar datos en paralelo
-      const [authResult, salesResult, customersResult] = await Promise.all([
+      const [authResult, salesResult] = await Promise.all([
         supabase.auth.getUser(),
         supabase
           .from('sales')
           .select('*')
           .eq('business_id', businessId)
           .order('created_at', { ascending: false })
-          .limit(50),
-        supabase
-          .from('customers')
-          .select('id, full_name, email, id_number')
-          .eq('business_id', businessId)
+          .limit(50)
       ]);
 
       const { data: { user } } = authResult;
       const { data: salesData, error: salesError } = salesResult;
-      const { data: customersData } = customersResult;
 
       if (salesError) throw salesError;
-
-      // Crear mapa de clientes
-      const customersMap = new Map();
-      customersData?.forEach(customer => {
-        customersMap.set(customer.id, customer);
-      });
 
       // Verificar ownership y cargar empleados en paralelo
       const [businessResult, employeesResult] = await Promise.all([
@@ -111,19 +101,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
       const { data: business } = businessResult;
       const { data: employeesData } = employeesResult;
-
-      // Fallback: cargar info básica de usuarios para mostrar email/username si falta nombre de empleado
-      const userIds = (salesData || []).map(s => s.user_id).filter(Boolean);
-      let usersMap = new Map();
-      if (userIds.length > 0) {
-        const { data: usersData } = await supabase
-          .from('users')
-          .select('id, email, username, full_name')
-          .in('id', userIds);
-        usersData?.forEach(u => {
-          usersMap.set(u.id, { email: u.email, username: u.username, full_name: u.full_name });
-        });
-      }
 
       // Crear mapa de empleados
       const employeeMap = new Map();
@@ -145,15 +122,13 @@ function Ventas({ businessId, userRole = 'admin' }) {
         const isOwner = userId === createdBy || (userId === currentUserId && userRole === 'admin');
         const isAdmin = employee?.role === 'admin';
         
-        const fallbackUser = usersMap.get(sale.user_id);
         return {
           ...sale,
-          customers: sale.customer_id ? customersMap.get(sale.customer_id) : null,
           employees: isOwner
             ? { full_name: 'Administrador', role: 'owner' }
             : isAdmin
             ? { full_name: 'Administrador', role: 'admin' }
-            : employee || { full_name: (fallbackUser?.full_name || fallbackUser?.username || fallbackUser?.email || 'Empleado'), role: 'employee' }
+            : employee || { full_name: 'Empleado', role: 'employee' }
         };
       }) || [];
 
@@ -177,37 +152,38 @@ function Ventas({ businessId, userRole = 'admin' }) {
   }, [businessId]);
 
   const loadClientes = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('business_id', businessId)
-        .order('full_name');
-
-      if (error) {
-        setClientes([]);
-        return;
-      }
-      setClientes(data || []);
-    } catch (err) {
-      setClientes([]);
-    }
-  }, [businessId]);
+    // Tabla customers eliminada - ya no se usa
+    setClientes([]);
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      
+      // Verificar sesión ANTES de cargar datos
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user?.id) {
+        setError('⚠️ Tu sesión ha expirado. Redirigiendo al login...');
+        setLoading(false);
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+        return;
+      }
+      
+      setSessionChecked(true);
+      
       await Promise.all([
         loadVentas(),
-        loadProductos(),
-        loadClientes()
+        loadProductos()
       ]);
     } catch (error) {
       setError('⚠️ No se pudo cargar la información. Por favor, intenta recargar la página.');
     } finally {
       setLoading(false);
     }
-  }, [loadVentas, loadProductos, loadClientes]);
+  }, [loadVentas, loadProductos]);
 
   useEffect(() => {
     if (businessId) {
@@ -253,8 +229,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
           ? { full_name: 'Administrador', role: 'owner' }
           : isAdmin
           ? { full_name: 'Administrador', role: 'admin' }
-          : employee || { full_name: 'Vendedor desconocido', role: 'employee' },
-        customers: newSale.customer_id ? clientesMap.get(newSale.customer_id) : null
+          : employee || { full_name: 'Vendedor desconocido', role: 'employee' }
       };
 
       // Verificar si la venta ya existe antes de agregarla
@@ -288,29 +263,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setProductos(prev => prev.filter(p => p.id !== deletedProduct.id));
     }
   });
-
-  // Memoizar mapa de clientes para acceso O(1)
-  const clientesMap = useMemo(() => {
-    const map = new Map();
-    clientes.forEach(c => map.set(c.id, c));
-    return map;
-  }, [clientes]);
-
-  // Cargar datos del cliente cuando se selecciona (optimizado)
-  useEffect(() => {
-    if (selectedCustomer && clientesMap.size > 0) {
-      const cliente = clientesMap.get(selectedCustomer);
-      if (cliente) {
-        setCustomerName(cliente.full_name || cliente.name || '');
-        setCustomerEmail(cliente.email || '');
-        setCustomerIdNumber(cliente.id_number || '');
-      }
-    } else {
-      setCustomerName('');
-      setCustomerEmail('');
-      setCustomerIdNumber('');
-    }
-  }, [selectedCustomer, clientesMap]);
 
   // Memoizar funciones del carrito
   const addToCart = useCallback((producto) => {
@@ -379,6 +331,12 @@ function Ventas({ businessId, userRole = 'admin' }) {
       return;
     }
 
+    // Verificar sesión antes de procesar
+    if (!sessionChecked) {
+      setError('⚠️ Verificando sesión...');
+      return;
+    }
+
     // DESHABILITADO - Requiere dominio verificado en Resend
     // Validar datos de facturación si está marcada
     // if (generateInvoice) {
@@ -399,40 +357,44 @@ function Ventas({ businessId, userRole = 'admin' }) {
       // Obtener el usuario actual autenticado
       const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-      if (userError || !user) {
+      if (userError || !user?.id) {
         setError('⚠️ Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+        setLoading(false);
         setTimeout(() => {
           window.location.href = '/login';
         }, 2000);
         return;
       }
 
-      // Buscar si existe en la tabla users
-      const { data: userRecord } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      // Obtener employee_id para la factura
+      // Obtener información del empleado para seller_name
       const { data: employee } = await supabase
         .from('employees')
-        .select('id')
+        .select('full_name')
         .eq('user_id', user.id)
         .maybeSingle();
+
+      // Datos a insertar
+      const saleData = {
+        business_id: businessId,
+        user_id: user.id,
+        seller_name: employee?.full_name || 'Vendedor',
+        payment_method: paymentMethod,
+        total: total
+      };
+
+      // Datos de venta a insertar
 
       // 1. Crear la venta principal
       const { data: sale, error: saleError } = await supabase
         .from('sales')
-        .insert([{
-          business_id: businessId,
-          user_id: user?.id || null, // Rastrear quién hizo la venta
-          payment_method: paymentMethod,
-          total: total,
-          customer_id: selectedCustomer || null
-        }])
+        .insert([saleData])
         .select()
-        .maybeSingle();      if (saleError) throw saleError;
+        .maybeSingle();
+      
+      if (saleError) {
+        // Error al insertar venta
+        throw saleError;
+      }
 
       // 2. Crear los detalles de venta
       const saleDetails = cart.map(item => ({
@@ -535,7 +497,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     } finally {
       setLoading(false);
     }
-  }, [cart, businessId, paymentMethod, selectedCustomer, total, loadVentas]);
+  }, [cart, businessId, paymentMethod, selectedCustomer, total, loadVentas, sessionChecked]);
 
   // Funciones de eliminación de venta (solo admin)
   const handleDeleteSale = (saleId) => {
@@ -617,23 +579,10 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
   // Memoizar función de modal de factura
   const openInvoiceModal = useCallback(async (venta) => {
-    // Usar datos de customer ya cargados si están disponibles
-    if (venta.customers) {
-      setInvoiceCustomerName(venta.customers.full_name || '');
-      setInvoiceCustomerEmail(venta.customers.email || '');
-      setInvoiceCustomerIdNumber(venta.customers.id_number || '');
-    } else if (venta.customer_id && clientesMap.size > 0) {
-      const cliente = clientesMap.get(venta.customer_id);
-      if (cliente) {
-        setInvoiceCustomerName(cliente.full_name || '');
-        setInvoiceCustomerEmail(cliente.email || '');
-        setInvoiceCustomerIdNumber(cliente.id_number || '');
-      }
-    } else {
-      setInvoiceCustomerName('');
-      setInvoiceCustomerEmail('');
-      setInvoiceCustomerIdNumber('');
-    }
+    // Campos de cliente vacíos (tabla customers eliminada)
+    setInvoiceCustomerName('');
+    setInvoiceCustomerEmail('');
+    setInvoiceCustomerIdNumber('');
 
     // Cargar detalles de la venta
     const { data: saleDetails } = await supabase
@@ -646,7 +595,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     
     setSelectedSale({ ...venta, sale_details: saleDetails || [] });
     setShowInvoiceModal(true);
-  }, [clientesMap]);
+  }, []);
 
   // Generar factura desde una venta existente (memoizado)
   const generateInvoiceFromSale = useCallback(async () => {
@@ -677,8 +626,9 @@ function Ventas({ businessId, userRole = 'admin' }) {
       // Obtener employee_id del usuario actual
       const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-      if (userError || !user) {
+      if (userError || !user?.id) {
         setError('⚠️ Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+        setGeneratingInvoice(false);
         setTimeout(() => window.location.href = '/login', 2000);
         return;
       }
@@ -695,7 +645,9 @@ function Ventas({ businessId, userRole = 'admin' }) {
       const { data: invNumber, error: numberError } = await supabase
         .rpc('generate_invoice_number', { p_business_id: businessId });
 
-      if (numberError) throw new Error('Error al generar número de factura: ' + numberError.message);
+      if (numberError) {
+        throw new Error('Error al generar número de factura: ' + numberError.message);
+      }
 
       const invoiceNumber = invNumber;
 
@@ -1140,7 +1092,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                 <div className="min-w-0">
                                   <p className="text-xs text-accent-500 uppercase tracking-wide">Cliente</p>
                                   <p className="text-sm font-semibold text-primary-900 truncate">
-                                    {venta.customers?.full_name || 'Venta general'}
+                                    Venta general
                                   </p>
                                 </div>
                               </div>
@@ -1198,9 +1150,9 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                     .eq('sale_id', venta.id);
                                   
                                   setSelectedSale({ ...venta, sale_details: saleDetails || [] });
-                                  setInvoiceCustomerName(venta.customers?.full_name || '');
-                                  setInvoiceCustomerEmail(venta.customers?.email || '');
-                                  setInvoiceCustomerIdNumber(venta.customers?.id_number || '');
+                                  setInvoiceCustomerName('');
+                                  setInvoiceCustomerEmail('');
+                                  setInvoiceCustomerIdNumber('');
                                   setShowInvoiceModal(true);
                                 }}
                                 className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"

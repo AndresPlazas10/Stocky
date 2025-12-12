@@ -6,28 +6,51 @@
 
 -- 1. Función para generar números de factura secuenciales
 -- =====================================================
+-- ✅ CORREGIDO: Usa alias de tabla (i) para evitar ambigüedad
 CREATE OR REPLACE FUNCTION generate_invoice_number(p_business_id UUID)
-RETURNS TEXT AS $$
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
-  last_number INTEGER;
-  new_number TEXT;
+  v_last_number INTEGER;
+  v_new_number TEXT;
 BEGIN
-  -- Obtener el último número de factura del negocio
+  -- Validar que p_business_id no sea NULL
+  IF p_business_id IS NULL THEN
+    RAISE EXCEPTION 'business_id no puede ser NULL';
+  END IF;
+
+  -- ✅ Usar alias de tabla (i) y referencia explícita (i.invoice_number)
+  -- Esto elimina la ambigüedad: "column reference 'invoice_number' is ambiguous"
   SELECT 
     COALESCE(
-      MAX(CAST(SUBSTRING(invoice_number FROM '[0-9]+$') AS INTEGER)), 
+      MAX(
+        CASE 
+          WHEN i.invoice_number ~ '^FAC-[0-9]+$' 
+          THEN CAST(SUBSTRING(i.invoice_number FROM 5) AS INTEGER)
+          ELSE 0
+        END
+      ), 
       0
     )
-  INTO last_number
-  FROM invoices
-  WHERE business_id = p_business_id;
+  INTO v_last_number
+  FROM invoices AS i  -- ✅ Alias de tabla
+  WHERE i.business_id = p_business_id;  -- ✅ Referencia explícita
   
   -- Generar el nuevo número (incrementar + 1)
-  new_number := 'FAC-' || LPAD((last_number + 1)::TEXT, 6, '0');
+  v_new_number := 'FAC-' || LPAD((v_last_number + 1)::TEXT, 6, '0');
   
-  RETURN new_number;
+  RETURN v_new_number;
 END;
-$$ LANGUAGE plpgsql;
+$$;
+
+COMMENT ON FUNCTION generate_invoice_number(UUID) IS 
+  'Genera números consecutivos de factura por negocio. Formato: FAC-XXXXXX';
+
+GRANT EXECUTE ON FUNCTION generate_invoice_number(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION generate_invoice_number(UUID) TO anon;
 
 -- 2. Función para reducir stock de productos
 -- =====================================================

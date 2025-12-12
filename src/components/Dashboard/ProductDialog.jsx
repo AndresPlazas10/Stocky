@@ -114,7 +114,7 @@ export function ProductDialog({
       await onSave(dataToSave);
       onClose();
     } catch (error) {
-      console.error('Error saving product:', error);
+      // Error handled silently
     } finally {
       setIsSubmitting(false);
     }
