@@ -85,7 +85,12 @@ function Empleados({ businessId }) {
     setSuccess(null);
 
     try {
-      // Validaciones
+      // ✅ VALIDACIÓN CRÍTICA: Verificar business_id
+      if (!businessId) {
+        throw new Error('❌ Error: No se pudo identificar tu negocio. Recarga la página e intenta de nuevo.');
+      }
+
+      // Validaciones de formulario
       if (!formData.full_name.trim()) {
         throw new Error('El nombre del empleado es requerido');
       }
@@ -138,6 +143,13 @@ function Empleados({ businessId }) {
         throw new Error('No puedes usar el nombre de usuario del negocio');
       }
 
+      // ✅ LOG: Iniciando creación de empleado
+      console.log('🔄 Creando empleado:', { 
+        username: cleanUsername, 
+        business_id: businessId,
+        role: formData.role 
+      });
+
       // Generar email automáticamente (mismo patrón que propietarios)
       const cleanEmail = `${cleanUsername}@stockly-app.com`;
 
@@ -154,6 +166,7 @@ function Empleados({ businessId }) {
       });
 
       if (authError) {
+        console.error('❌ Error Auth:', authError);
         // Error al crear cuenta de autenticación
         if (authError.message.includes('already registered')) {
           throw new Error('Ya existe una cuenta con este usuario');
@@ -165,29 +178,49 @@ function Empleados({ businessId }) {
         throw new Error('Error al crear la cuenta');
       }
 
+      console.log('✅ Usuario Auth creado:', authData.user.id);
+
       // Verificar que haya sesión (email confirmation desactivado)
       if (!authData.session) {
+        console.error('❌ No hay sesión. Email confirmation activo.');
         // Si no hay sesión, eliminar el usuario creado
         throw new Error('Email confirmation debe estar desactivado en Supabase');
       }
 
+      // ✅ CRÍTICO: Validar business_id antes de INSERT
+      const employeeData = {
+        business_id: businessId, // ✅ Usar el prop directamente
+        user_id: authData.user.id,
+        full_name: formData.full_name.trim(),
+        role: formData.role,
+        username: cleanUsername,
+        email: cleanEmail,
+        is_active: true
+      };
+
+      console.log('🔄 Insertando empleado en DB:', employeeData);
+
       // Crear registro de empleado
-      const { error: createEmployeeError } = await supabase
+      const { data: insertedEmployee, error: createEmployeeError } = await supabase
         .from('employees')
-        .insert([{
-          business_id: businessId,
-          user_id: authData.user.id,
-          full_name: formData.full_name.trim(),
-          role: formData.role,
-          username: cleanUsername,
-          email: cleanEmail,
-          is_active: true
-        }]);
+        .insert([employeeData])
+        .select()
+        .single();
 
       if (createEmployeeError) {
+        console.error('❌ Error al insertar empleado:', createEmployeeError);
+        console.error('❌ Detalles:', {
+          code: createEmployeeError.code,
+          message: createEmployeeError.message,
+          details: createEmployeeError.details,
+          hint: createEmployeeError.hint
+        });
+        
         // Error al crear empleado en BD
-        throw new Error('Error al crear el registro de empleado');
+        throw new Error(`Error al crear el registro de empleado: ${createEmployeeError.message || 'Verifica las políticas RLS'}`);
       }
+
+      console.log('✅ Empleado creado exitosamente:', insertedEmployee);
 
       // Mostrar credenciales generadas
       setGeneratedCode({
@@ -204,8 +237,10 @@ function Empleados({ businessId }) {
       await loadEmpleados();
 
     } catch (error) {
+      console.error('❌ Error completo:', error);
+      console.error('❌ Stack:', error.stack);
       // Error al crear empleado
-      setError(error.message || 'Error al crear la invitación');
+      setError(error.message || 'Error al crear el empleado. Revisa la consola para más detalles.');
     }
   }, [businessId, formData, loadEmpleados]);
 

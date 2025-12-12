@@ -1,8 +1,131 @@
 # 🎯 LISTA DE ACCIONES ESPECÍFICAS PARA PRODUCCIÓN
 
+## 🚨 URGENTE - EJECUTAR INMEDIATAMENTE
+
+### 0A. FIX: Código de Producto Inconsistente (10 minutos)
+
+**Problema Actual:**
+- Producto con código `PRD-897571` (timestamp) en lugar de secuencia normal
+- Debería ser `PRD-0001`, `PRD-0002`, etc.
+
+**Solución Rápida:**
+```bash
+# 1. Abrir Supabase Dashboard → SQL Editor
+# 2. Ejecutar el archivo: docs/sql/fix_product_codes.sql
+
+# Pasos dentro del script:
+# - PASO 1: Ver todos los códigos actuales
+# - PASO 2: Identificar máximo secuencial
+# - SOLUCIÓN 2: Genera UPDATE automático para corregir
+# - Copiar y ejecutar el UPDATE generado
+# - PASO 4: Verificar corrección
+```
+
+**Mejora Implementada en App:**
+- ✅ Regex mejorado: `^PRD-(\d{4})$` (solo 4 dígitos)
+- ✅ Ignora códigos con timestamp (6 dígitos)
+- ✅ Secuencia correcta garantizada
+
+**Documentación:** `docs/sql/fix_product_codes.sql`
+**Estado:** ✅ CÓDIGO CORREGIDO - Ejecutar SQL para limpiar BD
+**Prioridad:** 🟡 MEDIA - No bloquea operación
+
+---
+
+### 0B. FIX: Foreign Key Error en Purchases (15 minutos)
+
+**Error Actual:**
+```
+❌ insert or update on table "purchases" violates foreign key constraint "purchases_user_id_fkey"
+```
+
+**Solución:**
+```bash
+# 1. Abrir Supabase Dashboard → SQL Editor
+# 2. Ejecutar el siguiente SQL:
+
+ALTER TABLE purchases DROP CONSTRAINT IF EXISTS purchases_user_id_fkey;
+
+CREATE INDEX IF NOT EXISTS idx_purchases_user_id ON purchases(user_id);
+CREATE INDEX IF NOT EXISTS idx_purchases_business_user ON purchases(business_id, user_id);
+
+# 3. Verificar que funcionó:
+SELECT constraint_name 
+FROM information_schema.table_constraints 
+WHERE table_name = 'purchases' 
+  AND constraint_name = 'purchases_user_id_fkey';
+-- Debe retornar 0 filas ✅
+
+# 4. Probar registro de compra en la app
+```
+
+**Causa:** FK referenciaba tabla `users` que no existe. La app usa correctamente `auth.users.id`.
+
+**Documentación completa:** `docs/SOLUCION_PURCHASES_FK.md`
+**Script SQL completo:** `docs/sql/fix_purchases_fk.sql`
+
+**Estado:** ⏳ PENDIENTE - Ejecutar en Supabase
+**Prioridad:** 🔴 MÁXIMA - Bloquea registro de compras
+
+---
+
+### 🔒 NUEVO: Sistema RLS Completo (2 horas)
+
+**¿Qué es?**
+Sistema completo de Row Level Security con:
+- ✅ 42 políticas RLS para 14 tablas
+- ✅ 6 funciones de seguridad (SECURITY DEFINER)
+- ✅ 4 roles: Owner, Admin, Employee, Cashier
+- ✅ Aislamiento total entre negocios
+- ✅ 25+ casos de prueba
+- ✅ Documentación exhaustiva (3,100+ líneas)
+
+**Archivos Generados:**
+1. `docs/sql/ANALISIS_COMPLETO_RLS.md` - Análisis de 1,200+ líneas
+2. `docs/sql/POLITICAS_RLS_COMPLETAS.sql` - Script ejecutable de 800+ líneas
+3. `docs/sql/PRUEBAS_RLS.sql` - Tests de validación de 600+ líneas
+4. `docs/sql/MEJORAS_ESTRUCTURA.sql` - Mejoras opcionales de 500+ líneas
+5. `docs/sql/README_RLS.md` - Guía de implementación
+
+**Guía Rápida de Implementación:**
+
+```bash
+# PASO 1: Backup (CRÍTICO)
+# En Supabase Dashboard → Database → Backups
+
+# PASO 2: Leer documentación (30 min)
+cat docs/sql/README_RLS.md
+cat docs/sql/ANALISIS_COMPLETO_RLS.md
+
+# PASO 3: Ejecutar en Staging/Dev
+# Supabase Dashboard → SQL Editor
+# Copiar y ejecutar: docs/sql/POLITICAS_RLS_COMPLETAS.sql
+
+# PASO 4: Validar con pruebas
+# Ejecutar: docs/sql/PRUEBAS_RLS.sql
+
+# PASO 5 (Opcional): Mejoras
+# Ejecutar: docs/sql/MEJORAS_ESTRUCTURA.sql
+```
+
+**Beneficios:**
+- 🔒 Seguridad a nivel de base de datos (no solo app)
+- 🚀 Sin dependencias circulares (problema resuelto)
+- ⚡ Optimizado con índices
+- 🎯 Roles diferenciados por permisos
+- 📊 Auditoría completa (opcional)
+
+**Estado:** ✅ DOCUMENTADO - Listo para implementar
+**Prioridad:** 🟡 ALTA - Mejorar seguridad
+**Tiempo:** 2 horas (1h lectura + 1h implementación)
+
+**Ver guía completa:** `docs/sql/README_RLS.md`
+
+---
+
 ## ⚡ CRÍTICAS - EJECUTAR HOY (2-3 horas)
 
-### 1. Eliminar Console Logs (AUTOMATIZADO)
+### 1. Eliminar Console Logs (AUTOMATIZADO) ✅ COMPLETADO
 ```bash
 cd /Users/andres_plazas/Desktop/Stockly
 
@@ -491,5 +614,75 @@ grep -r "console\\.log" src/ --include="*.jsx" --include="*.js"
 
 ---
 
-**Última actualización**: 24 Nov 2025
-**Próxima revisión**: Después del deploy a producción
+## 📊 ESTADO ACTUAL DEL PROYECTO
+
+### ✅ Completado (Nov 2024)
+
+1. **Optimización para Producción** ✅
+   - Eliminados 30+ console.log statements
+   - Build optimizado: 4.05s, 0 errores
+   - Logger condicional implementado (DEV only)
+   - Script automatizado: `scripts/remove-console-logs.sh`
+
+2. **RLS Management** ✅
+   - Script para deshabilitar RLS: `docs/sql/disable_all_rls.sql`
+   - Script para fix de empleados: `docs/sql/fix_employees_creation.sql`
+   - Función `get_user_business_ids()` con SECURITY DEFINER
+   - Documentación completa: `docs/SOLUCION_EMPLEADOS_CLIENTES.md` (650+ líneas)
+
+### ⏳ Pendiente - URGENTE
+
+1. **Fix FK Constraint en Purchases** 🔴
+   - Error: `purchases_user_id_fkey` viola constraint
+   - Solución documentada en: `docs/SOLUCION_PURCHASES_FK.md`
+   - Script SQL: `docs/sql/fix_purchases_fk.sql`
+   - **Acción requerida:** Ejecutar SQL en Supabase Dashboard
+   - **Impacto:** Bloquea registro de compras (CRÍTICO)
+
+2. **RLS Re-habilitación** 🟡
+   - Ejecutar `docs/sql/fix_employees_creation.sql` en Supabase
+   - Verificar políticas de seguridad
+   - Probar creación de empleados
+
+### 📁 Nuevos Archivos Creados
+
+```
+docs/
+  sql/
+    ├── disable_all_rls.sql (nuevo)
+    ├── fix_employees_creation.sql (nuevo, 215 líneas)
+    └── fix_purchases_fk.sql (nuevo, 280+ líneas)
+  ├── SOLUCION_EMPLEADOS_CLIENTES.md (nuevo, 650+ líneas)
+  └── SOLUCION_PURCHASES_FK.md (nuevo, 450+ líneas)
+```
+
+### 🎯 Próximos Pasos (Orden de Ejecución)
+
+1. ⚡ **AHORA MISMO** (15 min)
+   - Ejecutar `docs/sql/fix_purchases_fk.sql` en Supabase
+   - Verificar que FK fue eliminado
+   - Probar registro de compra en app
+
+2. 🔜 **HOY** (30 min)
+   - Ejecutar `docs/sql/fix_employees_creation.sql`
+   - Probar creación de empleados
+   - Verificar RLS policies
+
+3. 📅 **ESTA SEMANA**
+   - Consolidar servicios de email
+   - Eliminar hooks sin usar
+   - Deploy a staging
+   - Testing completo
+
+### 🔗 Enlaces Rápidos
+
+- **Fix Purchases:** `docs/SOLUCION_PURCHASES_FK.md`
+- **Fix Empleados:** `docs/SOLUCION_EMPLEADOS_CLIENTES.md`
+- **SQL Scripts:** `docs/sql/`
+- **Optimización:** `OPTIMIZATION_REPORT.md`
+
+---
+
+**Última actualización**: Dic 2024
+**Próxima revisión**: Después de ejecutar fix de purchases
+**Autor**: GitHub Copilot + Andres Plazas

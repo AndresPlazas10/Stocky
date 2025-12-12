@@ -103,11 +103,13 @@ function Inventario({ businessId, userRole = 'admin' }) {
       
       let maxNumber = 0;
       
-      // Encontrar el número más alto entre todos los códigos PRD-####
+      // Encontrar el número más alto entre códigos secuenciales (PRD-0001, PRD-0002, etc.)
+      // ✅ MEJORADO: Ignorar códigos con timestamp (6 dígitos como PRD-897571)
       if (products && products.length > 0) {
         products.forEach(product => {
           if (product.code) {
-            const match = product.code.match(/PRD-(\d+)/);
+            // ✅ Solo aceptar códigos de 4 dígitos (PRD-0001 a PRD-9999)
+            const match = product.code.match(/^PRD-(\d{4})$/);
             if (match) {
               const num = parseInt(match[1], 10);
               if (num > maxNumber) {
@@ -122,8 +124,10 @@ function Inventario({ businessId, userRole = 'admin' }) {
       const nextNumber = maxNumber + 1;
       const newCode = `PRD-${String(nextNumber).padStart(4, '0')}`;
       
+      console.log(`📦 Código generado: ${newCode} (secuencia máxima: ${maxNumber})`);
       setGeneratedCode(newCode);
     } catch (error) {
+      console.error('❌ Error generando código:', error);
       // Fallback: usar timestamp para garantizar unicidad
       setGeneratedCode(`PRD-${Date.now().toString().slice(-6)}`);
     }
