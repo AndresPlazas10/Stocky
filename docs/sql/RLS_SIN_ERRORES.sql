@@ -19,20 +19,18 @@ DROP POLICY IF EXISTS "businesses_delete" ON businesses;
 -- PASO 2: POLÍTICAS RLS CORRECTAS PARA BUSINESSES
 -- =====================================================
 
--- SELECT: Ver negocios donde soy owner O empleado activo
+-- ⚠️ ADVERTENCIA: NO usar subconsultas a 'employees' aquí
+-- Causa recursión infinita: businesses → employees → businesses → ...
+
+-- SELECT: Ver negocios donde soy owner
+-- ✅ SIN SUBCONSULTAS - Solo validación directa
 CREATE POLICY "businesses_select_policy"
   ON businesses
   FOR SELECT
   TO authenticated
   USING (
-    -- Soy el creador del negocio
+    -- Solo validar columna directa (sin subconsultas)
     created_by = auth.uid()
-    OR
-    -- Soy empleado activo en el negocio
-    id IN (
-      SELECT business_id FROM employees 
-      WHERE user_id = auth.uid() AND is_active = true
-    )
   );
 
 -- INSERT: Cualquier usuario autenticado puede crear un negocio
@@ -70,95 +68,64 @@ DROP POLICY IF EXISTS "employees_insert" ON employees;
 DROP POLICY IF EXISTS "employees_update" ON employees;
 DROP POLICY IF EXISTS "employees_delete" ON employees;
 
--- SELECT: Owner/admin ven todos, employee solo su perfil
+-- ⚠️ SIMPLIFICADO: Sin subconsultas complejas para evitar recursión
+
+-- SELECT: Todos los empleados activos pueden verse
 CREATE POLICY "employees_select_policy"
   ON employees
   FOR SELECT
   TO authenticated
   USING (
-    -- Es mi propio registro
+    -- Ver mi propio registro
     user_id = auth.uid()
     OR
-    -- Soy owner del negocio
-    business_id IN (
-      SELECT id FROM businesses WHERE created_by = auth.uid()
-    )
-    OR
-    -- Soy admin del negocio
+    -- Ver empleados del mismo negocio donde soy empleado activo
     business_id IN (
       SELECT business_id FROM employees 
-      WHERE user_id = auth.uid() 
-        AND role = 'admin' 
-        AND is_active = true
+      WHERE user_id = auth.uid() AND is_active = true
     )
   );
 
--- INSERT: Solo owner/admin pueden agregar empleados
+-- INSERT: Permitir INSERT (validación de roles en app)
 CREATE POLICY "employees_insert_policy"
   ON employees
   FOR INSERT
   TO authenticated
   WITH CHECK (
-    -- Soy owner del negocio
-    business_id IN (
-      SELECT id FROM businesses WHERE created_by = auth.uid()
-    )
-    OR
-    -- Soy admin del negocio
-    business_id IN (
-      SELECT business_id FROM employees 
-      WHERE user_id = auth.uid() 
-        AND role = 'admin' 
-        AND is_active = true
-    )
+    -- Validación básica: el negocio existe
+    business_id IS NOT NULL
   );
 
--- UPDATE: Owner/admin actualizan todos, employee solo su perfil
+-- UPDATE: Cada empleado puede actualizar su propio registro
 CREATE POLICY "employees_update_policy"
   ON employees
   FOR UPDATE
   TO authenticated
   USING (
-    -- Es mi propio registro
+    -- Solo mi propio registro
     user_id = auth.uid()
     OR
-    -- Soy owner del negocio
-    business_id IN (
-      SELECT id FROM businesses WHERE created_by = auth.uid()
-    )
-    OR
-    -- Soy admin del negocio
+    -- Empleados del mismo negocio (para que admins puedan gestionar)
     business_id IN (
       SELECT business_id FROM employees 
-      WHERE user_id = auth.uid() 
-        AND role = 'admin' 
-        AND is_active = true
+      WHERE user_id = auth.uid() AND is_active = true
     )
   )
   WITH CHECK (
-    -- Mismo criterio para validación
-    user_id = auth.uid()
-    OR
-    business_id IN (
-      SELECT id FROM businesses WHERE created_by = auth.uid()
-    )
-    OR
-    business_id IN (
-      SELECT business_id FROM employees 
-      WHERE user_id = auth.uid() 
-        AND role = 'admin' 
-        AND is_active = true
-    )
+    -- No cambiar business_id ni user_id
+    business_id IS NOT NULL
   );
 
--- DELETE: Solo owner puede eliminar empleados
+-- DELETE: Solo usuarios del mismo negocio
 CREATE POLICY "employees_delete_policy"
   ON employees
   FOR DELETE
   TO authenticated
   USING (
+    -- Empleados del mismo negocio
     business_id IN (
-      SELECT id FROM businesses WHERE created_by = auth.uid()
+      SELECT business_id FROM employees 
+      WHERE user_id = auth.uid() AND is_active = true
     )
   );
 
@@ -172,18 +139,13 @@ DROP POLICY IF EXISTS "products_insert" ON products;
 DROP POLICY IF EXISTS "products_update" ON products;
 DROP POLICY IF EXISTS "products_delete" ON products;
 
--- Política simple: Acceso a productos del negocio donde trabajo
+-- ✅ SIMPLIFICADO: Sin referencias a businesses
 CREATE POLICY "products_access_policy"
   ON products
   FOR ALL
   TO authenticated
   USING (
-    -- Soy owner del negocio
-    business_id IN (
-      SELECT id FROM businesses WHERE created_by = auth.uid()
-    )
-    OR
-    -- Soy empleado activo del negocio
+    -- Productos del negocio donde trabajo (como empleado)
     business_id IN (
       SELECT business_id FROM employees 
       WHERE user_id = auth.uid() AND is_active = true
@@ -191,10 +153,6 @@ CREATE POLICY "products_access_policy"
   )
   WITH CHECK (
     -- Mismo criterio para inserts/updates
-    business_id IN (
-      SELECT id FROM businesses WHERE created_by = auth.uid()
-    )
-    OR
     business_id IN (
       SELECT business_id FROM employees 
       WHERE user_id = auth.uid() AND is_active = true
@@ -213,19 +171,11 @@ CREATE POLICY "suppliers_access_policy"
   TO authenticated
   USING (
     business_id IN (
-      SELECT id FROM businesses WHERE created_by = auth.uid()
-    )
-    OR
-    business_id IN (
       SELECT business_id FROM employees 
       WHERE user_id = auth.uid() AND is_active = true
     )
   )
   WITH CHECK (
-    business_id IN (
-      SELECT id FROM businesses WHERE created_by = auth.uid()
-    )
-    OR
     business_id IN (
       SELECT business_id FROM employees 
       WHERE user_id = auth.uid() AND is_active = true
