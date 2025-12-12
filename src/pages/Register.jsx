@@ -91,8 +91,7 @@ function Register() {
       // Usar dominio .com para evitar rechazo de validadores estrictos
       const cleanEmail = `${cleanUsername}@stockly-app.com`;
 
-      console.log('🚀 Iniciando registro de negocio...');
-      console.log('📧 Email generado:', cleanEmail);
+      // Registro de negocio
 
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: cleanEmail,
@@ -112,8 +111,7 @@ function Register() {
         throw new Error('Error al crear la cuenta');
       }
 
-      console.log('✅ Usuario creado:', authData.user.id);
-      console.log('🔐 Sesión:', authData.session ? 'Activa ✅' : 'Requiere confirmación de email ⚠️');
+      // Usuario creado exitosamente
 
       // Si no hay sesión, significa que Supabase requiere confirmación de email
       if (!authData.session) {
@@ -138,22 +136,13 @@ function Register() {
         .single();
 
       if (businessError) {
-        console.error('❌ Error al crear negocio:', businessError);
-        console.error('📋 Detalles del error:', {
-          code: businessError.code,
-          message: businessError.message,
-          details: businessError.details,
-          hint: businessError.hint
-        });
-        
-        // Eliminar el usuario de Auth para evitar usuarios huérfanos
-        await supabase.auth.signOut().catch(console.error);
-        await supabase.auth.signOut();
+        // Error al crear negocio - eliminar usuario de Auth
+        await supabase.auth.signOut().catch(() => {});
         
         throw new Error(`Error al crear el negocio: ${businessError.message || 'Verifica las políticas RLS en Supabase'}`);
       }
 
-      console.log('✅ Negocio creado:', businessData.id);
+      // Negocio creado
 
       const { error: employeeError } = await supabase
         .from('employees')
@@ -165,9 +154,7 @@ function Register() {
         }]);
 
       if (employeeError) {
-        console.warn('⚠️ Error al crear registro de empleado:', employeeError);
-      } else {
-        console.log('✅ Registro de empleado creado');
+        // Advertencia: error al crear registro de empleado (no crítico)
       }
 
       setSuccess(true);
@@ -175,14 +162,14 @@ function Register() {
       sessionStorage.setItem('justCreatedBusiness', businessData.id);
       sessionStorage.setItem('businessCreatedAt', Date.now().toString());
       
-      console.log('🎉 Registro completado, redirigiendo...');
+      // Registro completado, redirigiendo
       
       setTimeout(() => {
         window.location.href = '/dashboard';
       }, 1500);
       
     } catch (error) {
-      console.error('❌ Error en registro:', error);
+      // Error en registro
       setError(error.message || 'Error al procesar el registro');
       setLoading(false);
     }

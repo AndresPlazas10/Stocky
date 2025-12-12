@@ -60,7 +60,6 @@ export function useRealtimeSubscription(table, options = {}) {
       (payload) => {
         // Validación para DELETE sin datos
         if (payload.eventType === 'DELETE' && !payload.old) {
-          if (IS_DEV) console.warn(`[Realtime] DELETE sin datos para ${table}`);
           return;
         }
         

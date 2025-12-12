@@ -57,19 +57,8 @@ function Mesas({ businessId }) {
       }
       
       if (user) {
-        
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('id, role')
-          .eq('id', user.id)
-          .maybeSingle();
-        
-        if (userError) {
-          // Usar el ID de auth.users si no existe en users
-          setCurrentUser({ id: user.id, role: 'admin' });
-        } else {
-          setCurrentUser(userData);
-        }
+        // Tabla users (public) no existe, usar auth.users
+        setCurrentUser({ id: user.id, role: 'admin' });
       }
     } catch (error) {
     }
@@ -99,13 +88,12 @@ function Mesas({ businessId }) {
         .order('table_number', { ascending: true });
 
       if (error) {
-        console.error('Error al cargar mesas:', error);
         return;
       }
       
       setMesas(data || []);
     } catch (error) {
-      console.error('Error al cargar mesas:', error);
+      // Error handled silently
     }
   }, [businessId]);
 
@@ -119,7 +107,6 @@ function Mesas({ businessId }) {
         // Removido el filtro de stock para permitir ventas incluso con stock negativo
 
       if (error) {
-        console.error('Error al cargar productos:', error);
         return;
       }
       
@@ -134,24 +121,8 @@ function Mesas({ businessId }) {
   }, [businessId]);
 
   const loadClientes = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('business_id', businessId)
-        .order('full_name', { ascending: true });
-
-      if (error) {
-        // Tabla customers no disponible
-        setClientes([]);
-        return;
-      }
-      
-      setClientes(data || []);
-    } catch (err) {
-      // Clientes no disponibles
-      setClientes([]);
-    }
+    // Tabla customers eliminada - no hacer nada
+    setClientes([]);
   }, [businessId]);
 
   const loadData = useCallback(async () => {
@@ -178,7 +149,6 @@ function Mesas({ businessId }) {
 
   // Callbacks memoizados para Realtime
   const handleTableInsert = useCallback((newTable) => {
-    console.log('INSERT detectado:', newTable);
     setMesas(prev => {
       const exists = prev.some(m => m.id === newTable.id);
       if (exists) {
@@ -191,7 +161,6 @@ function Mesas({ businessId }) {
   }, []);
 
   const handleTableUpdate = useCallback((updatedTable) => {
-    console.log('UPDATE detectado:', updatedTable);
     setMesas(prev => prev.map(m => m.id === updatedTable.id ? updatedTable : m));
     // Si estamos viendo esta mesa, actualizar sus detalles
     setSelectedMesa(prev => {
@@ -203,10 +172,8 @@ function Mesas({ businessId }) {
   }, []);
 
   const handleTableDelete = useCallback((deletedTable) => {
-    console.log('DELETE detectado:', deletedTable);
     setMesas(prev => {
       const filtered = prev.filter(m => m.id !== deletedTable.id);
-      console.log('Mesas antes:', prev.length, 'Mesas después:', filtered.length);
       return filtered;
     });
     setSelectedMesa(prev => {
@@ -476,7 +443,6 @@ function Mesas({ businessId }) {
 
       await updateOrderTotal(selectedMesa.current_order_id);
     } catch (error) {
-      console.error('Error in removeItem:', error);
       setError('❌ No se pudo eliminar el producto. Por favor, intenta de nuevo.');
       // Revertir solo los items si falla
       const { data: freshItems } = await supabase
@@ -506,7 +472,6 @@ function Mesas({ businessId }) {
       setSuccess('✅ Orden guardada correctamente');
       setTimeout(() => setSuccess(null), 2000);
     } catch (error) {
-      console.error('Error saving order:', error);
       setError('❌ No se pudo guardar la orden');
     }
   }, [selectedMesa, updateOrderTotal, loadMesas]);
@@ -577,7 +542,6 @@ function Mesas({ businessId }) {
           .maybeSingle();
 
         if (error) {
-          console.error('Error inserting item:', error);
           throw error;
         }
         
@@ -604,7 +568,6 @@ function Mesas({ businessId }) {
       setSearchProduct('');
       setQuantityToAdd(1); // Resetear cantidad
     } catch (error) {
-      console.error('Error adding product:', error);
       setError('❌ No se pudo agregar el producto. Por favor, intenta de nuevo.');
       // Revertir solo los items si falla
       const { data: freshItems } = await supabase
@@ -640,13 +603,11 @@ function Mesas({ businessId }) {
         .eq('id', itemId);
 
       if (error) {
-        console.error('Error updating quantity:', error);
         throw error;
       }
 
       await updateOrderTotal(selectedMesa.current_order_id);
     } catch (error) {
-      console.error('Error in updateItemQuantity:', error);
       setError('❌ No se pudo actualizar la cantidad. Por favor, intenta de nuevo.');
       // Revertir cambio optimista solo si falla
       const { data: freshItems } = await supabase
@@ -693,6 +654,12 @@ function Mesas({ businessId }) {
 
   const processPaymentAndClose = async () => {
     try {
+      // Obtener usuario actual
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setError('No se pudo obtener información del usuario');
+        return;
+      }
 
       // Obtener los items de la orden para crear la venta
       const { data: orderData } = await supabase
@@ -713,26 +680,22 @@ function Mesas({ businessId }) {
       }
 
       // 1. Crear la venta con el método de pago y cliente seleccionados
-      // Determinar nombre del vendedor
+      // Determinar nombre del vendedor usando el user_id actual, no el de orderData
       let sellerName = 'Administrador';
       try {
         const { data: emp } = await supabase
           .from('employees')
           .select('full_name, role')
           .eq('business_id', businessId)
-          .eq('user_id', orderData.user_id)
+          .eq('user_id', user.id)  // ← Usar user.id actual, no orderData.user_id
           .maybeSingle();
         if (emp?.role === 'admin' || emp?.role === 'owner') {
           sellerName = 'Administrador';
         } else if (emp?.full_name) {
           sellerName = emp.full_name;
         } else {
-          const { data: usr } = await supabase
-            .from('users')
-            .select('full_name, username, email')
-            .eq('id', orderData.user_id)
-            .maybeSingle();
-          sellerName = usr?.full_name || usr?.username || usr?.email || 'Empleado';
+          // Tabla users no existe - usar nombre genérico
+          sellerName = 'Empleado';
         }
       } catch {}
 
@@ -740,8 +703,8 @@ function Mesas({ businessId }) {
         .from('sales')
         .insert([{
           business_id: businessId,
-          user_id: orderData.user_id,
-          customer_id: selectedCustomer || null,
+          user_id: user.id,
+          // customer_id eliminado - tabla customers no existe
           total: orderData.total,
           payment_method: paymentMethod,
           seller_name: sellerName

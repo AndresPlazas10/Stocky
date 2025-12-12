@@ -48,7 +48,7 @@ function EmployeeDashboard() {
         .maybeSingle();
 
       if (employeeError) {
-        console.error('Error al verificar empleado:', employeeError);
+        // Error al verificar empleado
         setError('Error al verificar permisos de empleado');
         setLoading(false);
         return;
@@ -75,7 +75,7 @@ function EmployeeDashboard() {
         .maybeSingle();
 
       if (businessError || !businessData) {
-        console.error('Error al cargar negocio:', businessError);
+        // Error al cargar negocio
         setError('Error al cargar información del negocio');
         setLoading(false);
         return;
@@ -91,7 +91,7 @@ function EmployeeDashboard() {
       setLoading(false);
 
     } catch (err) {
-      console.error('Error en checkEmployeeAuth:', err);
+      // Error en checkEmployeeAuth
       setError('Error al cargar información del empleado');
       setLoading(false);
     }
@@ -107,13 +107,13 @@ function EmployeeDashboard() {
       const { error } = await supabase.auth.signOut({ scope: 'global' });
       
       if (error) {
-        console.error('Error al cerrar sesión:', error);
+        // Error al cerrar sesión
       }
       
       // Redirigir siempre, incluso si hay error
       window.location.href = '/';
     } catch (error) {
-      console.error('Error inesperado al cerrar sesión:', error);
+      // Error inesperado al cerrar sesión
       // Forzar redirección de todas formas
       window.location.href = '/';
     }

@@ -313,9 +313,15 @@ function Compras({ businessId }) {
 
       // Para evitar problemas de permisos, simplemente validamos que el usuario esté autenticado
       // El usuario autenticado puede registrar compras en el negocio activo
-      console.log('✅ Usuario autenticado:', user.id, 'Business:', businessId);
 
-      // Insertar compra (el total se calculará automáticamente por trigger)
+
+      // ✅ VALIDACIÓN: Verificar que el total sea válido
+      if (!total || total <= 0) {
+        setError('⚠️ El total de la compra debe ser mayor a 0');
+        return;
+      }
+
+      // ✅ CORRECCIÓN: Insertar compra CON el total calculado
       const { data: purchase, error: purchaseError } = await supabase
         .from('purchases')
         .insert([{
@@ -323,7 +329,8 @@ function Compras({ businessId }) {
           user_id: user.id,
           supplier_id: supplierId,
           payment_method: paymentMethod,
-          notes: notes || null
+          notes: notes || null,
+          total: total  // ✅ AGREGADO: Total calculado desde el carrito
         }])
         .select()
         .maybeSingle();
@@ -332,11 +339,13 @@ function Compras({ businessId }) {
         throw purchaseError;
       }
 
-      // Insertar detalles de compra (solo purchase_id, product_id y quantity)
+      // ✅ CORRECCIÓN: Insertar detalles con quantity, unit_cost y subtotal
       const purchaseDetails = cart.map(item => ({
         purchase_id: purchase.id,
         product_id: item.product_id,
-        quantity: item.quantity
+        quantity: item.quantity,
+        unit_cost: item.unit_price,  // ✅ AGREGADO: Precio unitario
+        subtotal: item.quantity * item.unit_price  // ✅ AGREGADO: Subtotal
       }));
 
       const { error: detailsError } = await supabase
@@ -358,7 +367,7 @@ function Compras({ businessId }) {
           .eq('id', item.product_id);
 
         if (updateError) {
-          console.error('Error al actualizar stock:', updateError);
+          // Error al actualizar stock (no crítico)
           throw updateError;
         }
       }

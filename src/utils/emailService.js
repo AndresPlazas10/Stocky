@@ -22,12 +22,10 @@ export const sendInvoiceEmail = async (params) => {
   
   // 1. Intentar con Resend (mejor opción para producción)
   if (isResendConfigured()) {
-    console.log(`📧 Usando ${provider} para envío de email...`);
     return await sendInvoiceEmailResend(params);
   }
 
   // 2. Fallback a EmailJS
-  console.log(`⚠️ Usando ${provider} (fallback) - Configura Resend para mejor deliverability`);
   return await sendInvoiceEmailJS(params);
 };
 

@@ -66,7 +66,7 @@ function InventarioMobile({ businessId }) {
         loadProveedores()
       ]);
     } catch (error) {
-      console.error('Error loading data:', error);
+      // Error handled silently
     } finally {
       setLoading(false);
     }
@@ -104,7 +104,7 @@ function InventarioMobile({ businessId }) {
       setShowAddModal(false);
       resetForm();
     } catch (error) {
-      console.error('Error saving:', error);
+      // Error handled silently
     }
   };
 
@@ -123,7 +123,7 @@ function InventarioMobile({ businessId }) {
   };
 
   const handleDelete = async (product) => {
-    if (confirm(`¿Eliminar ${product.name}?`)) {
+    if (window.confirm(`¿Eliminar ${product.name}?`)) {
       // Lógica de eliminación
       await loadProductos();
     }

@@ -52,23 +52,23 @@ function Dashboard() {
         }
         
         if (userError) {
-          console.error('Error obteniendo usuario:', userError);
+          // Error obteniendo usuario
         }
         
         attempts++;
         if (attempts < maxAttempts) {
-          console.log(`⏳ Intento ${attempts}/${maxAttempts} - Esperando sesión...`);
+          // Esperando sesión
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
       
       if (!user) {
-        console.log('❌ No se pudo obtener usuario después de reintentos, redirigiendo a login');
+        // No se pudo obtener usuario, redirigiendo
         window.location.href = '/login';
         return;
       }
 
-      console.log('✅ Usuario autenticado:', user.email);
+      // Usuario autenticado
       setUser(user);
 
       // Verificar si acabamos de crear un negocio
@@ -80,7 +80,7 @@ function Dashboard() {
 
       // Si acabamos de crear un negocio, intentar cargarlo directamente
       if (justCreatedId && isRecent) {
-        console.log('🆕 Detectado negocio recién creado, cargando por ID:', justCreatedId);
+        // Detectado negocio recién creado
         const { data: newBusiness } = await supabase
           .from('businesses')
           .select('*')
@@ -91,13 +91,13 @@ function Dashboard() {
           finalBusiness = newBusiness;
           sessionStorage.removeItem('justCreatedBusiness');
           sessionStorage.removeItem('businessCreatedAt');
-          console.log('✅ Negocio recién creado encontrado');
+          // Negocio recién creado encontrado
         }
       }
 
       // Si no encontramos el negocio recién creado, buscar normalmente
       if (!finalBusiness) {
-        console.log('🔍 Buscando negocio para usuario:', user.id);
+        // Buscando negocio para usuario
         
         // Verificar si el usuario tiene un negocio (por ID de creador)
         const { data: business, error: businessError } = await supabase
@@ -107,9 +107,7 @@ function Dashboard() {
           .maybeSingle();
 
         if (businessError) {
-          console.error('Error buscando negocio por created_by:', businessError);
-        } else {
-          console.log('Resultado búsqueda por created_by:', business ? 'Encontrado' : 'No encontrado');
+          // Error buscando negocio
         }
 
         finalBusiness = business;
@@ -141,10 +139,10 @@ function Dashboard() {
 
       // Si no es ni dueño ni empleado
       if (!finalBusiness) {
-        console.log('❌ No se encontró negocio para el usuario');
+        // No se encontró negocio
         // Dar un poco de tiempo para replicación de BD si acabamos de crear
         if (justCreatedId && isRecent) {
-          console.log('⏳ Reintentando en 2 segundos...');
+          // Reintentando
           setTimeout(() => {
             window.location.reload();
           }, 2000);
@@ -158,30 +156,8 @@ function Dashboard() {
       setBusiness(finalBusiness);
       setBusinessLogo(finalBusiness.logo_url || null);
 
-      // Verificar si el administrador existe en la tabla users, si no, crearlo
-      const { data: existingUser, error: checkError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      // PGRST116 significa que no hay filas, es esperado
-      if (!existingUser && (!checkError || checkError.code === 'PGRST116')) {
-        // Crear el registro del administrador en la tabla users
-        const { error: userCreateError } = await supabase
-          .from('users')
-          .insert([{
-            id: user.id,
-            business_id: finalBusiness.id,
-            full_name: finalBusiness.owner_name || 'Administrador',
-            email: user.email,
-            role: 'admin',
-            is_active: true
-          }]);
-
-        if (userCreateError) {
-        }
-      }
+      // Tabla users (public) no existe - no crear registro
+      
     } catch (err) {
       setError('Error al cargar la información');
     } finally {
@@ -199,13 +175,13 @@ function Dashboard() {
       const { error } = await supabase.auth.signOut({ scope: 'global' });
       
       if (error) {
-        console.error('Error al cerrar sesión:', error);
+        // Error al cerrar sesión
       }
       
       // Redirigir siempre, incluso si hay error
       window.location.href = '/login';
     } catch (error) {
-      console.error('Error inesperado al cerrar sesión:', error);
+      // Error inesperado al cerrar sesión
       // Forzar redirección de todas formas
       window.location.href = '/login';
     }
@@ -227,7 +203,7 @@ function Dashboard() {
       setBusinessLogo(newLogoUrl);
       setBusiness({ ...business, logo_url: newLogoUrl });
     } catch (error) {
-      alert('Error al actualizar el logo');
+      setError('Error al actualizar el logo');
     }
   };
 

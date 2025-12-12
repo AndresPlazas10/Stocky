@@ -75,29 +75,17 @@ export default function Facturas({ userRole = 'admin' }) {
       let businessId = null;
       let employeeId = null;
 
-      // Primero intentar obtener desde users (para administradores)
-      const { data: userRecord } = await supabase
-        .from('users')
-        .select('business_id')
-        .eq('id', user.id)
+      // Obtener business_id desde employees (tabla users no existe)
+      const { data: employee } = await supabase
+        .from('employees')
+        .select('id, business_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
         .maybeSingle();
 
-      if (userRecord) {
-        businessId = userRecord.business_id;
-      }
-
-      // Si no es admin, buscar en employees
-      if (!businessId) {
-        const { data: employee } = await supabase
-          .from('employees')
-          .select('id, business_id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (employee) {
-          businessId = employee.business_id;
-          employeeId = employee.id;
-        }
+      if (employee) {
+        businessId = employee.business_id;
+        employeeId = employee.id;
       }
 
       if (!businessId) {
@@ -118,24 +106,8 @@ export default function Facturas({ userRole = 'admin' }) {
       if (productsError) throw productsError;
       setProductos(productsData || []);
 
-      // Cargar clientes (opcional si la tabla existe)
-      try {
-        const { data: customersData, error: customersError } = await supabase
-          .from('customers')
-          .select('*')
-          .eq('business_id', businessId)
-          .order('full_name');
-
-        if (customersError) {
-          // Tabla customers no existe, se omite
-          setClientes([]);
-        } else {
-          setClientes(customersData || []);
-        }
-      } catch (err) {
-        // Clientes no disponibles
-        setClientes([]);
-      }
+      // Tabla customers eliminada - no cargar clientes
+      setClientes([]);
 
     } catch (error) {
       setError(error.message);
@@ -279,29 +251,17 @@ export default function Facturas({ userRole = 'admin' }) {
       let businessId = null;
       let employeeId = null;
 
-      // Primero intentar obtener desde users (para administradores)
-      const { data: userRecord } = await supabase
-        .from('users')
-        .select('business_id')
-        .eq('id', user.id)
+      // Obtener business_id desde employees (tabla users no existe)
+      const { data: employee } = await supabase
+        .from('employees')
+        .select('id, business_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
         .maybeSingle();
 
-      if (userRecord) {
-        businessId = userRecord.business_id;
-      }
-
-      // Si no es admin, buscar en employees
-      if (!businessId) {
-        const { data: employee } = await supabase
-          .from('employees')
-          .select('id, business_id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (employee) {
-          businessId = employee.business_id;
-          employeeId = employee.id;
-        }
+      if (employee) {
+        businessId = employee.business_id;
+        employeeId = employee.id;
       }
 
       if (!businessId) {
@@ -332,31 +292,15 @@ export default function Facturas({ userRole = 'admin' }) {
         customer_id_number: null
       };
 
-      if (selectedCliente) {
-        try {
-          const { data: cliente } = await supabase
-            .from('customers')
-            .select('full_name, email, id_number')
-            .eq('id', selectedCliente)
-            .maybeSingle();
-
-          if (cliente) {
-            customerData = {
-              customer_name: cliente.full_name,
-              customer_email: cliente.email,
-              customer_id_number: cliente.id_number
-            };
-          }
-        } catch (err) {
-          // Cliente no disponible, usar consumidor final
-        }
-      }
+      // Tabla customers eliminada - no cargar datos de cliente
 
       // Generar número de factura
       const { data: invoiceNumber, error: numberError } = await supabase
         .rpc('generate_invoice_number', { p_business_id: businessId });
 
-      if (numberError) throw new Error('Error al generar número de factura: ' + numberError.message);
+      if (numberError) {
+        throw new Error('Error al generar número de factura: ' + numberError.message);
+      }
 
       // Crear factura
       const { data: invoice, error: invoiceError } = await supabase
@@ -456,7 +400,7 @@ export default function Facturas({ userRole = 'admin' }) {
       await loadFacturas(businessId);
 
     } catch (error) {
-      console.error('Error al crear factura:', error);
+      // Error al crear factura
       setError(error.message || 'Error desconocido al crear factura');
       setTimeout(() => setError(''), 8000);
     } finally {
@@ -531,7 +475,7 @@ export default function Facturas({ userRole = 'admin' }) {
           setSuccess(`✅ Factura ${factura.invoice_number} enviada exitosamente a ${factura.customer_email}`);
         }
       } catch (emailError) {
-        console.error('Error al enviar email:', emailError);
+        // Error al enviar email
         throw new Error('Error al enviar email: ' + emailError.message);
       }
       
@@ -548,29 +492,22 @@ export default function Facturas({ userRole = 'admin' }) {
         return;
       }
 
-      const { data: userRecord } = await supabase
-        .from('users')
+      // Obtener business_id desde employees (tabla users no existe)
+      const { data: employee } = await supabase
+        .from('employees')
         .select('business_id')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
+        .eq('is_active', true)
         .maybeSingle();
       
-      let businessId = userRecord?.business_id;
-      
-      if (!businessId) {
-        const { data: employee } = await supabase
-          .from('employees')
-          .select('business_id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        businessId = employee?.business_id;
-      }
+      let businessId = employee?.business_id;
       
       if (businessId) {
         await loadFacturas(businessId);
       }
 
     } catch (error) {
-      console.error('Error al enviar factura:', error);
+      // Error al enviar factura
       setError(error.message || 'Error desconocido al enviar factura');
       setTimeout(() => setError(''), 8000);
     } finally {
@@ -626,7 +563,7 @@ export default function Facturas({ userRole = 'admin' }) {
             }
           }
         } catch (restoreErr) {
-          console.warn('Advertencia al restaurar stock:', restoreErr);
+          // Advertencia al restaurar stock
           // No fallar la cancelación por esto
         }
       }
@@ -645,22 +582,15 @@ export default function Facturas({ userRole = 'admin' }) {
         return;
       }
 
-      const { data: userRecord } = await supabase
-        .from('users')
+      // Obtener business_id desde employees (tabla users no existe)
+      const { data: employee } = await supabase
+        .from('employees')
         .select('business_id')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
+        .eq('is_active', true)
         .maybeSingle();
       
-      let businessId = userRecord?.business_id;
-      
-      if (!businessId) {
-        const { data: employee } = await supabase
-          .from('employees')
-          .select('business_id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        businessId = employee?.business_id;
-      }
+      let businessId = employee?.business_id;
       
       if (businessId) {
         await loadFacturas(businessId);
@@ -670,7 +600,7 @@ export default function Facturas({ userRole = 'admin' }) {
       setInvoiceToCancel(null);
 
     } catch (error) {
-      console.error('Error al cancelar factura:', error);
+      // Error al cancelar factura
       setError(error.message || 'Error desconocido al cancelar factura');
       setTimeout(() => setError(''), 8000);
       setShowCancelModal(false);
@@ -714,13 +644,16 @@ export default function Facturas({ userRole = 'admin' }) {
 
       // Recargar facturas
       const { data: { user } } = await supabase.auth.getUser();
-      const { data: userRecord } = await supabase
-        .from('users')
+      
+      // Obtener business_id desde employees
+      const { data: employee } = await supabase
+        .from('employees')
         .select('business_id')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
+        .eq('is_active', true)
         .maybeSingle();
       
-      let businessId = userRecord?.business_id;
+      let businessId = employee?.business_id;
       
       if (!businessId) {
         const { data: employee } = await supabase
@@ -739,7 +672,7 @@ export default function Facturas({ userRole = 'admin' }) {
       setInvoiceToDelete(null);
 
     } catch (error) {
-      console.error('Error al eliminar factura:', error);
+      // Error al eliminar factura
       setError(error.message || 'Error desconocido al eliminar factura');
       setTimeout(() => setError(''), 8000);
       setShowDeleteModal(false);

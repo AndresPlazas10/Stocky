@@ -176,7 +176,8 @@ export const isDevelopment = () => {
  * @returns {string}
  */
 export const getTestEmail = () => {
-  return import.meta.env.VITE_TEST_EMAIL || 'test@example.com';
+  // Cambia 'test@example.com' por tu email real
+  return import.meta.env.VITE_TEST_EMAIL || 'andres.plazas@gmail.com';
 };
 
 /**
@@ -199,8 +200,6 @@ export const shouldSendEmail = (email) => {
   if (isDevelopment()) {
     const testEmail = getTestEmail();
     
-    console.log(`🧪 [DEV MODE] Email redirigido: ${email} → ${testEmail}`);
-    
     return {
       shouldSend: true,
       testEmail,
@@ -209,8 +208,6 @@ export const shouldSendEmail = (email) => {
   }
 
   // En producción, enviar al email real si es válido
-  console.log(`📧 [PRODUCTION] Enviando email a: ${validation.normalized}`);
-  
   return {
     shouldSend: true,
     email: validation.normalized
@@ -292,8 +289,7 @@ export const getEmailStats = () => {
 export const clearEmailLogs = () => {
   try {
     localStorage.removeItem('email_logs');
-    console.log('✅ Logs de emails limpiados');
   } catch (e) {
-    console.error('❌ Error al limpiar logs:', e);
+    // Silencioso en producción
   }
 };

@@ -40,8 +40,8 @@ function Empleados({ businessId }) {
     try {
       setLoading(true);
       
-      // Cargar empleados activos (aprobados)
-      const { data: activeEmployees, error: empError } = await supabase
+      // ✅ CORREGIDO: Cargar solo empleados (ya no existe employee_invitations)
+      const { data: employees, error: empError } = await supabase
         .from('employees')
         .select('*')
         .eq('business_id', businessId)
@@ -49,33 +49,16 @@ function Empleados({ businessId }) {
 
       if (empError) throw empError;
 
-      // Cargar invitaciones pendientes
-      const { data: pendingInvites, error: invError } = await supabase
-        .from('employee_invitations')
-        .select('*')
-        .eq('business_id', businessId)
-        .eq('is_approved', false)
-        .order('invited_at', { ascending: false });
-
-      if (invError) throw invError;
-
-      // Combinar empleados activos con invitaciones pendientes
-      const combined = [
-        ...(activeEmployees || []).map(emp => ({
-          ...emp,
-          is_active: true,
-          status: 'active'
-        })),
-        ...(pendingInvites || []).map(inv => ({
-          ...inv,
-          is_active: false,
-          status: 'pending'
-        }))
-      ];
+      // Todos los empleados son activos (ya no hay estado pendiente)
+      const employeesWithStatus = (employees || []).map(emp => ({
+        ...emp,
+        is_active: emp.is_active !== false, // Asegurar que is_active sea booleano
+        status: emp.is_active !== false ? 'active' : 'inactive'
+      }));
       
-      setEmpleados(combined);
+      setEmpleados(employeesWithStatus);
     } catch (error) {
-      console.error('Error al cargar empleados:', error);
+      // Error al cargar empleados
       setError('Error al cargar la lista de empleados');
     } finally {
       setLoading(false);
@@ -128,22 +111,7 @@ function Empleados({ businessId }) {
         throw new Error('El usuario solo puede contener letras minúsculas, números y guiones bajos');
       }
 
-      // Verificar que el username no esté ya usado en invitaciones
-      const { data: existingInvitation, error: checkInvitationError } = await supabase
-        .from('employee_invitations')
-        .select('id')
-        .eq('business_id', businessId)
-        .eq('username', cleanUsername)
-        .eq('is_approved', true)  // Solo validar invitaciones activas
-        .maybeSingle();
-
-      if (checkInvitationError) throw checkInvitationError;
-
-      if (existingInvitation) {
-        throw new Error('Este nombre de usuario ya está asociado a una invitación');
-      }
-
-      // Verificar que el username no esté ya usado en employees
+      // ✅ CORREGIDO: Verificar que el username no esté ya usado solo en employees
       const { data: existingEmployee, error: checkEmployeeError } = await supabase
         .from('employees')
         .select('id')
@@ -186,7 +154,7 @@ function Empleados({ businessId }) {
       });
 
       if (authError) {
-        console.error('Error al crear cuenta:', authError);
+        // Error al crear cuenta de autenticación
         if (authError.message.includes('already registered')) {
           throw new Error('Ya existe una cuenta con este usuario');
         }
@@ -217,7 +185,7 @@ function Empleados({ businessId }) {
         }]);
 
       if (createEmployeeError) {
-        console.error('Error al crear empleado:', createEmployeeError);
+        // Error al crear empleado en BD
         throw new Error('Error al crear el registro de empleado');
       }
 
@@ -236,7 +204,7 @@ function Empleados({ businessId }) {
       await loadEmpleados();
 
     } catch (error) {
-      console.error('Error al crear invitación:', error);
+      // Error al crear empleado
       setError(error.message || 'Error al crear la invitación');
     }
   }, [businessId, formData, loadEmpleados]);
@@ -250,55 +218,39 @@ function Empleados({ businessId }) {
     if (!employeeToDelete) return;
 
     try {
-      if (employeeToDelete.status === 'active') {
-        // Es un empleado activo - eliminar de la tabla employees
-        
-        // Primero eliminar el usuario de Auth usando la función SQL
-        if (employeeToDelete.user_id) {
-          const { error: authError } = await supabase.rpc('delete_auth_user', {
-            user_id_to_delete: employeeToDelete.user_id
-          });
+      // ✅ CORREGIDO: Solo manejar empleados activos (ya no hay invitaciones pendientes)
+      
+      // Primero eliminar el usuario de Auth usando la función SQL
+      if (employeeToDelete.user_id) {
+        const { error: authError } = await supabase.rpc('delete_auth_user', {
+          user_id_to_delete: employeeToDelete.user_id
+        });
 
-          if (authError) {
-            console.error('Error al eliminar usuario de Auth:', authError);
-            // Continuar aunque falle (el admin puede eliminarlo manualmente)
-          }
+        if (authError) {
+          // Error al eliminar usuario de Auth
+          // Continuar aunque falle (el admin puede eliminarlo manualmente)
         }
-
-        // Luego eliminar el registro de employees
-        const { error: empError } = await supabase
-          .from('employees')
-          .delete()
-          .eq('id', employeeToDelete.id)
-          .eq('business_id', businessId);
-
-        if (empError) {
-          console.error('Error al eliminar empleado:', empError);
-          throw new Error('Error al eliminar el empleado');
-        }
-
-        setSuccess('✅ Empleado eliminado exitosamente');
-      } else {
-        // Es una invitación pendiente - eliminar de employee_invitations
-        const { error: invError } = await supabase
-          .from('employee_invitations')
-          .delete()
-          .eq('id', employeeToDelete.id)
-          .eq('business_id', businessId);
-
-        if (invError) {
-          console.error('Error al eliminar invitación:', invError);
-          throw new Error('Error al eliminar la invitación');
-        }
-
-        setSuccess('✅ Invitación eliminada exitosamente');
       }
+
+      // Eliminar el registro de employees
+      const { error: empError } = await supabase
+        .from('employees')
+        .delete()
+        .eq('id', employeeToDelete.id)
+        .eq('business_id', businessId);
+
+      if (empError) {
+        // Error al eliminar empleado
+        throw new Error('Error al eliminar el empleado');
+      }
+
+      setSuccess('✅ Empleado eliminado exitosamente');
 
       await loadEmpleados();
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
     } catch (error) {
-      console.error('Error al eliminar:', error);
+      // Error al eliminar
       setError('❌ Error al eliminar la invitación');
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
@@ -316,7 +268,7 @@ function Empleados({ businessId }) {
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 2000);
     } catch (error) {
-      console.error('Error al copiar:', error);
+      // Error al copiar
     }
   };
 
@@ -331,11 +283,11 @@ function Empleados({ businessId }) {
     );
   }, [empleados, searchTerm]);
 
-  // Memoizar estadísticas
+  // ✅ CORREGIDO: Memoizar estadísticas (ya no hay estado pending)
   const stats = useMemo(() => ({
     total: empleados.length,
-    approved: empleados.filter(e => e.status === 'active').length,
-    pending: empleados.filter(e => e.status === 'pending').length
+    active: empleados.filter(e => e.is_active).length,
+    inactive: empleados.filter(e => !e.is_active).length
   }), [empleados]);
 
   useEffect(() => {
@@ -389,7 +341,7 @@ function Empleados({ businessId }) {
         </motion.div>
 
         {/* Estadísticas */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -418,24 +370,7 @@ function Empleados({ businessId }) {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Activos</p>
-                <p className="text-2xl font-bold text-gray-800">{stats.approved}</p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white rounded-xl shadow p-4 border border-gray-100"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <Clock className="w-5 h-5 text-yellow-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Pendientes</p>
-                <p className="text-2xl font-bold text-gray-800">{stats.pending}</p>
+                <p className="text-2xl font-bold text-gray-800">{stats.active}</p>
               </div>
             </div>
           </motion.div>
