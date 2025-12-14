@@ -44,6 +44,7 @@ function Compras({ businessId }) {
   const [paymentMethod, setPaymentMethod] = useState('efectivo');
   const [notes, setNotes] = useState('');
   const [cart, setCart] = useState([]);
+  const [isCreatingPurchase, setIsCreatingPurchase] = useState(false);
 
   const loadCompras = useCallback(async () => {
     try {
@@ -291,37 +292,23 @@ function Compras({ businessId }) {
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
-
-    if (!supplierId) {
-      setError('Selecciona un proveedor');
-      return;
-    }
-
-    if (cart.length === 0) {
-      setError('Agrega al menos un producto a la compra');
-      return;
-    }
-
+    
+    // Prevenir múltiples clicks
+    if (isCreatingPurchase) return;
+    
+    setIsCreatingPurchase(true);
+    setError('');
+    setSuccess('');
+    
     try {
-      // Obtener el usuario actual autenticado
+      if (!supplierId) throw new Error('Selecciona un proveedor');
+      if (cart.length === 0) throw new Error('Agrega al menos un producto a la compra');
+      if (!total || total <= 0) throw new Error('El total de la compra debe ser mayor a 0');
+
       const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error('Tu sesión ha expirado. Inicia sesión nuevamente.');
 
-      if (userError || !user) {
-        setError('⚠️ Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-        return;
-      }
-
-      // Para evitar problemas de permisos, simplemente validamos que el usuario esté autenticado
-      // El usuario autenticado puede registrar compras en el negocio activo
-
-
-      // ✅ VALIDACIÓN: Verificar que el total sea válido
-      if (!total || total <= 0) {
-        setError('⚠️ El total de la compra debe ser mayor a 0');
-        return;
-      }
-
-      // ✅ CORRECCIÓN: Insertar compra CON el total calculado
+      // Insertar compra
       const { data: purchase, error: purchaseError } = await supabase
         .from('purchases')
         .insert([{
@@ -330,22 +317,20 @@ function Compras({ businessId }) {
           supplier_id: supplierId,
           payment_method: paymentMethod,
           notes: notes || null,
-          total: total  // ✅ AGREGADO: Total calculado desde el carrito
+          total: total
         }])
         .select()
         .maybeSingle();
 
-      if (purchaseError) {
-        throw purchaseError;
-      }
+      if (purchaseError) throw purchaseError;
 
-      // ✅ CORRECCIÓN: Insertar detalles con quantity, unit_cost y subtotal
+      // Insertar detalles
       const purchaseDetails = cart.map(item => ({
         purchase_id: purchase.id,
         product_id: item.product_id,
         quantity: item.quantity,
-        unit_cost: item.unit_price,  // ✅ AGREGADO: Precio unitario
-        subtotal: item.quantity * item.unit_price  // ✅ AGREGADO: Subtotal
+        unit_cost: item.unit_price,
+        subtotal: item.quantity * item.unit_price
       }));
 
       const { error: detailsError } = await supabase
@@ -353,23 +338,20 @@ function Compras({ businessId }) {
         .insert(purchaseDetails);
 
       if (detailsError) {
+        // Intentar rollback manual
+        await supabase.from('purchases').delete().eq('id', purchase.id);
         throw detailsError;
       }
 
-      // Actualizar stock de productos
+      // Actualizar stock
       for (const item of cart) {
         const producto = productos.find(p => p.id === item.product_id);
         const newStock = (producto.stock || 0) + item.quantity;
-
         const { error: updateError } = await supabase
           .from('products')
           .update({ stock: newStock })
           .eq('id', item.product_id);
-
-        if (updateError) {
-          // Error al actualizar stock (no crítico)
-          throw updateError;
-        }
+        if (updateError) throw updateError;
       }
 
       setSuccess('✅ Compra registrada exitosamente');
@@ -377,10 +359,14 @@ function Compras({ businessId }) {
       setShowModal(false);
       loadCompras();
       loadProductos();
-    } catch (error) {
-      setError('❌ Error al registrar la compra: ' + error.message);
+      
+    } catch (err) {
+      console.error('Error al registrar compra:', err);
+      setError('❌ Error al registrar la compra: ' + err.message);
+    } finally {
+      setIsCreatingPurchase(false);
     }
-  }, [businessId, cart, supplierId, paymentMethod, notes, productos, loadCompras, loadProductos]);
+  }, [isCreatingPurchase, supplierId, cart, total, businessId, paymentMethod, notes, productos, loadCompras, loadProductos]);
 
   const resetForm = () => {
     setSupplierId('');
@@ -757,11 +743,20 @@ function Compras({ businessId }) {
                   </Button>
                   <Button
                     type="submit"
-                    disabled={cart.length === 0}
+                    disabled={cart.length === 0 || isCreatingPurchase}
                     className="flex-1 h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed border-none"
                   >
-                    <CheckCircle2 className="w-5 h-5 mr-2" />
-                    Registrar Compra
+                    {isCreatingPurchase ? (
+                      <>
+                        <CheckCircle2 className="w-5 h-5 mr-2 animate-spin" />
+                        Procesando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-5 h-5 mr-2" />
+                        Registrar Compra
+                      </>
+                    )}
                   </Button>
                 </div>
               </form>

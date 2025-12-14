@@ -35,6 +35,7 @@ function Empleados({ businessId }) {
     password: '',
     role: 'employee'
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadEmpleados = useCallback(async () => {
     try {
@@ -81,79 +82,58 @@ function Empleados({ businessId }) {
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
+    
+    if (isSubmitting) return; // Prevenir doble click
+    
+    setIsSubmitting(true);
     setError(null);
     setSuccess(null);
-
+    
     try {
-      // ✅ VALIDACIÓN CRÍTICA: Verificar business_id
       if (!businessId) {
         throw new Error('❌ Error: No se pudo identificar tu negocio. Recarga la página e intenta de nuevo.');
       }
 
-      // Validaciones de formulario
-      if (!formData.full_name.trim()) {
-        throw new Error('El nombre del empleado es requerido');
-      }
-
-      if (!formData.username.trim()) {
-        throw new Error('El nombre de usuario es requerido');
-      }
-
-      if (!formData.password.trim()) {
-        throw new Error('La contraseña es requerida');
-      }
-
-      if (formData.password.length < 6) {
-        throw new Error('La contraseña debe tener al menos 6 caracteres');
-      }
+      // Validaciones
+      if (!formData.full_name.trim()) throw new Error('El nombre del empleado es requerido');
+      if (!formData.username.trim()) throw new Error('El nombre de usuario es requerido');
+      if (!formData.password.trim()) throw new Error('La contraseña es requerida');
+      if (formData.password.length < 6) throw new Error('La contraseña debe tener al menos 6 caracteres');
 
       const cleanUsername = formData.username.toLowerCase().trim();
       const cleanPassword = formData.password.trim();
 
-      // Validar formato de username (solo letras, números y guiones bajos)
       const usernameRegex = /^[a-z0-9_]+$/;
       if (!usernameRegex.test(cleanUsername)) {
         throw new Error('El usuario solo puede contener letras minúsculas, números y guiones bajos');
       }
 
-      // ✅ CORREGIDO: Verificar que el username no esté ya usado solo en employees
-      const { data: existingEmployee, error: checkEmployeeError } = await supabase
+      // Verificar username duplicado
+      const { data: existingEmployee } = await supabase
         .from('employees')
         .select('id')
         .eq('business_id', businessId)
         .eq('username', cleanUsername)
         .maybeSingle();
 
-      if (checkEmployeeError) throw checkEmployeeError;
-
       if (existingEmployee) {
         throw new Error('Este nombre de usuario ya está asociado a un empleado activo');
       }
 
       // Verificar que no sea el username del negocio
-      const { data: businessData, error: businessError } = await supabase
+      const { data: businessData } = await supabase
         .from('businesses')
         .select('username')
         .eq('id', businessId)
         .maybeSingle();
 
-      if (businessError) throw businessError;
-
       if (businessData && businessData.username === cleanUsername) {
         throw new Error('No puedes usar el nombre de usuario del negocio');
       }
 
-      // ✅ LOG: Iniciando creación de empleado
-      console.log('🔄 Creando empleado:', { 
-        username: cleanUsername, 
-        business_id: businessId,
-        role: formData.role 
-      });
-
-      // Generar email automáticamente (mismo patrón que propietarios)
       const cleanEmail = `${cleanUsername}@stockly-app.com`;
 
-      // Crear cuenta de Supabase Auth directamente
+      // Crear cuenta Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: cleanEmail,
         password: cleanPassword,
@@ -166,83 +146,53 @@ function Empleados({ businessId }) {
       });
 
       if (authError) {
-        console.error('❌ Error Auth:', authError);
-        // Error al crear cuenta de autenticación
         if (authError.message.includes('already registered')) {
           throw new Error('Ya existe una cuenta con este usuario');
         }
         throw new Error('Error al crear la cuenta: ' + authError.message);
       }
 
-      if (!authData.user) {
-        throw new Error('Error al crear la cuenta');
-      }
+      if (!authData.user) throw new Error('Error al crear la cuenta');
+      if (!authData.session) throw new Error('Email confirmation debe estar desactivado en Supabase');
 
-      console.log('✅ Usuario Auth creado:', authData.user.id);
-
-      // Verificar que haya sesión (email confirmation desactivado)
-      if (!authData.session) {
-        console.error('❌ No hay sesión. Email confirmation activo.');
-        // Si no hay sesión, eliminar el usuario creado
-        throw new Error('Email confirmation debe estar desactivado en Supabase');
-      }
-
-      // ✅ CRÍTICO: Validar business_id antes de INSERT
-      const employeeData = {
-        business_id: businessId, // ✅ Usar el prop directamente
-        user_id: authData.user.id,
-        full_name: formData.full_name.trim(),
-        role: formData.role,
-        username: cleanUsername,
-        email: cleanEmail,
-        is_active: true
-      };
-
-      console.log('🔄 Insertando empleado en DB:', employeeData);
-
-      // Crear registro de empleado
+      // Crear empleado sin idempotency key
       const { data: insertedEmployee, error: createEmployeeError } = await supabase
         .from('employees')
-        .insert([employeeData])
+        .insert([{
+          business_id: businessId,
+          user_id: authData.user.id,
+          full_name: formData.full_name.trim(),
+          role: formData.role,
+          username: cleanUsername,
+          email: cleanEmail,
+          is_active: true
+        }])
         .select()
         .single();
 
       if (createEmployeeError) {
-        console.error('❌ Error al insertar empleado:', createEmployeeError);
-        console.error('❌ Detalles:', {
-          code: createEmployeeError.code,
-          message: createEmployeeError.message,
-          details: createEmployeeError.details,
-          hint: createEmployeeError.hint
-        });
-        
-        // Error al crear empleado en BD
         throw new Error(`Error al crear el registro de empleado: ${createEmployeeError.message || 'Verifica las políticas RLS'}`);
       }
 
-      console.log('✅ Empleado creado exitosamente:', insertedEmployee);
-
-      // Mostrar credenciales generadas
+      // Código de éxito
       setGeneratedCode({
         username: cleanUsername,
         password: cleanPassword,
         fullName: formData.full_name.trim()
       });
       setShowCodeModal(true);
-      
       setFormData({ full_name: '', username: '', password: '', role: 'employee' });
       setShowForm(false);
+      setSuccess('✅ Empleado creado exitosamente');
+      loadEmpleados();
       
-      // Recargar lista de empleados
-      await loadEmpleados();
-
-    } catch (error) {
-      console.error('❌ Error completo:', error);
-      console.error('❌ Stack:', error.stack);
-      // Error al crear empleado
-      setError(error.message || 'Error al crear el empleado. Revisa la consola para más detalles.');
+    } catch (err) {
+      console.error('Error:', err);
+      setError(err.message || 'Error al crear el empleado');
+    } finally {
+      setIsSubmitting(false); // SIEMPRE desbloquear
     }
-  }, [businessId, formData, loadEmpleados]);
+  }, [businessId, formData, loadEmpleados, isSubmitting]);
 
   const handleDelete = useCallback((empleado) => {
     setEmployeeToDelete(empleado);
@@ -518,9 +468,20 @@ function Empleados({ businessId }) {
 
                 <button
                   type="submit"
-                  className="w-full px-6 py-3 gradient-primary text-white rounded-xl font-semibold hover:shadow-lg transition-all"
+                  disabled={isSubmitting}
+                  className="w-full px-6 py-3 gradient-primary text-white rounded-xl font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Crear Empleado
+                  {isSubmitting ? (
+                    <>
+                      <Clock className="h-4 w-4 animate-spin" />
+                      Creando empleado...
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="h-4 w-4" />
+                      Crear Empleado
+                    </>
+                  )}
                 </button>
               </form>
             </motion.div>

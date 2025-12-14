@@ -66,6 +66,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [invoiceCustomerEmail, setInvoiceCustomerEmail] = useState('');
   const [invoiceCustomerIdNumber, setInvoiceCustomerIdNumber] = useState('');
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Funciones de carga memoizadas
   const loadVentas = useCallback(async () => {
@@ -326,44 +327,27 @@ function Ventas({ businessId, userRole = 'admin' }) {
   }, [cart]);
 
   const processSale = useCallback(async () => {
-    if (cart.length === 0) {
-      setError('⚠️ El carrito está vacío. Agrega productos antes de procesar la venta.');
-      return;
-    }
-
-    // Verificar sesión antes de procesar
-    if (!sessionChecked) {
-      setError('⚠️ Verificando sesión...');
-      return;
-    }
-
-    // DESHABILITADO - Requiere dominio verificado en Resend
-    // Validar datos de facturación si está marcada
-    // if (generateInvoice) {
-    //   if (!customerEmail || !customerEmail.includes('@')) {
-    //     setError('Debes ingresar un email válido para generar la factura electrónica');
-    //     return;
-    //   }
-    //   if (!customerName) {
-    //     setError('Debes ingresar el nombre del cliente para generar la factura');
-    //     return;
-    //   }
-    // }
-
+    if (isSubmitting) return; // Prevenir doble click
+    
+    setIsSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    
     try {
-      setLoading(true);
-      setError(null);
+      if (cart.length === 0) {
+        throw new Error('⚠️ El carrito está vacío. Agrega productos antes de procesar la venta.');
+      }
+
+      // Verificar sesión antes de procesar
+      if (!sessionChecked) {
+        throw new Error('⚠️ Verificando sesión...');
+      }
 
       // Obtener el usuario actual autenticado
       const { data: { user }, error: userError } = await supabase.auth.getUser();
 
       if (userError || !user?.id) {
-        setError('⚠️ Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-        setLoading(false);
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 2000);
-        return;
+        throw new Error('⚠️ Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
       }
 
       // Obtener información del empleado para seller_name
@@ -382,8 +366,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
         total: total
       };
 
-      // Datos de venta a insertar
-
       // 1. Crear la venta principal
       const { data: sale, error: saleError } = await supabase
         .from('sales')
@@ -392,7 +374,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
         .maybeSingle();
       
       if (saleError) {
-        // Error al insertar venta
         throw saleError;
       }
 
@@ -402,85 +383,20 @@ function Ventas({ businessId, userRole = 'admin' }) {
         product_id: item.product_id,
         quantity: item.quantity,
         unit_price: item.unit_price
-        // subtotal se calcula automáticamente en la BD (columna generada)
       }));
 
       const { error: detailsError } = await supabase
         .from('sale_details')
         .insert(saleDetails);
 
-      if (detailsError) throw detailsError;
+      if (detailsError) {
+        // Intentar rollback de la venta si los detalles fallan
+        await supabase.from('sales').delete().eq('id', sale.id);
+        throw detailsError;
+      }
 
-      // DESHABILITADO - Requiere dominio verificado en Resend
-      // 3. Si está marcada la opción de factura, crear la factura electrónica
-      // let invoiceNumber = null;
-      // if (generateInvoice) {
-      //   const total = calculateTotal(); // Total sin IVA adicional
-
-      //   // Generar número de factura
-      //   const { data: invNumber } = await supabase
-      //     .rpc('generate_invoice_number', { p_business_id: businessId });
-
-      //   invoiceNumber = invNumber;
-
-      //   // Crear factura
-      //   const { data: invoice, error: invoiceError } = await supabase
-      //     .from('invoices')
-      //     .insert({
-      //       business_id: businessId,
-      //       employee_id: employee?.id || null,
-      //       invoice_number: invoiceNumber,
-      //       customer_name: customerName || 'Consumidor Final',
-      //       customer_email: customerEmail,
-      //       customer_id_number: customerIdNumber || null,
-      //       payment_method: paymentMethod,
-      //       subtotal: total, // El total es el subtotal (sin IVA adicional)
-      //       tax: 0, // Sin IVA adicional
-      //       total,
-      //       status: 'pending',
-      //       issued_at: new Date().toISOString()
-      //     })
-      //     .select()
-      //     .maybeSingle();
-
-      //   if (invoiceError) throw invoiceError;
-
-      //   // Crear items de factura
-      //   const invoiceItems = cart.map(item => ({
-      //     invoice_id: invoice.id,
-      //     product_id: item.product_id,
-      //     product_name: item.name,
-      //     quantity: item.quantity,
-      //     unit_price: item.unit_price,
-      //     total: item.subtotal
-      //   }));
-
-      //   const { error: itemsError } = await supabase
-      //     .from('invoice_items')
-      //     .insert(invoiceItems);
-
-      //   if (itemsError) throw itemsError;
-
-      //   // Enviar factura por email
-      //   try {
-      //     const emailResult = await sendInvoiceEmail({
-      //       email: customerEmail,
-      //       invoiceNumber: invoiceNumber,
-      //       customerName: customerName,
-      //       total: total,
-      //       pdfUrl: invoice.pdf_url || null
-      //     });
-          
-      //     if (emailResult.demo) {
-      //     } else {
-      //     }
-      //   } catch (emailError) {
-      //     // No falla la venta si el email falla
-      //   }
-      // }
-
+      // Código de éxito
       const successMsg = `✅ Venta registrada exitosamente. Total: ${formatPrice(total)}`;
-      
       setSuccess(successMsg);
       
       // Limpiar el carrito y cerrar POS
@@ -491,13 +407,20 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
       // Recargar ventas inmediatamente
       await loadVentas();
-
+      
     } catch (error) {
+      console.error('Error:', error);
+      // Si es error de sesión, redirigir a login
+      if (error.message.includes('sesión ha expirado')) {
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      }
       setError('❌ ' + (error.message || 'No se pudo procesar la venta. Por favor, intenta de nuevo.'));
     } finally {
-      setLoading(false);
+      setIsSubmitting(false); // SIEMPRE desbloquear
     }
-  }, [cart, businessId, paymentMethod, selectedCustomer, total, loadVentas, sessionChecked]);
+  }, [cart, sessionChecked, businessId, paymentMethod, total, loadVentas, isSubmitting]);
 
   // Funciones de eliminación de venta (solo admin)
   const handleDeleteSale = (saleId) => {
@@ -1022,13 +945,13 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
               <Button
                 onClick={processSale}
-                disabled={cart.length === 0 || loading}
+                disabled={cart.length === 0 || isProcessingSale}
                 className="w-full h-12 sm:h-14 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold text-base sm:text-lg rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 sm:gap-3"
               >
-                {loading ? (
+                {isProcessingSale ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    Procesando...
+                    Procesando venta...
                   </>
                 ) : (
                   <>

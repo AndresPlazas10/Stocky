@@ -31,7 +31,6 @@ function Inventario({ businessId, userRole = 'admin' }) {
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Estados para modales de confirmación
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -50,6 +49,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
     is_active: true
   });
   const [generatedCode, setGeneratedCode] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Memoizar funciones de carga
   const loadProductos = useCallback(async () => {
@@ -208,16 +208,13 @@ function Inventario({ businessId, userRole = 'admin' }) {
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
+    
+    if (isSubmitting) return; // Prevenir doble click
+    
+    setIsSubmitting(true);
     setError(null);
     setSuccess(null);
-
-    // Prevenir doble submit
-    if (isSubmitting) {
-      return;
-    }
-
-    setIsSubmitting(true);
-
+    
     try {
       // ✅ VALIDACIONES MEJORADAS
       if (!formData.name?.trim()) {
@@ -284,6 +281,24 @@ function Inventario({ businessId, userRole = 'admin' }) {
           if (retryError) {
             throw new Error(`Error al crear producto: ${retryError.message || 'Código duplicado'}`);
           }
+          
+          // Éxito con retry
+          await loadProductos();
+          setShowForm(false);
+          setFormData({
+            name: '',
+            category: '',
+            purchase_price: '',
+            sale_price: '',
+            stock: '',
+            min_stock: '',
+            unit: 'unit',
+            supplier_id: ''
+          });
+          setGeneratedCode('');
+          setSuccess('✅ Producto creado exitosamente');
+          setTimeout(() => setSuccess(null), 3000);
+          return;
         } else if (insertError.code === '42501') {
           // Error de permisos RLS
           throw new Error('No tienes permisos para crear productos. Contacta al administrador.');
@@ -295,7 +310,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
         }
       }
       
-      // ✅ Actualizar lista y limpiar formulario
+      // Código de éxito
       await loadProductos();
       setShowForm(false);
       setFormData({
@@ -313,14 +328,15 @@ function Inventario({ businessId, userRole = 'admin' }) {
       
       // Auto-limpiar mensaje de éxito después de 3 segundos
       setTimeout(() => setSuccess(null), 3000);
-
+      
     } catch (error) {
+      console.error('Error:', error);
       setError(error.message || 'Error al crear el producto');
       
       // Auto-limpiar mensaje de error después de 5 segundos
       setTimeout(() => setError(null), 5000);
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false); // SIEMPRE desbloquear
     }
   }, [businessId, formData, generatedCode, loadProductos, isSubmitting]);
 
@@ -685,10 +701,20 @@ function Inventario({ businessId, userRole = 'admin' }) {
 
                 <Button
                   type="submit"
-                  className="w-full h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2"
+                  disabled={isSubmitting}
+                  className="w-full h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <CheckCircle2 className="w-5 h-5" />
-                  Guardar Producto
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Creando producto...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-5 h-5" />
+                      Guardar Producto
+                    </>
+                  )}
                 </Button>
               </form>
             </Card>
