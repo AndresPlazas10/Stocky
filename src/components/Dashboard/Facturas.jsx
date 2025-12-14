@@ -23,6 +23,7 @@ export default function Facturas({ userRole = 'admin' }) {
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState([]);
   const [sendEmailOnCreate, setSendEmailOnCreate] = useState(true); // Enviar email automáticamente
+  const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
   
   // Estados del modal de cancelación
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -215,43 +216,35 @@ export default function Facturas({ userRole = 'admin' }) {
   const handleCreateInvoice = async (e) => {
     e.preventDefault();
     
-    // Validaciones
-    if (items.length === 0) {
-      setError('Debes agregar al menos un producto');
-      return;
-    }
-
-    // Validar que todos los items tengan cantidad y precio válidos
-    const invalidItems = items.filter(item => item.quantity <= 0 || item.unit_price <= 0);
-    if (invalidItems.length > 0) {
-      setError('Hay productos con cantidad o precio inválido');
-      return;
-    }
-
-    // Validar que el total sea mayor a 0
-    if (totalFactura <= 0) {
-      setError('El total de la factura debe ser mayor a 0');
-      return;
-    }
-
-    setLoading(true);
+    if (isCreatingInvoice) return;
+    
+    setIsCreatingInvoice(true);
     setError('');
     
     try {
+      // Validaciones
+      if (items.length === 0) {
+        throw new Error('Debes agregar al menos un producto');
+      }
+
+      const invalidItems = items.filter(item => item.quantity <= 0 || item.unit_price <= 0);
+      if (invalidItems.length > 0) {
+        throw new Error('Hay productos con cantidad o precio inválido');
+      }
+
+      if (totalFactura <= 0) {
+        throw new Error('El total de la factura debe ser mayor a 0');
+      }
+
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError || !user) {
-        setError('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 2000);
-        return;
+        throw new Error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
       }
 
       let businessId = null;
       let employeeId = null;
 
-      // Obtener business_id desde employees (tabla users no existe)
       const { data: employee } = await supabase
         .from('employees')
         .select('id, business_id')
@@ -268,7 +261,7 @@ export default function Facturas({ userRole = 'admin' }) {
         throw new Error('No se encontró información del negocio');
       }
 
-      // Verificar stock disponible antes de crear la factura
+      // Verificar stock disponible
       for (const item of items) {
         const { data: product, error: stockError } = await supabase
           .from('products')
@@ -285,14 +278,11 @@ export default function Facturas({ userRole = 'admin' }) {
         }
       }
 
-      // Obtener información del cliente si se seleccionó
       let customerData = {
         customer_name: 'Consumidor Final',
         customer_email: null,
         customer_id_number: null
       };
-
-      // Tabla customers eliminada - no cargar datos de cliente
 
       // Generar número de factura
       const { data: invoiceNumber, error: numberError } = await supabase
@@ -337,7 +327,11 @@ export default function Facturas({ userRole = 'admin' }) {
         .from('invoice_items')
         .insert(invoiceItems);
 
-      if (itemsError) throw new Error('Error al crear items de factura: ' + itemsError.message);
+      if (itemsError) {
+        // Rollback: Eliminar factura si falla crear items
+        await supabase.from('invoices').delete().eq('id', invoice.id);
+        throw new Error('Error al crear items de factura: ' + itemsError.message);
+      }
 
       // Reducir stock de productos
       const stockErrors = [];
@@ -352,23 +346,20 @@ export default function Facturas({ userRole = 'admin' }) {
         }
       }
 
-      if (stockErrors.length > 0) {
-        // No lanzar error, la factura ya fue creada
-      }
-
-      // Enviar factura por email si está habilitado y hay email del cliente
+      // Enviar factura por email si está habilitado
       let emailSent = false;
+      let successMessage = `✅ Factura ${invoiceNumber} creada exitosamente`;
+
       if (sendEmailOnCreate && customerData.customer_email) {
         try {
           const emailResult = await sendInvoiceEmail({
             email: customerData.customer_email,
             invoiceNumber: invoiceNumber,
             customerName: customerData.customer_name || 'Cliente',
-            total: total,
+            total: totalFactura,
             items: invoiceItems
           });
           
-          // Actualizar estado a 'sent' si se envió exitosamente
           if (!emailResult.demo) {
             await supabase
               .from('invoices')
@@ -378,33 +369,36 @@ export default function Facturas({ userRole = 'admin' }) {
               })
               .eq('id', invoice.id);
             emailSent = true;
-          }
-
-          if (emailResult.demo) {
-            setSuccess(`✅ Factura ${invoiceNumber} creada. ⚠️ Email NO enviado (configura EmailJS en Configuración)`);
+            successMessage = `✅ Factura ${invoiceNumber} creada y enviada a ${customerData.customer_email}`;
           } else {
-            setSuccess(`✅ Factura ${invoiceNumber} creada y enviada a ${customerData.customer_email}`);
+            successMessage = `✅ Factura ${invoiceNumber} creada. ⚠️ Email NO enviado (configura EmailJS en Configuración)`;
           }
         } catch (emailError) {
-          setSuccess(`✅ Factura ${invoiceNumber} creada (⚠️ error al enviar email: ${emailError.message})`);
+          successMessage = `✅ Factura ${invoiceNumber} creada (⚠️ error al enviar email: ${emailError.message})`;
         }
       } else if (!customerData.customer_email) {
-        setSuccess(`✅ Factura ${invoiceNumber} creada exitosamente (sin email del cliente)`);
-      } else {
-        setSuccess(`✅ Factura ${invoiceNumber} creada exitosamente`);
+        successMessage = `✅ Factura ${invoiceNumber} creada exitosamente (sin email del cliente)`;
       }
-      
+
+      setSuccess(successMessage);
       setTimeout(() => setSuccess(''), 8000);
       setShowForm(false);
       resetForm();
       await loadFacturas(businessId);
-
+      
     } catch (error) {
-      // Error al crear factura
+      console.error('Error al crear factura:', error);
+      
+      // Si es error de sesión, redirigir
+      if (error.message.includes('sesión ha expirado')) {
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      }
       setError(error.message || 'Error desconocido al crear factura');
       setTimeout(() => setError(''), 8000);
     } finally {
-      setLoading(false);
+      setIsCreatingInvoice(false);
     }
   };
 
@@ -940,10 +934,17 @@ export default function Facturas({ userRole = 'admin' }) {
 
             <button
               type="submit"
-              disabled={loading || items.length === 0}
-              className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:bg-gray-400 font-semibold"
+              disabled={isCreatingInvoice || items.length === 0}
+              className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:bg-gray-400 font-semibold disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {loading ? 'Creando...' : '✅ Crear Factura'}
+              {isCreatingInvoice ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Creando factura...
+                </>
+              ) : (
+                '✅ Crear Factura'
+              )}
             </button>
           </form>
         </div>

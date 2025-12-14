@@ -290,7 +290,7 @@ WHERE table_schema = 'public'
 -- =====================================================
 
 -- Test 1: Ver mis negocios (debe funcionar)
-SELECT id, business_name, created_by 
+SELECT id, name, created_by 
 FROM businesses 
 WHERE created_by = auth.uid();
 
@@ -298,8 +298,8 @@ WHERE created_by = auth.uid();
 -- (Ejecutar desde la app o reemplazar valores)
 /*
 INSERT INTO businesses (
-  business_name,
-  business_type,
+  name,
+  type,
   created_by
 ) VALUES (
   'Test Negocio',

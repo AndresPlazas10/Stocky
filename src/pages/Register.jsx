@@ -18,11 +18,120 @@ function Register() {
     password: '',
     confirmPassword: ''
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
+    setError('');
+    
+    try {
+      const { name, address, phone, username, password, confirmPassword } = formData;
+      
+      // Validaciones
+      if (!name || !username || !password) {
+        throw new Error('Por favor completa todos los campos requeridos');
+      }
+
+      if (password !== confirmPassword) {
+        throw new Error('Las contraseñas no coinciden');
+      }
+
+      if (password.length < 6) {
+        throw new Error('La contraseña debe tener al menos 6 caracteres');
+      }
+
+      const cleanUsername = username.trim().toLowerCase();
+
+      if (!/^[a-z0-9_]{3,20}$/.test(cleanUsername)) {
+        throw new Error('El usuario debe tener entre 3-20 caracteres (solo letras, números y guiones bajos)');
+      }
+
+      const { data: existingUsername } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('cleanUsername', cleanUsername)
+        .maybeSingle();
+
+      if (existingUsername) {
+        throw new Error('Este nombre de usuario ya está en uso');
+      }
+
+      const cleanEmail = `${cleanUsername}@stockly-app.com`;
+
+      // Crear usuario en Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password: password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/dashboard`,
+          data: {
+            username: cleanUsername,
+            business_name: name.trim()
+          }
+        }
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('Error al crear la cuenta');
+
+      if (!authData.session) {
+        await supabase.auth.signOut();
+        throw new Error('Supabase requiere confirmación de email. Ve a Dashboard → Authentication → Providers → Email y desactiva "Confirm email"');
+      }
+
+      // Crear negocio
+      const { data: businessData, error: businessError } = await supabase
+        .from('businesses')
+        .insert([{
+          name: name.trim(),
+          address: address.trim() || null,
+          phone: phone.trim() || null,
+          email: cleanEmail,
+          username: cleanUsername,
+          created_by: authData.user.id
+        }])
+        .select()
+        .single();
+
+      if (businessError) {
+        await supabase.auth.signOut().catch(() => {});
+        throw new Error(`Error al crear el negocio: ${businessError.message || 'Verifica las políticas RLS en Supabase'}`);
+      }
+
+      // Crear registro de empleado
+      await supabase
+        .from('employees')
+        .insert([{
+          user_id: authData.user.id,
+          business_id: businessData.id,
+          role: 'owner',
+          full_name: name.trim() + ' (Propietario)'
+        }]);
+
+      sessionStorage.setItem('justCreatedBusiness', businessData.id);
+      sessionStorage.setItem('businessCreatedAt', Date.now().toString());
+      
+      // Redirigir al dashboard
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 1500);
+      
+    } catch (err) {
+      console.error('Error al crear negocio:', err);
+      setError(err.message || 'Error al crear el negocio');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -48,131 +157,6 @@ function Register() {
       ...prev,
       [name]: value
     }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
-
-    try {
-      const { name, address, phone, username, password, confirmPassword } = formData;
-      
-      if (!name || !username || !password) {
-        throw new Error('Por favor completa todos los campos requeridos');
-      }
-
-      if (password !== confirmPassword) {
-        throw new Error('Las contraseñas no coinciden');
-      }
-
-      if (password.length < 6) {
-        throw new Error('La contraseña debe tener al menos 6 caracteres');
-      }
-
-      const cleanUsername = username.trim().toLowerCase();
-
-      if (!/^[a-z0-9_]{3,20}$/.test(cleanUsername)) {
-        throw new Error('El usuario debe tener entre 3-20 caracteres (solo letras, números y guiones bajos)');
-      }
-
-      const { data: existingUsername } = await supabase
-        .from('businesses')
-        .select('id')
-        .eq('username', cleanUsername)
-        .maybeSingle();
-
-      if (existingUsername) {
-        throw new Error('Este nombre de usuario ya está en uso');
-      }
-
-      // Generar email automáticamente basado en username
-      // Usar dominio .com para evitar rechazo de validadores estrictos
-      const cleanEmail = `${cleanUsername}@stockly-app.com`;
-
-      // Registro de negocio
-
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: cleanEmail,
-        password: password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
-          data: {
-            username: cleanUsername,
-            business_name: name.trim()
-          }
-        }
-      });
-
-      if (authError) throw authError;
-
-      if (!authData.user) {
-        throw new Error('Error al crear la cuenta');
-      }
-
-      // Usuario creado exitosamente
-
-      // Si no hay sesión, significa que Supabase requiere confirmación de email
-      if (!authData.session) {
-        setError('Supabase requiere confirmación de email. Ve a Dashboard → Authentication → Providers → Email y desactiva "Confirm email"');
-        setLoading(false);
-        // Limpiar el usuario creado
-        await supabase.auth.signOut();
-        return;
-      }
-
-      const { data: businessData, error: businessError } = await supabase
-        .from('businesses')
-        .insert([{
-          name: name.trim(),
-          address: address.trim() || null,
-          phone: phone.trim() || null,
-          email: cleanEmail,
-          username: cleanUsername,
-          created_by: authData.user.id
-        }])
-        .select()
-        .single();
-
-      if (businessError) {
-        // Error al crear negocio - eliminar usuario de Auth
-        await supabase.auth.signOut().catch(() => {});
-        
-        throw new Error(`Error al crear el negocio: ${businessError.message || 'Verifica las políticas RLS en Supabase'}`);
-      }
-
-      // Negocio creado
-
-      const { error: employeeError } = await supabase
-        .from('employees')
-        .insert([{
-          user_id: authData.user.id,
-          business_id: businessData.id,
-          role: 'owner',
-          full_name: name.trim() + ' (Propietario)'
-        }]);
-
-      if (employeeError) {
-        // Advertencia: error al crear registro de empleado (no crítico)
-      }
-
-      setSuccess(true);
-      
-      sessionStorage.setItem('justCreatedBusiness', businessData.id);
-      sessionStorage.setItem('businessCreatedAt', Date.now().toString());
-      
-      // Registro completado, redirigiendo
-      
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 1500);
-      
-    } catch (error) {
-      // Error en registro
-      setError(error.message || 'Error al procesar el registro');
-      setLoading(false);
-    }
   };
 
   return (
@@ -396,10 +380,10 @@ function Register() {
               <Button
                 type="submit"
                 className="w-full h-12 text-base font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg transition-all duration-300"
-                disabled={loading || success}
+                disabled={isSubmitting || success}
                 size="lg"
               >
-                {loading ? (
+                {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creando negocio...

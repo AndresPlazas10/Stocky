@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client';
+
 import { 
   Trash2, 
   AlertTriangle, 
@@ -39,6 +40,7 @@ function Proveedores({ businessId }) {
     nit: '',
     notes: ''
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadProveedores = useCallback(async () => {
     try {
@@ -67,18 +69,19 @@ function Proveedores({ businessId }) {
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     
-    if (!formData.business_name.trim()) {
-      setError('El nombre del negocio es obligatorio');
-      return;
-    }
-
+    if (isSubmitting) return; // Prevenir doble click
+    
+    setIsSubmitting(true);
+    setError('');
+    
     try {
-      setLoading(true);
-      setError('');
+      if (!formData.business_name.trim()) {
+        throw new Error('El nombre del negocio es obligatorio');
+      }
 
       if (editingSupplier) {
         // Actualizar proveedor existente
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('suppliers')
           .update({
             business_name: formData.business_name,
@@ -89,13 +92,14 @@ function Proveedores({ businessId }) {
             nit: formData.nit || null,
             notes: formData.notes || null
           })
-          .eq('id', editingSupplier.id);
+          .eq('id', editingSupplier.id)
+          .select()
+          .maybeSingle();
 
         if (error) throw error;
-        setSuccess('Proveedor actualizado exitosamente');
       } else {
         // Crear nuevo proveedor
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('suppliers')
           .insert({
             business_id: businessId,
@@ -106,21 +110,26 @@ function Proveedores({ businessId }) {
             address: formData.address || null,
             nit: formData.nit || null,
             notes: formData.notes || null
-          });
+          })
+          .select()
+          .maybeSingle();
 
         if (error) throw error;
-        setSuccess('Proveedor creado exitosamente');
       }
 
+      // Código de éxito
+      setSuccess(editingSupplier ? 'Proveedor actualizado exitosamente' : 'Proveedor creado exitosamente');
       resetForm();
-      loadProveedores();
+      await loadProveedores();
       setShowModal(false);
+      
     } catch (error) {
+      console.error('Error:', error);
       setError(error.message || 'Error al guardar el proveedor');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false); // SIEMPRE desbloquear
     }
-  }, [businessId, formData, editingSupplier, loadProveedores]);
+  }, [editingSupplier, formData, businessId, loadProveedores, isSubmitting]);
 
   const handleEdit = useCallback((supplier) => {
     setEditingSupplier(supplier);
@@ -659,17 +668,17 @@ function Proveedores({ businessId }) {
                       setShowModal(false);
                       resetForm();
                     }}
-                    disabled={loading}
+                    disabled={isSubmitting}
                     className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={isSubmitting}
                     className="flex-1 px-6 py-3 gradient-primary hover:from-[#f1c691] hover:to-[#edb886] text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {loading ? (
+                    {isSubmitting ? (
                       <>
                         <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
                         Guardando...

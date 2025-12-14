@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice, formatNumber } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
+import { useIdempotentSubmit } from '../../hooks/useIdempotentSubmit';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -40,6 +41,7 @@ function Mesas({ businessId }) {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [clientes, setClientes] = useState([]);
+  const [isClosingOrder, setIsClosingOrder] = useState(false);
 
   // Form data para crear mesa
   const [newTableNumber, setNewTableNumber] = useState('');
@@ -283,23 +285,25 @@ function Mesas({ businessId }) {
     onDelete: (deletedItem) => handleOrderItemChange(deletedItem, 'DELETE')
   });
 
-  const handleCreateTable = useCallback(async (e) => {
-    e.preventDefault();
-    setError(null);
-
-    try {
+  // Hook para crear mesa con protección anti-duplicados
+  const { isSubmitting: isCreatingTable, submitAction: createTable } = useIdempotentSubmit({
+    actionName: 'create_table',
+    onSubmit: async ({ idempotencyKey }) => {
       const tableNum = parseInt(newTableNumber);
       if (isNaN(tableNum) || tableNum <= 0) {
         throw new Error('Ingresa un número de mesa válido');
       }
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('tables')
         .insert([{
           business_id: businessId,
           table_number: tableNum,
-          status: 'available'
-        }]);
+          status: 'available',
+          metadata: { idempotency_key: idempotencyKey }
+        }])
+        .select()
+        .maybeSingle();
 
       if (error) {
         if (error.code === '23505') {
@@ -308,14 +312,26 @@ function Mesas({ businessId }) {
         throw error;
       }
 
+      return data;
+    },
+    onSuccess: async (table) => {
       setSuccess('✅ Mesa creada exitosamente');
       setNewTableNumber('');
       setShowAddForm(false);
       await loadMesas();
-    } catch (error) {
+    },
+    onError: (error) => {
       setError('❌ Error al crear la mesa: ' + error.message);
-    }
-  }, [businessId, newTableNumber, loadMesas]);
+    },
+    debounceMs: 500,
+    enableRetry: true
+  });
+
+  const handleCreateTable = useCallback((e) => {
+    e.preventDefault();
+    setError(null);
+    createTable();
+  }, [createTable]);
 
   // IMPORTANTE: Definir estas funciones ANTES de handleOpenTable
   const createNewOrder = useCallback(async (mesa) => {
@@ -653,12 +669,19 @@ function Mesas({ businessId }) {
   };
 
   const processPaymentAndClose = async () => {
+    // Prevenir doble click
+    if (isClosingOrder) {
+      return;
+    }
+
+    setIsClosingOrder(true);
+    setError(null);
+
     try {
       // Obtener usuario actual
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        setError('No se pudo obtener información del usuario');
-        return;
+        throw new Error('No se pudo obtener información del usuario');
       }
 
       // Obtener los items de la orden para crear la venta
@@ -675,8 +698,7 @@ function Mesas({ businessId }) {
         .maybeSingle();
 
       if (!orderData || orderData.order_items.length === 0) {
-        setError('⚠️ No hay productos en la orden para cerrar');
-        return;
+        throw new Error('⚠️ No hay productos en la orden para cerrar');
       }
 
       // 1. Crear la venta con el método de pago y cliente seleccionados
@@ -704,7 +726,6 @@ function Mesas({ businessId }) {
         .insert([{
           business_id: businessId,
           user_id: user.id,
-          // customer_id eliminado - tabla customers no existe
           total: orderData.total,
           payment_method: paymentMethod,
           seller_name: sellerName
@@ -713,7 +734,7 @@ function Mesas({ businessId }) {
         .maybeSingle();
 
       if (saleError) {
-        throw new Error('Error al crear la venta');
+        throw new Error('Error al crear la venta: ' + saleError.message);
       }
 
       // 2. Crear los detalles de venta desde los items de la orden
@@ -722,7 +743,6 @@ function Mesas({ businessId }) {
         product_id: item.product_id,
         quantity: item.quantity,
         unit_price: item.price
-        // subtotal se calcula automáticamente en la BD (columna generada)
       }));
 
       const { error: detailsError } = await supabase
@@ -730,7 +750,9 @@ function Mesas({ businessId }) {
         .insert(saleDetails);
 
       if (detailsError) {
-        throw new Error('Error al crear los detalles de la venta');
+        // Rollback: eliminar venta si fallan los detalles
+        await supabase.from('sales').delete().eq('id', sale.id);
+        throw new Error('Error al crear los detalles de la venta: ' + detailsError.message);
       }
 
       // 3. Cerrar la orden
@@ -759,7 +781,6 @@ function Mesas({ businessId }) {
         throw tableError;
       }
 
-
       setSuccess(`✅ Venta registrada exitosamente. Total: ${formatPrice(orderData.total)}. Mesa liberada.`);
       setShowPaymentModal(false);
       setShowOrderDetails(false);
@@ -777,6 +798,8 @@ function Mesas({ businessId }) {
 
     } catch (error) {
       setError(`❌ Error al cerrar la orden: ${error.message || 'Error desconocido'}`);
+    } finally {
+      setIsClosingOrder(false);
     }
   };
 
@@ -931,11 +954,21 @@ function Mesas({ businessId }) {
                       </div>
                       <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                         <Button 
-                          type="submit" 
-                          className="gradient-primary text-white hover:opacity-90 h-12 w-full sm:w-auto"
+                          type="submit"
+                          disabled={isCreatingTable}
+                          className="gradient-primary text-white hover:opacity-90 h-12 w-full sm:w-auto disabled:opacity-50"
                         >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Crear Mesa
+                          {isCreatingTable ? (
+                            <>
+                              <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Creando...
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-4 h-4 mr-2" />
+                              Crear Mesa
+                            </>
+                          )}
                         </Button>
                         <Button 
                           type="button" 
@@ -1328,16 +1361,27 @@ function Mesas({ businessId }) {
                         setPaymentMethod('cash');
                         setSelectedCustomer('');
                       }}
-                      className="flex-1 h-12 border-2 border-accent-300 text-accent-700 hover:bg-accent-50"
+                      disabled={isClosingOrder}
+                      className="flex-1 h-12 border-2 border-accent-300 text-accent-700 hover:bg-accent-50 disabled:opacity-50"
                     >
                       Cancelar
                     </Button>
                     <Button
                       onClick={processPaymentAndClose}
-                      className="flex-1 h-12 gradient-primary text-white hover:opacity-90"
+                      disabled={isClosingOrder}
+                      className="flex-1 h-12 gradient-primary text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <CheckCircle2 className="w-5 h-5 mr-2" />
-                      Confirmar Venta
+                      {isClosingOrder ? (
+                        <>
+                          <div className="w-5 h-5 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Procesando venta...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-5 h-5 mr-2" />
+                          Confirmar Venta
+                        </>
+                      )}
                     </Button>
                   </div>
                 </CardContent>
