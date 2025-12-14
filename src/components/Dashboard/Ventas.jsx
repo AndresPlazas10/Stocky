@@ -945,10 +945,10 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
               <Button
                 onClick={processSale}
-                disabled={cart.length === 0 || isProcessingSale}
+                disabled={cart.length === 0 || isSubmitting}
                 className="w-full h-12 sm:h-14 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold text-base sm:text-lg rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 sm:gap-3"
               >
-                {isProcessingSale ? (
+                {isSubmitting ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                     Procesando venta...

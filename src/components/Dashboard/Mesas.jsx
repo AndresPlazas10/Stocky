@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice, formatNumber } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
-import { useIdempotentSubmit } from '../../hooks/useIdempotentSubmit';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -42,6 +41,7 @@ function Mesas({ businessId }) {
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [clientes, setClientes] = useState([]);
   const [isClosingOrder, setIsClosingOrder] = useState(false);
+  const [isCreatingTable, setIsCreatingTable] = useState(false);
 
   // Form data para crear mesa
   const [newTableNumber, setNewTableNumber] = useState('');
@@ -285,10 +285,16 @@ function Mesas({ businessId }) {
     onDelete: (deletedItem) => handleOrderItemChange(deletedItem, 'DELETE')
   });
 
-  // Hook para crear mesa con protección anti-duplicados
-  const { isSubmitting: isCreatingTable, submitAction: createTable } = useIdempotentSubmit({
-    actionName: 'create_table',
-    onSubmit: async ({ idempotencyKey }) => {
+  const handleCreateTable = useCallback(async (e) => {
+    e.preventDefault();
+    
+    if (isCreatingTable) return; // Prevenir doble click
+    
+    setIsCreatingTable(true);
+    setError(null);
+    setSuccess(null);
+    
+    try {
       const tableNum = parseInt(newTableNumber);
       if (isNaN(tableNum) || tableNum <= 0) {
         throw new Error('Ingresa un número de mesa válido');
@@ -299,8 +305,7 @@ function Mesas({ businessId }) {
         .insert([{
           business_id: businessId,
           table_number: tableNum,
-          status: 'available',
-          metadata: { idempotency_key: idempotencyKey }
+          status: 'available'
         }])
         .select()
         .maybeSingle();
@@ -312,26 +317,19 @@ function Mesas({ businessId }) {
         throw error;
       }
 
-      return data;
-    },
-    onSuccess: async (table) => {
+      // Código de éxito
       setSuccess('✅ Mesa creada exitosamente');
       setNewTableNumber('');
       setShowAddForm(false);
       await loadMesas();
-    },
-    onError: (error) => {
+      
+    } catch (error) {
+      console.error('Error al crear mesa:', error);
       setError('❌ Error al crear la mesa: ' + error.message);
-    },
-    debounceMs: 500,
-    enableRetry: true
-  });
-
-  const handleCreateTable = useCallback((e) => {
-    e.preventDefault();
-    setError(null);
-    createTable();
-  }, [createTable]);
+    } finally {
+      setIsCreatingTable(false); // SIEMPRE desbloquear
+    }
+  }, [isCreatingTable, newTableNumber, businessId, loadMesas]);
 
   // IMPORTANTE: Definir estas funciones ANTES de handleOpenTable
   const createNewOrder = useCallback(async (mesa) => {
