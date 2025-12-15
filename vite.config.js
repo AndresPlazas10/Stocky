@@ -14,6 +14,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // ZERO ANIMATIONS: Reemplazar framer-motion con shim sin animaciones
+      'framer-motion': path.resolve(__dirname, './src/lib/framer-motion-shim.jsx'),
     },
   },
   optimizeDeps: {

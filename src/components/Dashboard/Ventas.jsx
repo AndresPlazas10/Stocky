@@ -26,8 +26,12 @@ import {
 
 // Función helper pura fuera del componente (no se recrea en renders)
 const getVendedorName = (venta) => {
-  // Prioridad: seller_name guardado en la venta
-  if (venta?.seller_name) return venta.seller_name;
+  // Prioridad 1: seller_name guardado en la venta (ventas nuevas)
+  if (venta?.seller_name && typeof venta.seller_name === 'string' && venta.seller_name.trim() !== '') {
+    return venta.seller_name;
+  }
+  
+  // Prioridad 2: Fallback a employees join (ventas antiguas)
   if (!venta.employees) return 'Empleado';
   if (venta.employees.role === 'owner' || venta.employees.role === 'admin') return 'Administrador';
   return venta.employees.full_name || 'Empleado';
@@ -76,7 +80,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
         supabase.auth.getUser(),
         supabase
           .from('sales')
-          .select('*')
+          .select('*, seller_name')
           .eq('business_id', businessId)
           .order('created_at', { ascending: false })
           .limit(50)
@@ -350,20 +354,38 @@ function Ventas({ businessId, userRole = 'admin' }) {
         throw new Error('⚠️ Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
       }
 
-      // Obtener información del empleado para seller_name
-      const { data: employee } = await supabase
+      // Verificar si el user_id existe en la tabla employees del negocio actual
+      const { data: employee, error: employeeError } = await supabase
         .from('employees')
-        .select('full_name')
+        .select('full_name, role')
         .eq('user_id', user.id)
+        .eq('business_id', businessId)
         .maybeSingle();
+
+      // Si existe en employees → usar full_name, SALVO que sea owner/admin
+      // Si NO existe en employees → es el dueño, usar "Administrador"
+      let sellerName = 'Administrador';
+      
+      if (employee) {
+        // Si es owner o admin, mostrar Administrador
+        if (employee.role === 'owner' || employee.role === 'admin') {
+          sellerName = 'Administrador';
+        } else {
+          // Si es empleado regular, usar su nombre
+          sellerName = employee.full_name || 'Empleado';
+        }
+      }
+
+      // Calcular total del carrito
+      const saleTotal = cart.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
 
       // Datos a insertar
       const saleData = {
         business_id: businessId,
         user_id: user.id,
-        seller_name: employee?.full_name || 'Vendedor',
+        seller_name: sellerName,
         payment_method: paymentMethod,
-        total: total
+        total: saleTotal
       };
 
       // 1. Crear la venta principal
