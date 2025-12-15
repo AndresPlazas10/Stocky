@@ -240,7 +240,7 @@ function Home() {
                 onClick={() => navigate("/login")}
                 className="border-2 border-indigo-500 text-indigo-700 hover:bg-indigo-50 text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto"
               >
-                Ver Demo
+                Iniciar Sesión
               </Button>
             </motion.div>
           </motion.div>
