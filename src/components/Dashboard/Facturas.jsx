@@ -436,7 +436,7 @@ export default function Facturas({ userRole = 'admin' }) {
 
       // Validar que la factura tenga email del cliente
       if (!factura.customer_email) {
-        setError('Esta factura no tiene email del cliente. No se puede enviar.');
+        setError('⚠️ Esta factura no tiene email del cliente. No se puede enviar.');
         setTimeout(() => setError(''), 5000);
         setLoading(false);
         return;

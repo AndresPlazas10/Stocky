@@ -49,20 +49,20 @@ function EmployeeDashboard() {
 
       if (employeeError) {
         // Error al verificar empleado
-        setError('Error al verificar permisos de empleado');
+        setError('❌ Error al verificar permisos de empleado');
         setLoading(false);
         return;
       }
 
       if (!employeeData) {
-        setError('No tienes permisos de empleado. Tu usuario no está registrado como empleado.');
+        setError('❌ No tienes permisos de empleado. Tu usuario no está registrado como empleado.');
         setLoading(false);
         return;
       }
 
       // Validar que el empleado tenga business_id
       if (!employeeData.business_id) {
-        setError('Tu cuenta de empleado no tiene un negocio asignado.');
+        setError('❌ Tu cuenta de empleado no tiene un negocio asignado.');
         setLoading(false);
         return;
       }
@@ -76,7 +76,7 @@ function EmployeeDashboard() {
 
       if (businessError || !businessData) {
         // Error al cargar negocio
-        setError('Error al cargar información del negocio');
+        setError('❌ Error al cargar información del negocio');
         setLoading(false);
         return;
       }
@@ -92,7 +92,7 @@ function EmployeeDashboard() {
 
     } catch (err) {
       // Error en checkEmployeeAuth
-      setError('Error al cargar información del empleado');
+      setError('❌ Error al cargar información del empleado');
       setLoading(false);
     }
   };

@@ -82,7 +82,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       // Validar sesión
       const { user, error: userError } = await getCurrentUser();
       if (userError) {
-        setError('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+        setError('⚠️ Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
         setSessionValid(false);
         setTimeout(() => {
           window.location.href = '/login';
@@ -102,7 +102,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setProductos(productsData);
     } catch (err) {
       // Error cargando datos
-      setError('Error al cargar los datos. Por favor recarga la página.');
+      setError('❌ Error al cargar los datos. Por favor recarga la página.');
     } finally {
       setLoading(false);
     }

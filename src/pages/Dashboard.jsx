@@ -99,7 +99,7 @@ function Dashboard() {
       if (!finalBusiness) {
         // Buscando negocio para usuario
         
-        // Verificar si el usuario tiene un negocio (por ID de creador)
+        // Verificar si el usuario tiene un negocio (SOLO por created_by)
         const { data: business, error: businessError } = await supabase
           .from('businesses')
           .select('*')
@@ -111,16 +111,6 @@ function Dashboard() {
         }
 
         finalBusiness = business;
-
-        // Si no encuentra por ID, intentar por email (fallback)
-        if (!finalBusiness) {
-          const { data: businessByEmail } = await supabase
-            .from('businesses')
-            .select('*')
-            .eq('email', user.email)
-            .maybeSingle();
-          finalBusiness = businessByEmail;
-        }
       }
 
       const { data: employee } = await supabase
@@ -159,7 +149,7 @@ function Dashboard() {
       // Tabla users (public) no existe - no crear registro
       
     } catch (err) {
-      setError('Error al cargar la información');
+      setError('❌ Error al cargar la información del negocio');
     } finally {
       setLoading(false);
     }

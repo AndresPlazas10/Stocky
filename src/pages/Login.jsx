@@ -42,7 +42,7 @@ function Login() {
       const { username, password } = formData;
       
       if (!username || !password) {
-        throw new Error('Por favor ingresa usuario y contraseña');
+        throw new Error('⚠️ Por favor ingresa usuario y contraseña');
       }
 
       // Generar el email basado en el username (igual que en el registro)
@@ -58,7 +58,7 @@ function Login() {
 
       if (signInError) {
         // Error de login
-        throw new Error('Usuario o contraseña incorrectos');
+        throw new Error('❌ Usuario o contraseña incorrectos');
       }
 
       // Login exitoso
