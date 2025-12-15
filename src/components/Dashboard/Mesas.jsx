@@ -49,6 +49,9 @@ function Mesas({ businessId }) {
   // Estado para modal de confirmación de eliminación
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [mesaToDelete, setMesaToDelete] = useState(null);
+  
+  // Estado para prevenir clics múltiples (almacena el ID del item siendo actualizado)
+  const [updatingItemId, setUpdatingItemId] = useState(null);
 
   const getCurrentUser = useCallback(async () => {
     try {
@@ -593,13 +596,21 @@ function Mesas({ businessId }) {
   }, [selectedMesa, orderItems, quantityToAdd, updateOrderTotal]);
 
   const updateItemQuantity = useCallback(async (itemId, newQuantity) => {
+    // Prevenir clics múltiples: verificar si ya hay una actualización en progreso
+    if (updatingItemId !== null) {
+      return;
+    }
+
     try {
       if (newQuantity <= 0) {
         await removeItem(itemId);
         return;
       }
 
-      // Actualización optimista: actualizar estado local primero
+      // Marcar como actualizando
+      setUpdatingItemId(itemId);
+
+      // Actualización optimista: actualizar UI primero para respuesta instantánea
       setOrderItems(prevItems => 
         prevItems.map(item => {
           if (item.id === itemId) {
@@ -623,14 +634,17 @@ function Mesas({ businessId }) {
       await updateOrderTotal(selectedMesa.current_order_id);
     } catch (error) {
       setError('❌ No se pudo actualizar la cantidad. Por favor, intenta de nuevo.');
-      // Revertir cambio optimista solo si falla
+      // Revertir cambio optimista si falla
       const { data: freshItems } = await supabase
         .from('order_items')
         .select('*, products(name, code)')
         .eq('order_id', selectedMesa.current_order_id);
       if (freshItems) setOrderItems(freshItems);
+    } finally {
+      // Siempre liberar el bloqueo
+      setUpdatingItemId(null);
     }
-  }, [selectedMesa, updateOrderTotal, removeItem]);
+  }, [selectedMesa, updateOrderTotal, removeItem, updatingItemId]);
 
   const handleCloseModal = async () => {
     // Si la orden está vacía, eliminarla y liberar la mesa
@@ -699,32 +713,38 @@ function Mesas({ businessId }) {
         throw new Error('⚠️ No hay productos en la orden para cerrar');
       }
 
-      // 1. Crear la venta con el método de pago y cliente seleccionados
-      // Determinar nombre del vendedor usando el user_id actual, no el de orderData
-      let sellerName = 'Administrador';
-      try {
-        const { data: emp } = await supabase
-          .from('employees')
-          .select('full_name, role')
-          .eq('business_id', businessId)
-          .eq('user_id', user.id)  // ← Usar user.id actual, no orderData.user_id
-          .maybeSingle();
-        if (emp?.role === 'admin' || emp?.role === 'owner') {
-          sellerName = 'Administrador';
-        } else if (emp?.full_name) {
-          sellerName = emp.full_name;
-        } else {
-          // Tabla users no existe - usar nombre genérico
-          sellerName = 'Empleado';
-        }
-      } catch {}
+      // 1. Determinar nombre del vendedor
+      const { data: employee, error: employeeError } = await supabase
+        .from('employees')
+        .select('full_name, role')
+        .eq('user_id', user.id)
+        .eq('business_id', businessId)
+        .maybeSingle();
 
+      let sellerName = 'Administrador';
+      
+      if (employee) {
+        // Si es owner o admin, mostrar Administrador
+        if (employee.role === 'owner' || employee.role === 'admin') {
+          sellerName = 'Administrador';
+        } else {
+          // Si es empleado regular, usar su nombre
+          sellerName = employee.full_name || 'Empleado';
+        }
+      }
+
+      // 2. Calcular total desde los items de la orden
+      const saleTotal = orderData.order_items.reduce((sum, item) => {
+        return sum + (item.quantity * item.price);
+      }, 0);
+
+      // 3. Crear la venta con el método de pago y cliente seleccionados
       const { data: sale, error: saleError} = await supabase
         .from('sales')
         .insert([{
           business_id: businessId,
           user_id: user.id,
-          total: orderData.total,
+          total: saleTotal,
           payment_method: paymentMethod,
           seller_name: sellerName
         }])
@@ -779,7 +799,7 @@ function Mesas({ businessId }) {
         throw tableError;
       }
 
-      setSuccess(`✅ Venta registrada exitosamente. Total: ${formatPrice(orderData.total)}. Mesa liberada.`);
+      setSuccess(`✅ Venta registrada exitosamente. Total: ${formatPrice(saleTotal)}. Mesa liberada.`);
       setShowPaymentModal(false);
       setShowOrderDetails(false);
       setSelectedMesa(null);
@@ -954,12 +974,11 @@ function Mesas({ businessId }) {
                         <Button 
                           type="submit"
                           disabled={isCreatingTable}
-                          className="gradient-primary text-white hover:opacity-90 h-12 w-full sm:w-auto disabled:opacity-50"
+                          className="gradient-primary text-white h-12 w-full sm:w-auto disabled:opacity-50"
                         >
                           {isCreatingTable ? (
                             <>
-                              <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              Creando...
+                              Creando mesa...
                             </>
                           ) : (
                             <>
@@ -1214,7 +1233,8 @@ function Mesas({ businessId }) {
                                           size="sm"
                                           variant="outline"
                                           onClick={() => updateItemQuantity(item.id, item.quantity - 1)}
-                                          className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50"
+                                          disabled={updatingItemId !== null}
+                                          className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                           -
                                         </Button>
@@ -1225,7 +1245,8 @@ function Mesas({ businessId }) {
                                           size="sm"
                                           variant="outline"
                                           onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
-                                          className="h-8 w-8 p-0 border-green-300 text-green-600 hover:bg-green-50"
+                                          disabled={updatingItemId !== null}
+                                          className="h-8 w-8 p-0 border-green-300 text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                           +
                                         </Button>
