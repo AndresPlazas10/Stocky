@@ -68,7 +68,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
       
       setProductos(data || []);
     } catch (error) {
-      setError('Error al cargar el inventario');
+      setError('❌ Error al cargar el inventario');
     } finally {
       setLoading(false);
     }

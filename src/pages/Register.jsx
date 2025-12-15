@@ -36,21 +36,21 @@ function Register() {
       
       // Validaciones
       if (!name || !username || !password) {
-        throw new Error('Por favor completa todos los campos requeridos');
+        throw new Error('⚠️ Por favor completa todos los campos requeridos');
       }
 
       if (password !== confirmPassword) {
-        throw new Error('Las contraseñas no coinciden');
+        throw new Error('❌ Las contraseñas no coinciden');
       }
 
       if (password.length < 6) {
-        throw new Error('La contraseña debe tener al menos 6 caracteres');
+        throw new Error('❌ La contraseña debe tener al menos 6 caracteres');
       }
 
       const cleanUsername = username.trim().toLowerCase();
 
       if (!/^[a-z0-9_]{3,20}$/.test(cleanUsername)) {
-        throw new Error('El usuario debe tener entre 3-20 caracteres (solo letras, números y guiones bajos)');
+        throw new Error('❌ El usuario debe tener entre 3-20 caracteres (solo letras, números y guiones bajos)');
       }
 
       const { data: existingUsername } = await supabase
@@ -60,7 +60,7 @@ function Register() {
         .maybeSingle();
 
       if (existingUsername) {
-        throw new Error('Este nombre de usuario ya está en uso');
+        throw new Error('❌ Este nombre de usuario ya está en uso');
       }
 
       const cleanEmail = `${cleanUsername}@stockly-app.com`;
@@ -78,12 +78,27 @@ function Register() {
         }
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Error al crear la cuenta');
+      if (authError) {
+        // Mensajes de error mejorados
+        const errorMsg = authError.message || '';
+        
+        if (errorMsg.includes('already registered') || errorMsg === 'User already registered') {
+          throw new Error('❌ Ya existe una cuenta con este nombre de usuario. Intenta con otro nombre.');
+        }
+        if (errorMsg.includes('password')) {
+          throw new Error('❌ La contraseña debe tener al menos 6 caracteres');
+        }
+        if (errorMsg.includes('email')) {
+          throw new Error('❌ El formato del correo es inválido');
+        }
+        throw new Error(`❌ Error al crear la cuenta: ${errorMsg}`);
+      }
+      
+      if (!authData.user) throw new Error('❌ Error al crear la cuenta');
 
       if (!authData.session) {
         await supabase.auth.signOut();
-        throw new Error('Supabase requiere confirmación de email. Ve a Dashboard → Authentication → Providers → Email y desactiva "Confirm email"');
+        throw new Error('⚠️ Supabase requiere confirmación de email. Ve a Dashboard → Authentication → Providers → Email y desactiva "Confirm email"');
       }
 
       // Crear negocio
@@ -102,7 +117,7 @@ function Register() {
 
       if (businessError) {
         await supabase.auth.signOut().catch(() => {});
-        throw new Error(`Error al crear el negocio: ${businessError.message || 'Verifica las políticas RLS en Supabase'}`);
+        throw new Error(`❌ Error al crear el negocio: ${businessError.message || 'Verifica las políticas RLS en Supabase'}`);
       }
 
       // Crear registro de empleado
@@ -125,7 +140,7 @@ function Register() {
       
     } catch (err) {
       console.error('Error al crear negocio:', err);
-      setError(err.message || 'Error al crear el negocio');
+      setError(err.message || '❌ Error al crear el negocio');
     } finally {
       setIsSubmitting(false);
     }

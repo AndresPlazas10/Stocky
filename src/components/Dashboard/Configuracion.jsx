@@ -55,7 +55,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
     e.preventDefault();
     
     if (!businessData.name.trim()) {
-      setError('El nombre del negocio es obligatorio');
+      setError('⚠️ El nombre del negocio es obligatorio');
       return;
     }
 
@@ -101,7 +101,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
       if (error) throw error;
       window.location.href = '/';
     } catch (error) {
-      setError('No se pudo cerrar la sesión correctamente');
+      setError('❌ No se pudo cerrar la sesión correctamente');
     }
   }, []);
 

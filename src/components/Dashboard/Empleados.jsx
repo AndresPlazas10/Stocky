@@ -60,7 +60,7 @@ function Empleados({ businessId }) {
       setEmpleados(employeesWithStatus);
     } catch (error) {
       // Error al cargar empleados
-      setError('Error al cargar la lista de empleados');
+      setError('❌ Error al cargar la lista de empleados');
     } finally {
       setLoading(false);
     }
@@ -133,7 +133,16 @@ function Empleados({ businessId }) {
 
       const cleanEmail = `${cleanUsername}@stockly-app.com`;
 
-      // Crear cuenta Auth
+      // 💾 GUARDAR SESIÓN DEL ADMIN ANTES DE CREAR EL EMPLEADO
+      const { data: { session: adminSession } } = await supabase.auth.getSession();
+      
+      if (!adminSession) {
+        throw new Error('No hay sesión activa de administrador');
+      }
+
+      console.log('💾 Guardando sesión del admin:', adminSession.user.email);
+
+      // Crear cuenta Auth para el empleado
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: cleanEmail,
         password: cleanPassword,
@@ -146,32 +155,92 @@ function Empleados({ businessId }) {
       });
 
       if (authError) {
-        if (authError.message.includes('already registered')) {
-          throw new Error('Ya existe una cuenta con este usuario');
+        // Mensajes de error mejorados
+        const errorMsg = authError.message || '';
+        
+        if (errorMsg.includes('already registered') || errorMsg === 'User already registered') {
+          throw new Error('❌ Ya existe un empleado con este nombre de usuario');
         }
-        throw new Error('Error al crear la cuenta: ' + authError.message);
+        if (errorMsg.includes('password')) {
+          throw new Error('❌ La contraseña debe tener al menos 6 caracteres');
+        }
+        if (errorMsg.includes('email')) {
+          throw new Error('❌ El formato del correo es inválido');
+        }
+        throw new Error(`❌ Error al crear la cuenta: ${errorMsg}`);
       }
 
-      if (!authData.user) throw new Error('Error al crear la cuenta');
-      if (!authData.session) throw new Error('Email confirmation debe estar desactivado en Supabase');
+      if (!authData.user) throw new Error('❌ Error al crear la cuenta del empleado');
+      if (!authData.session) throw new Error('❌ La confirmación de email debe estar desactivada en Supabase');
 
-      // Crear empleado sin idempotency key
-      const { data: insertedEmployee, error: createEmployeeError } = await supabase
-        .from('employees')
-        .insert([{
-          business_id: businessId,
-          user_id: authData.user.id,
-          full_name: formData.full_name.trim(),
-          role: formData.role,
-          username: cleanUsername,
-          email: cleanEmail,
-          is_active: true
-        }])
-        .select()
-        .single();
+      console.log('✅ Cuenta de empleado creada:', authData.user.email);
+      console.log('⚠️  Sesión cambió al empleado - creando registro con ID del admin...');
+
+      // Crear empleado usando función SECURITY DEFINER (bypasea RLS)
+      // Pasamos adminSession.user.id como p_admin_user_id porque la sesión ya cambió
+      const { data: employeeId, error: createEmployeeError } = await supabase
+        .rpc('create_employee', {
+          p_business_id: businessId,
+          p_user_id: authData.user.id,
+          p_role: formData.role,
+          p_full_name: formData.full_name.trim(),
+          p_email: cleanEmail,
+          p_username: cleanUsername,
+          p_access_code: null,
+          p_is_active: true,
+          p_admin_user_id: adminSession.user.id  // ⚡ Pasar el ID del admin explícitamente
+        });
 
       if (createEmployeeError) {
-        throw new Error(`Error al crear el registro de empleado: ${createEmployeeError.message || 'Verifica las políticas RLS'}`);
+        // Errores mejorados de la base de datos
+        const errorMsg = createEmployeeError.message || '';
+        
+        // Error 23505: Violación de constraint único
+        if (errorMsg.includes('23505') || errorMsg.includes('duplicate key')) {
+          if (errorMsg.includes('username')) {
+            throw new Error('❌ Ya existe un empleado con este nombre de usuario');
+          }
+          if (errorMsg.includes('email')) {
+            throw new Error('❌ Ya existe un empleado con este correo');
+          }
+          throw new Error('❌ Este empleado ya existe en tu negocio');
+        }
+        
+        // Error de permisos
+        if (errorMsg.includes('permission denied') || errorMsg.includes('42501')) {
+          throw new Error('❌ No tienes permisos para crear empleados. Contacta al administrador');
+        }
+        
+        // Función no existe
+        if (errorMsg.includes('function') && errorMsg.includes('does not exist')) {
+          throw new Error('❌ Error de configuración. Ejecuta FUNCIONES_EMPLEADOS_SECURITY_DEFINER.sql en Supabase');
+        }
+        
+        // Error genérico
+        throw new Error(`❌ Error al crear el registro: ${errorMsg}`);
+      }
+      
+      if (!employeeId) {
+        throw new Error('No se pudo crear el empleado (función retornó null)');
+      }
+
+      console.log('✅ Empleado creado exitosamente');
+
+      // 🔄 RESTAURAR SESIÓN DEL ADMIN
+      console.log('🔄 Restaurando sesión del admin...');
+      
+      const { error: restoreError } = await supabase.auth.setSession({
+        access_token: adminSession.access_token,
+        refresh_token: adminSession.refresh_token
+      });
+
+      if (restoreError) {
+        console.error('⚠️  Error restaurando sesión:', restoreError);
+        // No lanzar error aquí - el empleado se creó correctamente
+        // Solo advertir al usuario
+        setError('⚠️ Empleado creado pero la sesión cambió. Recarga la página.');
+      } else {
+        console.log('✅ Sesión del admin restaurada correctamente');
       }
 
       // Código de éxito
@@ -544,11 +613,8 @@ function Empleados({ businessId }) {
                 <tbody className="divide-y divide-gray-200">
                   {filteredEmpleados.map((empleado, index) => {
                     return (
-                      <motion.tr
+                      <tr
                         key={empleado.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
                         className="hover:bg-gray-50 transition-colors"
                       >
                         <td className="px-6 py-4">
@@ -568,15 +634,15 @@ function Empleados({ businessId }) {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          {empleado.status === 'active' ? (
+                          {empleado.is_active ? (
                             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                               <CheckCircle className="w-3 h-3" />
                               Activo
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                              <Clock className="w-3 h-3" />
-                              Pendiente
+                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              <XCircle className="w-3 h-3" />
+                              Inactivo
                             </span>
                           )}
                         </td>
@@ -592,7 +658,7 @@ function Empleados({ businessId }) {
                             Eliminar
                           </button>
                         </td>
-                      </motion.tr>
+                      </tr>
                     );
                   })}
                 </tbody>

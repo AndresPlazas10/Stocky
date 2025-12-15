@@ -54,7 +54,7 @@ function Proveedores({ businessId }) {
       if (error) throw error;
       setProveedores(data || []);
     } catch (error) {
-      setError('Error al cargar los proveedores');
+      setError('❌ Error al cargar los proveedores');
     } finally {
       setLoading(false);
     }

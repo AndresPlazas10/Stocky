@@ -192,7 +192,7 @@ function Reportes({ businessId }) {
       });
 
     } catch (error) {
-      setError('Error al cargar los reportes');
+      setError('❌ Error al cargar los reportes');
     } finally {
       setLoading(false);
     }

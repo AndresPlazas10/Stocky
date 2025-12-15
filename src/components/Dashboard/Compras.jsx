@@ -106,7 +106,7 @@ function Compras({ businessId }) {
       
       setCompras(purchasesWithEmployees);
     } catch (error) {
-      setError('Error al cargar las compras');
+      setError('❌ Error al cargar las compras');
     } finally {
       setLoading(false);
     }
@@ -390,7 +390,7 @@ function Compras({ businessId }) {
       setSelectedPurchase({ ...purchase, details: data });
       setShowDetailsModal(true);
     } catch (error) {
-      setError('Error al cargar los detalles');
+      setError('❌ Error al cargar los detalles de la compra');
     }
   }, []);
 
