@@ -308,8 +308,7 @@ function Mesas({ businessId }) {
         .insert([{
           business_id: businessId,
           table_number: tableNum,
-          status: 'available',
-          created_at: new Date().toISOString()
+          status: 'available'
         }])
         .select()
         .maybeSingle();
@@ -349,8 +348,7 @@ function Mesas({ businessId }) {
           table_id: mesa.id,
           user_id: currentUser?.id || null,
           status: 'open',
-          total: 0,
-          created_at: new Date().toISOString()
+          total: 0
         }])
         .select()
         .maybeSingle();
@@ -554,8 +552,7 @@ function Mesas({ businessId }) {
             order_id: selectedMesa.current_order_id,
             product_id: producto.id,
             quantity: qty,
-            price: parseFloat(precio),
-            created_at: new Date().toISOString()
+            price: parseFloat(precio)
             // subtotal se calcula automáticamente con trigger
           }])
           .select('id')
