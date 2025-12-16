@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../../supabase/Client';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
-import { formatPrice, formatNumber } from '../../utils/formatters.js';
+import { formatPrice, formatNumber, formatDate } from '../../utils/formatters.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XCircle, AlertTriangle, Trash2 } from 'lucide-react';
 
@@ -999,13 +999,7 @@ export default function Facturas({ userRole = 'admin' }) {
                   </div>
                   
                   <div className="text-xs text-gray-600 mb-2">
-                    {new Date(factura.issued_at).toLocaleDateString('es-CO', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+                    {formatDate(factura.issued_at)}
                   </div>
                   
                   <div className="flex justify-between items-center mb-3">
@@ -1079,13 +1073,7 @@ export default function Facturas({ userRole = 'admin' }) {
                     )}
                   </td>
                   <td className="p-3">
-                    {new Date(factura.issued_at).toLocaleDateString('es-CO', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+                    {formatDate(factura.issued_at)}
                   </td>
                   <td className="p-3 text-right font-semibold">
                     {formatPrice(factura.total)}
