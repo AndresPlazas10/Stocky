@@ -385,7 +385,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
         user_id: user.id,
         seller_name: sellerName,
         payment_method: paymentMethod,
-        total: saleTotal
+        total: saleTotal,
+        created_at: new Date().toISOString() // Establecer fecha actual explícitamente
       };
 
       // 1. Crear la venta principal

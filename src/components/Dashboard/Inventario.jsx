@@ -256,7 +256,8 @@ function Inventario({ businessId, userRole = 'admin' }) {
         unit: formData.unit || 'unit',
         supplier_id: formData.supplier_id || null,
         business_id: businessId,
-        is_active: true
+        is_active: true,
+        created_at: new Date().toISOString()
       };
 
       const { data: insertedProduct, error: insertError } = await supabase

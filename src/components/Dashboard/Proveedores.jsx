@@ -109,7 +109,8 @@ function Proveedores({ businessId }) {
             phone: formData.phone || null,
             address: formData.address || null,
             nit: formData.nit || null,
-            notes: formData.notes || null
+            notes: formData.notes || null,
+            created_at: new Date().toISOString()
           })
           .select()
           .maybeSingle();

@@ -306,7 +306,8 @@ export default function Facturas({ userRole = 'admin' }) {
           total: totalFactura,
           notes,
           status: 'pending',
-          issued_at: new Date().toISOString()
+          issued_at: new Date().toISOString(),
+          created_at: new Date().toISOString()
         })
         .select()
         .maybeSingle();
