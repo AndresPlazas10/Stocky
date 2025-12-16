@@ -11,7 +11,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { formatPrice, formatNumber } from '../../utils/formatters.js';
+import { formatPrice, formatNumber, formatDate } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -444,13 +444,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                         {formatPrice(venta.total)}
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-600">
-                        {new Date(venta.created_at).toLocaleDateString('es-ES', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
+                        {formatDate(venta.created_at)}
                       </td>
                       {userRole === 'admin' && (
                         <td className="py-3 px-4 text-center">

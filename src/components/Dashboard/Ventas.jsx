@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
-import { formatPrice, formatNumber } from '../../utils/formatters.js';
+import { formatPrice, formatNumber, formatDate, formatDateOnly } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -1019,14 +1019,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                             <div className="flex items-center gap-2 text-accent-600">
                               <Calendar className="w-4 h-4 shrink-0" />
                               <span className="text-sm font-medium">
-                                {new Date(venta.created_at + 'Z').toLocaleString('es-CO', {
-                                  year: 'numeric',
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  timeZone: 'America/Bogota'
-                                })}
+                                {formatDate(venta.created_at)}
                               </span>
                             </div>
 
@@ -1156,7 +1149,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                     <div>
                       <h2 className="text-2xl font-bold">Generar Factura Electrónica</h2>
                       <p className="text-blue-100 mt-1">
-                        Venta del {new Date(selectedSale.created_at + 'Z').toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })} por {formatPrice(selectedSale.total)}
+                        Venta del {formatDateOnly(selectedSale.created_at)} por {formatPrice(selectedSale.total)}
                       </p>
                     </div>
                   </div>

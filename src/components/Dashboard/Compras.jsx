@@ -524,7 +524,7 @@ function Compras({ businessId }) {
                           </p>
                           <p className="text-white/80 text-sm flex items-center gap-1">
                             <Calendar className="w-4 h-4" />
-                            {new Date(compra.created_at).toLocaleDateString()}
+                            {formatDateOnly(compra.created_at)}
                           </p>
                         </div>
                       </div>
@@ -791,7 +791,7 @@ function Compras({ businessId }) {
                   <div>
                     <h3 className="text-2xl font-bold">Detalles de Compra</h3>
                     <p className="text-white/80 text-sm">
-                      {new Date(selectedPurchase.created_at).toLocaleDateString()}
+                      {formatDateOnly(selectedPurchase.created_at)}
                     </p>
                   </div>
                 </div>
