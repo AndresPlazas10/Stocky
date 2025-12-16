@@ -317,7 +317,8 @@ function Compras({ businessId }) {
           supplier_id: supplierId,
           payment_method: paymentMethod,
           notes: notes || null,
-          total: total
+          total: total,
+          created_at: new Date().toISOString()
         }])
         .select()
         .maybeSingle();
