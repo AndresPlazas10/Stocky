@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
-import { formatPrice } from '../../utils/formatters.js';
+import { formatPrice, formatNumber, parseFormattedNumber, formatDate, formatDateOnly } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
