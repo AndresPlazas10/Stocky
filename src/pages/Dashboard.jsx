@@ -200,34 +200,34 @@ function Dashboard() {
   const renderContent = () => {
     switch (activeSection) {
       case 'home':
-        return <Home business={business} />;
+        return <Home key="home" business={business} />;
       
       case 'ventas':
-        return <Ventas businessId={business?.id} />;
+        return <Ventas key="ventas" businessId={business?.id} />;
       
       case 'compras':
-        return <Compras businessId={business?.id} />;
+        return <Compras key="compras" businessId={business?.id} />;
       
       case 'inventario':
-        return <Inventario businessId={business?.id} userRole="admin" />;
+        return <Inventario key="inventario" businessId={business?.id} userRole="admin" />;
       
       case 'proveedores':
-        return <Proveedores businessId={business?.id} />;
+        return <Proveedores key="proveedores" businessId={business?.id} />;
       
       case 'empleados':
-        return <Empleados businessId={business?.id} />;
+        return <Empleados key="empleados" businessId={business?.id} />;
       
       case 'facturas':
-        return <Facturas userRole="admin" />;
+        return <Facturas key="facturas" userRole="admin" />;
       
       case 'clientes':
-        return <Clientes businessId={business?.id} />;
+        return <Clientes key="clientes" businessId={business?.id} />;
       
       case 'reportes':
-        return <Reportes businessId={business?.id} />;
+        return <Reportes key="reportes" businessId={business?.id} />;
       
       case 'configuracion':
-        return <Configuracion user={user} business={business} onBusinessUpdate={setBusiness} />;
+        return <Configuracion key="configuracion" user={user} business={business} onBusinessUpdate={setBusiness} />;
       
       default:
         return <p>Selecciona una opción del menú</p>;
