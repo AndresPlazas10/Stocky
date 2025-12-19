@@ -96,12 +96,33 @@ function Empleados({ businessId }) {
 
       // Validaciones
       if (!formData.full_name.trim()) throw new Error('El nombre del empleado es requerido');
+      
+      // Validar que el nombre no sea solo números
+      if (/^\d+$/.test(formData.full_name.trim())) {
+        throw new Error('❌ El nombre del empleado no puede ser solo números');
+      }
+
+      // Validar que el nombre contenga al menos una letra
+      if (!/[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(formData.full_name.trim())) {
+        throw new Error('❌ El nombre del empleado debe contener al menos una letra');
+      }
+
+      // Validar longitud mínima
+      if (formData.full_name.trim().length < 2) {
+        throw new Error('❌ El nombre del empleado debe tener al menos 2 caracteres');
+      }
+
       if (!formData.username.trim()) throw new Error('El nombre de usuario es requerido');
       if (!formData.password.trim()) throw new Error('La contraseña es requerida');
       if (formData.password.length < 6) throw new Error('La contraseña debe tener al menos 6 caracteres');
 
       const cleanUsername = formData.username.toLowerCase().trim();
       const cleanPassword = formData.password.trim();
+
+      // Validar que el usuario no sea solo números
+      if (/^\d+$/.test(cleanUsername)) {
+        throw new Error('❌ El nombre de usuario no puede ser solo números');
+      }
 
       const usernameRegex = /^[a-z0-9_]+$/;
       if (!usernameRegex.test(cleanUsername)) {
