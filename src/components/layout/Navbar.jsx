@@ -262,7 +262,7 @@ export const Navbar = React.memo(function Navbar({ userName = "Admin", userEmail
                   </button>
                   <button
                     onClick={() => setShowAvatarModal(false)}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-accent text-white hover:shadow-lg transition-all font-medium"
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-accent text-black hover:shadow-lg transition-all font-medium"
                   >
                     Guardar
                   </button>

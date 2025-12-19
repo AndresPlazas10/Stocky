@@ -106,17 +106,15 @@ function Mesas({ businessId }) {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select('id, code, name, sale_price, stock, category')
         .eq('business_id', businessId)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .order('name')
+        .limit(200);
         // Removido el filtro de stock para permitir ventas incluso con stock negativo
 
       if (error) {
         return;
-      }
-      
-      
-      if (data.length === 0) {
       }
       
       setProductos(data || []);
@@ -412,6 +410,10 @@ function Mesas({ businessId }) {
   }, []);
 
   const handleOpenTable = useCallback(async (mesa) => {
+    // Actualizar estado local inmediatamente para UI responsive
+    setSelectedMesa(mesa);
+    setShowOrderDetails(true);
+    
     if (mesa.status === 'occupied' && mesa.current_order_id) {
       // Cargar la orden actual
       await loadOrderDetails(mesa);
@@ -477,8 +479,14 @@ function Mesas({ businessId }) {
       // Actualizar el total antes de cerrar
       await updateOrderTotal(selectedMesa.current_order_id);
       
-      // Recargar todas las mesas para actualizar el estado
-      await loadMesas();
+      // Actualización optimista: actualizar solo la mesa actual en el estado
+      setMesas(prevMesas => 
+        prevMesas.map(m => 
+          m.id === selectedMesa.id 
+            ? { ...m, status: 'occupied', current_order_id: selectedMesa.current_order_id }
+            : m
+        )
+      );
       
       // Cerrar el modal
       setShowOrderDetails(false);
@@ -491,7 +499,7 @@ function Mesas({ businessId }) {
     } catch (error) {
       setError('❌ No se pudo guardar la orden');
     }
-  }, [selectedMesa, updateOrderTotal, loadMesas]);
+  }, [selectedMesa, updateOrderTotal]);
 
   const addProductToOrder = useCallback(async (producto) => {
     try {
@@ -650,13 +658,22 @@ function Mesas({ businessId }) {
     // Si la orden está vacía, eliminarla y liberar la mesa
     if (orderItems.length === 0 && selectedMesa?.current_order_id) {
       try {
-        // Eliminar la orden vacía
+        // Actualización optimista: liberar mesa inmediatamente en UI
+        setMesas(prevMesas => 
+          prevMesas.map(m => 
+            m.id === selectedMesa.id 
+              ? { ...m, status: 'available', current_order_id: null }
+              : m
+          )
+        );
+
+        // Eliminar la orden vacía en background
         await supabase
           .from('orders')
           .delete()
           .eq('id', selectedMesa.current_order_id);
 
-        // Liberar la mesa
+        // Liberar la mesa en DB
         await supabase
           .from('tables')
           .update({
@@ -664,9 +681,9 @@ function Mesas({ businessId }) {
             status: 'available'
           })
           .eq('id', selectedMesa.id);
-
-        await loadMesas();
       } catch (error) {
+        // Si falla, recargar para mantener consistencia
+        await loadMesas();
       }
     }
 
@@ -787,18 +804,29 @@ function Mesas({ businessId }) {
         throw orderError;
       }
 
-      // 4. Liberar la mesa
-      const { error: tableError } = await supabase
+      // 4. Actualización optimista: liberar mesa inmediatamente en UI
+      setMesas(prevMesas => 
+        prevMesas.map(m => 
+          m.id === selectedMesa.id 
+            ? { ...m, status: 'available', current_order_id: null }
+            : m
+        )
+      );
+
+      // Liberar la mesa en DB (en background)
+      supabase
         .from('tables')
         .update({
           current_order_id: null,
           status: 'available'
         })
-        .eq('id', selectedMesa.id);
-
-      if (tableError) {
-        throw tableError;
-      }
+        .eq('id', selectedMesa.id)
+        .then(({ error: tableError }) => {
+          if (tableError) {
+            // Si falla, recargar para sincronizar
+            loadMesas();
+          }
+        });
 
       setSuccess(`✅ Venta registrada exitosamente. Total: ${formatPrice(saleTotal)}. Mesa liberada.`);
       setShowPaymentModal(false);
@@ -807,8 +835,6 @@ function Mesas({ businessId }) {
       setOrderItems([]);
       setPaymentMethod('cash');
       setSelectedCustomer('');
-      
-      await loadMesas();
 
       // Mostrar mensaje por más tiempo
       setTimeout(() => {
