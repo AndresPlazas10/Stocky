@@ -45,6 +45,11 @@ function Compras({ businessId }) {
   const [notes, setNotes] = useState('');
   const [cart, setCart] = useState([]);
   const [isCreatingPurchase, setIsCreatingPurchase] = useState(false);
+  
+  // Estados para eliminación
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [purchaseToDelete, setPurchaseToDelete] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const loadCompras = useCallback(async () => {
     try {
@@ -139,6 +144,39 @@ function Compras({ businessId }) {
     } catch (error) {
       // Error silencioso
     }
+  }, [businessId]);
+
+  // Verificar permisos de admin
+  useEffect(() => {
+    const checkAdminRole = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !businessId) return;
+
+        const [businessResult, employeeResult] = await Promise.all([
+          supabase
+            .from('businesses')
+            .select('created_by')
+            .eq('id', businessId)
+            .maybeSingle(),
+          supabase
+            .from('employees')
+            .select('role')
+            .eq('business_id', businessId)
+            .eq('user_id', user.id)
+            .maybeSingle()
+        ]);
+
+        const isOwner = user.id === businessResult.data?.created_by;
+        const isAdminRole = employeeResult.data?.role === 'admin';
+        
+        setIsAdmin(isOwner || isAdminRole);
+      } catch (error) {
+        console.error('Error checking admin role:', error);
+      }
+    };
+
+    checkAdminRole();
   }, [businessId]);
 
   useEffect(() => {
@@ -395,6 +433,84 @@ function Compras({ businessId }) {
     }
   }, []);
 
+  // Funciones de eliminación de compra (solo admin)
+  const handleDeletePurchase = (purchaseId) => {
+    setPurchaseToDelete(purchaseId);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeletePurchase = async () => {
+    if (!purchaseToDelete) return;
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      // Obtener detalles de la compra para revertir el stock
+      const { data: purchaseDetails, error: detailsError } = await supabase
+        .from('purchase_details')
+        .select('product_id, quantity')
+        .eq('purchase_id', purchaseToDelete);
+
+      if (detailsError) throw new Error('Error al obtener detalles: ' + detailsError.message);
+
+      // Revertir el stock de cada producto
+      for (const detail of purchaseDetails) {
+        const producto = productos.find(p => p.id === detail.product_id);
+        if (producto) {
+          const newStock = Math.max(0, (producto.stock || 0) - detail.quantity);
+          const { error: updateError } = await supabase
+            .from('products')
+            .update({ stock: newStock })
+            .eq('id', detail.product_id);
+          
+          if (updateError) throw new Error('Error al revertir stock: ' + updateError.message);
+        }
+      }
+
+      // Eliminar detalles de compra
+      const { error: deleteDetailsError } = await supabase
+        .from('purchase_details')
+        .delete()
+        .eq('purchase_id', purchaseToDelete);
+
+      if (deleteDetailsError) throw new Error('Error al eliminar detalles: ' + deleteDetailsError.message);
+
+      // Eliminar la compra
+      const { error: deleteError } = await supabase
+        .from('purchases')
+        .delete()
+        .eq('id', purchaseToDelete);
+
+      if (deleteError) throw new Error('Error al eliminar compra: ' + deleteError.message);
+
+      setSuccess('✅ Compra eliminada exitosamente y stock revertido');
+      setTimeout(() => setSuccess(''), 4000);
+
+      // Recargar datos
+      await loadCompras();
+      await loadProductos();
+
+      setShowDeleteModal(false);
+      setPurchaseToDelete(null);
+
+    } catch (error) {
+      console.error('Error al eliminar compra:', error);
+      setError('❌ ' + (error.message || 'Error al eliminar la compra'));
+      setTimeout(() => setError(''), 8000);
+      setShowDeleteModal(false);
+      setPurchaseToDelete(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setPurchaseToDelete(null);
+  };
+
   // Memoizar compras filtradas
   const filteredCompras = useMemo(() => {
     if (!searchTerm.trim()) return compras;
@@ -556,13 +672,24 @@ function Compras({ businessId }) {
                       </div>
                     )}
 
-                    <Button
-                      onClick={() => viewDetails(compra)}
-                      className="w-full h-10 gradient-primary text-white hover:shadow-lg transition-all duration-300 rounded-xl flex items-center justify-center gap-2"
-                    >
-                      <Eye className="w-4 h-4" />
-                      Ver Detalles
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => viewDetails(compra)}
+                        className="flex-1 h-10 gradient-primary text-white hover:shadow-lg transition-all duration-300 rounded-xl flex items-center justify-center gap-2"
+                      >
+                        <Eye className="w-4 h-4" />
+                        Ver Detalles
+                      </Button>
+                      {isAdmin && (
+                        <Button
+                          onClick={() => handleDeletePurchase(compra.id)}
+                          className="h-10 px-3 bg-red-500 hover:bg-red-600 text-white transition-all duration-300 rounded-xl"
+                          title="Eliminar compra"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </Card>
               </motion.div>
@@ -860,6 +987,64 @@ function Compras({ businessId }) {
                     <p className="text-blue-700">{selectedPurchase.notes}</p>
                   </div>
                 )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Confirmación de Eliminación */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+            style={{ zIndex: 10000 }}
+            onClick={cancelDelete}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 bg-red-100 rounded-full">
+                  <AlertCircle className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800">Eliminar Compra</h3>
+                  <p className="text-sm text-gray-600">Esta acción no se puede deshacer</p>
+                </div>
+              </div>
+
+              <div className="mb-6 p-4 bg-amber-50 border-l-4 border-amber-500 rounded">
+                <p className="text-sm text-amber-800">
+                  <strong>⚠️ Importante:</strong> Al eliminar esta compra, el stock de los productos se revertirá automáticamente.
+                </p>
+              </div>
+
+              <p className="text-gray-700 mb-6">
+                ¿Estás seguro de que deseas eliminar esta compra? El inventario se ajustará restando las cantidades compradas.
+              </p>
+
+              <div className="flex gap-3">
+                <Button
+                  onClick={cancelDelete}
+                  className="flex-1 h-11 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={confirmDeletePurchase}
+                  className="flex-1 h-11 bg-red-500 hover:bg-red-600 text-white rounded-xl flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Eliminar
+                </Button>
               </div>
             </motion.div>
           </motion.div>
