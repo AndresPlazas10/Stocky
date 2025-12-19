@@ -447,38 +447,10 @@ function Compras({ businessId }) {
     setSuccess('');
     
     try {
-      // Obtener detalles de la compra para revertir el stock
-      const { data: purchaseDetails, error: detailsError } = await supabase
-        .from('purchase_details')
-        .select('product_id, quantity')
-        .eq('purchase_id', purchaseToDelete);
-
-      if (detailsError) throw new Error('Error al obtener detalles: ' + detailsError.message);
-
-      // Revertir el stock de cada producto
-      for (const detail of purchaseDetails) {
-        // Obtener el stock actual de la base de datos
-        const { data: producto, error: getError } = await supabase
-          .from('products')
-          .select('stock')
-          .eq('id', detail.product_id)
-          .single();
-
-        if (getError) throw new Error('Error al obtener producto: ' + getError.message);
-        
-        if (producto) {
-          // Restar la cantidad que se había agregado en la compra
-          const newStock = Math.max(0, (producto.stock || 0) - detail.quantity);
-          const { error: updateError } = await supabase
-            .from('products')
-            .update({ stock: newStock })
-            .eq('id', detail.product_id);
-          
-          if (updateError) throw new Error('Error al revertir stock: ' + updateError.message);
-        }
-      }
-
-      // Eliminar detalles de compra
+      // El trigger 'trigger_reduce_stock_on_purchase_delete' en la DB 
+      // se encargará automáticamente de revertir el stock al eliminar purchase_details
+      
+      // Eliminar detalles de compra (el trigger reducirá el stock automáticamente)
       const { error: deleteDetailsError } = await supabase
         .from('purchase_details')
         .delete()
@@ -796,15 +768,27 @@ function Compras({ businessId }) {
                         e.target.value = '';
                       }
                     }}
-                    className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#edb886] focus:ring-1 focus:ring-[#edb886] outline-none"
+                    disabled={!supplierId}
+                    className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#edb886] focus:ring-1 focus:ring-[#edb886] outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
-                    <option value="">Seleccionar producto...</option>
-                    {productos.map(producto => (
-                      <option key={producto.id} value={producto.id}>
-                        {producto.name} - {formatPrice(producto.purchase_price)}
-                      </option>
-                    ))}
+                    <option value="">
+                      {!supplierId ? 'Primero selecciona un proveedor...' : 'Seleccionar producto...'}
+                    </option>
+                    {productos
+                      .filter(producto => !supplierId || producto.supplier_id === supplierId)
+                      .map(producto => (
+                        <option key={producto.id} value={producto.id}>
+                          {producto.name} - {formatPrice(producto.purchase_price)}
+                        </option>
+                      ))
+                    }
                   </select>
+                  {supplierId && productos.filter(p => p.supplier_id === supplierId).length === 0 && (
+                    <p className="text-sm text-amber-600 mt-2 flex items-center gap-1">
+                      <AlertCircle className="w-4 h-4" />
+                      Este proveedor no tiene productos asignados. Puedes asignar productos en Inventario.
+                    </p>
+                  )}
                 </div>
 
                 {/* Carrito */}

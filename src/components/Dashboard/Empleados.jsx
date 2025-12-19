@@ -668,7 +668,9 @@ function Empleados({ businessId }) {
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          <span className="text-sm text-gray-600 capitalize">{empleado.role}</span>
+                          <span className="text-sm text-gray-600 capitalize">
+                            {empleado.role === 'admin' ? 'Administrador' : empleado.role === 'owner' ? 'Propietario' : 'Empleado'}
+                          </span>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <button

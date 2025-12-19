@@ -348,11 +348,11 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex items-center gap-2 px-6 py-3 gradient-primary hover:from-[#f1c691] hover:to-[#edb886] text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+                    className="flex items-center gap-2 px-6 py-3 gradient-primary hover:from-[#f1c691] hover:to-[#edb886] text-black rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
                   >
                     {loading ? (
                       <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-black border-t-transparent"></div>
                         Guardando...
                       </>
                     ) : (
