@@ -457,8 +457,17 @@ function Compras({ businessId }) {
 
       // Revertir el stock de cada producto
       for (const detail of purchaseDetails) {
-        const producto = productos.find(p => p.id === detail.product_id);
+        // Obtener el stock actual de la base de datos
+        const { data: producto, error: getError } = await supabase
+          .from('products')
+          .select('stock')
+          .eq('id', detail.product_id)
+          .single();
+
+        if (getError) throw new Error('Error al obtener producto: ' + getError.message);
+        
         if (producto) {
+          // Restar la cantidad que se había agregado en la compra
           const newStock = Math.max(0, (producto.stock || 0) - detail.quantity);
           const { error: updateError } = await supabase
             .from('products')
