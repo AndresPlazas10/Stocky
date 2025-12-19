@@ -102,6 +102,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
           .from('employees')
           .select('user_id, full_name, role')
           .eq('business_id', businessId)
+          .limit(100)
       ]);
 
       const { data: business } = businessResult;
@@ -146,11 +147,12 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const loadProductos = useCallback(async () => {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select('id, code, name, sale_price, stock, category')
       .eq('business_id', businessId)
       .eq('is_active', true)
       .gt('stock', 0)
-      .order('name');
+      .order('name')
+      .limit(200);
 
     if (error) throw error;
     setProductos(data || []);
