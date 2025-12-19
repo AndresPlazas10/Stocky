@@ -39,6 +39,21 @@ function Register() {
         throw new Error('⚠️ Por favor completa todos los campos requeridos');
       }
 
+      // Validar que el nombre del negocio no sea solo números
+      if (/^\d+$/.test(name.trim())) {
+        throw new Error('❌ El nombre del negocio no puede ser solo números');
+      }
+
+      // Validar que el nombre del negocio contenga al menos una letra
+      if (!/[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(name.trim())) {
+        throw new Error('❌ El nombre del negocio debe contener al menos una letra');
+      }
+
+      // Validar longitud mínima del nombre
+      if (name.trim().length < 2) {
+        throw new Error('❌ El nombre del negocio debe tener al menos 2 caracteres');
+      }
+
       if (password !== confirmPassword) {
         throw new Error('❌ Las contraseñas no coinciden');
       }
@@ -48,6 +63,11 @@ function Register() {
       }
 
       const cleanUsername = username.trim().toLowerCase();
+
+      // Validar que el usuario no sea solo números
+      if (/^\d+$/.test(cleanUsername)) {
+        throw new Error('❌ El nombre de usuario no puede ser solo números');
+      }
 
       if (!/^[a-z0-9_]{3,20}$/.test(cleanUsername)) {
         throw new Error('❌ El usuario debe tener entre 3-20 caracteres (solo letras, números y guiones bajos)');
