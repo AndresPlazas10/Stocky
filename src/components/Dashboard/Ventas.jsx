@@ -628,7 +628,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
         product_name: detail.products?.name || 'Producto',
         quantity: detail.quantity,
         unit_price: detail.unit_price,
-        total: detail.quantity * detail.unit_price
+        total: detail.quantity * detail.unit_price,
+        created_at: new Date().toISOString()
       }));
 
       const { error: itemsError } = await supabase
