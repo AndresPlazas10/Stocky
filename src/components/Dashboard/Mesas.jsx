@@ -769,8 +769,20 @@ function Mesas({ businessId }) {
         .select()
         .maybeSingle();
 
+      console.log('DEBUG: sale insert result', { sale, saleError, saleData: {
+        business_id: businessId,
+        user_id: user.id,
+        total: saleTotal,
+        payment_method: paymentMethod,
+        seller_name: sellerName
+      }});
+
       if (saleError) {
-        throw new Error('Error al crear la venta: ' + saleError.message);
+        throw new Error('Error al crear la venta: ' + (saleError.message || JSON.stringify(saleError)));
+      }
+
+      if (!sale || !sale.id) {
+        throw new Error('Venta creada sin id: la respuesta del insert no devolvió el id. Comprueba RLS/permisos y el objeto sale: ' + JSON.stringify(sale));
       }
 
       // 2. Crear los detalles de venta desde los items de la orden
@@ -780,6 +792,8 @@ function Mesas({ businessId }) {
         quantity: item.quantity,
         unit_price: item.price
       }));
+
+      console.log('DEBUG: saleDetails payload', saleDetails);
 
       const { error: detailsError } = await supabase
         .from('sale_details')

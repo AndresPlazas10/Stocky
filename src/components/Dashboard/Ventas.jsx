@@ -397,9 +397,14 @@ function Ventas({ businessId, userRole = 'admin' }) {
         .insert([saleData])
         .select()
         .maybeSingle();
-      
+      console.log('DEBUG: sale insert result', { sale, saleError, saleData });
+
       if (saleError) {
-        throw saleError;
+        throw new Error('Error al crear la venta: ' + (saleError.message || JSON.stringify(saleError)));
+      }
+
+      if (!sale || !sale.id) {
+        throw new Error('Venta creada sin id: la respuesta del insert no devolvió el id. Comprueba RLS/permisos y el objeto sale: ' + JSON.stringify(sale));
       }
 
       // 2. Crear los detalles de venta
@@ -409,6 +414,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
         quantity: item.quantity,
         unit_price: item.unit_price
       }));
+
+      console.log('DEBUG: saleDetails payload', saleDetails);
 
       const { error: detailsError } = await supabase
         .from('sale_details')
