@@ -321,7 +321,8 @@ export default function Facturas({ userRole = 'admin' }) {
         product_name: item.product_name,
         quantity: item.quantity,
         unit_price: item.unit_price,
-        total: item.total
+        total: item.total,
+        created_at: new Date().toISOString()
       }));
 
       const { error: itemsError } = await supabase
