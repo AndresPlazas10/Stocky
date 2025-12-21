@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Suspense, lazy } from 'react';
 import { Loader2 } from 'lucide-react';
 
@@ -30,6 +31,7 @@ function App() {
         <Route path='/employee-dashboard' element={<EmployeeDashboard />} />
       </Routes>
       <Analytics />
+      <SpeedInsights />
     </Suspense>
   );
 }
