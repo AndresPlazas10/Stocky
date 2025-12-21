@@ -150,7 +150,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
       .select('id, code, name, sale_price, stock, category')
       .eq('business_id', businessId)
       .eq('is_active', true)
-      .gt('stock', 0)
       .order('name')
       .limit(200);
 
@@ -277,16 +276,19 @@ function Ventas({ businessId, userRole = 'admin' }) {
       const existingItem = prevCart.find(item => item.product_id === producto.id);
       
       if (existingItem) {
-        if (existingItem.quantity >= producto.stock) {
-          setError(`⚠️ Stock insuficiente. Solo hay ${producto.stock} unidades disponibles`);
-          return prevCart;
-        }
-        
-        return prevCart.map(item =>
+        const newCart = prevCart.map(item =>
           item.product_id === producto.id
             ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.unit_price }
             : item
         );
+
+        // Aviso transitorio si superamos stock disponible
+        const newQty = existingItem.quantity + 1;
+        if (typeof producto.stock === 'number' && newQty > producto.stock) {
+          setError(`⚠️ Stock insuficiente para ${producto.name}. Considera crear una compra.`);
+        }
+
+        return newCart;
       } else {
         return [...prevCart, {
           product_id: producto.id,
@@ -314,9 +316,9 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
     setCart(prevCart => {
       const item = prevCart.find(i => i.product_id === productId);
-      if (newQuantity > item.available_stock) {
-        setError(`⚠️ Stock insuficiente. Solo hay ${item.available_stock} unidades disponibles`);
-        return prevCart;
+      // Si la nueva cantidad supera el stock disponible, mostrar aviso transitorio (no bloquear)
+      if (item && typeof item.available_stock === 'number' && newQuantity > item.available_stock) {
+        setError(`⚠️ Stock insuficiente para ${item.name}. Disponibles: ${item.available_stock}. Considera crear una compra.`);
       }
 
       return prevCart.map(item =>
@@ -944,7 +946,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                   value={item.quantity}
                                   onChange={(e) => updateQuantity(item.product_id, parseInt(e.target.value) || 0)}
                                   min="1"
-                                  max={item.available_stock}
                                   className="w-12 text-center border-none focus:outline-none focus:ring-0 font-bold text-accent-600"
                                 />
                                 <button
@@ -958,6 +959,17 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                 {formatPrice(item.subtotal)}
                               </p>
                             </div>
+                            {typeof item.available_stock === 'number' && item.quantity > item.available_stock && (
+                              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                                <div className="flex items-center gap-3">
+                                  <AlertCircle className="w-5 h-5 text-red-600" />
+                                  <div>
+                                    <p className="text-sm font-semibold text-red-800">⚠️ Stock insuficiente</p>
+                                    <p className="text-xs text-red-700">Disponibles: {item.available_stock} — Pedido: {item.quantity}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </Card>
                       </motion.div>
