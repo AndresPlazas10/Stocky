@@ -520,6 +520,11 @@ function Mesas({ businessId }) {
         return;
       }
 
+      // Aviso transitorio si la cantidad solicitada supera el stock disponible
+      if (typeof producto.stock === 'number' && qty > producto.stock) {
+        setError(`⚠️ Stock insuficiente para ${producto.name}. Disponibles: ${producto.stock}. Considera crear una compra.`);
+      }
+
       // Verificar si el producto ya está en la orden
       const existingItem = orderItems.find(item => item.product_id === producto.id);
 
@@ -615,6 +620,14 @@ function Mesas({ businessId }) {
         return;
       }
 
+      // Aviso transitorio si la cantidad nueva supera el stock del producto
+      const existing = orderItems.find(i => i.id === itemId);
+      if (existing) {
+        const prod = productos.find(p => p.id === existing.product_id);
+        if (prod && typeof prod.stock === 'number' && newQuantity > prod.stock) {
+          setError(`⚠️ Stock insuficiente para ${prod.name}. Disponibles: ${prod.stock}. Considera crear una compra.`);
+        }
+      }
       // Marcar como actualizando
       setUpdatingItemId(itemId);
 
@@ -917,6 +930,18 @@ function Mesas({ businessId }) {
   const orderTotal = useMemo(() => {
     return orderItems.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
   }, [orderItems]);
+
+  // Items que exceden el stock disponible (para mostrar en el modal de pago)
+  const insufficientItems = useMemo(() => {
+    if (!orderItems || orderItems.length === 0) return [];
+    return orderItems
+      .map(item => {
+        const prod = productos.find(p => p.id === item.product_id);
+        return prod ? { ...item, available_stock: prod.stock, product_name: prod.name } : null;
+      })
+      .filter(Boolean)
+      .filter(i => typeof i.available_stock === 'number' && i.quantity > i.available_stock);
+  }, [orderItems, productos]);
 
   useEffect(() => {
     let errorTimer, successTimer;
@@ -1306,6 +1331,25 @@ function Mesas({ businessId }) {
                                   </div>
                                 </div>
                               </CardContent>
+                              {/* Aviso inline si cantidad excede stock */}
+                              {(() => {
+                                const prod = productos.find(p => p.id === item.product_id);
+                                const prodStock = prod ? prod.stock : null;
+                                if (typeof prodStock === 'number' && item.quantity > prodStock) {
+                                  return (
+                                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                                      <div className="flex items-center gap-3">
+                                        <AlertCircle className="w-5 h-5 text-red-600" />
+                                        <div>
+                                          <p className="text-sm font-semibold text-red-800">⚠️ Stock insuficiente</p>
+                                          <p className="text-xs text-red-700">Disponibles: {prodStock} — Pedido: {item.quantity}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })()}
                             </Card>
                           </motion.div>
                         ))}
@@ -1378,6 +1422,27 @@ function Mesas({ businessId }) {
                       {formatPrice(orderTotal)}
                     </h3>
                   </div>
+
+                  {insufficientItems.length > 0 && (
+                    <div className="p-4 rounded-lg border border-red-200 bg-red-50 flex flex-col gap-3">
+                      <div className="flex items-center gap-3">
+                        <AlertCircle className="w-5 h-5 text-red-600" />
+                        <div>
+                          <p className="text-sm font-semibold text-red-800">⚠️ Hay productos con stock insuficiente</p>
+                          <p className="text-xs text-red-700">Revisa los siguientes productos o crea una compra antes de cerrar la orden.</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {insufficientItems.map(it => (
+                          <div key={it.id || `${it.product_id}-${it.quantity}`} className="text-sm text-red-700">
+                            <strong className="text-primary-900">{it.product_name}</strong>
+                            <div>Disponibles: {it.available_stock} — Pedido: {it.quantity}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-end" />
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-semibold text-primary-700 mb-2">
