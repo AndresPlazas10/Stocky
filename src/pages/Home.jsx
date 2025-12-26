@@ -132,7 +132,7 @@ function Home() {
                 onClick={() => navigate("/register")}
                 className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90"
               >
-                Comenzar Gratis
+                Registra tu negocio
               </Button>
             </div>
 
@@ -231,7 +231,7 @@ function Home() {
                 onClick={() => navigate("/register")}
                 className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90 text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 hover-lift w-full sm:w-auto"
               >
-                Comienza Gratis
+                Registra tu negocio
                 <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
               </Button>
               <Button
