@@ -59,18 +59,18 @@ const PurchaseFilters = React.memo(function PurchaseFilters({ businessId, onAppl
       </div>
       
       {/* Botones de acción */}
-      <div className="flex items-center gap-3 pt-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
         <Button 
           onClick={handleApply} 
           disabled={loading}
-          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium px-6 py-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center gap-2"
+          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium px-6 py-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2"
         >
           <Filter className="w-4 h-4" />
           {loading ? 'Aplicando...' : 'Aplicar Filtros'}
         </Button>
         <Button 
           onClick={handleClear} 
-          className="bg-white hover:bg-gray-100 text-gray-700 font-medium px-6 py-2 rounded-xl border-2 border-gray-300 hover:border-gray-400 transition-all duration-300 flex items-center gap-2"
+          className="bg-white hover:bg-gray-100 text-gray-700 font-medium px-6 py-2 rounded-xl border-2 border-gray-300 hover:border-gray-400 transition-all duration-300 flex items-center justify-center gap-2"
         >
           <X className="w-4 h-4" />
           Limpiar
