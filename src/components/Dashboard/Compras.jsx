@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
+import PurchaseFilters from '../Filters/PurchaseFilters';
+import { getFilteredPurchases } from '../../services/purchasesService';
 import { formatPrice, formatNumber, parseFormattedNumber, formatDate, formatDateOnly } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { Card } from '../ui/card';
@@ -31,6 +33,10 @@ const getResponsableName = (compra) => {
 
 function Compras({ businessId }) {
   const [compras, setCompras] = useState([]);
+  const [pagePurchases, setPagePurchases] = useState(1);
+  const [limitPurchases, setLimitPurchases] = useState(50);
+  const [totalCountPurchases, setTotalCountPurchases] = useState(0);
+  const [currentFiltersPurchases, setCurrentFiltersPurchases] = useState({});
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -51,71 +57,53 @@ function Compras({ businessId }) {
   const [purchaseToDelete, setPurchaseToDelete] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  const loadCompras = useCallback(async () => {
+  const loadCompras = useCallback(async (filters = currentFiltersPurchases, pagination = {}) => {
     try {
-      // Cargar compras y business en paralelo
-      const [purchasesResult, businessResult] = await Promise.all([
-        supabase
-          .from('purchases')
-          .select(`
-            *,
-            supplier:suppliers(business_name, contact_name)
-          `)
-          .eq('business_id', businessId)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('businesses')
-          .select('created_by')
-          .eq('id', businessId)
-          .maybeSingle()
+      setLoading(true);
+      const lim = Number(pagination.limit ?? limitPurchases);
+      const off = Number(pagination.offset ?? ((pagePurchases - 1) * lim));
+      const { data: purchasesData, count } = await getFilteredPurchases(businessId, filters, { limit: lim, offset: off });
+
+      // Obtener business y datos relacionados
+      const [businessResult, employeesResult, suppliersResult] = await Promise.all([
+        supabase.from('businesses').select('created_by').eq('id', businessId).maybeSingle(),
+        supabase.from('employees').select('user_id, full_name, role').eq('business_id', businessId),
+        supabase.from('suppliers').select('*').eq('business_id', businessId)
       ]);
 
-      const { data: purchasesData, error: purchasesError } = purchasesResult;
-      const { data: business } = businessResult;
+      const business = businessResult.data;
+      const employeesData = employeesResult.data || [];
+      const suppliersData = suppliersResult.data || [];
 
-      if (purchasesError) throw purchasesError;
-
-      // Cargar empleados
-      const { data: employeesData } = await supabase
-        .from('employees')
-        .select('user_id, full_name, role')
-        .eq('business_id', businessId);
-
-      // Crear mapa de empleados
       const employeeMap = new Map();
-      employeesData?.forEach(emp => {
-        employeeMap.set(emp.user_id, {
-          full_name: emp.full_name || 'Usuario',
-          role: emp.role
-        });
-      });
+      employeesData.forEach(emp => employeeMap.set(emp.user_id, { full_name: emp.full_name || 'Usuario', role: emp.role }));
 
-      // Combinar datos con información del empleado
-      const purchasesWithEmployees = purchasesData?.map(purchase => {
+      const supplierMap = new Map();
+      suppliersData.forEach(s => supplierMap.set(s.id, s));
+
+      const purchasesWithEmployees = (purchasesData || []).map(purchase => {
         const employee = employeeMap.get(purchase.user_id);
-        // Comparación estricta con trim por si acaso
+        const supplier = supplierMap.get(purchase.supplier_id) || purchase.supplier || null;
         const userId = String(purchase.user_id || '').trim();
         const createdBy = String(business?.created_by || '').trim();
         const isOwner = userId === createdBy;
         const isAdmin = employee?.role === 'admin';
-        
+
         return {
           ...purchase,
-          employees: isOwner
-            ? { full_name: 'Administrador', role: 'owner' }
-            : isAdmin
-            ? { full_name: 'Administrador', role: 'admin' }
-            : employee || { full_name: 'Responsable desconocido', role: 'employee' }
+          supplier,
+          employees: isOwner ? { full_name: 'Administrador', role: 'owner' } : isAdmin ? { full_name: 'Administrador', role: 'admin' } : employee || { full_name: 'Responsable desconocido', role: 'employee' }
         };
-      }) || [];
-      
+      });
+
       setCompras(purchasesWithEmployees);
+      setTotalCountPurchases(count || 0);
     } catch (error) {
       setError('❌ Error al cargar las compras');
     } finally {
       setLoading(false);
     }
-  }, [businessId]);
+  }, [businessId, pagePurchases, limitPurchases, currentFiltersPurchases]);
 
   const loadProductos = useCallback(async () => {
     try {
@@ -181,7 +169,7 @@ function Compras({ businessId }) {
 
   useEffect(() => {
     if (businessId) {
-      loadCompras();
+      loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (pagePurchases - 1) * limitPurchases });
       loadProductos();
       loadProveedores();
     }
@@ -396,7 +384,7 @@ function Compras({ businessId }) {
       setSuccess('✅ Compra registrada exitosamente');
       resetForm();
       setShowModal(false);
-      loadCompras();
+      loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (pagePurchases - 1) * limitPurchases });
       loadProductos();
       
     } catch (err) {
@@ -470,7 +458,7 @@ function Compras({ businessId }) {
       setTimeout(() => setSuccess(''), 4000);
 
       // Recargar datos
-      await loadCompras();
+      await loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (pagePurchases - 1) * limitPurchases });
       await loadProductos();
 
       setShowDeleteModal(false);
@@ -571,8 +559,22 @@ function Compras({ businessId }) {
           </motion.div>
         )}
       </AnimatePresence>
+        {/* Filtros */}
+        <PurchaseFilters
+          businessId={businessId}
+          onApply={(filters) => {
+            setCurrentFiltersPurchases(filters || {});
+            setPagePurchases(1);
+            loadCompras(filters || {}, { limit: limitPurchases, offset: 0 });
+          }}
+          onClear={() => {
+            setCurrentFiltersPurchases({});
+            setPagePurchases(1);
+            loadCompras({}, { limit: limitPurchases, offset: 0 });
+          }}
+        />
 
-      {/* Buscador */}
+        {/* Buscador */}
       <Card className="mb-6 p-4 shadow-lg rounded-2xl">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -600,8 +602,18 @@ function Compras({ businessId }) {
               <p className="text-gray-400">Haz clic en "Nueva Compra" para comenzar</p>
             </div>
           </Card>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          ) : (
+          <>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm text-gray-600">Mostrando {compras.length} de {totalCountPurchases}</div>
+              <div className="flex items-center gap-2">
+                <Button onClick={async () => { if (pagePurchases > 1) { setPagePurchases(p => p - 1); await loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (pagePurchases-2)*limitPurchases }); } }} disabled={pagePurchases <= 1}>Prev</Button>
+                <div className="text-sm">Página {pagePurchases} / {Math.max(1, Math.ceil(totalCountPurchases / limitPurchases))}</div>
+                <Button onClick={async () => { if (pagePurchases * limitPurchases < totalCountPurchases) { setPagePurchases(p => p + 1); await loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (pagePurchases)*limitPurchases }); } }} disabled={pagePurchases * limitPurchases >= totalCountPurchases}>Next</Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredCompras.map((compra, index) => (
               <motion.div
                 key={compra.id}
@@ -676,6 +688,7 @@ function Compras({ businessId }) {
               </motion.div>
             ))}
           </div>
+          </>
         )}
       </motion.div>
 

@@ -108,6 +108,104 @@ export async function getSales(businessId) {
 }
 
 /**
+ * Obtiene ventas aplicando filtros en la base de datos (no en memoria).
+ * @param {string} businessId - ID del negocio (requerido)
+ * @param {object} filters - { fromDate, toDate, paymentMethod, employeeId, minAmount, maxAmount, invoiceNumber, status, customerId }
+ * @param {object} pagination - { limit = 50, offset = 0 }
+ * @returns {Promise<{data: Array, count: number}>}
+ */
+export async function getFilteredSales(businessId, filters = {}, pagination = {}) {
+  try {
+    if (!businessId) return { data: [], count: 0 };
+
+    const limit = Number(pagination.limit || 50);
+    const offset = Number(pagination.offset || 0);
+
+    // Construir query optimizada - solo seleccionar campos necesarios
+    let query = supabase
+      .from('sales')
+      .select('*', { count: 'exact' })
+      .eq('business_id', businessId)
+      .order('created_at', { ascending: false });
+
+    // Aplicar filtros de fecha primero (mejor uso de índices)
+    if (filters.fromDate) query = query.gte('created_at', filters.fromDate);
+    if (filters.toDate) {
+      // Añadir tiempo al final del día para incluir todo el día
+      const endDate = new Date(filters.toDate);
+      endDate.setHours(23, 59, 59, 999);
+      query = query.lte('created_at', endDate.toISOString());
+    }
+
+    // Otros filtros
+    if (filters.paymentMethod) query = query.eq('payment_method', filters.paymentMethod);
+    if (filters.employeeId) query = query.eq('user_id', filters.employeeId);
+    if (filters.customerId) query = query.eq('customer_id', filters.customerId);
+
+    // Filtros de monto
+    if (filters.minAmount) query = query.gte('total', filters.minAmount);
+    if (filters.maxAmount) query = query.lte('total', filters.maxAmount);
+
+    // Aplicar paginación
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: sales, error, count } = await query;
+    if (error) throw error;
+
+    // Enriquecer con empleados de forma optimizada
+    const { data: employees } = await supabase
+      .from('employees')
+      .select('user_id, full_name, role')
+      .eq('business_id', businessId)
+      .eq('is_active', true)
+      .limit(100);
+
+    // Obtener created_by del negocio para identificar owner
+    const { data: business } = await supabase
+      .from('businesses')
+      .select('created_by')
+      .eq('id', businessId)
+      .maybeSingle();
+
+    // Crear mapa de empleados para acceso O(1)
+    const employeeMap = new Map();
+    employees?.forEach(emp => {
+      if (emp.user_id) {
+        employeeMap.set(emp.user_id, { 
+          full_name: emp.full_name || 'Empleado', 
+          role: emp.role 
+        });
+      }
+    });
+
+    // Enriquecer ventas
+    const enriched = (sales || []).map(sale => {
+      const employee = sale.user_id ? employeeMap.get(sale.user_id) : null;
+      const isOwner = sale.user_id && business?.created_by && 
+                      String(sale.user_id).trim() === String(business.created_by).trim();
+      const isAdmin = employee?.role === 'admin';
+
+      return {
+        ...sale,
+        employees: isOwner 
+          ? { full_name: 'Administrador', role: 'owner' } 
+          : isAdmin 
+          ? { full_name: 'Administrador', role: 'admin' } 
+          : employee || { 
+              full_name: sale.seller_name || 'Empleado', 
+              role: 'employee' 
+            }
+      };
+    });
+
+    return { data: enriched, count: count || 0 };
+  } catch (error) {
+    console.error('Error en getFilteredSales:', error);
+    return { data: [], count: 0 };
+  }
+}
+
+/**
  * Crea una nueva venta
  * @param {object} params - Parámetros de la venta
  * @returns {Promise<{success: boolean, data?: object, error?: string}>}

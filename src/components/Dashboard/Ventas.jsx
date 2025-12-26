@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client';
+import { getFilteredSales } from '../../services/salesService';
+import SalesFilters from '../Filters/SalesFilters';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatNumber, formatDate, formatDateOnly } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
@@ -39,6 +41,10 @@ const getVendedorName = (venta) => {
 
 function Ventas({ businessId, userRole = 'admin' }) {
   const [ventas, setVentas] = useState([]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentFilters, setCurrentFilters] = useState({});
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -73,76 +79,18 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Funciones de carga memoizadas
-  const loadVentas = useCallback(async () => {
+  const loadVentas = useCallback(async (filters = currentFilters, pagination = {}) => {
     try {
-      // Cargar datos en paralelo
-      const [authResult, salesResult] = await Promise.all([
-        supabase.auth.getUser(),
-        supabase
-          .from('sales')
-          .select('*, seller_name')
-          .eq('business_id', businessId)
-          .order('created_at', { ascending: false })
-          .limit(50)
-      ]);
-
-      const { data: { user } } = authResult;
-      const { data: salesData, error: salesError } = salesResult;
-
-      if (salesError) throw salesError;
-
-      // Verificar ownership y cargar empleados en paralelo
-      const [businessResult, employeesResult] = await Promise.all([
-        supabase
-          .from('businesses')
-          .select('created_by, name')
-          .eq('id', businessId)
-          .maybeSingle(),
-        supabase
-          .from('employees')
-          .select('user_id, full_name, role')
-          .eq('business_id', businessId)
-          .limit(100)
-      ]);
-
-      const { data: business } = businessResult;
-      const { data: employeesData } = employeesResult;
-
-      // Crear mapa de empleados
-      const employeeMap = new Map();
-      employeesData?.forEach(emp => {
-        employeeMap.set(emp.user_id, {
-          full_name: emp.full_name || 'Usuario',
-          role: emp.role
-        });
-      });
-
-      // Combinar datos manualmente
-      const salesWithEmployees = salesData?.map(sale => {
-        const employee = employeeMap.get(sale.user_id);
-        const userId = String(sale.user_id || '').trim();
-        const createdBy = String(business?.created_by || '').trim();
-        const currentUserId = String(user?.id || '').trim();
-        
-        // Es owner si: created_by coincide O es el usuario actual y userRole es admin
-        const isOwner = userId === createdBy || (userId === currentUserId && userRole === 'admin');
-        const isAdmin = employee?.role === 'admin';
-        
-        return {
-          ...sale,
-          employees: isOwner
-            ? { full_name: 'Administrador', role: 'owner' }
-            : isAdmin
-            ? { full_name: 'Administrador', role: 'admin' }
-            : employee || { full_name: 'Empleado', role: 'employee' }
-        };
-      }) || [];
-
-      setVentas(salesWithEmployees);
-    } catch (error) {
+      const lim = Number(pagination.limit ?? limit);
+      const off = Number(pagination.offset ?? ((page - 1) * lim));
+      const { data, count } = await getFilteredSales(businessId, filters, { limit: lim, offset: off });
+      setVentas(data || []);
+      setTotalCount(count || 0);
+    } catch (err) {
       setVentas([]);
+      setTotalCount(0);
     }
-  }, [businessId]);
+  }, [businessId, page, limit, currentFilters]);
 
   const loadProductos = useCallback(async () => {
     const { data, error } = await supabase
@@ -440,7 +388,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setShowPOS(false);
 
       // Recargar ventas inmediatamente
-      await loadVentas();
+      await loadVentas(currentFilters, { limit, offset: (page - 1) * limit });
       
     } catch (error) {
       console.error('Error:', error);
@@ -489,7 +437,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setTimeout(() => setSuccess(null), 4000);
 
       // Recargar ventas
-      await loadVentas();
+      await loadVentas(currentFilters, { limit, offset: (page - 1) * limit });
 
       setShowDeleteModal(false);
       setSaleToDelete(null);
@@ -773,6 +721,22 @@ function Ventas({ businessId, userRole = 'admin' }) {
         )}
       </AnimatePresence>
 
+      {!showPOS && (
+        <SalesFilters
+          businessId={businessId}
+          onApply={(filters) => {
+            setCurrentFilters(filters || {});
+            setPage(1);
+            loadVentas(filters || {}, { limit, offset: 0 });
+          }}
+          onClear={() => {
+            setCurrentFilters({});
+            setPage(1);
+            loadVentas({}, { limit, offset: 0 });
+          }}
+        />
+      )}
+
       {showPOS ? (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1014,7 +978,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          {ventas.length === 0 ? (
+            {ventas.length === 0 ? (
             <Card className="shadow-xl rounded-2xl bg-white border-none">
               <div className="p-12 text-center">
                 <Receipt className="w-16 h-16 mx-auto mb-4 text-gray-300" />
@@ -1022,8 +986,19 @@ function Ventas({ businessId, userRole = 'admin' }) {
                 <p className="text-gray-400">Haz clic en "Nueva Venta" para comenzar</p>
               </div>
             </Card>
-          ) : (
+              ) : (
             <div className="space-y-4">
+                {/* Paginación: prev/next */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-sm text-gray-600">Mostrando {ventas.length} de {totalCount}</div>
+                  <div className="flex items-center gap-2">
+                    <Button onClick={async () => { if (page > 1) { setPage(p => p - 1); await loadVentas(currentFilters, { limit, offset: (page-2)*limit }); } }} disabled={page <= 1}>Prev</Button>
+                    <div className="text-sm">Página {page} / {Math.max(1, Math.ceil(totalCount / limit))}</div>
+                    <Button onClick={async () => { if (page * limit < totalCount) { setPage(p => p + 1); await loadVentas(currentFilters, { limit, offset: (page)*limit }); } }} disabled={page * limit >= totalCount}>Next</Button>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
               {/* Vista de tarjetas en móvil y desktop */}
               <div className="grid grid-cols-1 gap-4">
                 {ventas.map((venta, index) => (
@@ -1140,6 +1115,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                 ))}
               </div>
             </div>
+          </div>
           )}
         </motion.div>
       )}
