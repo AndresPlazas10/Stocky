@@ -40,6 +40,16 @@ WHERE user_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_sales_payment_method 
 ON sales (payment_method);
 
+-- Índice para búsqueda por número de factura (si aplica en sales)
+CREATE INDEX IF NOT EXISTS idx_sales_invoice_number
+ON sales (invoice_number)
+WHERE invoice_number IS NOT NULL;
+
+-- Índice para filtrar por cliente
+CREATE INDEX IF NOT EXISTS idx_sales_customer
+ON sales (customer_id)
+WHERE customer_id IS NOT NULL;
+
 COMMENT ON INDEX idx_sales_business_created IS 
   'Optimiza queries de ventas por negocio ordenadas por fecha';
 
