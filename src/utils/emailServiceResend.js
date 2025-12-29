@@ -200,10 +200,6 @@ export const sendInvoiceEmailResend = async ({
       success: true
     });
 
-    if (isTestMode) {
-      console.log(`✅ [TEST] Email enviado a ${targetEmail} (original: ${email})`);
-    }
-
     return {
       success: true,
       testMode: isTestMode,

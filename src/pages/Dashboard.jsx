@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase/Client.jsx';
 import { DashboardLayout } from '../components/layout/DashboardLayout.jsx';
+import ChangelogModal from '../components/ChangelogModal.jsx';
 import Home from '../components/Dashboard/Home.jsx';
 import Ventas from '../components/Dashboard/Ventas.jsx';
 import Compras from '../components/Dashboard/Compras.jsx';
@@ -19,6 +20,7 @@ function Dashboard() {
   const [user, setUser] = useState(null);
   const [activeSection, setActiveSection] = useState('home');
   const [businessLogo, setBusinessLogo] = useState(null);
+  const [showChangelog, setShowChangelog] = useState(false);
 
   useEffect(() => {
     checkAuthAndLoadBusiness();
@@ -262,20 +264,39 @@ function Dashboard() {
   }
 
   return (
-    <DashboardLayout
-      userName={business?.owner_name || 'Usuario'}
-      userEmail={user?.email || ''}
-      userRole="Administrador"
-      businessName={business?.name}
-      businessId={business?.id}
-      businessLogo={businessLogo}
-      onLogoChange={handleLogoChange}
-      onSignOut={handleSignOut}
-      activeSection={activeSection}
-      onSectionChange={setActiveSection}
-    >
-      {renderContent()}
-    </DashboardLayout>
+    <>
+      <ChangelogModal 
+        forceOpen={showChangelog} 
+        onClose={() => setShowChangelog(false)} 
+      />
+      
+      {/* 🚨 BOTÓN TEMPORAL - Eliminar después de unas semanas */}
+      <button
+        onClick={() => setShowChangelog(true)}
+        className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 font-medium"
+        title="Ver novedades de la aplicación"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+        Ver Novedades
+      </button>
+      
+      <DashboardLayout
+        userName={business?.owner_name || 'Usuario'}
+        userEmail={user?.email || ''}
+        userRole="Administrador"
+        businessName={business?.name}
+        businessId={business?.id}
+        businessLogo={businessLogo}
+        onLogoChange={handleLogoChange}
+        onSignOut={handleSignOut}
+        activeSection={activeSection}
+        onSectionChange={setActiveSection}
+      >
+        {renderContent()}
+      </DashboardLayout>
+    </>
   );
 }
 

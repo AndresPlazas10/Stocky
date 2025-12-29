@@ -13,7 +13,7 @@ import { MobileListCard } from './MobileCard';
  *     { key: 'price', label: 'Precio', format: (val) => `$${val}` },
  *     { key: 'stock', label: 'Stock' }
  *   ]}
- *   onRowClick={(item) => console.log(item)}
+ *   onRowClick={(item) => }
  * />
  */
 export function MobileTable({ 

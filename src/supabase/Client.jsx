@@ -3,15 +3,12 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Validación optimizada para desarrollo
+// Validación mejorada de variables de entorno
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  const errorMsg = 'Faltan variables de entorno de Supabase. Verifica .env:\n' +
-    `VITE_SUPABASE_URL: ${SUPABASE_URL ? '✓' : '✗'}\n` +
-    `VITE_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY ? '✗' : '✓'}`;
+  const errorMsg = '❌ Configuración de Supabase incompleta. Verifica tu archivo .env:\n' +
+    `VITE_SUPABASE_URL: ${SUPABASE_URL ? '✓ Configurada' : '✗ FALTA'}\n` +
+    `VITE_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY ? '✓ Configurada' : '✗ FALTA'}`;
   
-  if (import.meta.env.DEV) {
-    console.error(errorMsg);
-  }
   throw new Error(errorMsg);
 }
 

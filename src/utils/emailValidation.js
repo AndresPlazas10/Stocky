@@ -237,13 +237,9 @@ export const logEmailAttempt = ({
     error: error?.message || error
   };
 
-  if (isDev) {
-    console.log(`📧 [Email ${type}]`, logData);
-  }
-
-  // En producción, podrías enviar esto a un servicio de logging
+  // En producción, enviar a servicio de logging si hay error
   if (!isDev && error) {
-    console.error('[Email Error]', logData);
+    // TODO: Integrar con servicio de monitoreo (Sentry, etc)
   }
 
   // Opcional: guardar en localStorage para debugging

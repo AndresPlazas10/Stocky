@@ -389,7 +389,7 @@ export default function Facturas({ userRole = 'admin' }) {
       await loadFacturas(businessId);
       
     } catch (error) {
-      console.error('Error al crear factura:', error);
+      
       
       // Si es error de sesión, redirigir
       if (error.message.includes('sesión ha expirado')) {

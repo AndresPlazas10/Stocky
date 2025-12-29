@@ -27,8 +27,8 @@
  *   onSubmit: async (idempotencyKey) => {
  *     return await supabase.from('businesses').insert({...data, idempotency_key: idempotencyKey})
  *   },
- *   onSuccess: (result) => console.log('Success:', result),
- *   onError: (error) => console.error('Error:', error),
+ *   onSuccess: (result) => 
+ *   onError: (error) => 
  *   actionName: 'create_business' // Identificador único de la acción
  * });
  * ```
@@ -80,7 +80,7 @@ class IdempotencyManager {
 
       return data.status === 'in_progress';
     } catch (error) {
-      console.error('[IdempotencyManager] Error checking progress:', error);
+      
       return false;
     }
   }
@@ -109,7 +109,7 @@ class IdempotencyManager {
         });
       }
     } catch (error) {
-      console.error('[IdempotencyManager] Error starting action:', error);
+      
     }
 
     return key;
@@ -139,7 +139,7 @@ class IdempotencyManager {
         });
       }
     } catch (error) {
-      console.error('[IdempotencyManager] Error completing action:', error);
+      
     }
   }
 
@@ -167,7 +167,7 @@ class IdempotencyManager {
         });
       }
     } catch (error) {
-      console.error('[IdempotencyManager] Error failing action:', error);
+      
     }
   }
 
@@ -178,7 +178,7 @@ class IdempotencyManager {
     try {
       sessionStorage.removeItem(this.storageKey);
     } catch (error) {
-      console.error('[IdempotencyManager] Error clearing action:', error);
+      
     }
   }
 
@@ -191,7 +191,7 @@ class IdempotencyManager {
       if (!stored) return null;
       return JSON.parse(stored);
     } catch (error) {
-      console.error('[IdempotencyManager] Error getting state:', error);
+      
       return null;
     }
   }
@@ -230,7 +230,7 @@ export function useIdempotentSubmit({
   // Inicializar IdempotencyManager
   useEffect(() => {
     if (!actionName) {
-      console.warn('[useIdempotentSubmit] actionName is required for proper idempotency tracking');
+      // actionName is required for proper idempotency tracking
       return;
     }
 
@@ -246,7 +246,6 @@ export function useIdempotentSubmit({
       // Si el estado es muy antiguo, limpiarlo
       if (now - state.timestamp > TTL) {
         managerRef.current.clear();
-        console.log(`[useIdempotentSubmit] Cleared stale state for action "${actionName}"`);
       }
     }
 
@@ -270,13 +269,11 @@ export function useIdempotentSubmit({
   const submitAction = useCallback(async (additionalData = {}) => {
     // PROTECCIÓN 1: Verificar si ya está en progreso (local)
     if (isSubmitting) {
-      console.warn('[useIdempotentSubmit] Submission already in progress (local state). Ignoring.');
       return { success: false, error: 'Operación en progreso' };
     }
 
     // PROTECCIÓN 2: Verificar si ya está en progreso (persistente/otras tabs)
     if (managerRef.current && managerRef.current.isInProgress()) {
-      console.warn('[useIdempotentSubmit] Submission already in progress (persistent state). Ignoring.');
       return { success: false, error: 'Operación en progreso en otra pestaña' };
     }
 
@@ -294,7 +291,6 @@ export function useIdempotentSubmit({
 
           // ✅ TIMEOUT DE SEGURIDAD: Auto-reset después de 30 segundos
           timeoutRef.current = setTimeout(() => {
-            console.warn(`[useIdempotentSubmit] Timeout reached for action "${actionName}". Auto-resetting state.`);
             setIsSubmitting(false);
             if (managerRef.current) {
               managerRef.current.clear();
@@ -304,8 +300,6 @@ export function useIdempotentSubmit({
           // Generar idempotency key
           const idempotencyKey = managerRef.current ? managerRef.current.start() : generateIdempotencyKey();
 
-          console.log(`[useIdempotentSubmit] Starting action "${actionName}" with key:`, idempotencyKey);
-
           // PROTECCIÓN 4: Ejecutar la acción con el idempotency key
           const result = await onSubmit({
             idempotencyKey,
@@ -314,7 +308,6 @@ export function useIdempotentSubmit({
 
           // Verificar si el componente se desmontó durante la operación
           if (isUnmountedRef.current) {
-            console.warn('[useIdempotentSubmit] Component unmounted during submission. Aborting callbacks.');
             return;
           }
 
@@ -340,7 +333,7 @@ export function useIdempotentSubmit({
           resolve({ success: true, data: result, idempotencyKey });
 
         } catch (err) {
-          console.error(`[useIdempotentSubmit] Error in action "${actionName}":`, err);
+          
 
           // Verificar si el componente se desmontó
           if (isUnmountedRef.current) {
@@ -357,7 +350,6 @@ export function useIdempotentSubmit({
 
           // PROTECCIÓN 5: Retry automático (opcional)
           if (enableRetry && retryCount < maxRetries) {
-            console.log(`[useIdempotentSubmit] Retry ${retryCount + 1}/${maxRetries} for action "${actionName}"`);
             setRetryCount(prev => prev + 1);
             
             // Esperar antes de reintentar (exponential backoff)

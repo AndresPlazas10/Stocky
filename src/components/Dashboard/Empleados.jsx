@@ -161,8 +161,6 @@ function Empleados({ businessId }) {
         throw new Error('No hay sesión activa de administrador');
       }
 
-      console.log('💾 Guardando sesión del admin:', adminSession.user.email);
-
       // Crear cuenta Auth para el empleado
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: cleanEmail,
@@ -193,9 +191,6 @@ function Empleados({ businessId }) {
 
       if (!authData.user) throw new Error('❌ Error al crear la cuenta del empleado');
       if (!authData.session) throw new Error('❌ La confirmación de email debe estar desactivada en Supabase');
-
-      console.log('✅ Cuenta de empleado creada:', authData.user.email);
-      console.log('⚠️  Sesión cambió al empleado - creando registro con ID del admin...');
 
       // Crear empleado usando función SECURITY DEFINER (bypasea RLS)
       // Pasamos adminSession.user.id como p_admin_user_id porque la sesión ya cambió
@@ -245,10 +240,7 @@ function Empleados({ businessId }) {
         throw new Error('No se pudo crear el empleado (función retornó null)');
       }
 
-      console.log('✅ Empleado creado exitosamente');
-
       // 🔄 RESTAURAR SESIÓN DEL ADMIN
-      console.log('🔄 Restaurando sesión del admin...');
       
       const { error: restoreError } = await supabase.auth.setSession({
         access_token: adminSession.access_token,
@@ -256,12 +248,9 @@ function Empleados({ businessId }) {
       });
 
       if (restoreError) {
-        console.error('⚠️  Error restaurando sesión:', restoreError);
         // No lanzar error aquí - el empleado se creó correctamente
         // Solo advertir al usuario
         setError('⚠️ Empleado creado pero la sesión cambió. Recarga la página.');
-      } else {
-        console.log('✅ Sesión del admin restaurada correctamente');
       }
 
       // Código de éxito
@@ -277,7 +266,7 @@ function Empleados({ businessId }) {
       loadEmpleados();
       
     } catch (err) {
-      console.error('Error:', err);
+      
       setError(err.message || 'Error al crear el empleado');
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear

@@ -29,11 +29,11 @@
   --ring: 239 84% 67%;
   --radius: 1rem;
   
-  /* Sombras personalizadas */
-  --shadow-sm: 0 1px 2px 0 rgb(79 70 229 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(79 70 229 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(79 70 229 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(79 70 229 / 0.15);
+  /* Sombras personalizadas - Compatible con navegadores antiguos */
+  --shadow-sm: 0 1px 2px 0 rgba(79, 70, 229, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(79, 70, 229, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(79, 70, 229, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(79, 70, 229, 0.15);
   
   /* Gradientes corporativos */
   --gradient-primary: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
@@ -102,24 +102,30 @@ body {
   background-size: 16px 16px;
 }
 
-/* Glassmorphism */
+/* Glassmorphism - Compatible con navegadores antiguos */
 .glass-card {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(200, 200, 200, 0.3);
+  -webkit-box-shadow: var(--shadow-lg);
+  -moz-box-shadow: var(--shadow-lg);
   box-shadow: var(--shadow-lg);
 }
 
 .dark .glass-card {
-  background: rgba(0, 59, 70, 0.5);
-  border: 1px solid rgba(102, 165, 173, 0.2);
+  background: rgba(0, 59, 70, 0.95);
+  border: 1px solid rgba(102, 165, 173, 0.3);
 }
 
-/* Transiciones suaves globales */
+/* Transiciones suaves globales - Compatible con navegadores antiguos */
 * {
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+  -webkit-transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter;
+  -moz-transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter;
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter;
+  -webkit-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  -moz-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-transition-duration: 200ms;
+  -moz-transition-duration: 200ms;
   transition-duration: 200ms;
 }
 
@@ -225,12 +231,10 @@ body {
 
 .animate-shimmer {
   animation: shimmer 2s infinite linear;
-  background: linear-gradient(
-    to right,
-    rgba(196, 223, 230, 0) 0%,
-    rgba(102, 165, 173, 0.3) 50%,
-    rgba(196, 223, 230, 0) 100%
-  );
+  background: rgba(196, 223, 230, 0.2);
+  background: -webkit-linear-gradient(left, rgba(196, 223, 230, 0) 0%, rgba(102, 165, 173, 0.3) 50%, rgba(196, 223, 230, 0) 100%);
+  background: -moz-linear-gradient(left, rgba(196, 223, 230, 0) 0%, rgba(102, 165, 173, 0.3) 50%, rgba(196, 223, 230, 0) 100%);
+  background: linear-gradient(to right, rgba(196, 223, 230, 0) 0%, rgba(102, 165, 173, 0.3) 50%, rgba(196, 223, 230, 0) 100%);
   background-size: 1000px 100%;
 }
 
@@ -289,14 +293,14 @@ body {
 
 /* Loading skeleton */
 .skeleton {
-  background: linear-gradient(
-    90deg,
-    rgba(196, 223, 230, 0.3) 25%,
-    rgba(102, 165, 173, 0.2) 50%,
-    rgba(196, 223, 230, 0.3) 75%
-  );
+  background: rgba(196, 223, 230, 0.3);
+  background: -webkit-linear-gradient(left, rgba(196, 223, 230, 0.3) 25%, rgba(102, 165, 173, 0.2) 50%, rgba(196, 223, 230, 0.3) 75%);
+  background: -moz-linear-gradient(left, rgba(196, 223, 230, 0.3) 25%, rgba(102, 165, 173, 0.2) 50%, rgba(196, 223, 230, 0.3) 75%);
+  background: linear-gradient(90deg, rgba(196, 223, 230, 0.3) 25%, rgba(102, 165, 173, 0.2) 50%, rgba(196, 223, 230, 0.3) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
+  -webkit-border-radius: 0.5rem;
+  -moz-border-radius: 0.5rem;
   border-radius: 0.5rem;
 }
 
@@ -345,13 +349,19 @@ body {
   background: white;
   border-radius: 1.5rem;
   padding: 1.5rem;
-  box-shadow: 0 4px 6px -1px rgb(0 59 70 / 0.1), 0 2px 4px -2px rgb(0 59 70 / 0.05);
+  -webkit-box-shadow: 0 4px 6px -1px rgba(0, 59, 70, 0.1), 0 2px 4px -2px rgba(0, 59, 70, 0.05);
+  -moz-box-shadow: 0 4px 6px -1px rgba(0, 59, 70, 0.1), 0 2px 4px -2px rgba(0, 59, 70, 0.05);
+  box-shadow: 0 4px 6px -1px rgba(0, 59, 70, 0.1), 0 2px 4px -2px rgba(0, 59, 70, 0.05);
+  -webkit-transition: all 0.2s ease;
+  -moz-transition: all 0.2s ease;
   transition: all 0.2s ease;
   border: 1px solid rgba(102, 165, 173, 0.1);
 }
 
 .card-modern:hover {
-  box-shadow: 0 10px 15px -3px rgb(0 59 70 / 0.1), 0 4px 6px -4px rgb(0 59 70 / 0.05);
+  -webkit-box-shadow: 0 10px 15px -3px rgba(0, 59, 70, 0.1), 0 4px 6px -4px rgba(0, 59, 70, 0.05);
+  -moz-box-shadow: 0 10px 15px -3px rgba(0, 59, 70, 0.1), 0 4px 6px -4px rgba(0, 59, 70, 0.05);
+  box-shadow: 0 10px 15px -3px rgba(0, 59, 70, 0.1), 0 4px 6px -4px rgba(0, 59, 70, 0.05);
 }
 
 /* Badge estilos */
@@ -418,6 +428,9 @@ body {
 }
 
 .table-modern thead {
+  background: #003B46;
+  background: -webkit-linear-gradient(135deg, #003B46 0%, #07575B 100%);
+  background: -moz-linear-gradient(135deg, #003B46 0%, #07575B 100%);
   background: linear-gradient(135deg, #003B46 0%, #07575B 100%);
 }
 
@@ -475,9 +488,14 @@ body {
 }
 
 .nav-item.active {
+  background: #003B46;
+  background: -webkit-linear-gradient(135deg, #003B46 0%, #07575B 100%);
+  background: -moz-linear-gradient(135deg, #003B46 0%, #07575B 100%);
   background: linear-gradient(135deg, #003B46 0%, #07575B 100%);
   color: white;
-  box-shadow: 0 4px 6px -1px rgb(0 59 70 / 0.3);
+  -webkit-box-shadow: 0 4px 6px -1px rgba(0, 59, 70, 0.3);
+  -moz-box-shadow: 0 4px 6px -1px rgba(0, 59, 70, 0.3);
+  box-shadow: 0 4px 6px -1px rgba(0, 59, 70, 0.3);
 }
 
 /* Mobile utilities */
@@ -527,12 +545,11 @@ body {
   opacity: 0.3;
 }
 
-/* Overlays y modales */
+/* Overlays y modales - Compatible con navegadores antiguos */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 59, 70, 0.75);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 59, 70, 0.85);
   z-index: 50;
   display: flex;
   align-items: center;
@@ -542,8 +559,12 @@ body {
 
 .modal-content {
   background: white;
+  -webkit-border-radius: 1.5rem;
+  -moz-border-radius: 1.5rem;
   border-radius: 1.5rem;
-  box-shadow: 0 20px 25px -5px rgb(0 59 70 / 0.2);
+  -webkit-box-shadow: 0 20px 25px -5px rgba(0, 59, 70, 0.2);
+  -moz-box-shadow: 0 20px 25px -5px rgba(0, 59, 70, 0.2);
+  box-shadow: 0 20px 25px -5px rgba(0, 59, 70, 0.2);
   max-width: 90vw;
   max-height: 90vh;
   overflow-y: auto;

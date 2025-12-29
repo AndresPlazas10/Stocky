@@ -1,0 +1,72 @@
+/**
+ * COMPATIBILIDAD TOTAL CON NAVEGADORES ANTIGUOS
+ * Border-radius solo para elementos esenciales
+ */
+
+/* ===== BORDER-RADIUS ESENCIAL ===== */
+/* Esquinas redondeadas solo en contenedores principales */
+
+/* CARDS Y CONTENEDORES PRINCIPALES */
+[class*="Card"],
+.card,
+.card-modern {
+  -webkit-border-radius: 1rem;
+  -moz-border-radius: 1rem;
+  border-radius: 1rem;
+}
+
+/* MODALES Y DIÁLOGOS */
+[role="dialog"],
+[role="alertdialog"],
+.modal-content {
+  -webkit-border-radius: 1rem;
+  -moz-border-radius: 1rem;
+  border-radius: 1rem;
+}
+
+/* BOTONES */
+button,
+.btn {
+  -webkit-border-radius: 0.5rem;
+  -moz-border-radius: 0.5rem;
+  border-radius: 0.5rem;
+}
+
+/* INPUTS Y FORMULARIOS */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="tel"],
+input[type="date"],
+input[type="time"],
+input[type="search"],
+textarea,
+select {
+  -webkit-border-radius: 0.5rem;
+  -moz-border-radius: 0.5rem;
+  border-radius: 0.5rem;
+}
+
+/* BADGES (completamente redondos) */
+.badge,
+[class*="badge"] {
+  -webkit-border-radius: 9999px;
+  -moz-border-radius: 9999px;
+  border-radius: 9999px;
+}
+
+/* ===== COMPATIBILIDAD FLEXBOX ===== */
+.flex {
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+}
+
+/* ===== SOPORTE DE GRID ===== */
+.grid {
+  display: -ms-grid;
+  display: grid;
+}

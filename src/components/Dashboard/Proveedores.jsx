@@ -125,7 +125,7 @@ function Proveedores({ businessId }) {
       setShowModal(false);
       
     } catch (error) {
-      console.error('Error:', error);
+      
       setError(error.message || 'Error al guardar el proveedor');
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear
