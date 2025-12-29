@@ -180,7 +180,8 @@ npm run build
 - [ ] Login como empleado
 - [ ] Verificar que NO aparecen botones: Editar Producto, Eliminar Producto
 - [ ] Verificar que NO aparece botón: Eliminar Venta
-- [ ] Verificar que NO aparecen: Eliminar Mesa, Cerrar Orden
+- [ ] Verificar que NO aparece botón: Eliminar Mesa
+- [ ] Verificar que SÍ aparece botón: Cerrar Orden (permitido para empleados)
 - [ ] Login como admin y verificar que SÍ aparecen todos los botones
 
 #### 4. **Inventario** (5 min)
@@ -205,7 +206,7 @@ npm run build
 - [ ] Click en "Imprimir para cocina"
 - [ ] Verificar que SOLO aparecen productos "Platos" en impresión
 - [ ] Verificar formato de ticket (sin precios)
-- [ ] Cerrar orden (solo si eres admin)
+- [ ] Cerrar orden (empleados y admin pueden hacerlo)
 - [ ] Eliminar mesa (solo si eres admin)
 
 #### 7. **Performance** (3 min)
