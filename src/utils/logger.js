@@ -16,7 +16,7 @@ class Logger {
    */
   info(...args) {
     if (this.isDev) {
-      console.log('ℹ️', ...args);
+      
     }
   }
 
@@ -25,7 +25,7 @@ class Logger {
    */
   warn(...args) {
     if (this.isDev) {
-      console.warn('⚠️', ...args);
+      
     }
   }
 
@@ -35,7 +35,7 @@ class Logger {
    */
   error(...args) {
     if (this.isDev) {
-      console.error('❌', ...args);
+      
     }
     // En producción: silencioso o enviar a servicio de monitoring
     // Para integrar: Sentry.captureException(args[0])
@@ -46,7 +46,7 @@ class Logger {
    */
   debug(...args) {
     if (this.isDev) {
-      console.debug('🐛', ...args);
+      
     }
   }
 
@@ -55,7 +55,7 @@ class Logger {
    */
   success(...args) {
     if (this.isDev) {
-      console.log('✅', ...args);
+      
     }
   }
 

@@ -93,7 +93,7 @@ export const parseFormattedNumber = (formattedValue) => {
 export const formatDate = (timestamp, options = {}) => {
   // Validar entrada
   if (!timestamp || timestamp === null || timestamp === undefined) {
-    console.warn('formatDate: timestamp vacío o null');
+    
     return 'Sin fecha';
   }
   
@@ -111,13 +111,13 @@ export const formatDate = (timestamp, options = {}) => {
       // Timestamp en milisegundos
       date = new Date(timestamp);
     } else {
-      console.error('formatDate: Tipo de dato no soportado ->', typeof timestamp, timestamp);
+      
       return 'Formato inválido';
     }
     
     // Validar que la fecha sea válida
     if (isNaN(date.getTime())) {
-      console.error('formatDate: Fecha inválida después de parsear ->', timestamp);
+      
       return 'Fecha inválida';
     }
     
@@ -133,7 +133,7 @@ export const formatDate = (timestamp, options = {}) => {
     
     return date.toLocaleString('es-CO', defaultOptions);
   } catch (error) {
-    console.error('formatDate: Error al formatear ->', error.message, timestamp);
+    
     return 'Error de formato';
   }
 };
@@ -145,7 +145,7 @@ export const formatDate = (timestamp, options = {}) => {
  */
 export const formatDateOnly = (timestamp) => {
   if (!timestamp) {
-    console.warn('formatDateOnly: timestamp vacío');
+    
     return 'Fecha inválida';
   }
   
@@ -153,7 +153,7 @@ export const formatDateOnly = (timestamp) => {
     const date = new Date(timestamp);
     
     if (isNaN(date.getTime())) {
-      console.error('formatDateOnly: Fecha inválida ->', timestamp);
+      
       return 'Fecha inválida';
     }
     
@@ -164,7 +164,7 @@ export const formatDateOnly = (timestamp) => {
       timeZone: 'America/Bogota'
     });
   } catch (error) {
-    console.error('formatDateOnly: Error al formatear ->', error, timestamp);
+    
     return 'Fecha inválida';
   }
 };
@@ -176,7 +176,7 @@ export const formatDateOnly = (timestamp) => {
  */
 export const formatTimeOnly = (timestamp) => {
   if (!timestamp) {
-    console.warn('formatTimeOnly: timestamp vacío');
+    
     return 'Hora inválida';
   }
   
@@ -184,7 +184,7 @@ export const formatTimeOnly = (timestamp) => {
     const date = new Date(timestamp);
     
     if (isNaN(date.getTime())) {
-      console.error('formatTimeOnly: Fecha inválida ->', timestamp);
+      
       return 'Hora inválida';
     }
     
@@ -194,7 +194,7 @@ export const formatTimeOnly = (timestamp) => {
       timeZone: 'America/Bogota'
     });
   } catch (error) {
-    console.error('formatTimeOnly: Error al formatear ->', error, timestamp);
+    
     return 'Hora inválida';
   }
 };
@@ -206,7 +206,7 @@ export const formatTimeOnly = (timestamp) => {
  */
 export const formatDateLong = (timestamp) => {
   if (!timestamp) {
-    console.warn('formatDateLong: timestamp vacío');
+    
     return 'Fecha inválida';
   }
   
@@ -214,7 +214,7 @@ export const formatDateLong = (timestamp) => {
     const date = new Date(timestamp);
     
     if (isNaN(date.getTime())) {
-      console.error('formatDateLong: Fecha inválida ->', timestamp);
+      
       return 'Fecha inválida';
     }
     
@@ -227,7 +227,7 @@ export const formatDateLong = (timestamp) => {
       timeZone: 'America/Bogota'
     });
   } catch (error) {
-    console.error('formatDateLong: Error al formatear ->', error, timestamp);
+    
     return 'Fecha inválida';
   }
 };

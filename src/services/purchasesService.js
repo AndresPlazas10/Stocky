@@ -45,7 +45,7 @@ export async function getFilteredPurchases(businessId, filters = {}, pagination 
 
     return { data: data || [], count: count || 0 };
   } catch (error) {
-    console.error('Error en getFilteredPurchases:', error);
+    
     return { data: [], count: 0 };
   }
 }

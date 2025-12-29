@@ -62,7 +62,6 @@ export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userNam
             transition={{ type: "tween", duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
             drag="x"
             dragConstraints={{ left: -280, right: 0 }}
-            dragElastic={0.1}
             onDragEnd={(e, { offset, velocity }) => {
               if (offset.x < -50 || velocity.x < -500) {
                 onClose();

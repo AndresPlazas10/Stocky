@@ -3,6 +3,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Suspense, lazy } from 'react';
 import { Loader2 } from 'lucide-react';
+import OfflineBanner from './components/OfflineBanner';
 
 // Lazy loading de páginas para optimizar carga inicial
 const Home = lazy(() => import('./pages/Home.jsx'));
@@ -21,18 +22,23 @@ const PageLoader = () => (
 
 function App() {
   return (
-    <Suspense fallback={<PageLoader />}>
-      <Routes>
-        <Route path='/' element={<Home />} />
-        <Route path='/login' element={<Login />} />
-        <Route path='/register' element={<Register />} />
-        <Route path='/dashboard' element={<Dashboard />} />
-        <Route path='/employee-access' element={<EmployeeAccess />} />
-        <Route path='/employee-dashboard' element={<EmployeeDashboard />} />
-      </Routes>
-      <Analytics />
-      <SpeedInsights />
-    </Suspense>
+    <>
+      {/* Banner de estado de conexión */}
+      <OfflineBanner />
+      
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path='/' element={<Home />} />
+          <Route path='/login' element={<Login />} />
+          <Route path='/register' element={<Register />} />
+          <Route path='/dashboard' element={<Dashboard />} />
+          <Route path='/employee-access' element={<EmployeeAccess />} />
+          <Route path='/employee-dashboard' element={<EmployeeDashboard />} />
+        </Routes>
+        <Analytics />
+        <SpeedInsights />
+      </Suspense>
+    </>
   );
 }
 

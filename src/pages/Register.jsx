@@ -159,7 +159,7 @@ function Register() {
       }, 1500);
       
     } catch (err) {
-      console.error('Error al crear negocio:', err);
+      
       setError(err.message || '❌ Error al crear el negocio');
     } finally {
       setIsSubmitting(false);

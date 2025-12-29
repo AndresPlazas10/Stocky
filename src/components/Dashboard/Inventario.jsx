@@ -21,7 +21,8 @@ import {
   Box,
   Tag,
   Building2,
-  X
+  X,
+  Edit
 } from 'lucide-react';
 
 function Inventario({ businessId, userRole = 'admin' }) {
@@ -31,11 +32,14 @@ function Inventario({ businessId, userRole = 'admin' }) {
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [isEmployee, setIsEmployee] = useState(false); // Nuevo estado para verificar si es empleado
   
   // Estados para modales de confirmación
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -89,6 +93,30 @@ function Inventario({ businessId, userRole = 'admin' }) {
     }
   }, [businessId]);
 
+  // Verificar si el usuario autenticado es empleado
+  const checkIfEmployee = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setIsEmployee(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('business_id', businessId)
+        .single();
+
+      // Si existe en employees, es empleado (NO puede editar/eliminar)
+      setIsEmployee(!!data);
+    } catch (error) {
+      // Si hay error, asumimos que NO es empleado (es admin)
+      setIsEmployee(false);
+    }
+  }, [businessId]);
+
   // ✅ OPTIMIZADO: Generación de código único sin intentos fallidos
   const generateProductCode = useCallback(async () => {
     try {
@@ -124,10 +152,9 @@ function Inventario({ businessId, userRole = 'admin' }) {
       const nextNumber = maxNumber + 1;
       const newCode = `PRD-${String(nextNumber).padStart(4, '0')}`;
       
-      console.log(`📦 Código generado: ${newCode} (secuencia máxima: ${maxNumber})`);
       setGeneratedCode(newCode);
     } catch (error) {
-      console.error('❌ Error generando código:', error);
+      
       // Fallback: usar timestamp para garantizar unicidad
       setGeneratedCode(`PRD-${Date.now().toString().slice(-6)}`);
     }
@@ -138,8 +165,10 @@ function Inventario({ businessId, userRole = 'admin' }) {
     if (businessId) {
       loadProductos();
       loadProveedores();
+      checkIfEmployee();
     }
-  }, [businessId, loadProductos, loadProveedores]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessId, loadProductos, loadProveedores]); // checkIfEmployee no debe estar aquí
 
   useEffect(() => {
     if (showForm && businessId) {
@@ -239,7 +268,13 @@ function Inventario({ businessId, userRole = 'admin' }) {
         }
       }
 
-      // ✅ VALIDAR código generado
+      // Si estamos editando, actualizar en lugar de crear
+      if (editingProduct) {
+        await handleUpdate();
+        return;
+      }
+
+      // ✅ VALIDAR código generado (solo para creación)
       if (!generatedCode || !generatedCode.startsWith('PRD-')) {
         throw new Error('Error al generar código del producto. Recarga la página.');
       }
@@ -331,7 +366,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
       setTimeout(() => setSuccess(null), 3000);
       
     } catch (error) {
-      console.error('Error:', error);
+      
       setError(error.message || 'Error al crear el producto');
       
       // Auto-limpiar mensaje de error después de 5 segundos
@@ -339,7 +374,72 @@ function Inventario({ businessId, userRole = 'admin' }) {
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear
     }
-  }, [businessId, formData, generatedCode, loadProductos, isSubmitting]);
+  }, [businessId, formData, generatedCode, loadProductos, isSubmitting, editingProduct]);
+
+  const handleUpdate = useCallback(async () => {
+    try {
+      const productData = {
+        name: formData.name.trim(),
+        category: formData.category.trim(),
+        purchase_price: parseFloat(formData.purchase_price) || 0,
+        sale_price: parseFloat(formData.sale_price),
+        // No se actualiza el stock al editar (se maneja con compras/ventas)
+        min_stock: parseInt(formData.min_stock) || 5,
+        unit: formData.unit || 'unit',
+        supplier_id: formData.supplier_id || null,
+        is_active: formData.is_active
+      };
+
+      const { data: updatedProduct, error: updateError } = await supabase
+        .from('products')
+        .update(productData)
+        .eq('id', editingProduct.id)
+        .select()
+        .maybeSingle();
+      
+      if (updateError) {
+        throw new Error(`Error al actualizar producto: ${updateError.message}`);
+      }
+
+      await loadProductos();
+      setShowEditModal(false);
+      setEditingProduct(null);
+      setFormData({
+        name: '',
+        category: '',
+        purchase_price: '',
+        sale_price: '',
+        stock: '',
+        min_stock: '',
+        unit: 'unit',
+        supplier_id: ''
+      });
+      setGeneratedCode('');
+      setSuccess('✅ Producto actualizado exitosamente');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [editingProduct, formData, loadProductos]);
+
+  const handleEdit = useCallback((producto) => {
+    setEditingProduct(producto);
+    setFormData({
+      name: producto.name,
+      category: producto.category,
+      purchase_price: producto.purchase_price.toString(),
+      sale_price: producto.sale_price.toString(),
+      stock: producto.stock.toString(),
+      min_stock: producto.min_stock.toString(),
+      unit: producto.unit,
+      supplier_id: producto.supplier_id || '',
+      is_active: producto.is_active
+    });
+    setGeneratedCode(producto.code);
+    setShowEditModal(true);
+  }, []);
 
   const handleDelete = useCallback(async (productId) => {
     setProductToDelete(productId);
@@ -460,7 +560,25 @@ function Inventario({ businessId, userRole = 'admin' }) {
             </div>
             {userRole === 'admin' && (
               <Button
-                onClick={() => setShowForm(!showForm)}
+                onClick={() => {
+                  if (showForm) {
+                    setShowForm(false);
+                    setFormData({
+                      name: '',
+                      category: '',
+                      purchase_price: '',
+                      sale_price: '',
+                      stock: '',
+                      min_stock: '',
+                      unit: 'unit',
+                      supplier_id: '',
+                      is_active: true
+                    });
+                    setGeneratedCode('');
+                  } else {
+                    setShowForm(true);
+                  }
+                }}
                 className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 sm:px-6 py-3 rounded-xl flex items-center gap-2 w-full sm:w-auto justify-center whitespace-nowrap"
               >
                 {showForm ? (
@@ -514,26 +632,72 @@ function Inventario({ businessId, userRole = 'admin' }) {
         )}
       </AnimatePresence>
 
-      {/* Formulario */}
+      {/* Modal Formulario Agregar Producto */}
       <AnimatePresence>
         {showForm && userRole === 'admin' && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => {
+              setShowForm(false);
+              setFormData({
+                name: '',
+                category: '',
+                purchase_price: '',
+                sale_price: '',
+                stock: '',
+                min_stock: '',
+                unit: 'unit',
+                supplier_id: '',
+                is_active: true
+              });
+              setGeneratedCode('');
+            }}
           >
-            <Card className="shadow-xl rounded-2xl bg-white border-none mb-6">
-              <div className="gradient-primary text-white p-6 rounded-t-2xl">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header del Modal */}
+              <div className="gradient-primary p-6 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/20 rounded-lg">
-                    <Plus className="w-6 h-6" />
+                    <Plus className="w-6 h-6 text-white" />
                   </div>
-                  <h3 className="text-xl font-bold">Agregar Nuevo Producto</h3>
+                  <h2 className="text-2xl font-bold text-white">Agregar Nuevo Producto</h2>
                 </div>
+                <button
+                  onClick={() => {
+                    setShowForm(false);
+                    setFormData({
+                      name: '',
+                      category: '',
+                      purchase_price: '',
+                      sale_price: '',
+                      stock: '',
+                      min_stock: '',
+                      unit: 'unit',
+                      supplier_id: '',
+                      is_active: true
+                    });
+                    setGeneratedCode('');
+                  }}
+                  className="text-white/80 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg"
+                >
+                  <X className="w-6 h-6" />
+                </button>
               </div>
-              
-              <form onSubmit={handleSubmit} className="p-6 space-y-6">
+
+              {/* Contenido del Modal con scroll */}
+              <div className="p-6 overflow-y-auto max-h-[calc(95vh-88px)]">
+                <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
@@ -564,6 +728,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#edb886] focus:ring-[#edb886] transition-all duration-300"
                     >
                       <option value="">Seleccionar categoría</option>
+                      <option value="Platos">Platos</option>
                       <option value="Bebidas Alcohólicas">Bebidas Alcohólicas</option>
                       <option value="Cervezas">Cervezas</option>
                       <option value="Vinos">Vinos</option>
@@ -700,25 +865,49 @@ function Inventario({ businessId, userRole = 'admin' }) {
                   </label>
                 </div>
 
-                <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Creando producto...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-5 h-5" />
-                      Guardar Producto
-                    </>
-                  )}
-                </Button>
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setShowForm(false);
+                      setFormData({
+                        name: '',
+                        category: '',
+                        purchase_price: '',
+                        sale_price: '',
+                        stock: '',
+                        min_stock: '',
+                        unit: 'unit',
+                        supplier_id: '',
+                        is_active: true
+                      });
+                      setGeneratedCode('');
+                    }}
+                    className="flex-1 h-12 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl border-none font-medium"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="flex-1 h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Creando producto...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-5 h-5" />
+                        Guardar Producto
+                      </>
+                    )}
+                  </Button>
+                </div>
               </form>
-            </Card>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -873,8 +1062,15 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       </div>
 
                       {/* Acciones */}
-                      {userRole === 'admin' && (
-                        <div className="pt-4 border-t border-accent-200">
+                      {userRole === 'admin' && !isEmployee && (
+                        <div className="pt-4 border-t border-accent-200 space-y-2">
+                          <Button
+                            onClick={() => handleEdit(producto)}
+                            className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg"
+                          >
+                            <Edit className="w-4 h-4" />
+                            <span className="text-sm">Editar Producto</span>
+                          </Button>
                           <Button
                             onClick={() => handleDelete(producto.id)}
                             className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg"
@@ -1016,6 +1212,246 @@ function Inventario({ businessId, userRole = 'admin' }) {
                   </div>
                 </div>
               </Card>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Edición */}
+      <AnimatePresence>
+        {showEditModal && editingProduct && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => {
+              setShowEditModal(false);
+              setEditingProduct(null);
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+            >
+              <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-t-2xl flex items-center justify-between z-10">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <Edit className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold">Editar Producto</h3>
+                    <p className="text-blue-100 text-sm mt-1">Código: {generatedCode}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingProduct(null);
+                  }}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                handleUpdate();
+              }} className="p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      <Box className="w-4 h-4" />
+                      Nombre del producto *
+                    </label>
+                    <Input
+                      name="name"
+                      type="text" 
+                      placeholder="Ej: Laptop HP" 
+                      value={formData.name}
+                      onChange={handleChange}
+                      required
+                      className="h-11 rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4" />
+                      Categoría *
+                    </label>
+                    <select
+                      name="category"
+                      value={formData.category}
+                      onChange={handleChange}
+                      required
+                      className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-blue-500 focus:ring-blue-500 transition-all duration-300"
+                    >
+                      <option value="">Seleccionar categoría</option>
+                      <option value="Platos">Platos</option>
+                      <option value="Bebidas Alcohólicas">Bebidas Alcohólicas</option>
+                      <option value="Cervezas">Cervezas</option>
+                      <option value="Vinos">Vinos</option>
+                      <option value="Licores">Licores</option>
+                      <option value="Bebidas">Bebidas</option>
+                      <option value="Snacks">Snacks</option>
+                      <option value="Comida">Comida</option>
+                      <option value="Otros">Otros</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      <DollarSign className="w-4 h-4" />
+                      Precio de compra *
+                    </label>
+                    <Input
+                      name="purchase_price"
+                      type="number" 
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00" 
+                      value={formData.purchase_price}
+                      onChange={handleChange}
+                      required
+                      className="h-11 rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      <Tag className="w-4 h-4" />
+                      Precio de venta *
+                    </label>
+                    <Input
+                      name="sale_price"
+                      type="number" 
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00" 
+                      value={formData.sale_price}
+                      onChange={handleChange}
+                      required
+                      className="h-11 rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      <Package className="w-4 h-4" />
+                      Stock actual
+                    </label>
+                    <div className="h-11 px-4 rounded-xl border border-gray-300 bg-gray-100 flex items-center">
+                      <span className="text-gray-500">{formData.stock}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">El stock se modifica con compras/ventas</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Stock mínimo
+                    </label>
+                    <Input
+                      name="min_stock"
+                      type="number" 
+                      min="0"
+                      placeholder="0" 
+                      value={formData.min_stock}
+                      onChange={handleChange}
+                      className="h-11 rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Unidad
+                    </label>
+                    <select
+                      name="unit"
+                      value={formData.unit}
+                      onChange={handleChange}
+                      className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-blue-500 focus:ring-blue-500 transition-all duration-300"
+                    >
+                      <option value="unit">Unidad</option>
+                      <option value="kg">Kilogramo</option>
+                      <option value="l">Litro</option>
+                      <option value="box">Caja</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                    <Building2 className="w-4 h-4" />
+                    Proveedor (opcional)
+                  </label>
+                  <select
+                    name="supplier_id"
+                    value={formData.supplier_id}
+                    onChange={handleChange}
+                    className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-blue-500 focus:ring-blue-500 transition-all duration-300"
+                  >
+                    <option value="">Sin proveedor</option>
+                    {proveedores.map(prov => (
+                      <option key={prov.id} value={prov.id}>
+                        {prov.business_name || prov.contact_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-xl">
+                  <input 
+                    type="checkbox"
+                    name="is_active"
+                    checked={formData.is_active}
+                    onChange={handleChange}
+                    className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label className="text-sm font-medium text-gray-700">
+                    Producto activo
+                  </label>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setShowEditModal(false);
+                      setEditingProduct(null);
+                    }}
+                    className="flex-1 h-12 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl border-none font-medium"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Actualizando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-5 h-5" />
+                        Actualizar Producto
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
             </motion.div>
           </motion.div>
         )}

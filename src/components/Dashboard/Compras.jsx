@@ -9,6 +9,7 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
+import Pagination from '../Pagination';
 import {
   ShoppingBag,
   Plus,
@@ -160,7 +161,7 @@ function Compras({ businessId }) {
         
         setIsAdmin(isOwner || isAdminRole);
       } catch (error) {
-        console.error('Error checking admin role:', error);
+        
       }
     };
 
@@ -388,7 +389,7 @@ function Compras({ businessId }) {
       loadProductos();
       
     } catch (err) {
-      console.error('Error al registrar compra:', err);
+      
       setError('❌ Error al registrar la compra: ' + err.message);
     } finally {
       setIsCreatingPurchase(false);
@@ -465,7 +466,7 @@ function Compras({ businessId }) {
       setPurchaseToDelete(null);
 
     } catch (error) {
-      console.error('Error al eliminar compra:', error);
+      
       setError('❌ ' + (error.message || 'Error al eliminar la compra'));
       setTimeout(() => setError(''), 8000);
       setShowDeleteModal(false);
@@ -604,15 +605,6 @@ function Compras({ businessId }) {
           </Card>
           ) : (
           <>
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-sm text-gray-600">Mostrando {compras.length} de {totalCountPurchases}</div>
-              <div className="flex items-center gap-2">
-                <Button onClick={async () => { if (pagePurchases > 1) { setPagePurchases(p => p - 1); await loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (pagePurchases-2)*limitPurchases }); } }} disabled={pagePurchases <= 1}>Prev</Button>
-                <div className="text-sm">Página {pagePurchases} / {Math.max(1, Math.ceil(totalCountPurchases / limitPurchases))}</div>
-                <Button onClick={async () => { if (pagePurchases * limitPurchases < totalCountPurchases) { setPagePurchases(p => p + 1); await loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (pagePurchases)*limitPurchases }); } }} disabled={pagePurchases * limitPurchases >= totalCountPurchases}>Next</Button>
-              </div>
-            </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredCompras.map((compra, index) => (
               <motion.div
@@ -688,6 +680,18 @@ function Compras({ businessId }) {
               </motion.div>
             ))}
           </div>
+
+          {/* Paginación inferior */}
+          <Pagination
+            currentPage={pagePurchases}
+            totalItems={totalCountPurchases}
+            itemsPerPage={limitPurchases}
+            onPageChange={async (newPage) => {
+              setPagePurchases(newPage);
+              await loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (newPage - 1) * limitPurchases });
+            }}
+            disabled={loading}
+          />
           </>
         )}
       </motion.div>

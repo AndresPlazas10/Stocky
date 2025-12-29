@@ -16,7 +16,8 @@ import {
   ShoppingCart,
   CheckCircle2,
   AlertCircle,
-  Save
+  Save,
+  Printer
 } from 'lucide-react';
 
 function Mesas({ businessId }) {
@@ -27,6 +28,7 @@ function Mesas({ businessId }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedMesa, setSelectedMesa] = useState(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [isEmployee, setIsEmployee] = useState(false); // Verificar si es empleado
   
   // Estados para la orden
   const [orderItems, setOrderItems] = useState([]);
@@ -69,6 +71,30 @@ function Mesas({ businessId }) {
     }
   }, []);
 
+  // Verificar si el usuario autenticado es empleado
+  const checkIfEmployee = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setIsEmployee(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('business_id', businessId)
+        .single();
+
+      // Si existe en employees, es empleado (NO puede eliminar mesas)
+      setIsEmployee(!!data);
+    } catch (error) {
+      // Si hay error, asumimos que NO es empleado (es admin)
+      setIsEmployee(false);
+    }
+  }, [businessId]);
+
   const loadMesas = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -85,7 +111,7 @@ function Mesas({ businessId }) {
               quantity,
               price,
               subtotal,
-              products (name)
+              products (name, category)
             )
           )
         `)
@@ -147,8 +173,9 @@ function Mesas({ businessId }) {
     if (businessId) {
       loadData();
       getCurrentUser();
+      checkIfEmployee();
     }
-  }, [businessId, loadData, getCurrentUser]);
+  }, [businessId, loadData, getCurrentUser, checkIfEmployee]);
 
   // Callbacks memoizados para Realtime
   const handleTableInsert = useCallback((newTable) => {
@@ -246,7 +273,7 @@ function Mesas({ businessId }) {
             quantity,
             price,
             subtotal,
-            products (name)
+            products (name, category)
           )
         `)
         .eq('id', orderId)
@@ -325,7 +352,7 @@ function Mesas({ businessId }) {
       await loadMesas();
       
     } catch (error) {
-      console.error('Error al crear mesa:', error);
+      
       setError('❌ Error al crear la mesa: ' + error.message);
     } finally {
       setIsCreatingTable(false); // SIEMPRE desbloquear
@@ -388,7 +415,7 @@ function Mesas({ businessId }) {
           *,
           order_items (
             *,
-            products (name, code)
+            products (name, code, category)
           )
         `)
         .eq('id', mesa.current_order_id)
@@ -782,14 +809,6 @@ function Mesas({ businessId }) {
         .select()
         .maybeSingle();
 
-      console.log('DEBUG: sale insert result', { sale, saleError, saleData: {
-        business_id: businessId,
-        user_id: user.id,
-        total: saleTotal,
-        payment_method: paymentMethod,
-        seller_name: sellerName
-      }});
-
       if (saleError) {
         throw new Error('Error al crear la venta: ' + (saleError.message || JSON.stringify(saleError)));
       }
@@ -806,7 +825,7 @@ function Mesas({ businessId }) {
         unit_price: item.price
       }));
 
-      console.log('DEBUG: saleDetails payload', saleDetails);
+      
 
       const { error: detailsError } = await supabase
         .from('sale_details')
@@ -872,6 +891,186 @@ function Mesas({ businessId }) {
       setError(`❌ Error al cerrar la orden: ${error.message || 'Error desconocido'}`);
     } finally {
       setIsClosingOrder(false);
+    }
+  };
+
+  // Función para imprimir la orden (formato para cocina)
+  const handlePrintOrder = () => {
+    if (!selectedMesa || orderItems.length === 0) {
+      setError('No hay productos en la orden para imprimir');
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    // Filtrar solo productos que van a cocina (solo Platos)
+    const categoriasParaCocina = ['Platos'];
+    const itemsParaCocina = orderItems.filter(item => 
+      categoriasParaCocina.includes(item.products?.category)
+    );
+
+    // Si no hay nada para cocina, mostrar mensaje
+    if (itemsParaCocina.length === 0) {
+      setError('No hay productos que requieran preparación en cocina');
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    // Crear contenido HTML para impresión
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Orden Mesa ${selectedMesa.table_number}</title>
+        <style>
+          @media print {
+            @page {
+              size: 80mm auto;
+              margin: 0;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+            }
+          }
+          
+          body {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            max-width: 80mm;
+            margin: 0 auto;
+            padding: 10px;
+          }
+          
+          .header {
+            text-align: center;
+            border-bottom: 2px dashed #000;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+          }
+          
+          .header h1 {
+            font-size: 20px;
+            margin: 0 0 5px 0;
+            font-weight: bold;
+          }
+          
+          .header p {
+            margin: 2px 0;
+            font-size: 11px;
+          }
+          
+          .info {
+            margin: 10px 0;
+            font-size: 13px;
+          }
+          
+          .info strong {
+            font-weight: bold;
+          }
+          
+          .items {
+            margin: 15px 0;
+          }
+          
+          .item {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 5px 0;
+            border-bottom: 1px dashed #ccc;
+          }
+          
+          .item-name {
+            flex: 1;
+            font-weight: bold;
+            font-size: 13px;
+          }
+          
+          .item-qty {
+            width: 60px;
+            text-align: right;
+            font-size: 13px;
+            font-weight: bold;
+          }
+          
+          .total {
+            display: none;
+          }
+          
+          .footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 2px dashed #000;
+            font-size: 11px;
+          }
+          
+          .separator {
+            border-top: 2px dashed #000;
+            margin: 10px 0;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>ORDEN DE COCINA</h1>
+          <p>Mesa #${selectedMesa.table_number}</p>
+          <p>${new Date().toLocaleDateString('es-ES', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          })}</p>
+          <p>${new Date().toLocaleTimeString('es-ES')}</p>
+        </div>
+        
+        <div class="info">
+          <p><strong>Estado:</strong> ${selectedMesa.status === 'occupied' ? 'Ocupada' : 'Disponible'}</p>
+          <p><strong>Productos:</strong> ${itemsParaCocina.length} item${itemsParaCocina.length !== 1 ? 's' : ''}</p>
+        </div>
+        
+        <div class="separator"></div>
+        
+        <div class="items">
+          ${itemsParaCocina.map(item => `
+            <div class="item">
+              <div class="item-name">${item.products?.name || 'Producto'}</div>
+              <div class="item-qty">x${item.quantity}</div>
+            </div>
+          `).join('')}
+        </div>
+        
+        <div class="total">
+          TOTAL: ${formatPrice(orderTotal)}
+        </div>
+        
+        <div class="footer">
+          <p>*** ORDEN PARA COCINA ***</p>
+          <p>Sistema Stocky</p>
+        </div>
+        
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() {
+              window.close();
+            }, 100);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    // Abrir ventana de impresión
+    const printWindow = window.open('', '_blank', 'width=300,height=600');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+    } else {
+      setError('No se pudo abrir la ventana de impresión. Verifica los permisos del navegador.');
+      setTimeout(() => setError(null), 3000);
     }
   };
 
@@ -1091,8 +1290,8 @@ function Mesas({ businessId }) {
                   onClick={() => handleOpenTable(mesa)}
                 >
                   <CardContent className="pt-6 text-center">
-                    {/* Botón eliminar (solo si está disponible) */}
-                    {mesa.status === 'available' && (
+                    {/* Botón eliminar (solo si está disponible y no es empleado) */}
+                    {mesa.status === 'available' && !isEmployee && (
                       <Button
                         size="sm"
                         variant="ghost"
@@ -1377,13 +1576,24 @@ function Mesas({ businessId }) {
                         Guardar
                       </Button>
                       <Button
-                        onClick={handleCloseOrder}
+                        onClick={handlePrintOrder}
+                        variant="outline"
+                        className="border-2 border-blue-300 text-blue-700 hover:bg-blue-50 h-12 px-6 w-full sm:w-auto"
                         disabled={orderItems.length === 0}
-                        className="gradient-primary text-white hover:opacity-90 h-12 px-8 text-lg w-full sm:w-auto"
                       >
-                        <CheckCircle2 className="w-5 h-5 mr-2" />
-                        Cerrar Orden
+                        <Printer className="w-5 h-5 mr-2" />
+                        Imprimir para cocina
                       </Button>
+                      {!isEmployee && (
+                        <Button
+                          onClick={handleCloseOrder}
+                          disabled={orderItems.length === 0}
+                          className="gradient-primary text-white hover:opacity-90 h-12 px-8 text-lg w-full sm:w-auto"
+                        >
+                          <CheckCircle2 className="w-5 h-5 mr-2" />
+                          Cerrar Orden
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>

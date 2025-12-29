@@ -200,7 +200,7 @@ export async function getFilteredSales(businessId, filters = {}, pagination = {}
 
     return { data: enriched, count: count || 0 };
   } catch (error) {
-    console.error('Error en getFilteredSales:', error);
+    
     return { data: [], count: 0 };
   }
 }

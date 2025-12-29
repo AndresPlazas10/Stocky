@@ -30,12 +30,16 @@ const SalesFilters = React.memo(function SalesFilters({ businessId, onApply, onC
       const allSellers = [...(employeesData || [])];
       
       // Agregar administrador al inicio de la lista si hay usuario autenticado
+      // y no está ya en la lista de empleados
       if (user?.id) {
-        allSellers.unshift({
-          user_id: user.id,
-          full_name: 'Administrador',
-          is_admin: true
-        });
+        const isAlreadyInList = allSellers.some(seller => seller.user_id === user.id);
+        if (!isAlreadyInList) {
+          allSellers.unshift({
+            user_id: user.id,
+            full_name: 'Administrador',
+            is_admin: true
+          });
+        }
       }
       
       setSellers(allSellers);

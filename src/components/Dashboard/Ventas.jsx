@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
+import Pagination from '../Pagination';
 import { 
   ShoppingCart, 
   Plus, 
@@ -23,7 +24,9 @@ import {
   Mail,
   FileText,
   Calendar,
-  CreditCard
+  CreditCard,
+  X,
+  Printer
 } from 'lucide-react';
 
 // Función helper pura fuera del componente (no se recrea en renders)
@@ -48,10 +51,11 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showPOS, setShowPOS] = useState(false);
+  const [showSaleModal, setShowSaleModal] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [sessionChecked, setSessionChecked] = useState(false);
+  const [isEmployee, setIsEmployee] = useState(false); // Verificar si es empleado
   
   // Estados para modal de eliminación de venta (solo admin)
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -110,6 +114,30 @@ function Ventas({ businessId, userRole = 'admin' }) {
     setClientes([]);
   }, []);
 
+  // Verificar si el usuario autenticado es empleado
+  const checkIfEmployee = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setIsEmployee(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('business_id', businessId)
+        .single();
+
+      // Si existe en employees, es empleado (NO puede eliminar ventas)
+      setIsEmployee(!!data);
+    } catch (error) {
+      // Si hay error, asumimos que NO es empleado (es admin)
+      setIsEmployee(false);
+    }
+  }, [businessId]);
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -130,7 +158,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
       
       await Promise.all([
         loadVentas(),
-        loadProductos()
+        loadProductos(),
+        checkIfEmployee()
       ]);
     } catch (error) {
       setError('⚠️ No se pudo cargar la información. Por favor, intenta recargar la página.');
@@ -347,7 +376,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
         .insert([saleData])
         .select()
         .maybeSingle();
-      console.log('DEBUG: sale insert result', { sale, saleError, saleData });
 
       if (saleError) {
         throw new Error('Error al crear la venta: ' + (saleError.message || JSON.stringify(saleError)));
@@ -364,8 +392,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
         quantity: item.quantity,
         unit_price: item.unit_price
       }));
-
-      console.log('DEBUG: saleDetails payload', saleDetails);
 
       const { error: detailsError } = await supabase
         .from('sale_details')
@@ -385,13 +411,13 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setCart([]);
       setSelectedCustomer('');
       setPaymentMethod('cash');
-      setShowPOS(false);
+      setShowSaleModal(false);
 
       // Recargar ventas inmediatamente
       await loadVentas(currentFilters, { limit, offset: (page - 1) * limit });
       
     } catch (error) {
-      console.error('Error:', error);
+      
       // Si es error de sesión, redirigir a login
       if (error.message.includes('sesión ha expirado')) {
         setTimeout(() => {
@@ -449,6 +475,239 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setSaleToDelete(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Función para imprimir factura física
+  const handlePrintInvoice = async (venta) => {
+    // Cargar detalles de la venta
+    const { data: saleDetails } = await supabase
+      .from('sale_details')
+      .select('*, products(name, code)')
+      .eq('sale_id', venta.id);
+
+    if (!saleDetails || saleDetails.length === 0) {
+      setError('No se pudieron cargar los detalles de la venta');
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    // Crear contenido HTML para impresión
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Factura #${venta.id}</title>
+        <style>
+          @media print {
+            @page {
+              size: 80mm auto;
+              margin: 0;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+            }
+          }
+          
+          body {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            max-width: 80mm;
+            margin: 0 auto;
+            padding: 10px;
+          }
+          
+          .header {
+            text-align: center;
+            border-bottom: 2px dashed #000;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+          }
+          
+          .header h1 {
+            font-size: 18px;
+            margin: 0 0 5px 0;
+            font-weight: bold;
+          }
+          
+          .header p {
+            margin: 2px 0;
+            font-size: 11px;
+          }
+          
+          .info {
+            margin: 10px 0;
+            font-size: 11px;
+          }
+          
+          .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+          }
+          
+          .separator {
+            border-top: 1px dashed #000;
+            margin: 10px 0;
+          }
+          
+          .items-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            border-bottom: 1px solid #000;
+            padding: 5px 0;
+            font-size: 11px;
+          }
+          
+          .item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 11px;
+          }
+          
+          .item-name {
+            flex: 1;
+            padding-right: 5px;
+          }
+          
+          .item-qty {
+            width: 40px;
+            text-align: center;
+          }
+          
+          .item-price {
+            width: 70px;
+            text-align: right;
+          }
+          
+          .totals {
+            margin-top: 15px;
+            border-top: 2px solid #000;
+            padding-top: 10px;
+          }
+          
+          .total-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 12px;
+          }
+          
+          .total-row.final {
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #000;
+          }
+          
+          .payment-info {
+            margin: 15px 0;
+            padding: 8px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 11px;
+          }
+          
+          .footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 2px dashed #000;
+            font-size: 10px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>FACTURA DE VENTA</h1>
+          <p>Sistema Stocky</p>
+          <p>${new Date(venta.created_at).toLocaleDateString('es-ES', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          })}</p>
+          <p>${new Date(venta.created_at).toLocaleTimeString('es-ES')}</p>
+        </div>
+        
+        <div class="info">
+          <div class="info-row">
+            <span><strong>Factura #:</strong></span>
+            <span>${venta.id}</span>
+          </div>
+          <div class="info-row">
+            <span><strong>Vendedor:</strong></span>
+            <span>${venta.employees?.full_name || 'N/A'}</span>
+          </div>
+          <div class="info-row">
+            <span><strong>Cliente:</strong></span>
+            <span>Venta general</span>
+          </div>
+        </div>
+        
+        <div class="separator"></div>
+        
+        <div class="items-header">
+          <span style="flex: 1;">Producto</span>
+          <span style="width: 40px; text-align: center;">Cant.</span>
+          <span style="width: 70px; text-align: right;">Total</span>
+        </div>
+        
+        ${saleDetails.map(item => `
+          <div class="item">
+            <div class="item-name">${item.products?.name || 'Producto'}</div>
+            <div class="item-qty">x${item.quantity}</div>
+            <div class="item-price">${formatPrice(item.subtotal)}</div>
+          </div>
+        `).join('')}
+        
+        <div class="totals">
+          <div class="total-row final">
+            <span>TOTAL:</span>
+            <span>${formatPrice(venta.total)}</span>
+          </div>
+        </div>
+        
+        <div class="payment-info">
+          <strong>Método de Pago:</strong><br>
+          ${venta.payment_method === 'cash' ? '💵 Efectivo' : 
+            venta.payment_method === 'card' ? '💳 Tarjeta' :
+            venta.payment_method === 'transfer' ? '🏦 Transferencia' :
+            '🔀 Mixto'}
+        </div>
+        
+        <div class="footer">
+          <p>¡Gracias por su compra!</p>
+          <p>*** FACTURA FÍSICA ***</p>
+        </div>
+        
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() {
+              window.close();
+            }, 100);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    // Abrir ventana de impresión
+    const printWindow = window.open('', '_blank', 'width=300,height=600');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+    } else {
+      setError('No se pudo abrir la ventana de impresión. Verifica los permisos del navegador.');
+      setTimeout(() => setError(null), 3000);
     }
   };
 
@@ -668,10 +927,10 @@ function Ventas({ businessId, userRole = 'admin' }) {
               </div>
             </div>
             <Button
-              onClick={() => setShowPOS(!showPOS)}
+              onClick={() => setShowSaleModal(!showSaleModal)}
               className="w-full sm:w-auto gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-xl flex items-center justify-center gap-2 text-sm sm:text-base"
             >
-              {showPOS ? (
+              {showSaleModal ? (
                 <>
                   <Receipt className="w-4 h-4 sm:w-5 sm:h-5" />
                   <span className="whitespace-nowrap">Ver Historial</span>
@@ -721,7 +980,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
         )}
       </AnimatePresence>
 
-      {!showPOS && (
+      {!showSaleModal && (
         <SalesFilters
           businessId={businessId}
           onApply={(filters) => {
@@ -737,13 +996,55 @@ function Ventas({ businessId, userRole = 'admin' }) {
         />
       )}
 
-      {showPOS ? (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="grid xl:grid-cols-2 gap-4 sm:gap-6"
-        >
+      {/* Modal para Nueva Venta */}
+      <AnimatePresence>
+        {showSaleModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => {
+              setShowSaleModal(false);
+              // Limpiar carrito al cerrar
+              setCart([]);
+              setSelectedCustomer('');
+              setPaymentMethod('cash');
+              setSearchProduct('');
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header del Modal */}
+              <div className="gradient-primary p-6 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <ShoppingCart className="w-6 h-6 text-white" />
+                  <h2 className="text-2xl font-bold text-white">Nueva Venta</h2>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowSaleModal(false);
+                    setCart([]);
+                    setSelectedCustomer('');
+                    setPaymentMethod('cash');
+                    setSearchProduct('');
+                  }}
+                  className="text-white/80 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Contenido del Modal */}
+              <div className="p-6 overflow-y-auto max-h-[calc(95vh-88px)]">
+                <div className="grid xl:grid-cols-2 gap-4 sm:gap-6">
           {/* Panel izquierdo - Productos */}
           <Card className="shadow-xl rounded-2xl bg-white border-none">
             <div className="p-4 sm:p-6">
@@ -971,14 +1272,21 @@ function Ventas({ businessId, userRole = 'admin' }) {
               </Button>
             </div>
           </Card>
-        </motion.div>
-      ) : (
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Historial de Ventas */}
+      {!showSaleModal && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-            {ventas.length === 0 ? (
+          {ventas.length === 0 ? (
             <Card className="shadow-xl rounded-2xl bg-white border-none">
               <div className="p-12 text-center">
                 <Receipt className="w-16 h-16 mx-auto mb-4 text-gray-300" />
@@ -988,15 +1296,17 @@ function Ventas({ businessId, userRole = 'admin' }) {
             </Card>
               ) : (
             <div className="space-y-4">
-                {/* Paginación: prev/next */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-sm text-gray-600">Mostrando {ventas.length} de {totalCount}</div>
-                  <div className="flex items-center gap-2">
-                    <Button onClick={async () => { if (page > 1) { setPage(p => p - 1); await loadVentas(currentFilters, { limit, offset: (page-2)*limit }); } }} disabled={page <= 1}>Prev</Button>
-                    <div className="text-sm">Página {page} / {Math.max(1, Math.ceil(totalCount / limit))}</div>
-                    <Button onClick={async () => { if (page * limit < totalCount) { setPage(p => p + 1); await loadVentas(currentFilters, { limit, offset: (page)*limit }); } }} disabled={page * limit >= totalCount}>Next</Button>
-                  </div>
-                </div>
+                {/* Paginación superior */}
+                <Pagination
+                  currentPage={page}
+                  totalItems={totalCount}
+                  itemsPerPage={limit}
+                  onPageChange={async (newPage) => {
+                    setPage(newPage);
+                    await loadVentas(currentFilters, { limit, offset: (newPage - 1) * limit });
+                  }}
+                  disabled={loading}
+                />
 
                 <div className="space-y-4">
               {/* Vista de tarjetas en móvil y desktop */}
@@ -1093,10 +1403,17 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                 }}
                                 className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
                               >
-                                <FileText className="w-4 h-4" />
-                                <span className="text-sm">Factura</span>
+                                <Mail className="w-4 h-4" />
+                                <span className="text-sm">Factura Electrónica</span>
                               </Button>
-                              {userRole === 'admin' && (
+                              <Button
+                                onClick={() => handlePrintInvoice(venta)}
+                                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
+                              >
+                                <Printer className="w-4 h-4" />
+                                <span className="text-sm">Factura Física</span>
+                              </Button>
+                              {userRole === 'admin' && !isEmployee && (
                                 <Button
                                   onClick={() => handleDeleteSale(venta.id)}
                                   className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
