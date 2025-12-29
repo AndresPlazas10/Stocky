@@ -1584,16 +1584,14 @@ function Mesas({ businessId }) {
                         <Printer className="w-5 h-5 mr-2" />
                         Imprimir para cocina
                       </Button>
-                      {!isEmployee && (
-                        <Button
-                          onClick={handleCloseOrder}
-                          disabled={orderItems.length === 0}
-                          className="gradient-primary text-white hover:opacity-90 h-12 px-8 text-lg w-full sm:w-auto"
-                        >
-                          <CheckCircle2 className="w-5 h-5 mr-2" />
-                          Cerrar Orden
-                        </Button>
-                      )}
+                      <Button
+                        onClick={handleCloseOrder}
+                        disabled={orderItems.length === 0}
+                        className="gradient-primary text-white hover:opacity-90 h-12 px-8 text-lg w-full sm:w-auto"
+                      >
+                        <CheckCircle2 className="w-5 h-5 mr-2" />
+                        Cerrar Orden
+                      </Button>
                     </div>
                   </div>
                 </div>
