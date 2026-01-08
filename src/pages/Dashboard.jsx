@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase/Client.jsx';
 import { DashboardLayout } from '../components/layout/DashboardLayout.jsx';
-import ChangelogModal from '../components/ChangelogModal.jsx';
+import PaymentWarningModal from '../components/PaymentWarningModal.jsx';
+import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
+import { shouldShowPaymentWarning } from '../config/unpaidBusinesses.js';
 import Home from '../components/Dashboard/Home.jsx';
 import Ventas from '../components/Dashboard/Ventas.jsx';
 import Compras from '../components/Dashboard/Compras.jsx';
@@ -20,7 +22,9 @@ function Dashboard() {
   const [user, setUser] = useState(null);
   const [activeSection, setActiveSection] = useState('home');
   const [businessLogo, setBusinessLogo] = useState(null);
-  const [showChangelog, setShowChangelog] = useState(false);
+  const [showPaymentWarning, setShowPaymentWarning] = useState(false);
+  const [hasUnpaidBusiness, setHasUnpaidBusiness] = useState(false);
+  const [isBusinessDisabled, setIsBusinessDisabled] = useState(false);
 
   useEffect(() => {
     checkAuthAndLoadBusiness();
@@ -148,6 +152,22 @@ function Dashboard() {
       setBusiness(finalBusiness);
       setBusinessLogo(finalBusiness.logo_url || null);
 
+      // � VERIFICAR SI EL NEGOCIO ESTÁ DESHABILITADO (PRIORIDAD MÁXIMA)
+      if (finalBusiness.is_active === false) {
+        setIsBusinessDisabled(true);
+        setLoading(false);
+        return; // Detener ejecución y mostrar modal bloqueante
+      }
+
+      // 🚨 VERIFICAR SI HOY ES DÍA DE ADVERTENCIA DE PAGO (para todos los negocios)
+      if (shouldShowPaymentWarning()) {
+        setHasUnpaidBusiness(true);
+        // Mostrar el modal de advertencia después de 1 segundo
+        setTimeout(() => {
+          setShowPaymentWarning(true);
+        }, 1000);
+      }
+
       // Tabla users (public) no existe - no crear registro
       
     } catch (err) {
@@ -247,6 +267,11 @@ function Dashboard() {
     );
   }
 
+  // 🔒 Si el negocio está deshabilitado, mostrar modal bloqueante
+  if (isBusinessDisabled) {
+    return <BusinessDisabledModal businessName={business?.name} onSignOut={handleSignOut} />;
+  }
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
@@ -265,22 +290,12 @@ function Dashboard() {
 
   return (
     <>
-      <ChangelogModal 
-        forceOpen={showChangelog} 
-        onClose={() => setShowChangelog(false)} 
+      {/* Modal de advertencia de pago pendiente */}
+      <PaymentWarningModal 
+        isOpen={showPaymentWarning}
+        onClose={() => setShowPaymentWarning(false)}
+        businessName={business?.name}
       />
-      
-      {/* 🚨 BOTÓN TEMPORAL - Eliminar después de unas semanas */}
-      <button
-        onClick={() => setShowChangelog(true)}
-        className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 font-medium"
-        title="Ver novedades de la aplicación"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-        Ver Novedades
-      </button>
       
       <DashboardLayout
         userName={business?.owner_name || 'Usuario'}
