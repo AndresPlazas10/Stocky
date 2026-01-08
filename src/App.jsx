@@ -35,7 +35,7 @@ function App() {
           <Route path='/employee-access' element={<EmployeeAccess />} />
           <Route path='/employee-dashboard' element={<EmployeeDashboard />} />
         </Routes>
-        <Analytics />
+        <Analytics mode="production" debug={false} />
         <SpeedInsights />
       </Suspense>
     </>
