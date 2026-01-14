@@ -498,7 +498,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>Factura #${venta.id}</title>
+        <title>Comprobante de Pago #${venta.id}</title>
         <style>
           @media print {
             @page {
@@ -622,12 +622,22 @@ function Ventas({ businessId, userRole = 'admin' }) {
             border-top: 2px dashed #000;
             font-size: 10px;
           }
+          
+          .legal-notice {
+            margin-top: 15px;
+            padding: 8px;
+            border-top: 1px dashed #000;
+            font-size: 9px;
+            text-align: center;
+            line-height: 1.4;
+            color: #555;
+          }
         </style>
       </head>
       <body>
         <div class="header">
-          <h1>FACTURA DE VENTA</h1>
-          <p>Sistema Stocky</p>
+          <h1>COMPROBANTE DE PAGO</h1>
+          <p>Sistema Stockly</p>
           <p>${new Date(venta.created_at).toLocaleDateString('es-ES', { 
             weekday: 'long', 
             year: 'numeric', 
@@ -639,8 +649,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
         
         <div class="info">
           <div class="info-row">
-            <span><strong>Factura #:</strong></span>
-            <span>${venta.id}</span>
+            <span><strong>Comprobante #:</strong></span>
+            <span>CPV-${String(venta.id).substring(0, 8).toUpperCase()}</span>
           </div>
           <div class="info-row">
             <span><strong>Vendedor:</strong></span>
@@ -685,7 +695,10 @@ function Ventas({ businessId, userRole = 'admin' }) {
         
         <div class="footer">
           <p>¡Gracias por su compra!</p>
-          <p>*** FACTURA FÍSICA ***</p>
+        </div>
+        
+        <div class="legal-notice">
+          El presente comprobante es informativo. La responsabilidad tributaria recae exclusivamente en el establecimiento emisor.
         </div>
         
         <script>
@@ -1404,7 +1417,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                 className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
                               >
                                 <Mail className="w-4 h-4" />
-                                <span className="text-sm">Factura Electrónica</span>
+                                <span className="text-sm">Factura por Correo</span>
                               </Button>
                               <Button
                                 onClick={() => handlePrintInvoice(venta)}
@@ -1437,7 +1450,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
         </motion.div>
       )}
 
-      {/* Modal para generar factura desde venta */}
+      {/* Modal para generar comprobante de pago desde venta */}
       <AnimatePresence>
         {showInvoiceModal && selectedSale && (
           <motion.div
@@ -1463,7 +1476,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                       <FileText className="w-8 h-8" />
                     </div>
                     <div>
-                      <h2 className="text-2xl font-bold">Generar Factura Electrónica</h2>
+                      <h2 className="text-2xl font-bold">Enviar Comprobante de Pago</h2>
                       <p className="text-blue-100 mt-1">
                         Venta del {formatDateOnly(selectedSale.created_at)} por {formatPrice(selectedSale.total)}
                       </p>
@@ -1501,7 +1514,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                       className="h-11 rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      La factura se enviará a este correo electrónico
+                      El comprobante de pago se enviará a este correo electrónico
                     </p>
                   </div>
 
@@ -1578,16 +1591,21 @@ function Ventas({ businessId, userRole = 'admin' }) {
                       {generatingInvoice ? (
                         <>
                           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                          Generando...
+                          Enviando...
                         </>
                       ) : (
                         <>
                           <CheckCircle2 className="w-5 h-5" />
-                          Generar y Enviar Factura
+                          Enviar Comprobante
                         </>
                       )}
                     </Button>
                   </div>
+                  
+                  {/* Nota informativa */}
+                  <p className="text-gray-500 text-xs text-center mt-4 italic">
+                    El presente comprobante es informativo. La responsabilidad tributaria recae exclusivamente en el establecimiento emisor.
+                  </p>
                 </div>
               </Card>
             </motion.div>

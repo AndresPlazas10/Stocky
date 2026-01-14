@@ -214,7 +214,10 @@ export async function createSale({
   businessId,
   cart,
   paymentMethod,
-  total
+  total,
+  documentType = 'receipt',
+  generateElectronicInvoice = false,
+  customerData = null
 }) {
   try {
     // 1. Validar sesión
@@ -242,7 +245,9 @@ export async function createSale({
       user_id: user.id,
       seller_name: employee?.full_name || user.email || 'Vendedor',
       payment_method: paymentMethod || 'cash',
-      total: total || 0
+      total: total || 0,
+      document_type: documentType,
+      is_electronic_invoice: generateElectronicInvoice
     };
 
     // Creando venta
@@ -292,10 +297,134 @@ export async function createSale({
       }
     }
 
-    return { success: true, data: sale };
+    // 8. Si se solicitó factura electrónica, generarla
+    let invoiceResult = null;
+    if (generateElectronicInvoice) {
+      try {
+        invoiceResult = await generateElectronicInvoiceForSale(sale.id, businessId, cart, total, paymentMethod, customerData);
+        
+        if (!invoiceResult.success) {
+          // La factura falló pero la venta ya está registrada
+          // Actualizamos la venta para indicar que la factura falló
+          await supabase
+            .from('sales')
+            .update({ 
+              invoice_status: 'failed',
+              invoice_error: invoiceResult.error
+            })
+            .eq('id', sale.id);
+        } else {
+          // Actualizar venta con datos de factura
+          await supabase
+            .from('sales')
+            .update({ 
+              invoice_status: 'success',
+              cufe: invoiceResult.cufe,
+              invoice_number: invoiceResult.invoiceNumber,
+              invoice_pdf_url: invoiceResult.pdfUrl
+            })
+            .eq('id', sale.id);
+        }
+      } catch (invoiceError) {
+        // Error generando factura (la venta ya está registrada)
+        console.error('Error generando factura electrónica:', invoiceError);
+      }
+    }
+
+    return { 
+      success: true, 
+      data: sale,
+      invoice: invoiceResult
+    };
   } catch (error) {
     // Error en createSale
     return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Genera factura electrónica para una venta
+ * @param {string} saleId - ID de la venta
+ * @param {string} businessId - ID del negocio
+ * @param {Array} cart - Items del carrito
+ * @param {number} total - Total de la venta
+ * @param {string} paymentMethod - Método de pago
+ * @param {object} customerData - Datos del cliente (opcional)
+ * @returns {Promise<{success: boolean, cufe?: string, invoiceNumber?: string, pdfUrl?: string, error?: string}>}
+ */
+async function generateElectronicInvoiceForSale(saleId, businessId, cart, total, paymentMethod, customerData) {
+  try {
+    // Obtener token de sesión
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      return { success: false, error: 'Sesión no válida' };
+    }
+
+    // URL de la Edge Function de Siigo
+    const SIIGO_FUNCTION_URL = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/siigo-invoice';
+
+    // Preparar datos para la factura
+    const invoiceData = {
+      action: 'create',
+      businessId: businessId,
+      customer: customerData || {
+        // Cliente genérico si no se especifica
+        identification: '222222222222',
+        id_type: 'CC',
+        name: ['Consumidor', 'Final'],
+        address: {
+          city_code: '11001', // Bogotá por defecto
+          address: 'Calle Principal'
+        }
+      },
+      items: cart.map(item => ({
+        code: item.product_id,
+        description: item.name,
+        quantity: item.quantity,
+        price: item.unit_price,
+        tax_rate: 0 // Por defecto sin IVA, ajustar según producto
+      })),
+      payment: {
+        method: paymentMethod === 'cash' ? 'CASH' : 
+                paymentMethod === 'card' ? 'CREDIT_CARD' : 
+                paymentMethod === 'transfer' ? 'TRANSFER' : 'CASH'
+      },
+      sale_id: saleId
+    };
+
+    // Llamar a la Edge Function
+    const response = await fetch(SIIGO_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify(invoiceData)
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      return { 
+        success: false, 
+        error: result.error || 'Error generando factura electrónica'
+      };
+    }
+
+    return {
+      success: true,
+      cufe: result.cufe,
+      invoiceNumber: result.invoice_number,
+      pdfUrl: result.pdf_url,
+      qrCode: result.qr_code
+    };
+  } catch (error) {
+    console.error('Error en generateElectronicInvoiceForSale:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Error inesperado generando factura'
+    };
   }
 }
 

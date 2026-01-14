@@ -34,20 +34,21 @@ export default async function handler(req, res) {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Factura ${invoiceNumber}</title>
+        <title>Comprobante de Pago ${invoiceNumber}</title>
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
             <td style="background: linear-gradient(135deg, #edb886 0%, #f1c691 100%); padding: 30px; text-align: center;">
               <h1 style="color: white; margin: 0; font-size: 28px;">${businessName}</h1>
-              <p style="color: #f9f9f1; margin: 10px 0 0 0; font-size: 16px;">Factura #${invoiceNumber}</p>
+              <p style="color: #f9f9f1; margin: 10px 0 0 0; font-size: 16px;">Comprobante de Pago #${invoiceNumber}</p>
+              <p style="color: #f9f9f1; margin: 5px 0 0 0; font-size: 12px;">Documento Informativo</p>
             </td>
           </tr>
           <tr>
             <td style="padding: 30px; background-color: #ffffff;">
               <h2 style="color: #edb886; margin-top: 0;">Hola ${customerName},</h2>
-              <p style="color: #666; font-size: 16px;">Gracias por tu compra. Aquí está el detalle de tu factura:</p>
+              <p style="color: #666; font-size: 16px;">Gracias por tu compra. Aquí está el detalle de tu comprobante:</p>
               <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                 <thead>
                   <tr style="background-color: #edb886; color: white;">
@@ -66,12 +67,16 @@ export default async function handler(req, res) {
                   Total: $${total.toLocaleString('es-CO')}
                 </p>
               </div>
+              
             </td>
           </tr>
           <tr>
             <td style="background-color: #f9f9f9; padding: 20px; text-align: center; border-top: 1px solid #eee;">
               <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">Gracias por confiar en ${businessName}</p>
-              <p style="margin: 0; color: #999; font-size: 12px;">Este es un email automático, por favor no responder.</p>
+              <p style="margin: 0 0 8px 0; color: #999; font-size: 12px;">Este es un email automático, por favor no responder.</p>
+              <p style="margin: 0; color: #888; font-size: 11px; font-style: italic;">
+                El presente comprobante es informativo. La responsabilidad tributaria recae exclusivamente en el establecimiento emisor.
+              </p>
             </td>
           </tr>
         </table>
@@ -89,7 +94,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         from: process.env.RESEND_FROM_EMAIL || 'Stockly <onboarding@resend.dev>',
         to: [email],
-        subject: `Factura ${invoiceNumber} - ${businessName}`,
+        subject: `Comprobante de Pago ${invoiceNumber} - ${businessName}`,
         html: htmlContent,
       })
     });
