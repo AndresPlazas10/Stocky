@@ -4,6 +4,7 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Suspense, lazy } from 'react';
 import { Loader2 } from 'lucide-react';
 import OfflineBanner from './components/OfflineBanner';
+import ChangelogModal from './components/ChangelogModal';
 
 // Lazy loading de páginas para optimizar carga inicial
 const Home = lazy(() => import('./pages/Home.jsx'));
@@ -25,6 +26,9 @@ function App() {
     <>
       {/* Banner de estado de conexión */}
       <OfflineBanner />
+      
+      {/* Modal de novedades - se muestra automáticamente para nuevas versiones */}
+      <ChangelogModal />
       
       <Suspense fallback={<PageLoader />}>
         <Routes>

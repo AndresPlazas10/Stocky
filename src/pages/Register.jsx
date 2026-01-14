@@ -12,6 +12,7 @@ function Register() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
+    nit: '',
     address: '',
     phone: '',
     username: '',
@@ -126,6 +127,7 @@ function Register() {
         .from('businesses')
         .insert([{
           name: name.trim(),
+          nit: formData.nit.trim() || null,
           address: address.trim() || null,
           phone: phone.trim() || null,
           email: cleanEmail,
@@ -319,6 +321,23 @@ function Register() {
                   </p>
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="nit" className="text-base font-semibold">
+                    NIT <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+                  </Label>
+                  <div className="relative">
+                    <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input
+                      id="nit"
+                      name="nit"
+                      type="text"
+                      placeholder="900.123.456-7"
+                      value={formData.nit}
+                      onChange={handleChange}
+                      className="pl-10 h-12 text-base border-2 border-gray-200 focus:border-indigo-400"
+                    />
+                  </div>
+                </div>
 
 
                 <div className="space-y-2">

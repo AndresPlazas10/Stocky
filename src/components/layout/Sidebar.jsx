@@ -15,8 +15,10 @@ import {
   Menu,
   X,
   Upload,
-  Building2
+  Building2,
+  Sparkles
 } from 'lucide-react';
+import ChangelogModal from '../ChangelogModal';
 import { cn } from '@/lib/utils';
 
 const menuItems = [
@@ -33,6 +35,7 @@ const menuItems = [
 export const Sidebar = React.memo(function Sidebar({ activeSection, onSectionChange, businessName, businessLogo, onLogoChange }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
 
   const toggleCollapse = () => setIsCollapsed(!isCollapsed);
   const toggleMobile = () => setIsMobileOpen(!isMobileOpen);
@@ -194,6 +197,25 @@ export const Sidebar = React.memo(function Sidebar({ activeSection, onSectionCha
         })}
       </nav>
 
+      {/* What's New button */}
+      <div className={cn(
+        "px-4 pb-2",
+        isCollapsed && "px-2"
+      )}>
+        <button
+          onClick={() => setShowChangelog(true)}
+          className={cn(
+            "w-full flex items-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 text-amber-600 transition-all border border-amber-500/20",
+            isCollapsed && "justify-center px-2"
+          )}
+        >
+          <Sparkles className="w-5 h-5 flex-shrink-0" />
+          {!isCollapsed && (
+            <span className="text-sm font-medium">Ver novedades</span>
+          )}
+        </button>
+      </div>
+
       {/* Collapse button - Desktop only */}
       <div className="hidden lg:block p-4 border-t border-primary/10">
         <button
@@ -260,6 +282,14 @@ export const Sidebar = React.memo(function Sidebar({ activeSection, onSectionCha
           </>
         )}
       </AnimatePresence>
+
+      {/* Changelog Modal */}
+      {showChangelog && (
+        <ChangelogModal 
+          forceOpen={true} 
+          onClose={() => setShowChangelog(false)} 
+        />
+      )}
     </>
   );
 });

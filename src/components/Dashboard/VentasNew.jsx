@@ -7,6 +7,7 @@
  * - Validación exhaustiva
  * - Sin dependencias de tablas inexistentes
  * - Manejo de errores robusto
+ * - Soporte para facturación electrónica (opcional)
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -26,7 +27,8 @@ import {
   DollarSign,
   CheckCircle2,
   AlertCircle,
-  User
+  User,
+  FileText
 } from 'lucide-react';
 
 // Importar servicios
@@ -37,6 +39,10 @@ import {
   deleteSale,
   getCurrentUser
 } from '../../services/salesService';
+
+// Importar componentes de facturación
+import { InvoicingProvider, useInvoicing } from '../../context/InvoicingContext';
+import DocumentTypeSelector, { DOCUMENT_TYPES } from '../POS/DocumentTypeSelector';
 
 // Helper para obtener nombre del vendedor
 const getVendedorName = (venta) => {
@@ -63,10 +69,16 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [searchProduct, setSearchProduct] = useState('');
   const [processing, setProcessing] = useState(false);
+  
+  // Estado del tipo de documento (comprobante o factura electrónica)
+  const [documentType, setDocumentType] = useState(DOCUMENT_TYPES.RECEIPT);
 
   // Estados del modal de eliminación
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [saleToDelete, setSaleToDelete] = useState(null);
+  
+  // Hook de facturación para verificar si está habilitada
+  const { canGenerateElectronicInvoice, isLoading: invoicingLoading } = useInvoicing();
 
   // ========================================
   // CARGA INICIAL DE DATOS
@@ -229,6 +241,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     setCart([]);
     setPaymentMethod('cash');
     setSearchProduct('');
+    setDocumentType(DOCUMENT_TYPES.RECEIPT);
   }, []);
 
   // ========================================
@@ -246,6 +259,12 @@ function Ventas({ businessId, userRole = 'admin' }) {
       return;
     }
 
+    // Validar que si se selecciona factura electrónica, el sistema esté configurado
+    if (documentType === DOCUMENT_TYPES.ELECTRONIC_INVOICE && !canGenerateElectronicInvoice) {
+      setError('⚠️ La facturación electrónica no está habilitada. Configúrala en Ajustes.');
+      return;
+    }
+
     try {
       setProcessing(true);
       setError(null);
@@ -256,14 +275,23 @@ function Ventas({ businessId, userRole = 'admin' }) {
         businessId,
         cart,
         paymentMethod,
-        total
+        total,
+        // Incluir tipo de documento para posterior procesamiento
+        documentType: documentType,
+        generateElectronicInvoice: documentType === DOCUMENT_TYPES.ELECTRONIC_INVOICE
       });
 
       if (!result.success) {
         throw new Error(result.error || 'Error al procesar la venta');
       }
 
-      setSuccess(`✅ Venta registrada exitosamente. Total: ${formatPrice(total)}`);
+      // Mensaje diferenciado según tipo de documento
+      if (documentType === DOCUMENT_TYPES.ELECTRONIC_INVOICE) {
+        setSuccess(`✅ Venta registrada y factura electrónica generada. Total: ${formatPrice(total)}`);
+      } else {
+        setSuccess(`✅ Venta registrada. Comprobante generado. Total: ${formatPrice(total)}`);
+      }
+      
       clearCart();
       setShowPOS(false);
 
@@ -276,7 +304,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     } finally {
       setProcessing(false);
     }
-  }, [cart, businessId, paymentMethod, sessionValid, clearCart, loadData]);
+  }, [cart, businessId, paymentMethod, sessionValid, clearCart, loadData, documentType, canGenerateElectronicInvoice]);
 
   // ========================================
   // ELIMINACIÓN DE VENTA
@@ -570,28 +598,117 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
                 {cart.length > 0 && (
                   <>
-                    <div className="mt-6 space-y-3">
+                    <div className="mt-6 space-y-4">
+                      {/* Total */}
                       <div className="flex justify-between items-center text-2xl font-bold">
                         <span>Total:</span>
                         <span className="text-blue-600">{formatPrice(totalCart)}</span>
                       </div>
 
-                      <select
-                        value={paymentMethod}
-                        onChange={(e) => setPaymentMethod(e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded-lg"
-                      >
-                        <option value="cash">Efectivo</option>
-                        <option value="card">Tarjeta</option>
-                        <option value="transfer">Transferencia</option>
-                      </select>
+                      {/* Selector de método de pago */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Método de pago
+                        </label>
+                        <select
+                          value={paymentMethod}
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded-lg"
+                        >
+                          <option value="cash">Efectivo</option>
+                          <option value="card">Tarjeta</option>
+                          <option value="transfer">Transferencia</option>
+                        </select>
+                      </div>
+
+                      {/* Selector de tipo de documento */}
+                      <div className="pt-3 border-t border-gray-200">
+                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                          Tipo de documento
+                        </label>
+                        <div className="space-y-2">
+                          {/* Opción: Comprobante de venta */}
+                          <label 
+                            className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                              documentType === DOCUMENT_TYPES.RECEIPT 
+                                ? 'border-blue-500 bg-blue-50' 
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="documentType"
+                              value={DOCUMENT_TYPES.RECEIPT}
+                              checked={documentType === DOCUMENT_TYPES.RECEIPT}
+                              onChange={(e) => setDocumentType(e.target.value)}
+                              className="text-blue-600"
+                            />
+                            <Receipt className="w-5 h-5 text-gray-600" />
+                            <div className="flex-1">
+                              <span className="font-medium">Comprobante de venta</span>
+                              <p className="text-xs text-gray-500">Documento informativo (sin validez fiscal)</p>
+                            </div>
+                          </label>
+
+                          {/* Opción: Factura electrónica */}
+                          <label 
+                            className={`flex items-center gap-3 p-3 border rounded-lg transition-colors ${
+                              !canGenerateElectronicInvoice 
+                                ? 'opacity-50 cursor-not-allowed bg-gray-50' 
+                                : documentType === DOCUMENT_TYPES.ELECTRONIC_INVOICE 
+                                  ? 'border-green-500 bg-green-50 cursor-pointer' 
+                                  : 'border-gray-200 hover:border-gray-300 cursor-pointer'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="documentType"
+                              value={DOCUMENT_TYPES.ELECTRONIC_INVOICE}
+                              checked={documentType === DOCUMENT_TYPES.ELECTRONIC_INVOICE}
+                              onChange={(e) => setDocumentType(e.target.value)}
+                              disabled={!canGenerateElectronicInvoice}
+                              className="text-green-600"
+                            />
+                            <FileText className={`w-5 h-5 ${canGenerateElectronicInvoice ? 'text-green-600' : 'text-gray-400'}`} />
+                            <div className="flex-1">
+                              <span className="font-medium">Factura electrónica</span>
+                              <p className="text-xs text-gray-500">
+                                {canGenerateElectronicInvoice 
+                                  ? 'Documento válido ante la DIAN' 
+                                  : 'Activa la facturación en Configuración'}
+                              </p>
+                            </div>
+                            {canGenerateElectronicInvoice && (
+                              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">DIAN</span>
+                            )}
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Advertencia si es comprobante */}
+                      {documentType === DOCUMENT_TYPES.RECEIPT && (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <p className="text-xs text-amber-800">
+                            ⚠️ El comprobante de venta <strong>no tiene validez fiscal</strong> ante la DIAN.
+                          </p>
+                        </div>
+                      )}
 
                       <Button
                         onClick={processSale}
                         disabled={processing}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white py-4 text-lg"
+                        className={`w-full py-4 text-lg ${
+                          documentType === DOCUMENT_TYPES.ELECTRONIC_INVOICE
+                            ? 'bg-green-600 hover:bg-green-700'
+                            : 'bg-blue-600 hover:bg-blue-700'
+                        } text-white`}
                       >
-                        {processing ? 'Procesando...' : 'Finalizar Venta'}
+                        {processing 
+                          ? 'Procesando...' 
+                          : documentType === DOCUMENT_TYPES.ELECTRONIC_INVOICE
+                            ? '📄 Generar Factura Electrónica'
+                            : '🧾 Generar Comprobante'
+                        }
                       </Button>
 
                       <Button
@@ -644,4 +761,13 @@ function Ventas({ businessId, userRole = 'admin' }) {
   );
 }
 
-export default Ventas;
+// Componente wrapper que proporciona el contexto de facturación
+function VentasWrapper(props) {
+  return (
+    <InvoicingProvider businessId={props.businessId}>
+      <Ventas {...props} />
+    </InvoicingProvider>
+  );
+}
+
+export default VentasWrapper;

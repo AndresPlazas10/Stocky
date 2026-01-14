@@ -4,16 +4,18 @@ import {
   X, 
   Sparkles, 
   Shield, 
-  Printer, 
+  FileText, 
   Receipt, 
-  Package,
+  Building2,
   Users,
   CheckCircle2,
-  Layers
+  Zap,
+  MessageCircle,
+  Settings
 } from 'lucide-react';
 import { Button } from './ui/button';
 
-const CHANGELOG_VERSION = 'v2.0.0-2025-12-28'; // Cambiar esto cuando haya nuevos cambios
+const CHANGELOG_VERSION = 'v2.1.0-2026-02-28'; // Cambiar esto cuando haya nuevos cambios
 
 function ChangelogModal({ forceOpen = false, onClose }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -51,72 +53,76 @@ function ChangelogModal({ forceOpen = false, onClose }) {
 
   const changes = [
     {
-      icon: Sparkles,
-      color: 'from-purple-500 to-pink-500',
-      title: 'Nueva Experiencia con Modales',
-      description: 'Ahora puedes crear y editar productos en modales elegantes que facilitan tu trabajo sin distracciones.',
+      icon: FileText,
+      color: 'from-amber-500 to-orange-500',
+      title: 'Facturacion Electronica DIAN',
+      description: 'Ahora puedes solicitar facturacion electronica valida ante la DIAN directamente desde Stocky.',
       items: [
-        'Modal para crear productos',
-        'Modal para editar productos',
-        'Modal para nueva venta'
+        'Facturas con CUFE y codigo QR',
+        'Validacion automatica con la DIAN',
+        'Envio de PDF por email al cliente',
+        'Integracion con Siigo',
+        'Activacion incluida en tu plan mensual'
       ]
     },
     {
-      icon: Shield,
-      color: 'from-blue-500 to-cyan-500',
-      title: 'Control de Permisos para Empleados',
-      description: 'Mayor seguridad con restricciones específicas para empleados.',
-      items: [
-        'Empleados no pueden editar productos',
-        'Empleados no pueden eliminar ventas',
-        'Empleados no pueden eliminar mesas',
-        'Solo administradores pueden cerrar órdenes'
-      ]
-    },
-    {
-      icon: Printer,
+      icon: MessageCircle,
       color: 'from-green-500 to-emerald-500',
-      title: 'Sistema de Impresión Profesional',
-      description: 'Imprime órdenes de cocina y facturas físicas con formato optimizado para impresoras térmicas.',
+      title: 'Solicita tu Activacion',
+      description: 'El proceso es muy sencillo: contactanos y nosotros nos encargamos de todo.',
       items: [
-        'Impresión de órdenes para cocina (solo platos)',
-        'Facturas físicas para clientes',
-        'Compatible con impresoras térmicas de 80mm',
-        'Formato limpio y profesional'
+        'Contacto directo por WhatsApp',
+        'Configuracion sin complicaciones',
+        'Soporte personalizado',
+        'Activacion en maximo 48 horas habiles'
+      ]
+    },
+    {
+      icon: Building2,
+      color: 'from-blue-500 to-cyan-500',
+      title: 'Datos de tu Negocio',
+      description: 'Agregamos el campo NIT opcional para negocios que deseen facturar.',
+      items: [
+        'NIT opcional en configuracion',
+        'Razon social para facturas',
+        'Datos fiscales seguros',
+        'Funciona igual si no tienes NIT'
       ]
     },
     {
       icon: Receipt,
-      color: 'from-orange-500 to-red-500',
-      title: 'Dos Tipos de Factura',
-      description: 'Ahora puedes elegir entre factura electrónica por email o factura física impresa.',
+      color: 'from-purple-500 to-pink-500',
+      title: 'Comprobantes Mejorados',
+      description: 'Tus ventas siempre generan un comprobante, con o sin facturacion electronica.',
       items: [
-        'Factura Electrónica (envío por email)',
-        'Factura Física (impresión directa)',
-        'Ambas con información completa de la venta'
+        'Comprobantes informativos (sin DIAN)',
+        'Facturas electronicas (con DIAN)',
+        'Aviso legal automatico',
+        'Historial de facturas'
       ]
     },
     {
-      icon: Package,
-      color: 'from-yellow-500 to-orange-500',
-      title: 'Nueva Categoría "Platos"',
-      description: 'Categoría especial para productos que requieren preparación en cocina.',
+      icon: Settings,
+      color: 'from-gray-600 to-gray-800',
+      title: 'Nueva Seccion en Configuracion',
+      description: 'Encuentra todo sobre facturacion en la seccion de Configuracion de tu negocio.',
       items: [
-        'Diferencia entre bebidas y comida',
-        'Solo "Platos" se imprimen para cocina',
-        'Optimización del flujo de trabajo'
+        'Estado de facturacion visible',
+        'Boton para solicitar activacion',
+        'Informacion de resolucion DIAN',
+        'Alertas de vencimiento'
       ]
     },
     {
-      icon: Layers,
-      color: 'from-indigo-500 to-purple-500',
-      title: 'Mejoras de Interfaz',
-      description: 'Múltiples mejoras en la experiencia de usuario y rendimiento.',
+      icon: Zap,
+      color: 'from-yellow-500 to-amber-500',
+      title: 'Mejoras de Rendimiento',
+      description: 'Optimizaciones generales para una experiencia mas fluida.',
       items: [
-        'Navegación más fluida',
-        'Mensajes de confirmación claros',
-        'Corrección de bugs menores',
-        'Mejor rendimiento general'
+        'Carga mas rapida',
+        'Mejor manejo de errores',
+        'Sincronizacion mejorada',
+        'Correccion de bugs menores'
       ]
     }
   ];
@@ -141,7 +147,7 @@ function ChangelogModal({ forceOpen = false, onClose }) {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header con gradiente */}
-            <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 p-8 text-white relative overflow-hidden">
+            <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 p-8 text-white relative overflow-hidden">
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32" />
               <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -ml-24 -mb-24" />
               
@@ -149,11 +155,11 @@ function ChangelogModal({ forceOpen = false, onClose }) {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm">
-                      <Sparkles className="w-8 h-8" />
+                      <FileText className="w-8 h-8" />
                     </div>
                     <div>
-                      <h1 className="text-3xl font-bold">¡Novedades en Stocky!</h1>
-                      <p className="text-white/90 text-sm mt-1">Versión 2.0 - Diciembre 2025</p>
+                      <h1 className="text-3xl font-bold">Novedades en Stocky!</h1>
+                      <p className="text-white/90 text-sm mt-1">Version 2.1 - Enero 2026</p>
                     </div>
                   </div>
                   <button
@@ -164,7 +170,7 @@ function ChangelogModal({ forceOpen = false, onClose }) {
                   </button>
                 </div>
                 <p className="text-white/90 text-lg">
-                  Hemos mejorado tu experiencia con nuevas funcionalidades diseñadas para optimizar tu trabajo diario.
+                  Ahora puedes tener facturacion electronica valida ante la DIAN. Contactanos para activarla!
                 </p>
               </div>
             </div>
@@ -206,16 +212,20 @@ function ChangelogModal({ forceOpen = false, onClose }) {
               </div>
 
               {/* Mensaje final */}
-              <div className="mt-8 p-6 bg-gradient-to-r from-purple-100 to-pink-100 rounded-2xl border-2 border-purple-200">
+              <div className="mt-8 p-6 bg-gradient-to-r from-amber-100 to-orange-100 rounded-2xl border-2 border-amber-200">
                 <div className="flex items-center gap-3 mb-3">
-                  <Users className="w-6 h-6 text-purple-600" />
-                  <h4 className="text-lg font-bold text-purple-900">
-                    ¡Gracias por usar Stocky!
+                  <MessageCircle className="w-6 h-6 text-amber-600" />
+                  <h4 className="text-lg font-bold text-amber-900">
+                    Quieres facturacion electronica?
                   </h4>
                 </div>
-                <p className="text-purple-800">
-                  Seguimos trabajando para brindarte la mejor experiencia. Si tienes alguna sugerencia o encuentras algún problema, no dudes en contactarnos.
+                <p className="text-amber-800 mb-4">
+                  Ve a <strong>Configuracion</strong> y solicita la activacion. Te contactaremos en maximo 48 horas habiles para configurar todo.
                 </p>
+                <div className="flex items-center gap-2 text-sm text-amber-700">
+                  <Shield className="w-4 h-4" />
+                  <span>Incluido en tu plan mensual - Sin costo adicional</span>
+                </div>
               </div>
             </div>
 
@@ -223,10 +233,10 @@ function ChangelogModal({ forceOpen = false, onClose }) {
             <div className="p-6 bg-gray-50 border-t border-gray-200">
               <Button
                 onClick={handleClose}
-                className="w-full gradient-primary text-white hover:opacity-90 h-12 text-lg font-semibold rounded-xl shadow-lg"
+                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:opacity-90 h-12 text-lg font-semibold rounded-xl shadow-lg"
               >
                 <CheckCircle2 className="w-5 h-5 mr-2" />
-                ¡Entendido! Comenzar a usar las novedades
+                Entendido!
               </Button>
             </div>
           </motion.div>

@@ -18,6 +18,8 @@ import {
   Database,
   Shield
 } from 'lucide-react';
+import { InvoicingProvider } from '../../context/InvoicingContext';
+import InvoicingSection from '../Settings/InvoicingSection';
 
 function Configuracion({ user, business, onBusinessUpdate }) {
   const [loading, setLoading] = useState(false);
@@ -27,6 +29,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
   
   const [businessData, setBusinessData] = useState({
     name: '',
+    nit: '',
     email: '',
     phone: '',
     address: ''
@@ -36,6 +39,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
     if (business) {
       setBusinessData({
         name: business.name || '',
+        nit: business.nit || '',
         email: business.email || '',
         phone: business.phone || '',
         address: business.address || ''
@@ -68,6 +72,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
         .from('businesses')
         .update({
           name: businessData.name,
+          nit: businessData.nit || null,
           email: businessData.email,
           phone: businessData.phone,
           address: businessData.address
@@ -255,6 +260,14 @@ function Configuracion({ user, business, onBusinessUpdate }) {
 
                 <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
                   <div className="flex items-center gap-3 mb-2">
+                    <Shield className="w-5 h-5 text-accent-600" />
+                    <span className="text-sm text-gray-600 font-medium">NIT</span>
+                  </div>
+                  <p className="text-lg font-semibold text-gray-800 pl-8">{business?.nit || 'No registrado'}</p>
+                </div>
+
+                <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
+                  <div className="flex items-center gap-3 mb-2">
                     <Mail className="w-5 h-5 text-accent-600" />
                     <span className="text-sm text-gray-600 font-medium">Email</span>
                   </div>
@@ -295,6 +308,22 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                       required
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
                       placeholder="Mi Negocio S.A.S"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                      <Shield className="w-4 h-4 text-accent-600" />
+                      NIT
+                      <span className="text-xs font-normal text-gray-400">(opcional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="nit"
+                      value={businessData.nit}
+                      onChange={handleBusinessChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
+                      placeholder="900.123.456-7"
                     />
                   </div>
 
@@ -368,6 +397,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                       setEditingBusiness(false);
                       setBusinessData({
                         name: business?.name || '',
+                        nit: business?.nit || '',
                         email: business?.email || '',
                         phone: business?.phone || '',
                         address: business?.address || ''
@@ -435,6 +465,23 @@ function Configuracion({ user, business, onBusinessUpdate }) {
             </div>
           </div>
         </motion.div>
+
+        {/* Sección de Facturación Electrónica */}
+        {business && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <InvoicingProvider businessId={business.id}>
+              <InvoicingSection 
+                businessId={business.id}
+                businessName={business.name}
+                businessNit={business.nit}
+              />
+            </InvoicingProvider>
+          </motion.div>
+        )}
       </div>
     </div>
   );
