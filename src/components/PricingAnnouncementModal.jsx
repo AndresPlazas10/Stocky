@@ -33,7 +33,7 @@ function PricingAnnouncementModal({ forceOpen = false, onClose }) {
     const todayString = today.toDateString();
     
     // Solo mostrar si:
-    // 1. Ya pasó la fecha de lanzamiento (1 de febrero 2026)
+    // 1. Ya pasó la fecha de lanzamiento (20 de enero 2026)
     // 2. Es día 1 del mes
     // 3. No se ha mostrado hoy
     if (today >= LAUNCH_DATE && dayOfMonth === PAYMENT_DAY && lastShownDate !== todayString) {
@@ -95,7 +95,7 @@ function PricingAnnouncementModal({ forceOpen = false, onClose }) {
                     </div>
                     <div>
                       <h1 className="text-3xl font-bold">💰 Planes y Precios Stocky</h1>
-                      <p className="text-white/90 text-sm mt-1">Información Actualizada - Febrero 2026</p>
+                      <p className="text-white/90 text-sm mt-1">Información Actualizada - Enero 2026</p>
                     </div>
                   </div>
                   <button
