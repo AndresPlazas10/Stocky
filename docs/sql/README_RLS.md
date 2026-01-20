@@ -2,7 +2,7 @@
 
 ## 📋 Resumen Ejecutivo
 
-Este paquete contiene un sistema **COMPLETO** de Row Level Security (RLS) diseñado específicamente para Stockly, con análisis profundo de la base de datos, lógica de negocio, y políticas optimizadas para cada rol de usuario.
+Este paquete contiene un sistema **COMPLETO** de Row Level Security (RLS) diseñado específicamente para Stocky, con análisis profundo de la base de datos, lógica de negocio, y políticas optimizadas para cada rol de usuario.
 
 ### ✅ Lo que se Entrega
 
@@ -356,7 +356,7 @@ Las funciones con `SECURITY DEFINER` se ejecutan con permisos del **creador de l
 
 ## 📝 Notas Finales
 
-Este sistema RLS fue diseñado específicamente para **Stockly** después de un análisis exhaustivo de:
+Este sistema RLS fue diseñado específicamente para **Stocky** después de un análisis exhaustivo de:
 
 - ✅ Estructura de 14 tablas
 - ✅ 80+ queries en componentes React
@@ -377,7 +377,7 @@ Es un sistema **production-ready** que puede ejecutarse tal cual está, pero sie
 **Creado por:** GitHub Copilot + Andres Plazas  
 **Fecha:** Diciembre 2024  
 **Versión:** 1.0  
-**Licencia:** Uso exclusivo para Stockly
+**Licencia:** Uso exclusivo para Stocky
 
 ---
 

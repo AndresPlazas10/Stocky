@@ -1,7 +1,7 @@
 # 🔍 ANÁLISIS COMPLETO - ERRORES ACTUALES Y POTENCIALES
 
 **Fecha:** 28 de diciembre de 2025  
-**Proyecto:** Stockly - Sistema POS  
+**Proyecto:** Stocky - Sistema POS  
 **Alcance:** Código, configuración, seguridad, performance, compatibilidad
 
 ---
@@ -736,7 +736,7 @@ No se rastrean eventos de usuario para mejorar UX.
 
 ## 📝 CONCLUSIÓN
 
-El proyecto **Stockly** tiene una base sólida con RLS, índices y arquitectura moderna. Los problemas identificados son **comunes en proyectos en crecimiento** y pueden resolverse progresivamente.
+El proyecto **Stocky** tiene una base sólida con RLS, índices y arquitectura moderna. Los problemas identificados son **comunes en proyectos en crecimiento** y pueden resolverse progresivamente.
 
 **Prioridad #1:** Corregir race conditions en stock para evitar pérdida de inventario.  
 **Prioridad #2:** Eliminar console.log para producción.  

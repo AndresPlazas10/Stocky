@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
-import { formatPrice, formatNumber } from '../../utils/formatters.js';
+import { formatPrice, formatNumber, formatDateTimeTicket } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -242,7 +242,8 @@ function Mesas({ businessId }) {
         const { data: items } = await supabase
           .from('order_items')
           .select('*, products(name, code)')
-          .eq('order_id', updatedOrder.id);
+          .eq('order_id', updatedOrder.id)
+          .order('id', { ascending: true });
         
         if (items) {
           setOrderItems(items);
@@ -268,7 +269,7 @@ function Mesas({ businessId }) {
         .from('orders')
         .select(`
           *,
-          order_items (
+          order_items!order_items_order_id_fkey (
             id,
             quantity,
             price,
@@ -277,6 +278,7 @@ function Mesas({ businessId }) {
           )
         `)
         .eq('id', orderId)
+        .order('id', { foreignTable: 'order_items', ascending: true })
         .single()
         .then(({ data: updatedOrder }) => {
           if (updatedOrder) {
@@ -413,12 +415,13 @@ function Mesas({ businessId }) {
         .from('orders')
         .select(`
           *,
-          order_items (
+          order_items!order_items_order_id_fkey (
             *,
             products (name, code, category)
           )
         `)
         .eq('id', mesa.current_order_id)
+        .order('id', { foreignTable: 'order_items', ascending: true })
         .maybeSingle();
 
       if (error) {
@@ -494,7 +497,8 @@ function Mesas({ businessId }) {
       const { data: freshItems } = await supabase
         .from('order_items')
         .select('*, products(name, code)')
-        .eq('order_id', selectedMesa.current_order_id);
+        .eq('order_id', selectedMesa.current_order_id)
+        .order('id', { ascending: true });
       if (freshItems) setOrderItems(freshItems);
     }
   }, [selectedMesa, updateOrderTotal]);
@@ -630,7 +634,8 @@ function Mesas({ businessId }) {
       const { data: freshItems } = await supabase
         .from('order_items')
         .select('*, products(name, code)')
-        .eq('order_id', selectedMesa.current_order_id);
+        .eq('order_id', selectedMesa.current_order_id)
+        .order('id', { ascending: true });
       if (freshItems) setOrderItems(freshItems);
     }
   }, [selectedMesa, orderItems, quantityToAdd, updateOrderTotal]);
@@ -686,7 +691,8 @@ function Mesas({ businessId }) {
       const { data: freshItems } = await supabase
         .from('order_items')
         .select('*, products(name, code)')
-        .eq('order_id', selectedMesa.current_order_id);
+        .eq('order_id', selectedMesa.current_order_id)
+        .order('id', { ascending: true });
       if (freshItems) setOrderItems(freshItems);
     } finally {
       // Siempre liberar el bloqueo
@@ -1017,13 +1023,7 @@ function Mesas({ businessId }) {
         <div class="header">
           <h1>ORDEN DE COCINA</h1>
           <p>Mesa #${selectedMesa.table_number}</p>
-          <p>${new Date().toLocaleDateString('es-ES', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}</p>
-          <p>${new Date().toLocaleTimeString('es-ES')}</p>
+          <p>${formatDateTimeTicket(new Date())}</p>
         </div>
         
         <div class="info">

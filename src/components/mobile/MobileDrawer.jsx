@@ -72,7 +72,7 @@ export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userNam
             {/* Header del drawer */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 gradient-primary">
               <div className="flex-1">
-                <h2 className="text-white font-bold text-lg">{businessName || 'Stockly'}</h2>
+                <h2 className="text-white font-bold text-lg">{businessName || 'Stocky'}</h2>
                 <p className="text-white/80 text-sm">{userName || 'Usuario'}</p>
               </div>
               <button

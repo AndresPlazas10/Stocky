@@ -1,78 +1,56 @@
 // ============================================
-// 🧾 Hook React para Facturación Siigo
+// 🧾 Hook React para Facturación Siigo (DEPRECATED)
 // ============================================
 // Ubicación: src/hooks/useSiigoInvoice.js
 // 
-// Hook personalizado para manejar la facturación electrónica
-// con Siigo desde componentes React
+// ⚠️ DEPRECATED: Stocky ya NO es proveedor de facturación electrónica.
+// Este hook está deprecado. Todas las funciones retornan estado deshabilitado.
 
 import { useState, useCallback } from 'react'
-import { siigoService, ID_TYPES, PAYMENT_METHODS, TAX_RATES } from '../services/siigoService'
+import { ID_TYPES, PAYMENT_METHODS, TAX_RATES } from '../services/siigoService'
 
 /**
- * Hook para manejar la generación de facturas electrónicas
+ * ⚠️ DEPRECATED - Hook para facturación (ya no genera facturas electrónicas)
  * @param {string} businessId - ID del negocio
- * @returns {Object} Estado y funciones para facturación
+ * @returns {Object} Estado y funciones (todas deshabilitadas)
  */
 export function useSiigoInvoice(businessId) {
   // Estados
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState('La facturación electrónica a través de Stocky ya no está disponible')
   const [lastInvoice, setLastInvoice] = useState(null)
-  const [canInvoice, setCanInvoice] = useState(null)
+  const [canInvoice, setCanInvoice] = useState(false)
 
   /**
-   * Verifica si el negocio puede facturar electrónicamente
+   * ⚠️ DEPRECATED - Siempre retorna false
    */
   const checkCanInvoice = useCallback(async () => {
-    if (!businessId) return false
-
-    const result = await siigoService.canBusinessInvoice(businessId)
-    setCanInvoice(result.canInvoice)
-    return result.canInvoice
-  }, [businessId])
+    return false
+  }, [])
 
   /**
-   * Genera una factura electrónica
-   * @param {Object} invoiceData - Datos de la factura
-   * @returns {Promise<Object>} Resultado de la facturación
+   * ⚠️ DEPRECATED - Siempre retorna error
    */
   const createInvoice = useCallback(async (invoiceData) => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const result = await siigoService.createInvoice({
-        ...invoiceData,
-        business_id: businessId,
-      })
-
-      if (result.success) {
-        setLastInvoice(result)
-      } else {
-        setError(result.error)
-      }
-
-      return result
-    } catch (err) {
-      const errorMessage = err.message || 'Error desconocido'
-      setError(errorMessage)
-      return { success: false, error: errorMessage }
-    } finally {
-      setLoading(false)
+    return {
+      success: false,
+      isInformativeOnly: true,
+      error: 'La facturación electrónica a través de Stocky ya no está disponible',
+      message: '⚠️ Los negocios deben facturar directamente en Siigo (incluido en su plan).',
     }
-  }, [businessId])
+  }, [])
 
   /**
-   * Genera factura desde una venta del POS
-   * @param {Object} sale - Datos de la venta
-   * @param {Object} customer - Datos del cliente
-   * @returns {Promise<Object>} Resultado de la facturación
+   * ⚠️ DEPRECATED - Siempre retorna error
    */
   const createInvoiceFromSale = useCallback(async (sale, customer) => {
-    const invoiceData = siigoService.prepareSaleForInvoice(sale, customer, businessId)
-    return createInvoice(invoiceData)
-  }, [businessId, createInvoice])
+    return {
+      success: false,
+      isInformativeOnly: true,
+      error: 'La facturación electrónica a través de Stocky ya no está disponible',
+      message: '⚠️ Los negocios deben facturar directamente en Siigo.',
+    }
+  }, [])
 
   /**
    * Limpia el estado de error
@@ -90,10 +68,10 @@ export function useSiigoInvoice(businessId) {
 
   return {
     // Estados
-    loading,
+    loading: false,
     error,
-    lastInvoice,
-    canInvoice,
+    lastInvoice: null,
+    canInvoice: false,
 
     // Funciones
     checkCanInvoice,
@@ -102,7 +80,7 @@ export function useSiigoInvoice(businessId) {
     clearError,
     clearLastInvoice,
 
-    // Constantes útiles
+    // Constantes útiles (se mantienen por compatibilidad)
     ID_TYPES,
     PAYMENT_METHODS,
     TAX_RATES,
@@ -110,43 +88,42 @@ export function useSiigoInvoice(businessId) {
 }
 
 /**
- * Hook para obtener el historial de facturas
+ * ⚠️ DEPRECATED - Hook para historial (ya no consulta DB)
  * @param {string} businessId - ID del negocio
- * @returns {Object} Estado y funciones para historial
+ * @returns {Object} Estado vacío
  */
 export function useSiigoHistory(businessId) {
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(false)
-  const [stats, setStats] = useState(null)
+  const [stats, setStats] = useState({
+    total_invoices: 0,
+    successful_invoices: 0,
+    failed_invoices: 0,
+    total_amount: 0,
+  })
 
   /**
-   * Carga el historial de facturas
+   * ⚠️ DEPRECATED - Ya no carga historial
    */
   const loadHistory = useCallback(async (options = {}) => {
-    if (!businessId) return
-
-    setLoading(true)
-    try {
-      const data = await siigoService.getInvoiceHistory(businessId, options)
-      setInvoices(data)
-    } finally {
-      setLoading(false)
-    }
-  }, [businessId])
+    setInvoices([])
+  }, [])
 
   /**
-   * Carga las estadísticas de facturación
+   * ⚠️ DEPRECATED - Ya no carga estadísticas
    */
   const loadStats = useCallback(async (fromDate, toDate) => {
-    if (!businessId) return
-
-    const data = await siigoService.getInvoiceStats(businessId, fromDate, toDate)
-    setStats(data)
-  }, [businessId])
+    setStats({
+      total_invoices: 0,
+      successful_invoices: 0,
+      failed_invoices: 0,
+      total_amount: 0,
+    })
+  }, [])
 
   return {
-    invoices,
-    loading,
+    invoices: [],
+    loading: false,
     stats,
     loadHistory,
     loadStats,
@@ -154,7 +131,7 @@ export function useSiigoHistory(businessId) {
 }
 
 /**
- * Hook para gestionar las ciudades DANE
+ * Hook para gestionar las ciudades DANE (se mantiene funcional)
  * @returns {Object} Estado y funciones para ciudades
  */
 export function useDaneCities() {
@@ -162,13 +139,28 @@ export function useDaneCities() {
   const [loading, setLoading] = useState(false)
 
   /**
-   * Busca ciudades por nombre
+   * Busca ciudades por nombre (aún funcional - tabla no deprecada)
    */
   const searchCities = useCallback(async (term) => {
     setLoading(true)
     try {
-      const data = await siigoService.getCities(term)
-      setCities(data)
+      // Nota: dane_cities no está deprecada, se mantiene funcional
+      const { supabase } = await import('../supabase/Client')
+      let query = supabase
+        .from('dane_cities')
+        .select('city_code, city_name, department_name')
+        .order('city_name')
+        .limit(50)
+
+      if (term) {
+        query = query.ilike('city_name', `%${term}%`)
+      }
+
+      const { data } = await query
+      setCities(data || [])
+    } catch (error) {
+      console.error('Error cargando ciudades:', error)
+      setCities([])
     } finally {
       setLoading(false)
     }

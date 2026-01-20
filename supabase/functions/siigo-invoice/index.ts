@@ -4,6 +4,28 @@
 // ============================================
 // Ubicación: supabase/functions/siigo-invoice/index.ts
 // 
+// ⚠️ ⚠️ ⚠️ ADVERTENCIA IMPORTANTE ⚠️ ⚠️ ⚠️
+// 
+// ESTA INTEGRACIÓN FUE DESHABILITADA POR DECISIÓN DE NEGOCIO
+// 
+// Razones:
+// 1. Costos operativos elevados (API Siigo: $200-500 USD/mes)
+// 2. Complejidad técnica y legal innecesaria
+// 3. Riesgo de responsabilidad fiscal ante DIAN
+// 4. Obligaciones de custodia de documentos (10 años)
+// 
+// Modelo actual (Enero 2026):
+// - Stocky NO emite facturas electrónicas
+// - Solo genera comprobantes informativos (sin validez DIAN)
+// - Cada negocio factura directamente en Siigo (plan incluido)
+// - Responsabilidad fiscal 100% del comercio
+// 
+// Este código se mantiene como referencia para posible
+// implementación futura bajo condiciones diferentes.
+// 
+// NO USAR EN PRODUCCIÓN SIN REVISIÓN LEGAL Y ESTRATÉGICA
+// ============================================
+// 
 // CONFIGURACIÓN REQUERIDA:
 // supabase secrets set SIIGO_API_URL=https://api.siigo.com
 // 

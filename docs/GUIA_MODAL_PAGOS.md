@@ -2,7 +2,7 @@
 
 ## 📋 Descripción
 
-Sistema de advertencia automática para negocios que no han realizado el pago mensual de Stockly.
+Sistema de advertencia automática para negocios que no han realizado el pago mensual de Stocky.
 
 ## 🎯 Funcionamiento
 

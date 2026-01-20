@@ -2,7 +2,7 @@
 
 ## Resumen
 
-La facturación electrónica en Stockly es **completamente opcional**. Cada negocio puede elegir si desea activarla o no. Mientras no esté activada, el sistema genera **comprobantes de venta informativos** que no tienen validez fiscal ante la DIAN.
+La facturación electrónica en Stocky es **completamente opcional**. Cada negocio puede elegir si desea activarla o no. Mientras no esté activada, el sistema genera **comprobantes de venta informativos** que no tienen validez fiscal ante la DIAN.
 
 ## Arquitectura
 
@@ -174,7 +174,7 @@ Desplegar `supabase/functions/siigo-invoice/index.ts`
 
 ### En Configuración (cuando no está activa)
 > 📋 **La facturación electrónica es opcional**
-> Puedes usar Stockly sin facturación electrónica y activarla cuando lo necesites.
+> Puedes usar Stocky sin facturación electrónica y activarla cuando lo necesites.
 
 ### Advertencia de resolución próxima a vencer
 > ⚠️ Tu resolución DIAN vence en X días

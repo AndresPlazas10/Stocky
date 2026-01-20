@@ -14,7 +14,7 @@ Esta guía te ayudará a configurar las variables de entorno necesarias para que
 ## 🔧 Paso 1: Acceder a la Configuración (30 segundos)
 
 1. Ve a https://vercel.com/dashboard
-2. Selecciona tu proyecto **Stockly** (o como lo hayas nombrado)
+2. Selecciona tu proyecto **Stocky** (o como lo hayas nombrado)
 3. Click en **Settings** (arriba a la derecha)
 4. En el menú lateral izquierdo, click en **Environment Variables**
 
@@ -108,7 +108,7 @@ Después de agregar las variables, debes redesplegar para que tomen efecto:
 Haz un commit vacío para forzar redespliegue:
 
 ```bash
-cd /Users/andres_plazas/Desktop/Stockly
+cd /Users/andres_plazas/Desktop/Stocky
 git commit --allow-empty -m "chore: trigger redeploy for Resend config"
 git push origin main
 ```

@@ -126,7 +126,7 @@ CREATE OR REPLACE FUNCTION generate_product_code(p_business_id UUID)...
 ### 6. Build Local (Verificación)
 
 ```bash
-cd /Users/andres_plazas/Desktop/Stockly
+cd /Users/andres_plazas/Desktop/Stocky
 npm run build
 
 # Verificar:

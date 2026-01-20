@@ -1,11 +1,11 @@
 // ============================================
-// 🧾 Cliente Siigo para Frontend
-// Facturación Electrónica DIAN Colombia
+// 🧾 Cliente Siigo para Frontend (DEPRECATED)
 // ============================================
 // Ubicación: src/services/siigoService.js
 // 
-// Este servicio conecta el frontend con la Edge Function
-// de Siigo para generar facturas electrónicas
+// ⚠️ DEPRECATED: Stocky ya NO es proveedor de facturación electrónica.
+// Este servicio está deprecado. Todas las funciones retornan estado deshabilitado.
+// Los negocios facturan directamente en Siigo (incluido en su plan).
 
 import { supabase } from '../supabase/Client'
 
@@ -47,96 +47,28 @@ export const TAX_RATES = [
 
 export const siigoService = {
   /**
-   * Verifica si un negocio puede generar facturas electrónicas
+   * ⚠️ DEPRECATED - Siempre retorna false
    * @param {string} businessId - ID del negocio
    * @returns {Promise<{canInvoice: boolean, message?: string}>}
    */
   async canBusinessInvoice(businessId) {
-    try {
-      const { data, error } = await supabase.rpc('can_business_invoice', {
-        p_business_id: businessId,
-      })
-
-      if (error) throw error
-
-      return {
-        canInvoice: data === true,
-        message: data ? null : 'Negocio no habilitado para facturación electrónica DIAN',
-      }
-    } catch (error) {
-      console.error('Error verificando habilitación:', error)
-      return {
-        canInvoice: false,
-        message: 'Error verificando estado de facturación',
-      }
+    return {
+      canInvoice: false,
+      message: 'Stocky ya no es proveedor de facturación electrónica. Los negocios facturan directamente en Siigo.',
     }
   },
 
   /**
-   * Genera una factura electrónica a través de Siigo
+   * ⚠️ DEPRECATED - Ya no genera facturas electrónicas
    * @param {Object} invoiceData - Datos de la factura
-   * @returns {Promise<Object>} Resultado con CUFE, QR, PDF, etc.
+   * @returns {Promise<Object>} Siempre retorna error
    */
   async createInvoice(invoiceData) {
-    try {
-      // Obtener token de sesión
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        throw new Error('Debes iniciar sesión para generar facturas')
-      }
-
-      // Validar datos antes de enviar
-      const validationErrors = this.validateInvoiceData(invoiceData)
-      if (validationErrors.length > 0) {
-        return {
-          success: false,
-          error: 'Errores de validación',
-          details: validationErrors,
-        }
-      }
-
-      // Llamar a la Edge Function
-      const response = await fetch(SIIGO_FUNCTION_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(invoiceData),
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        // Manejar error de negocio no habilitado
-        if (result.error_code === 'BUSINESS_NOT_ENABLED') {
-          return {
-            success: false,
-            isInformativeOnly: true,
-            error: result.error,
-            message: '⚠️ Este documento es solo informativo. No constituye factura electrónica válida ante la DIAN.',
-          }
-        }
-
-        return {
-          success: false,
-          error: result.error || 'Error generando factura',
-          error_code: result.error_code,
-          details: result.details,
-        }
-      }
-
-      return {
-        success: true,
-        ...result.data,
-      }
-    } catch (error) {
-      console.error('Error en siigoService.createInvoice:', error)
-      return {
-        success: false,
-        error: error.message || 'Error de conexión con el servicio de facturación',
-      }
+    return {
+      success: false,
+      isInformativeOnly: true,
+      error: 'La facturación electrónica a través de Stocky ya no está disponible',
+      message: '⚠️ Los negocios deben facturar directamente en Siigo (incluido en su plan).',
     }
   },
 
@@ -271,69 +203,28 @@ export const siigoService = {
   },
 
   /**
-   * Obtiene el historial de facturas de un negocio
+   * ⚠️ DEPRECATED - Ya no consulta historial
    * @param {string} businessId - ID del negocio
    * @param {Object} options - Opciones de filtrado
-   * @returns {Promise<Array>} Lista de facturas
+   * @returns {Promise<Array>} Siempre retorna array vacío
    */
   async getInvoiceHistory(businessId, options = {}) {
-    try {
-      const { from, to, status, limit = 50 } = options
-
-      let query = supabase
-        .from('siigo_invoice_logs')
-        .select('*')
-        .eq('business_id', businessId)
-        .order('created_at', { ascending: false })
-        .limit(limit)
-
-      if (from) {
-        query = query.gte('created_at', from)
-      }
-      if (to) {
-        query = query.lte('created_at', to)
-      }
-      if (status) {
-        query = query.eq('status', status)
-      }
-
-      const { data, error } = await query
-
-      if (error) throw error
-
-      return data
-    } catch (error) {
-      console.error('Error obteniendo historial:', error)
-      return []
-    }
+    return []
   },
 
   /**
-   * Obtiene estadísticas de facturación
+   * ⚠️ DEPRECATED - Ya no consulta estadísticas
    * @param {string} businessId - ID del negocio
    * @param {string} fromDate - Fecha inicio (YYYY-MM-DD)
    * @param {string} toDate - Fecha fin (YYYY-MM-DD)
-   * @returns {Promise<Object>} Estadísticas
+   * @returns {Promise<Object>} Siempre retorna estadísticas en cero
    */
   async getInvoiceStats(businessId, fromDate, toDate) {
-    try {
-      const { data, error } = await supabase.rpc('get_invoice_stats', {
-        p_business_id: businessId,
-        p_from_date: fromDate,
-        p_to_date: toDate,
-      })
-
-      if (error) throw error
-
-      return data?.[0] || {
-        total_invoices: 0,
-        successful_invoices: 0,
-        failed_invoices: 0,
-        total_amount: 0,
-      }
-    } catch (error) {
-      console.error('Error obteniendo estadísticas:', error)
-      return null
+    return {
+      total_invoices: 0,
+      successful_invoices: 0,
+      failed_invoices: 0,
+      total_amount: 0,
     }
   },
 
@@ -366,38 +257,14 @@ export const siigoService = {
   },
 
   /**
-   * Verifica el estado de las credenciales Siigo del negocio
+   * ⚠️ DEPRECATED - Ya no consulta credenciales
    * @param {string} businessId - ID del negocio
-   * @returns {Promise<Object>} Estado de las credenciales
+   * @returns {Promise<Object>} Siempre retorna no configurado
    */
   async getCredentialsStatus(businessId) {
-    try {
-      const { data, error } = await supabase
-        .from('business_siigo_credentials')
-        .select('is_enabled, is_production, resolution_number, resolution_valid_to')
-        .eq('business_id', businessId)
-        .single()
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          return { configured: false }
-        }
-        throw error
-      }
-
-      return {
-        configured: true,
-        isEnabled: data.is_enabled,
-        isProduction: data.is_production,
-        resolutionNumber: data.resolution_number,
-        resolutionValidTo: data.resolution_valid_to,
-        isResolutionExpired: data.resolution_valid_to 
-          ? new Date(data.resolution_valid_to) < new Date() 
-          : false,
-      }
-    } catch (error) {
-      console.error('Error verificando credenciales:', error)
-      return { configured: false, error: error.message }
+    return { 
+      configured: false,
+      message: 'Stocky ya no gestiona credenciales Siigo. Los negocios deben configurar Siigo directamente.',
     }
   },
 }

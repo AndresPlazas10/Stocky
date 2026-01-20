@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client';
 import { getFilteredSales } from '../../services/salesService';
 import SalesFilters from '../Filters/SalesFilters';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
-import { formatPrice, formatNumber, formatDate, formatDateOnly } from '../../utils/formatters.js';
+import { formatPrice, formatNumber, formatDate, formatDateOnly, formatDateTimeTicket } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
+import { queryCache } from '../../utils/queryCache.js';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -28,6 +29,8 @@ import {
   X,
   Printer
 } from 'lucide-react';
+import PrimeraVentaModal from '../Modals/PrimeraVentaModal';
+import ComprobanteDisclaimer from '../Legal/ComprobanteDisclaimer';
 
 // Función helper pura fuera del componente (no se recrea en renders)
 const getVendedorName = (venta) => {
@@ -80,14 +83,20 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [invoiceCustomerEmail, setInvoiceCustomerEmail] = useState('');
   const [invoiceCustomerIdNumber, setInvoiceCustomerIdNumber] = useState('');
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
+  
+  // Modal educativo de primera venta
+  const [showFirstSaleModal, setShowFirstSaleModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Funciones de carga memoizadas
+  // Funciones de carga memoizadas SIN cache para evitar problemas de actualización
   const loadVentas = useCallback(async (filters = currentFilters, pagination = {}) => {
     try {
       const lim = Number(pagination.limit ?? limit);
       const off = Number(pagination.offset ?? ((page - 1) * lim));
+      
+      // SIEMPRE cargar datos frescos - sin caché
       const { data, count } = await getFilteredSales(businessId, filters, { limit: lim, offset: off });
+      
       setVentas(data || []);
       setTotalCount(count || 0);
     } catch (err) {
@@ -224,6 +233,9 @@ function Ventas({ businessId, userRole = 'admin' }) {
         return [saleWithDetails, ...prev];
       });
       
+      // Incrementar el contador total
+      setTotalCount(prev => prev + 1);
+      
       setSuccess('✨ Nueva venta registrada');
       setTimeout(() => setSuccess(null), 3000);
     },
@@ -232,6 +244,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     },
     onDelete: (deletedSale) => {
       setVentas(prev => prev.filter(v => v.id !== deletedSale.id));
+      setTotalCount(prev => Math.max(0, prev - 1));
     }
   });
 
@@ -415,6 +428,14 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
       // Recargar ventas inmediatamente
       await loadVentas(currentFilters, { limit, offset: (page - 1) * limit });
+      
+      // Verificar si es la primera venta y mostrar modal educativo
+      const hideModal = localStorage.getItem('stockly_hide_first_sale_modal');
+      if (!hideModal && ventas.length === 0) {
+        setTimeout(() => {
+          setShowFirstSaleModal(true);
+        }, 1000); // Delay para que se vea primero el mensaje de éxito
+      }
       
     } catch (error) {
       
@@ -636,15 +657,13 @@ function Ventas({ businessId, userRole = 'admin' }) {
       </head>
       <body>
         <div class="header">
-          <h1>COMPROBANTE DE PAGO</h1>
-          <p>Sistema Stockly</p>
-          <p>${new Date(venta.created_at).toLocaleDateString('es-ES', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}</p>
-          <p>${new Date(venta.created_at).toLocaleTimeString('es-ES')}</p>
+          <h1>═══════════════════════════════════</h1>
+          <h1>COMPROBANTE DE VENTA</h1>
+          <h1>═══════════════════════════════════</h1>
+          <p style="margin: 10px 0; font-size: 9px; border-top: 1px dashed #000; padding-top: 8px;">
+            Sistema Stocky<br>
+            ${formatDateTimeTicket(venta.created_at)}
+          </p>
         </div>
         
         <div class="info">
@@ -695,10 +714,37 @@ function Ventas({ businessId, userRole = 'admin' }) {
         
         <div class="footer">
           <p>¡Gracias por su compra!</p>
-        </div>
-        
-        <div class="legal-notice">
-          El presente comprobante es informativo. La responsabilidad tributaria recae exclusivamente en el establecimiento emisor.
+          <div style="margin: 12px 0; padding: 8px; background: #f9f9f9; border-radius: 4px; border-left: 3px solid #666;">
+            <p style="margin: 0 0 4px 0; font-size: 8px; font-weight: bold; color: #333; text-transform: uppercase; letter-spacing: 0.5px;">
+              💬 Frase del día
+            </p>
+            <p style="margin: 0; font-size: 9px; font-style: italic; color: #555; line-height: 1.4;">
+              "${(() => {
+                const frases = [
+                  'El éxito es la suma de pequeños esfuerzos repetidos día tras día.', 
+                  'La mejor manera de predecir el futuro es crearlo.', 
+                  'El cliente no siempre tiene la razón, pero siempre es el cliente.',
+                  'La calidad nunca es un accidente; siempre es el resultado del esfuerzo.',
+                  'Haz que cada cliente se sienta único y especial.',
+                  'El secreto del cambio es enfocar toda tu energía no en luchar contra lo viejo, sino en construir lo nuevo.',
+                  'Tu actitud determina tu dirección.',
+                  'Los negocios exitosos se construyen con relaciones, no con transacciones.',
+                  'La excelencia no es un acto, es un hábito.',
+                  'Cada día es una nueva oportunidad para mejorar.'
+                ];
+                const hoy = new Date();
+                const inicioDia = new Date(hoy.getFullYear(), 0, 0);
+                const diff = hoy - inicioDia;
+                const unDia = 1000 * 60 * 60 * 24;
+                const diaDelAno = Math.floor(diff / unDia);
+                return frases[diaDelAno % frases.length];
+              })()}"
+            </p>
+          </div>
+          <p style="margin: 10px 0; font-size: 8px; border-top: 1px dashed #000; padding-top: 5px;">
+            Generado por Stocky - Sistema de Gestión POS<br>
+            www.stockypos.app
+          </p>
         </div>
         
         <script>
@@ -1417,14 +1463,14 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                 className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
                               >
                                 <Mail className="w-4 h-4" />
-                                <span className="text-sm">Factura por Correo</span>
+                                <span className="text-sm">Enviar Comprobante</span>
                               </Button>
                               <Button
                                 onClick={() => handlePrintInvoice(venta)}
                                 className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
                               >
                                 <Printer className="w-4 h-4" />
-                                <span className="text-sm">Factura Física</span>
+                                <span className="text-sm">Imprimir Comprobante</span>
                               </Button>
                               {userRole === 'admin' && !isEmployee && (
                                 <Button
@@ -1669,8 +1715,62 @@ function Ventas({ businessId, userRole = 'admin' }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Modal educativo de primera venta */}
+      <PrimeraVentaModal 
+        isOpen={showFirstSaleModal}
+        onClose={() => setShowFirstSaleModal(false)}
+      />
     </div>
   );
 }
+
+// =====================================================
+// COMPONENTES MEMOIZADOS PARA OPTIMIZACIÓN
+// =====================================================
+
+// ProductCard memoizado - solo se renderiza si producto cambia
+const ProductCard = memo(({ producto, onAdd }) => {
+  return (
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      className="cursor-pointer"
+    >
+      <Card 
+        className="hover:shadow-lg transition-all duration-300 rounded-xl border-gray-200 bg-gradient-to-br from-white to-gray-50"
+        onClick={() => onAdd(producto)}
+      >
+        <div className="p-3 sm:p-4 flex items-center justify-between">
+          <div className="flex-1">
+            <p className="font-bold text-accent-600 text-lg">{producto.name}</p>
+            <p className="text-sm text-gray-500 mt-1">Código: {producto.code}</p>
+            <Badge 
+              className={`mt-2 ${
+                producto.stock > 10 
+                  ? 'bg-green-100 text-green-800' 
+                  : producto.stock > 0 
+                  ? 'bg-yellow-100 text-yellow-800' 
+                  : 'bg-red-100 text-red-800'
+              }`}
+            >
+              Stock: {producto.stock}
+            </Badge>
+          </div>
+          <div className="text-right ml-4">
+            <p className="text-2xl font-bold text-secondary-600">
+              {formatPrice(producto.sale_price)}
+            </p>
+            <Plus className="w-6 h-6 text-accent-600 mt-2 ml-auto" />
+          </div>
+        </div>
+      </Card>
+    </motion.div>
+  );
+}, (prevProps, nextProps) => {
+  // Solo re-render si cambia el ID o el stock
+  return prevProps.producto.id === nextProps.producto.id &&
+         prevProps.producto.stock === nextProps.producto.stock;
+});
 
 export default Ventas;

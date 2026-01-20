@@ -2,7 +2,7 @@
 
 ## 📝 Resumen de Cambios
 
-Se ha revisado y mejorado completamente el sistema de facturación de Stockly para asegurar su correcto funcionamiento antes de continuar con el diseño.
+Se ha revisado y mejorado completamente el sistema de facturación de Stocky para asegurar su correcto funcionamiento antes de continuar con el diseño.
 
 ## 🎯 Mejoras Implementadas
 

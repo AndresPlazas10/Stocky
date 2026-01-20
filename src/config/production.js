@@ -53,7 +53,7 @@ export const LIMITS = {
 
 // URLs y endpoints
 export const APP_CONFIG = {
-  appName: 'Stockly',
+  appName: 'Stocky',
   appVersion: '1.0.0',
   baseUrl: IS_PRODUCTION 
     ? 'https://stockly.vercel.app' 

@@ -1,4 +1,4 @@
-# 📧 Guía de Configuración de Email para Stockly
+# 📧 Guía de Configuración de Email para Stocky
 
 ## 🚨 Problema Detectado
 

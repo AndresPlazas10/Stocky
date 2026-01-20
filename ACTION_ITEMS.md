@@ -127,7 +127,7 @@ cat docs/sql/ANALISIS_COMPLETO_RLS.md
 
 ### 1. Eliminar Console Logs (AUTOMATIZADO) ✅ COMPLETADO
 ```bash
-cd /Users/andres_plazas/Desktop/Stockly
+cd /Users/andres_plazas/Desktop/Stocky
 
 # Dar permisos al script
 chmod +x scripts/remove-console-logs.sh
@@ -356,7 +356,7 @@ mv *_SUMMARY.md .archive/docs/
 
 **Crear README.md conciso**:
 ```markdown
-# Stockly POS System
+# Stocky POS System
 
 Sistema POS completo para restaurantes y bares.
 
@@ -469,8 +469,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Stockly POS',
-        short_name: 'Stockly',
+        name: 'Stocky POS',
+        short_name: 'Stocky',
         description: 'Sistema POS para restaurantes',
         theme_color: '#4f46e5',
         icons: [

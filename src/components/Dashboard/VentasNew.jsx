@@ -7,7 +7,8 @@
  * - Validación exhaustiva
  * - Sin dependencias de tablas inexistentes
  * - Manejo de errores robusto
- * - Soporte para facturación electrónica (opcional)
+ * - Genera comprobantes informativos (NO válidos ante DIAN)
+ * - Para facturación oficial: usar Siigo directamente
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -27,9 +28,14 @@ import {
   DollarSign,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   User,
   FileText
 } from 'lucide-react';
+
+// Importar componentes legales
+import PrimeraVentaModal from '../Modals/PrimeraVentaModal';
+import ComprobanteDisclaimer from '../Legal/ComprobanteDisclaimer';
 
 // Importar servicios
 import {
@@ -70,14 +76,17 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [searchProduct, setSearchProduct] = useState('');
   const [processing, setProcessing] = useState(false);
   
-  // Estado del tipo de documento (comprobante o factura electrónica)
+  // Estado del tipo de documento (comprobante - factura deshabilitada)
   const [documentType, setDocumentType] = useState(DOCUMENT_TYPES.RECEIPT);
 
   // Estados del modal de eliminación
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [saleToDelete, setSaleToDelete] = useState(null);
   
-  // Hook de facturación para verificar si está habilitada
+  // Modal educativo de primera venta
+  const [showFirstSaleModal, setShowFirstSaleModal] = useState(false);
+  
+  // Hook de facturación (DESHABILITADO - usar Siigo directamente)
   const { canGenerateElectronicInvoice, isLoading: invoicingLoading } = useInvoicing();
 
   // ========================================
@@ -259,12 +268,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
       return;
     }
 
-    // Validar que si se selecciona factura electrónica, el sistema esté configurado
-    if (documentType === DOCUMENT_TYPES.ELECTRONIC_INVOICE && !canGenerateElectronicInvoice) {
-      setError('⚠️ La facturación electrónica no está habilitada. Configúrala en Ajustes.');
-      return;
-    }
-
     try {
       setProcessing(true);
       setError(null);
@@ -276,27 +279,28 @@ function Ventas({ businessId, userRole = 'admin' }) {
         cart,
         paymentMethod,
         total,
-        // Incluir tipo de documento para posterior procesamiento
-        documentType: documentType,
-        generateElectronicInvoice: documentType === DOCUMENT_TYPES.ELECTRONIC_INVOICE
       });
 
       if (!result.success) {
         throw new Error(result.error || 'Error al procesar la venta');
       }
 
-      // Mensaje diferenciado según tipo de documento
-      if (documentType === DOCUMENT_TYPES.ELECTRONIC_INVOICE) {
-        setSuccess(`✅ Venta registrada y factura electrónica generada. Total: ${formatPrice(total)}`);
-      } else {
-        setSuccess(`✅ Venta registrada. Comprobante generado. Total: ${formatPrice(total)}`);
-      }
+      // Mensaje para comprobante de venta
+      setSuccess(`✅ Venta registrada. Comprobante generado. Total: ${formatPrice(total)}`);
       
       clearCart();
       setShowPOS(false);
 
       // Recargar datos
       await loadData();
+      
+      // Verificar si es la primera venta y mostrar modal educativo
+      const hideModal = localStorage.getItem('stockly_hide_first_sale_modal');
+      if (!hideModal && ventas.length === 0) {
+        setTimeout(() => {
+          setShowFirstSaleModal(true);
+        }, 1000);
+      }
 
     } catch (err) {
       // Error procesando venta
@@ -304,7 +308,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     } finally {
       setProcessing(false);
     }
-  }, [cart, businessId, paymentMethod, sessionValid, clearCart, loadData, documentType, canGenerateElectronicInvoice]);
+  }, [cart, businessId, paymentMethod, sessionValid, clearCart, loadData, ventas.length]);
 
   // ========================================
   // ELIMINACIÓN DE VENTA
@@ -621,93 +625,14 @@ function Ventas({ businessId, userRole = 'admin' }) {
                         </select>
                       </div>
 
-                      {/* Selector de tipo de documento */}
-                      <div className="pt-3 border-t border-gray-200">
-                        <label className="block text-sm font-medium text-gray-700 mb-3">
-                          Tipo de documento
-                        </label>
-                        <div className="space-y-2">
-                          {/* Opción: Comprobante de venta */}
-                          <label 
-                            className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                              documentType === DOCUMENT_TYPES.RECEIPT 
-                                ? 'border-blue-500 bg-blue-50' 
-                                : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="documentType"
-                              value={DOCUMENT_TYPES.RECEIPT}
-                              checked={documentType === DOCUMENT_TYPES.RECEIPT}
-                              onChange={(e) => setDocumentType(e.target.value)}
-                              className="text-blue-600"
-                            />
-                            <Receipt className="w-5 h-5 text-gray-600" />
-                            <div className="flex-1">
-                              <span className="font-medium">Comprobante de venta</span>
-                              <p className="text-xs text-gray-500">Documento informativo (sin validez fiscal)</p>
-                            </div>
-                          </label>
-
-                          {/* Opción: Factura electrónica */}
-                          <label 
-                            className={`flex items-center gap-3 p-3 border rounded-lg transition-colors ${
-                              !canGenerateElectronicInvoice 
-                                ? 'opacity-50 cursor-not-allowed bg-gray-50' 
-                                : documentType === DOCUMENT_TYPES.ELECTRONIC_INVOICE 
-                                  ? 'border-green-500 bg-green-50 cursor-pointer' 
-                                  : 'border-gray-200 hover:border-gray-300 cursor-pointer'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="documentType"
-                              value={DOCUMENT_TYPES.ELECTRONIC_INVOICE}
-                              checked={documentType === DOCUMENT_TYPES.ELECTRONIC_INVOICE}
-                              onChange={(e) => setDocumentType(e.target.value)}
-                              disabled={!canGenerateElectronicInvoice}
-                              className="text-green-600"
-                            />
-                            <FileText className={`w-5 h-5 ${canGenerateElectronicInvoice ? 'text-green-600' : 'text-gray-400'}`} />
-                            <div className="flex-1">
-                              <span className="font-medium">Factura electrónica</span>
-                              <p className="text-xs text-gray-500">
-                                {canGenerateElectronicInvoice 
-                                  ? 'Documento válido ante la DIAN' 
-                                  : 'Activa la facturación en Configuración'}
-                              </p>
-                            </div>
-                            {canGenerateElectronicInvoice && (
-                              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">DIAN</span>
-                            )}
-                          </label>
-                        </div>
-                      </div>
-
-                      {/* Advertencia si es comprobante */}
-                      {documentType === DOCUMENT_TYPES.RECEIPT && (
-                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                          <p className="text-xs text-amber-800">
-                            ⚠️ El comprobante de venta <strong>no tiene validez fiscal</strong> ante la DIAN.
-                          </p>
-                        </div>
-                      )}
-
                       <Button
                         onClick={processSale}
                         disabled={processing}
-                        className={`w-full py-4 text-lg ${
-                          documentType === DOCUMENT_TYPES.ELECTRONIC_INVOICE
-                            ? 'bg-green-600 hover:bg-green-700'
-                            : 'bg-blue-600 hover:bg-blue-700'
-                        } text-white`}
+                        className="w-full py-4 text-lg bg-blue-600 hover:bg-blue-700 text-white"
                       >
                         {processing 
                           ? 'Procesando...' 
-                          : documentType === DOCUMENT_TYPES.ELECTRONIC_INVOICE
-                            ? '📄 Generar Factura Electrónica'
-                            : '🧾 Generar Comprobante'
+                          : '🧾 Generar Comprobante'
                         }
                       </Button>
 
@@ -757,6 +682,12 @@ function Ventas({ businessId, userRole = 'admin' }) {
           </motion.div>
         </div>
       )}
+
+      {/* Modal educativo de primera venta */}
+      <PrimeraVentaModal 
+        isOpen={showFirstSaleModal}
+        onClose={() => setShowFirstSaleModal(false)}
+      />
     </div>
   );
 }

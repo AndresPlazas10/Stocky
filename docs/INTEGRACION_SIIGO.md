@@ -14,7 +14,7 @@
 
 ## Descripción General
 
-Esta integración permite a los negocios registrados en Stockly generar **facturas electrónicas válidas ante la DIAN** a través de la API de Siigo, proveedor tecnológico autorizado.
+Esta integración permite a los negocios registrados en Stocky generar **facturas electrónicas válidas ante la DIAN** a través de la API de Siigo, proveedor tecnológico autorizado.
 
 ### Características:
 - ✅ Autenticación OAuth con caché de tokens

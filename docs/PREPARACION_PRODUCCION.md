@@ -1,4 +1,4 @@
-# 🚀 Preparación para Producción - Stockly
+# 🚀 Preparación para Producción - Stocky
 
 **Fecha**: 12 de diciembre de 2025
 **Estado**: ✅ LISTO PARA DEPLOY

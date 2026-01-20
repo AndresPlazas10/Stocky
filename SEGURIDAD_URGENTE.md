@@ -30,7 +30,7 @@ El archivo `.env.production` fue commiteado al repositorio con **credenciales re
 
 ### 1. **Commitear los Cambios de Seguridad**
 ```bash
-cd /Users/andres_plazas/Desktop/Stockly
+cd /Users/andres_plazas/Desktop/Stocky
 git add .gitignore
 git commit -m "🔒 Security: Remove .env.production and update .gitignore"
 git push

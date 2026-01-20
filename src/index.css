@@ -76,10 +76,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Sobrescribir texto blanco (#ffffff) a gris claro (#c7c7c7) con sombra blanca */
+/* Sobrescribir texto blanco (#ffffff) a gris claro (#c7c7c7) con sombra negra */
 .text-white {
   color: #c7c7c7 !important;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
 }
 
 /* Utilidades de gradiente */

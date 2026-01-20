@@ -1,12 +1,12 @@
-# 📚 Índice de Documentación - Stockly
+# 📚 Índice de Documentación - Stocky
 
-Bienvenido a la documentación completa de Stockly. Aquí encontrarás todo lo necesario para configurar, usar y desplegar el sistema.
+Bienvenido a la documentación completa de Stocky. Aquí encontrarás todo lo necesario para configurar, usar y desplegar el sistema.
 
 ---
 
 ## 🚀 Inicio Rápido
 
-¿Primera vez usando Stockly? Empieza aquí:
+¿Primera vez usando Stocky? Empieza aquí:
 
 1. **[Guía de Inicio Rápido](setup/QUICK_START.md)** - Prueba el sistema en 2 minutos
 2. **[Instalación](../README.md#instalación-rápida)** - Setup completo paso a paso
@@ -240,7 +240,7 @@ Ver [CHANGELOG](../CHANGELOG.md) para historial completo.
 
 ## 🤝 Contribuir
 
-¿Quieres mejorar Stockly?
+¿Quieres mejorar Stocky?
 
 1. Fork el repositorio
 2. Crea una rama: `git checkout -b feature/mejora`
@@ -253,7 +253,7 @@ Ver [CHANGELOG](../CHANGELOG.md) para historial completo.
 
 ## 📜 Licencia
 
-Stockly está bajo la Licencia MIT. Ver [LICENSE](../LICENSE) para más información.
+Stocky está bajo la Licencia MIT. Ver [LICENSE](../LICENSE) para más información.
 
 ---
 

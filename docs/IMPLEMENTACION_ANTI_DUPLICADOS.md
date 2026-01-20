@@ -1,4 +1,4 @@
-# ✅ Implementación Anti-Duplicados - Stockly
+# ✅ Implementación Anti-Duplicados - Stocky
 
 ## 📊 Estado de Implementación
 

@@ -91,7 +91,7 @@ serve(async (req) => {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: 'Stockly <onboarding@resend.dev>',
+        from: 'Stocky <onboarding@resend.dev>',
         to: [email],
         subject: `Factura ${invoiceNumber} - ${businessName}`,
         html: htmlContent,
