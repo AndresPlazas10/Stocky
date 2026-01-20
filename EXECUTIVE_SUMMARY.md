@@ -2,7 +2,7 @@
 
 ## 🎯 OBJETIVO COMPLETADO
 
-Se realizó un **análisis técnico profundo** del proyecto Stockly POS System, identificando problemas críticos, aplicando optimizaciones inmediatas y generando un roadmap completo para producción.
+Se realizó un **análisis técnico profundo** del proyecto Stocky POS System, identificando problemas críticos, aplicando optimizaciones inmediatas y generando un roadmap completo para producción.
 
 ---
 
@@ -250,7 +250,7 @@ Script automatizado:
 
 **Próximo paso recomendado**:
 ```bash
-cd /Users/andres_plazas/Desktop/Stockly
+cd /Users/andres_plazas/Desktop/Stocky
 chmod +x scripts/remove-console-logs.sh
 ./scripts/remove-console-logs.sh
 # Luego seguir ACTION_ITEMS.md
@@ -272,7 +272,7 @@ chmod +x scripts/remove-console-logs.sh
 ---
 
 **Generado**: 24 de Noviembre de 2025  
-**Proyecto**: Stockly POS System  
+**Proyecto**: Stocky POS System  
 **Versión**: 1.0  
 **Siguiente revisión**: Post-deploy a producción
 

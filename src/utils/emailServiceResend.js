@@ -1,6 +1,11 @@
 /**
  * 📧 Servicio de Email con Resend
  * 
+ * Envía comprobantes de venta (NO facturas electrónicas) por email.
+ * 
+ * IMPORTANTE: Los comprobantes enviados NO tienen validez ante DIAN.
+ * Para facturación electrónica oficial, usar Siigo directamente.
+ * 
  * Resend es el proveedor recomendado para aplicaciones modernas.
  * - 99.9% deliverability
  * - Dashboard con analytics
@@ -28,7 +33,8 @@ import {
 } from './emailValidation';
 
 /**
- * Envía factura por email usando Resend API
+ * Envía comprobante de venta por email usando Resend API
+ * IMPORTANTE: Este NO es una factura electrónica válida ante DIAN
  * Usa fetch() directo (compatible con navegador y Edge Functions)
  */
 export const sendInvoiceEmailResend = async ({ 
@@ -37,7 +43,7 @@ export const sendInvoiceEmailResend = async ({
   customerName, 
   total,
   items = [],
-  businessName = 'Stockly'
+  businessName = 'Stocky'
 }) => {
   try {
     // ✅ PASO 1: Validar email
@@ -96,7 +102,7 @@ export const sendInvoiceEmailResend = async ({
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Factura ${invoiceNumber}</title>
+        <title>Comprobante ${invoiceNumber}</title>
       </head>
       <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
@@ -112,7 +118,8 @@ export const sendInvoiceEmailResend = async ({
           <tr>
             <td style="background: linear-gradient(135deg, #edb886 0%, #f1c691 100%); padding: 40px 20px; text-align: center;">
               <h1 style="color: white; margin: 0; font-size: 28px;">${businessName}</h1>
-              <p style="color: #f9f9f1; margin: 10px 0 0 0;">Factura Electrónica</p>
+              <p style="color: #f9f9f1; margin: 10px 0 0 0;">Comprobante de Venta</p>
+              <p style="color: #fff8e1; margin: 5px 0 0 0; font-size: 11px;">Documento NO válido ante DIAN</p>
             </td>
           </tr>
 
@@ -120,11 +127,11 @@ export const sendInvoiceEmailResend = async ({
           <tr>
             <td style="padding: 30px 20px;">
               <p style="margin: 0 0 20px 0; color: #666;">Hola <strong>${customerName}</strong>,</p>
-              <p style="margin: 0 0 20px 0; color: #666;">Gracias por tu compra. Adjuntamos los detalles de tu factura:</p>
+              <p style="margin: 0 0 20px 0; color: #666;">Gracias por tu compra. Adjuntamos los detalles de tu comprobante de venta:</p>
               
               <table width="100%" style="margin: 20px 0; background-color: #f9f9f9; border-radius: 8px; padding: 15px;">
                 <tr>
-                  <td style="padding: 5px;"><strong>Número de Factura:</strong></td>
+                  <td style="padding: 5px;"><strong>Número de Comprobante:</strong></td>
                   <td style="padding: 5px; text-align: right;">${invoiceNumber}</td>
                 </tr>
                 <tr>
@@ -152,6 +159,21 @@ export const sendInvoiceEmailResend = async ({
                   ${itemsHTML}
                 </tbody>
               </table>
+              
+              <!-- Disclaimer Legal -->
+              <div style="margin: 30px 0; padding: 15px; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                <p style="margin: 0 0 10px 0; color: #856404; font-size: 13px; font-weight: bold;">
+                  ⚠️ INFORMACIÓN LEGAL IMPORTANTE
+                </p>
+                <p style="margin: 0 0 5px 0; color: #856404; font-size: 12px;">
+                  ✗ Este comprobante NO es una factura electrónica<br>
+                  ✗ NO tiene validez fiscal ante la DIAN<br>
+                  ✗ NO es deducible de impuestos
+                </p>
+                <p style="margin: 10px 0 0 0; color: #856404; font-size: 11px; font-style: italic;">
+                  Para factura electrónica oficial, solicitarla directamente al establecimiento.
+                </p>
+              </div>
             </td>
           </tr>
 

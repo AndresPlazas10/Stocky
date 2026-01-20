@@ -1,6 +1,6 @@
 # 🔴 REPORTE DE VULNERABILIDADES Y PROBLEMAS CRÍTICOS
 
-> **Análisis de código detectado - Stockly**  
+> **Análisis de código detectado - Stocky**  
 > Fecha: 15 de diciembre de 2025  
 > Severidad: CRÍTICA - ALTA - MEDIA
 

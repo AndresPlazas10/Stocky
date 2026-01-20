@@ -128,63 +128,47 @@ export default function DocumentTypeSelector({
           ]}
         />
 
-        {/* Factura electrónica */}
+        {/* Factura electrónica - DESHABILITADA */}
         <DocumentTypeCard
           type={DOCUMENT_TYPES.ELECTRONIC_INVOICE}
-          selected={selectedType === DOCUMENT_TYPES.ELECTRONIC_INVOICE}
-          disabled={disabled || !canGenerateElectronicInvoice}
-          onClick={() => handleSelect(DOCUMENT_TYPES.ELECTRONIC_INVOICE)}
+          selected={false}
+          disabled={true}
+          onClick={() => {}}
           icon={FileText}
-          title="Factura electrónica"
-          description="Documento válido ante la DIAN"
-          badge={canGenerateElectronicInvoice ? "Válido DIAN" : "No disponible"}
-          badgeColor={canGenerateElectronicInvoice ? "green" : "gray"}
+          title="Factura electrónica DIAN"
+          description="Emitir directamente en Siigo"
+          badge="Usar Siigo directamente"
+          badgeColor="gray"
           features={[
-            'Código CUFE único',
-            'Código QR de verificación',
-            'Envío automático al cliente'
+            'Factura con validez fiscal',
+            'Código CUFE y QR oficial',
+            'Transmisión automática a DIAN'
           ]}
-          unavailableMessage={
-            !canGenerateElectronicInvoice 
-              ? "Activa la facturación electrónica en Configuración"
-              : null
-          }
+          unavailableMessage="Para facturar: ingresa a tu cuenta de Siigo incluida en tu plan. Stocky solo genera comprobantes informativos."
         />
       </div>
 
-      {/* Disclaimer */}
-      {selectedType === DOCUMENT_TYPES.RECEIPT && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl"
-        >
-          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm text-amber-800">
-              <strong>Nota importante:</strong> El comprobante de venta NO tiene validez fiscal 
-              ante la DIAN. Si el cliente necesita factura electrónica para efectos tributarios, 
-              debes activar la facturación electrónica.
-            </p>
-          </div>
-        </motion.div>
-      )}
-
-      {selectedType === DOCUMENT_TYPES.ELECTRONIC_INVOICE && canGenerateElectronicInvoice && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-xl"
-        >
-          <Shield className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm text-green-800">
-              <strong>Factura electrónica:</strong> Se validará automáticamente con la DIAN 
-              y el cliente recibirá su copia por email.
-            </p>
-          </div>
-        </motion.div>
-      )}
+      {/* Disclaimer Legal */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-start gap-3 p-4 bg-amber-50 border-l-4 border-amber-400 rounded-r-xl"
+      >
+        <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-amber-900 mb-1">
+            Documento sin validez fiscal
+          </p>
+          <p className="text-sm text-amber-800 mb-2">
+            Este comprobante de pago es únicamente para control interno del negocio. NO tiene validez ante la DIAN 
+            y NO es deducible de impuestos.
+          </p>
+          <p className="text-xs text-amber-700">
+            <strong>Para facturar oficialmente:</strong> Ingresa a tu cuenta de Siigo (incluida en tu plan) 
+            y emite la factura electrónica desde allí.
+          </p>
+        </div>
+      </motion.div>
     </div>
   )
 }

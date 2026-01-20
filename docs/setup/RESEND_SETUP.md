@@ -13,7 +13,7 @@
 
 1. En el dashboard de Resend, ve a **API Keys**
 2. Haz clic en **Create API Key**
-3. Nombre: `Stockly Production` (o el que prefieras)
+3. Nombre: `Stocky Production` (o el que prefieras)
 4. Permiso: **Sending access** (es el predeterminado)
 5. Haz clic en **Add**
 6. **COPIA la API Key** (empieza con `re_`)
@@ -24,7 +24,7 @@
 
 ## 📝 Paso 3: Configurar .env.local (30 segundos)
 
-Abre `/Users/andres_plazas/Desktop/Stockly/.env.local` y pega tu API Key:
+Abre `/Users/andres_plazas/Desktop/Stocky/.env.local` y pega tu API Key:
 
 ```env
 # Pega tu API Key aquí (la que copiaste arriba)

@@ -1,6 +1,6 @@
 # 🚀 Guía de Despliegue a Producción
 
-Esta guía te ayudará a desplegar Stockly en producción de manera segura y eficiente.
+Esta guía te ayudará a desplegar Stocky en producción de manera segura y eficiente.
 
 ## 📋 Checklist Pre-Despliegue
 

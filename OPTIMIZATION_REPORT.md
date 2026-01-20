@@ -1,5 +1,5 @@
 # 📊 INFORME COMPLETO DE OPTIMIZACIÓN Y PRODUCCIÓN
-## Proyecto: Stockly POS System
+## Proyecto: Stocky POS System
 ## Fecha: 24 de Noviembre de 2025
 
 ---
@@ -8,7 +8,7 @@
 
 ### Estructura del Proyecto
 ```
-Stockly/
+Stocky/
 ├── src/
 │   ├── components/        ✅ Bien organizado
 │   │   ├── Dashboard/     ✅ Componentes de negocio
@@ -451,7 +451,7 @@ auth: {
 1. **Eliminar console.log de producción**
 ```bash
 # Opción automática:
-cd /Users/andres_plazas/Desktop/Stockly
+cd /Users/andres_plazas/Desktop/Stocky
 chmod +x scripts/remove-console-logs.sh
 ./scripts/remove-console-logs.sh
 
@@ -651,4 +651,4 @@ Para dudas sobre este reporte:
 
 **Generado**: 24 Nov 2025
 **Versión**: 1.0
-**Proyecto**: Stockly POS System
+**Proyecto**: Stocky POS System

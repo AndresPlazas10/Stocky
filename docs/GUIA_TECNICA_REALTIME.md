@@ -458,5 +458,5 @@ DROP POLICY "Enable all for business members via orders" ON order_items;
 ---
 
 **Última actualización**: 28 de noviembre de 2025  
-**Autor**: Equipo Stockly  
+**Autor**: Equipo Stocky  
 **Versión**: 1.0

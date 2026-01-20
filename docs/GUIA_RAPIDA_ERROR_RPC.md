@@ -6,7 +6,7 @@
 
 1. **Abre tu proyecto en Supabase:**
    - Ve a [https://supabase.com/dashboard](https://supabase.com/dashboard)
-   - Selecciona tu proyecto de Stockly
+   - Selecciona tu proyecto de Stocky
 
 2. **Ve a SQL Editor** (menú lateral izquierdo)
 

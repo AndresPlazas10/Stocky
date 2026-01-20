@@ -36,7 +36,7 @@ git remote add origin https://github.com/TU_USUARIO/stockly.git
 git add .
 
 # Commit
-git commit -m "🚀 Initial commit - Stockly POS System
+git commit -m "🚀 Initial commit - Stocky POS System
 
 ✅ Sistema completo de punto de venta
 ✅ Gestión de inventario

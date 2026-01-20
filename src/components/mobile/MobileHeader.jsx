@@ -10,7 +10,7 @@ import { motion } from 'framer-motion';
  */
 export function MobileHeader({ 
   onMenuClick, 
-  businessName = "Stockly",
+  businessName = "Stocky",
   showSearch = false,
   showNotifications = false,
   onSearchClick,

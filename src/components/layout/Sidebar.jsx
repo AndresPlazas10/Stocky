@@ -115,7 +115,7 @@ export const Sidebar = React.memo(function Sidebar({ activeSection, onSectionCha
           {!isCollapsed && (
             <div className="flex-1 text-center w-full transition-opacity duration-150">
               <h1 className="text-xl font-bold text-primary">
-                {businessName || 'Stockly'}
+                {businessName || 'Stocky'}
               </h1>
               <p className="text-xs text-muted-foreground">POS System</p>
               <div className="mt-3 flex flex-col gap-1.5">

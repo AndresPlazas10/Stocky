@@ -64,7 +64,7 @@ export const options = {
   
   // Opciones de ejecución
   noConnectionReuse: false,
-  userAgent: 'K6LoadTest/1.0 (Stockly Performance Testing)',
+  userAgent: 'K6LoadTest/1.0 (Stocky Performance Testing)',
   throw: true,
 };
 

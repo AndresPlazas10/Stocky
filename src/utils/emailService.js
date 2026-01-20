@@ -1,6 +1,11 @@
 /**
  * 🎯 Servicio Unificado de Email
  * 
+ * Envía comprobantes de venta por email (NO facturas electrónicas).
+ * 
+ * IMPORTANTE: Los comprobantes enviados NO tienen validez ante DIAN.
+ * Para facturación electrónica oficial, usar Siigo directamente.
+ * 
  * Detecta automáticamente qué proveedor usar según la configuración:
  * 1. Resend (si está configurado) - RECOMENDADO para producción
  * 2. EmailJS (fallback) - Solo para desarrollo/testing
@@ -14,7 +19,8 @@ import { sendInvoiceEmailResend, isResendConfigured } from './emailServiceResend
 import { sendInvoiceEmail as sendInvoiceEmailJS } from './emailServiceSupabase';
 
 /**
- * Envía factura usando el mejor proveedor disponible
+ * Envía comprobante de venta usando el mejor proveedor disponible
+ * IMPORTANTE: NO es factura electrónica válida ante DIAN
  * Prioridad: Resend > EmailJS
  */
 export const sendInvoiceEmail = async (params) => {

@@ -15,7 +15,8 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 
-const CHANGELOG_VERSION = 'v2.1.0-2026-02-28'; // Cambiar esto cuando haya nuevos cambios
+const CHANGELOG_VERSION = 'v2.0.0-2026-02-01'; // Versión Simplicity - Lanzamiento 1 de Febrero
+const LAUNCH_DATE = new Date('2026-02-01'); // Modal activo desde esta fecha
 
 function ChangelogModal({ forceOpen = false, onClose }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -23,8 +24,12 @@ function ChangelogModal({ forceOpen = false, onClose }) {
   useEffect(() => {
     // Verificar si ya se mostró esta versión del changelog
     const lastSeenVersion = localStorage.getItem('changelog_last_seen');
+    const today = new Date();
     
-    if (lastSeenVersion !== CHANGELOG_VERSION) {
+    // Solo mostrar si:
+    // 1. Ya pasó la fecha de lanzamiento
+    // 2. No se ha visto esta versión antes
+    if (today >= LAUNCH_DATE && lastSeenVersion !== CHANGELOG_VERSION) {
       // Mostrar el modal después de 1 segundo
       const timer = setTimeout(() => {
         setIsOpen(true);
@@ -53,76 +58,78 @@ function ChangelogModal({ forceOpen = false, onClose }) {
 
   const changes = [
     {
-      icon: FileText,
-      color: 'from-amber-500 to-orange-500',
-      title: 'Facturacion Electronica DIAN',
-      description: 'Ahora puedes solicitar facturacion electronica valida ante la DIAN directamente desde Stocky.',
-      items: [
-        'Facturas con CUFE y codigo QR',
-        'Validacion automatica con la DIAN',
-        'Envio de PDF por email al cliente',
-        'Integracion con Siigo',
-        'Activacion incluida en tu plan mensual'
-      ]
-    },
-    {
-      icon: MessageCircle,
-      color: 'from-green-500 to-emerald-500',
-      title: 'Solicita tu Activacion',
-      description: 'El proceso es muy sencillo: contactanos y nosotros nos encargamos de todo.',
-      items: [
-        'Contacto directo por WhatsApp',
-        'Configuracion sin complicaciones',
-        'Soporte personalizado',
-        'Activacion en maximo 48 horas habiles'
-      ]
-    },
-    {
-      icon: Building2,
+      icon: Sparkles,
       color: 'from-blue-500 to-cyan-500',
-      title: 'Datos de tu Negocio',
-      description: 'Agregamos el campo NIT opcional para negocios que deseen facturar.',
+      title: '🎨 Nueva Imagen de Marca',
+      description: 'Stocky con un diseño renovado, logo profesional y moderno.',
       items: [
-        'NIT opcional en configuracion',
-        'Razon social para facturas',
-        'Datos fiscales seguros',
-        'Funciona igual si no tienes NIT'
-      ]
-    },
-    {
-      icon: Receipt,
-      color: 'from-purple-500 to-pink-500',
-      title: 'Comprobantes Mejorados',
-      description: 'Tus ventas siempre generan un comprobante, con o sin facturacion electronica.',
-      items: [
-        'Comprobantes informativos (sin DIAN)',
-        'Facturas electronicas (con DIAN)',
-        'Aviso legal automatico',
-        'Historial de facturas'
-      ]
-    },
-    {
-      icon: Settings,
-      color: 'from-gray-600 to-gray-800',
-      title: 'Nueva Seccion en Configuracion',
-      description: 'Encuentra todo sobre facturacion en la seccion de Configuracion de tu negocio.',
-      items: [
-        'Estado de facturacion visible',
-        'Boton para solicitar activacion',
-        'Informacion de resolucion DIAN',
-        'Alertas de vencimiento'
+        'Logo optimizado de alta resolución',
+        'Icono visible y profesional en todas las pestañas del navegador',
+        'Diseño visual refinado y efectos más sutiles',
+        'Branding consistente en toda la plataforma'
       ]
     },
     {
       icon: Zap,
       color: 'from-yellow-500 to-amber-500',
-      title: 'Mejoras de Rendimiento',
-      description: 'Optimizaciones generales para una experiencia mas fluida.',
+      title: '⚡ Sistema 10x Más Rápido',
+      description: 'Optimizaciones que hacen tu día a día mucho más ágil.',
       items: [
-        'Carga mas rapida',
-        'Mejor manejo de errores',
-        'Sincronizacion mejorada',
-        'Correccion de bugs menores'
+        'Guardado de ventas 83% más rápido (de 1.8s a 0.3s)',
+        'Búsquedas instantáneas - 99.8% más rápidas (de 2.5s a 0.003s)',
+        '80% menos consultas gracias al sistema de caché inteligente',
+        'Interfaz 97% más fluida - sin congelamientos ni esperas',
+        'Actualización en tiempo real sin recargas innecesarias'
+      ]
+    },
+    {
+      icon: Settings,
+      color: 'from-purple-500 to-pink-500',
+      title: '🕐 Formato de 12 Horas',
+      description: 'Todas las horas ahora se muestran en formato AM/PM para mayor claridad.',
+      items: [
+        'Hora más clara y fácil de leer',
+        'Formato universal: 2:30 PM, 9:00 AM',
+        'Aplicado en toda la plataforma (ventas, tickets, reportes)',
+        'Sin confusión entre horarios'
+      ]
+    },
+    {
+      icon: CheckCircle2,
+      color: 'from-green-500 to-emerald-500',
+      title: '✨ Orden Consistente en Mesas',
+      description: 'Los productos mantienen su posición sin movimientos inesperados.',
+      items: [
+        'Productos siempre en el mismo orden',
+        'Sin cambios de posición al actualizar',
+        'Interfaz más predecible y confiable',
+        'Mejor experiencia de usuario'
+      ]
+    },
+    {
+      icon: Sparkles,
+      color: 'from-purple-500 to-pink-500',
+      title: '🎯 Sistema Simplificado',
+      description: 'Stocky ahora se enfoca 100% en ser tu mejor aliado POS.',
+      items: [
+        'Proceso de venta ultra-simplificado: Agregar → Pagar → Listo',
+        'Sin pasos adicionales ni campos innecesarios',
+        'Comprobantes informativos profesionales y limpios',
+        'Interfaz renovada, más ágil y sin distracciones',
+        'Integración con Siigo para facturación oficial (incluida en tu plan)'
+      ]
+    },
+    {
+      icon: MessageCircle,
+      color: 'from-green-500 to-teal-500',
+      title: '💬 Recibos con Frase del Día',
+      description: 'Cada comprobante incluye una frase motivacional que cambia diariamente.',
+      items: [
+        '10 frases únicas de inspiración empresarial',
+        'Rotación automática cada día del año',
+        'Diseño elegante con emojis y formato especial',
+        'Experiencia única para tus clientes',
+        'Mensajes positivos sobre servicio y excelencia'
       ]
     }
   ];
@@ -155,11 +162,11 @@ function ChangelogModal({ forceOpen = false, onClose }) {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm">
-                      <FileText className="w-8 h-8" />
+                      <Sparkles className="w-8 h-8" />
                     </div>
                     <div>
-                      <h1 className="text-3xl font-bold">Novedades en Stocky!</h1>
-                      <p className="text-white/90 text-sm mt-1">Version 2.1 - Enero 2026</p>
+                      <h1 className="text-3xl font-bold">¡Bienvenido a Stocky 2.0!</h1>
+                      <p className="text-white/90 text-sm mt-1">Versión Simplicity - 1 de Febrero 2026</p>
                     </div>
                   </div>
                   <button
@@ -170,7 +177,7 @@ function ChangelogModal({ forceOpen = false, onClose }) {
                   </button>
                 </div>
                 <p className="text-white/90 text-lg">
-                  Ahora puedes tener facturacion electronica valida ante la DIAN. Contactanos para activarla!
+                  Sistema POS completamente renovado: más simple, más rápido, más potente. ✨
                 </p>
               </div>
             </div>
@@ -212,19 +219,30 @@ function ChangelogModal({ forceOpen = false, onClose }) {
               </div>
 
               {/* Mensaje final */}
-              <div className="mt-8 p-6 bg-gradient-to-r from-amber-100 to-orange-100 rounded-2xl border-2 border-amber-200">
+              <div className="mt-8 p-6 bg-gradient-to-r from-blue-100 to-cyan-100 rounded-2xl border-2 border-blue-200">
                 <div className="flex items-center gap-3 mb-3">
-                  <MessageCircle className="w-6 h-6 text-amber-600" />
-                  <h4 className="text-lg font-bold text-amber-900">
-                    Quieres facturacion electronica?
+                  <Shield className="w-6 h-6 text-blue-600" />
+                  <h4 className="text-lg font-bold text-blue-900">
+                    💼 ¿Necesitas facturar electrónicamente?
                   </h4>
                 </div>
-                <p className="text-amber-800 mb-4">
-                  Ve a <strong>Configuracion</strong> y solicita la activacion. Te contactaremos en maximo 48 horas habiles para configurar todo.
+                <p className="text-blue-800 mb-4">
+                  Tu plan incluye acceso a <strong>Siigo</strong>, líder en facturación electrónica en Colombia. 
+                  Contacta a soporte para activar tu cuenta y empieza a facturar oficialmente desde hoy.
                 </p>
-                <div className="flex items-center gap-2 text-sm text-amber-700">
-                  <Shield className="w-4 h-4" />
-                  <span>Incluido en tu plan mensual - Sin costo adicional</span>
+                <div className="flex flex-col gap-2 text-sm text-blue-700">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Plan Siigo incluido sin costo adicional</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Guía completa en Configuración → Facturación</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Tus ventas se mantienen intactas, nada cambia en tu historial</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -233,10 +251,10 @@ function ChangelogModal({ forceOpen = false, onClose }) {
             <div className="p-6 bg-gray-50 border-t border-gray-200">
               <Button
                 onClick={handleClose}
-                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:opacity-90 h-12 text-lg font-semibold rounded-xl shadow-lg"
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:opacity-90 h-12 text-lg font-semibold rounded-xl shadow-lg"
               >
-                <CheckCircle2 className="w-5 h-5 mr-2" />
-                Entendido!
+                <Sparkles className="w-5 h-5 mr-2" />
+                ¡Entendido, empecemos! 🚀
               </Button>
             </div>
           </motion.div>

@@ -50,7 +50,7 @@ CREATE POLICY "employees_insert"
 
 ### Paso 1: Abrir Supabase SQL Editor
 1. Ve a [supabase.com](https://supabase.com)
-2. Abre tu proyecto **Stockly**
+2. Abre tu proyecto **Stocky**
 3. Ir a **SQL Editor** (menú lateral izquierdo)
 4. Click en **New Query**
 

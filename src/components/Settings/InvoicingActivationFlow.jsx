@@ -37,7 +37,7 @@ export default function InvoicingActivationFlow({
   const [error, setError] = useState('')
 
   // Numero de WhatsApp de Stocky
-  const STOCKY_WHATSAPP = '+573176854477'
+  const STOCKY_WHATSAPP = '+573188246925'
   const STOCKY_EMAIL = 'aplazas000@gmail.com'
 
   const handleContactWhatsApp = () => {

@@ -441,7 +441,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                   <Settings className="w-5 h-5 text-blue-600" />
                   <span className="text-sm text-blue-700 font-medium">Versión</span>
                 </div>
-                <p className="text-lg font-bold text-blue-800 pl-8">Stockly v1.0.0</p>
+                <p className="text-lg font-bold text-blue-800 pl-8">Stocky v1.0.0</p>
               </div>
 
               <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200">

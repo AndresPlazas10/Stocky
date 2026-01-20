@@ -132,12 +132,12 @@ WHERE id = 'abc-123-def-456';
 
 ## 💰 5. INFORMACIÓN DE PAGO
 
-**Método:** Nequi  
-**Número:** 3176854477  
-**Titular:** StockyPos  
+**Método:** Nu (Bre-B)  
+**Llave:** @APM331  
+**Titular:** Andres Felipe  
 **Valor:** $50.000 COP  
 
-**⚠️ IMPORTANTE:** El cliente debe escribir el **nombre de su negocio** en la descripción de la transferencia para identificar el pago.
+**⚠️ IMPORTANTE:** El cliente debe enviar por **Bre-B** a la llave **@APM331** y escribir el **nombre de su negocio** en la descripción de la transferencia para identificar el pago.
 
 ---
 

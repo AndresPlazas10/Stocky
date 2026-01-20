@@ -153,7 +153,7 @@ Puedes agregar:
 ### Cambiar el Remitente
 
 En EmailJS, puedes configurar:
-- Nombre del remitente: "Stockly - Facturación"
+- Nombre del remitente: "Stocky - Facturación"
 - Email de respuesta personalizado
 - Email "Reply-to" diferente
 

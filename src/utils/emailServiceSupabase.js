@@ -104,7 +104,7 @@ export const sendInvoiceEmail = async ({
       invoice_number: invoiceNumber,
       total: `$${total.toLocaleString('es-CO')}`,
       items_list: itemsText || 'Ver factura adjunta',
-      business_name: 'Stockly',
+      business_name: 'Stocky',
       message: isTestMode 
         ? `[TEST MODE] Email original: ${email}\n\nHola ${customerName},\n\nAdjuntamos tu factura ${invoiceNumber} por un valor de $${total.toLocaleString('es-CO')}.\n\nProductos:\n${itemsText}\n\nGracias por tu compra.`
         : `Hola ${customerName},\n\nAdjuntamos tu factura ${invoiceNumber} por un valor de $${total.toLocaleString('es-CO')}.\n\nProductos:\n${itemsText}\n\nGracias por tu compra.`

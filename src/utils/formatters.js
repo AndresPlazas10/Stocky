@@ -127,6 +127,7 @@ export const formatDate = (timestamp, options = {}) => {
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      hour12: true, // Formato de 12 horas con AM/PM
       timeZone: 'America/Bogota',
       ...options
     };
@@ -170,9 +171,9 @@ export const formatDateOnly = (timestamp) => {
 };
 
 /**
- * Formatea solo la hora
+ * Formatea solo la hora en formato de 12 horas con AM/PM
  * @param {string|Date} timestamp - Timestamp de PostgreSQL o objeto Date
- * @returns {string} - Hora formateada (ej: "14:30")
+ * @returns {string} - Hora formateada (ej: "02:30 PM")
  */
 export const formatTimeOnly = (timestamp) => {
   if (!timestamp) {
@@ -191,6 +192,7 @@ export const formatTimeOnly = (timestamp) => {
     return date.toLocaleTimeString('es-CO', {
       hour: '2-digit',
       minute: '2-digit',
+      hour12: true, // Formato de 12 horas con AM/PM
       timeZone: 'America/Bogota'
     });
   } catch (error) {
@@ -200,9 +202,9 @@ export const formatTimeOnly = (timestamp) => {
 };
 
 /**
- * Formatea fecha en formato completo
+ * Formatea fecha en formato completo con hora de 12 horas
  * @param {string|Date} timestamp - Timestamp de PostgreSQL o objeto Date
- * @returns {string} - Fecha formateada (ej: "15 de diciembre de 2025, 14:30")
+ * @returns {string} - Fecha formateada (ej: "15 de diciembre de 2025, 02:30 PM")
  */
 export const formatDateLong = (timestamp) => {
   if (!timestamp) {
@@ -224,10 +226,115 @@ export const formatDateLong = (timestamp) => {
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      hour12: true, // Formato de 12 horas con AM/PM
       timeZone: 'America/Bogota'
     });
   } catch (error) {
     
+    return 'Fecha inválida';
+  }
+};
+
+/**
+ * Formatea fecha y hora completa para tickets y recibos
+ * Formato legible para impresiones POS
+ * @param {string|Date} timestamp - Timestamp de PostgreSQL o objeto Date
+ * @returns {string} - Fecha formateada (ej: "lunes, 15 de diciembre de 2025 - 02:30 PM")
+ */
+export const formatDateTimeTicket = (timestamp) => {
+  if (!timestamp) {
+    return 'Fecha inválida';
+  }
+  
+  try {
+    const date = new Date(timestamp);
+    
+    if (isNaN(date.getTime())) {
+      return 'Fecha inválida';
+    }
+    
+    const dateOptions = {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'America/Bogota'
+    };
+    
+    const timeOptions = {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'America/Bogota'
+    };
+    
+    const datePart = date.toLocaleDateString('es-CO', dateOptions);
+    const timePart = date.toLocaleTimeString('es-CO', timeOptions);
+    
+    return `${datePart} - ${timePart}`;
+  } catch (error) {
+    return 'Fecha inválida';
+  }
+};
+
+/**
+ * Formatea solo la hora de forma compacta para UI
+ * @param {string|Date} timestamp - Timestamp de PostgreSQL o objeto Date
+ * @returns {string} - Hora formateada (ej: "2:30 PM")
+ */
+export const formatTimeCompact = (timestamp) => {
+  if (!timestamp) {
+    return 'Hora inválida';
+  }
+  
+  try {
+    const date = new Date(timestamp);
+    
+    if (isNaN(date.getTime())) {
+      return 'Hora inválida';
+    }
+    
+    return date.toLocaleTimeString('es-CO', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'America/Bogota'
+    });
+  } catch (error) {
+    return 'Hora inválida';
+  }
+};
+
+/**
+ * Formatea fecha y hora de forma completa para reportes
+ * @param {string|Date} timestamp - Timestamp de PostgreSQL o objeto Date
+ * @returns {string} - Fecha formateada (ej: "15/12/2025 02:30 PM")
+ */
+export const formatDateTimeReport = (timestamp) => {
+  if (!timestamp) {
+    return 'Fecha inválida';
+  }
+  
+  try {
+    const date = new Date(timestamp);
+    
+    if (isNaN(date.getTime())) {
+      return 'Fecha inválida';
+    }
+    
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    
+    const timeFormatted = date.toLocaleTimeString('es-CO', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'America/Bogota'
+    });
+    
+    return `${day}/${month}/${year} ${timeFormatted}`;
+  } catch (error) {
     return 'Fecha inválida';
   }
 };

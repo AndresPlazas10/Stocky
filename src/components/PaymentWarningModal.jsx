@@ -89,16 +89,16 @@ function PaymentWarningModal({ isOpen, onClose, businessName = 'su negocio' }) {
                       <span className="text-gray-800 font-bold">$50.000 COP</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-900">• Nequi:</span>
-                      <span className="text-gray-800 font-mono font-bold">3176854477</span>
+                      <span className="font-semibold text-gray-900">• Nu (Bre-B):</span>
+                      <span className="text-gray-800 font-mono font-bold">@APM331</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-gray-900">• Titular:</span>
-                      <span className="text-gray-800">StockyPos</span>
+                      <span className="text-gray-800">Andres Felipe</span>
                     </div>
                     <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
                       <p className="text-xs text-yellow-900 leading-snug">
-                        <strong>⚠️ Importante:</strong> En la descripción de la transferencia escribir <strong>el nombre de su negocio</strong> para identificarlo.
+                        <strong>⚠️ Importante:</strong> Enviar por Bre-B a la llave <strong>@APM331</strong> y escribir <strong>el nombre de su negocio</strong> para identificarlo.
                       </p>
                     </div>
                   </div>

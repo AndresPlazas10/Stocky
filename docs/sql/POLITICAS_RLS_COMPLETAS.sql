@@ -2,7 +2,7 @@
 -- POLÍTICAS RLS COMPLETAS Y PERFECTAS - STOCKLY
 -- =====================================================
 -- Este script implementa un sistema completo de Row Level Security
--- diseñado específicamente para Stockly.
+-- diseñado específicamente para Stocky.
 --
 -- ✅ Soporta múltiples roles: owner, admin, employee, cashier
 -- ✅ Aislamiento completo entre negocios

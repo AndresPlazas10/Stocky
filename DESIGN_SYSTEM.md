@@ -1,4 +1,4 @@
-# Guía de Estilos Modernos - Stockly
+# Guía de Estilos Modernos - Stocky
 
 ## Paleta de Colores
 

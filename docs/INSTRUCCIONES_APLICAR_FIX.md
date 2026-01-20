@@ -44,7 +44,7 @@ useRealtimeSubscription('order_items', {
 
 ```bash
 # Si tienes psql instalado y configurado
-cd /Users/andres_plazas/Desktop/Stockly
+cd /Users/andres_plazas/Desktop/Stocky
 psql -h <tu-host-supabase> -U postgres -d postgres -f .archive/sql/enable_rls_fixed.sql
 ```
 

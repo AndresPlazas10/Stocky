@@ -5,6 +5,7 @@ import { Suspense, lazy } from 'react';
 import { Loader2 } from 'lucide-react';
 import OfflineBanner from './components/OfflineBanner';
 import ChangelogModal from './components/ChangelogModal';
+import PricingAnnouncementModal from './components/PricingAnnouncementModal';
 
 // Lazy loading de páginas para optimizar carga inicial
 const Home = lazy(() => import('./pages/Home.jsx'));
@@ -29,6 +30,9 @@ function App() {
       
       {/* Modal de novedades - se muestra automáticamente para nuevas versiones */}
       <ChangelogModal />
+      
+      {/* Modal de precios y planes */}
+      <PricingAnnouncementModal />
       
       <Suspense fallback={<PageLoader />}>
         <Routes>

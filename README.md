@@ -1,4 +1,4 @@
-# 🏪 Stockly - Sistema POS & Inventario# 🏪 Stockly - Sistema POS & Facturación Electrónica# 🏪 Stockly - Sistema POS & Facturación Electrónica# Stockly - Sistema POS Multi-tenant
+# 🏪 Stocky - Sistema POS & Inventario# 🏪 Stocky - Sistema POS & Facturación Electrónica# 🏪 Stocky - Sistema POS & Facturación Electrónica# Stocky - Sistema POS Multi-tenant
 
 
 

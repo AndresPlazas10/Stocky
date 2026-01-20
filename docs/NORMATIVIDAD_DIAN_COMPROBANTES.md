@@ -1,7 +1,7 @@
 # Normatividad DIAN para Comprobantes POS (Colombia)
 
 > **Documento actualizado:** Enero 2026  
-> **Aplica a:** Sistema Stockly POS
+> **Aplica a:** Sistema Stocky POS
 
 ---
 
@@ -56,7 +56,7 @@ Método: Efectivo
    directamente al establecimiento.
 
 ═══════════════════════════════════════
-    Sistema POS Stockly - Software de 
+    Sistema POS Stocky - Software de 
     gestión comercial sin integración 
     a facturación electrónica DIAN.
 ═══════════════════════════════════════
@@ -151,7 +151,7 @@ Al usar la terminología correcta y los avisos legales:
                         │
                         ▼
 ┌─────────────────────────────────────────────────┐
-│     GENERAR COMPROBANTE DE PAGO (Stockly)       │
+│     GENERAR COMPROBANTE DE PAGO (Stocky)       │
 │     - Documento informativo interno             │
 │     - Sin efectos fiscales ante DIAN            │
 └─────────────────────────────────────────────────┘
@@ -185,7 +185,7 @@ Al usar la terminología correcta y los avisos legales:
 
 ## ⚠️ DESCARGO DE RESPONSABILIDAD
 
-Este documento es una guía informativa para el uso correcto del software Stockly POS. **El software Stockly NO está integrado a la facturación electrónica de la DIAN** y los documentos que genera son únicamente comprobantes internos sin validez fiscal.
+Este documento es una guía informativa para el uso correcto del software Stocky POS. **El software Stocky NO está integrado a la facturación electrónica de la DIAN** y los documentos que genera son únicamente comprobantes internos sin validez fiscal.
 
 **La responsabilidad tributaria de todas las operaciones comerciales recae exclusivamente en el establecimiento comercial que utiliza el software.**
 
@@ -193,4 +193,4 @@ Para integrar su negocio a la facturación electrónica de la DIAN, debe contrat
 
 ---
 
-*Documento generado por el equipo de Stockly POS - Enero 2026*
+*Documento generado por el equipo de Stocky POS - Enero 2026*

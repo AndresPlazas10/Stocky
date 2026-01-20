@@ -1,4 +1,4 @@
-# 🚀 GUÍA DE DESPLIEGUE A PRODUCCIÓN - Stockly
+# 🚀 GUÍA DE DESPLIEGUE A PRODUCCIÓN - Stocky
 
 ## ✅ Pre-requisitos Completados
 

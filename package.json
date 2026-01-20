@@ -1,5 +1,5 @@
 {
-  "name": "stockly",
+  "name": "stocky",
   "version": "1.0.0",
   "description": "Sistema POS completo con facturación electrónica, gestión de inventario y ventas",
   "author": "Tu Nombre <tu-email@ejemplo.com>",
@@ -17,12 +17,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/tu-usuario/stockly"
+    "url": "https://github.com/tu-usuario/stocky"
   },
   "bugs": {
-    "url": "https://github.com/tu-usuario/stockly/issues"
+    "url": "https://github.com/tu-usuario/stocky/issues"
   },
-  "homepage": "https://github.com/tu-usuario/stockly#readme",
+  "homepage": "https://github.com/tu-usuario/stocky#readme",
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"

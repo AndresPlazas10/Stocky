@@ -92,7 +92,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL || 'Stockly <onboarding@resend.dev>',
+        from: process.env.RESEND_FROM_EMAIL || 'Stocky <onboarding@resend.dev>',
         to: [email],
         subject: `Comprobante de Pago ${invoiceNumber} - ${businessName}`,
         html: htmlContent,
