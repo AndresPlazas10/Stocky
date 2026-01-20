@@ -25,7 +25,8 @@ export const sendInvoiceEmail = async ({
   invoiceNumber, 
   customerName, 
   total,
-  items = []
+  items = [],
+  issuedAt = null
 }) => {
   try {
     // ✅ PASO 1: Validar el email antes de intentar enviar
@@ -97,17 +98,29 @@ export const sendInvoiceEmail = async ({
       `- ${item.product_name || item.name} x ${item.quantity} = $${(item.quantity * item.unit_price).toLocaleString('es-CO')}`
     ).join('\n');
 
+    // Formatear fecha de emisión
+    const formattedDate = issuedAt 
+      ? new Date(issuedAt).toLocaleDateString('es-CO', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric', 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        })
+      : new Date().toLocaleDateString('es-CO');
+
     // ✅ PASO 5: Preparar template params para EmailJS con email validado
     const templateParams = {
       to_email: targetEmail, // ✅ Usar email validado (test o real)
       customer_name: customerName,
       invoice_number: invoiceNumber,
+      issued_at: formattedDate,
       total: `$${total.toLocaleString('es-CO')}`,
       items_list: itemsText || 'Ver factura adjunta',
       business_name: 'Stocky',
       message: isTestMode 
-        ? `[TEST MODE] Email original: ${email}\n\nHola ${customerName},\n\nAdjuntamos tu factura ${invoiceNumber} por un valor de $${total.toLocaleString('es-CO')}.\n\nProductos:\n${itemsText}\n\nGracias por tu compra.`
-        : `Hola ${customerName},\n\nAdjuntamos tu factura ${invoiceNumber} por un valor de $${total.toLocaleString('es-CO')}.\n\nProductos:\n${itemsText}\n\nGracias por tu compra.`
+        ? `[TEST MODE] Email original: ${email}\n\nHola ${customerName},\n\nAdjuntamos tu comprobante ${invoiceNumber} emitido el ${formattedDate} por un valor de $${total.toLocaleString('es-CO')}.\n\nProductos:\n${itemsText}\n\nGracias por tu compra.`
+        : `Hola ${customerName},\n\nAdjuntamos tu comprobante ${invoiceNumber} emitido el ${formattedDate} por un valor de $${total.toLocaleString('es-CO')}.\n\nProductos:\n${itemsText}\n\nGracias por tu compra.`
     };
 
     // ✅ PASO 6: Enviar email usando EmailJS

@@ -17,19 +17,19 @@ import { Button } from './ui/button';
 
 const CHANGELOG_VERSION = 'v2.0.0-2026-02-01'; // Versión Simplicity - Lanzamiento 1 de Febrero
 const LAUNCH_DATE = new Date('2026-02-01'); // Modal activo desde esta fecha
+const MODAL_ENABLED = true; // ⚠️ CAMBIAR A false CUANDO QUIERAS DESACTIVAR EL MODAL PARA TODOS
 
 function ChangelogModal({ forceOpen = false, onClose }) {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    // Verificar si ya se mostró esta versión del changelog
-    const lastSeenVersion = localStorage.getItem('changelog_last_seen');
     const today = new Date();
     
     // Solo mostrar si:
-    // 1. Ya pasó la fecha de lanzamiento
-    // 2. No se ha visto esta versión antes
-    if (today >= LAUNCH_DATE && lastSeenVersion !== CHANGELOG_VERSION) {
+    // 1. El modal está habilitado (MODAL_ENABLED = true)
+    // 2. Ya pasó la fecha de lanzamiento (1 de febrero)
+    // NO se guarda en localStorage - aparece SIEMPRE hasta que MODAL_ENABLED sea false
+    if (MODAL_ENABLED && today >= LAUNCH_DATE) {
       // Mostrar el modal después de 1 segundo
       const timer = setTimeout(() => {
         setIsOpen(true);
@@ -47,8 +47,8 @@ function ChangelogModal({ forceOpen = false, onClose }) {
   }, [forceOpen]);
 
   const handleClose = () => {
-    // Guardar que ya vimos esta versión
-    localStorage.setItem('changelog_last_seen', CHANGELOG_VERSION);
+    // Solo cierra el modal, NO guarda nada en localStorage
+    // El modal volverá a aparecer en la próxima sesión hasta que MODAL_ENABLED sea false
     setIsOpen(false);
     // Notificar al padre si es una apertura manual
     if (onClose) {

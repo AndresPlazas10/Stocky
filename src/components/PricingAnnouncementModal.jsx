@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, 
@@ -9,15 +10,19 @@ import {
   Calendar,
   CreditCard,
   Building2,
-  Zap
+  Zap,
+  Package,
+  ShoppingCart
 } from 'lucide-react';
 import { Button } from './ui/button';
 
 const PRICING_VERSION = 'v1.0.0-pricing-2026'; // Cambiar esto cuando actualices precios
-const PAYMENT_DAY = 25; // Día del mes en que se muestra el recordatorio
+const PAYMENT_DAY = 1; // Día del mes en que se muestra el recordatorio
+const LAUNCH_DATE = new Date('2026-02-01'); // Empezar a mostrar desde el 1 de febrero
 
 function PricingAnnouncementModal({ forceOpen = false, onClose }) {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const today = new Date();
@@ -28,9 +33,10 @@ function PricingAnnouncementModal({ forceOpen = false, onClose }) {
     const todayString = today.toDateString();
     
     // Solo mostrar si:
-    // 1. Es día 25 del mes
-    // 2. No se ha mostrado hoy
-    if (dayOfMonth === PAYMENT_DAY && lastShownDate !== todayString) {
+    // 1. Ya pasó la fecha de lanzamiento (1 de febrero 2026)
+    // 2. Es día 1 del mes
+    // 3. No se ha mostrado hoy
+    if (today >= LAUNCH_DATE && dayOfMonth === PAYMENT_DAY && lastShownDate !== todayString) {
       // Mostrar el modal después de 2 segundos (después del changelog)
       const timer = setTimeout(() => {
         setIsOpen(true);
@@ -286,8 +292,30 @@ function PricingAnnouncementModal({ forceOpen = false, onClose }) {
 
             </div>
 
-            {/* Footer con botón */}
+            {/* Footer con botones */}
             <div className="p-6 bg-gray-50 border-t border-gray-200">
+              <div className="grid grid-cols-2 gap-4 mb-3">
+                <Button
+                  onClick={() => {
+                    handleClose();
+                    navigate('/dashboard?tab=inventario');
+                  }}
+                  className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:opacity-90 h-12 text-base font-semibold rounded-xl shadow-lg"
+                >
+                  <Package className="w-5 h-5 mr-2" />
+                  Ver Precios
+                </Button>
+                <Button
+                  onClick={() => {
+                    handleClose();
+                    navigate('/dashboard?tab=ventas');
+                  }}
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:opacity-90 h-12 text-base font-semibold rounded-xl shadow-lg"
+                >
+                  <ShoppingCart className="w-5 h-5 mr-2" />
+                  Ir a Ventas
+                </Button>
+              </div>
               <Button
                 onClick={handleClose}
                 className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:opacity-90 h-12 text-lg font-semibold rounded-xl shadow-lg"

@@ -33,9 +33,9 @@ import {
 } from './emailValidation';
 
 /**
- * Envía comprobante de venta por email usando Resend API
+ * Envía comprobante de venta por email usando Resend API vía Vercel Function
  * IMPORTANTE: Este NO es una factura electrónica válida ante DIAN
- * Usa fetch() directo (compatible con navegador y Edge Functions)
+ * Usa la API serverless de Vercel para proteger la API key
  */
 export const sendInvoiceEmailResend = async ({ 
   email, 
@@ -43,7 +43,8 @@ export const sendInvoiceEmailResend = async ({
   customerName, 
   total,
   items = [],
-  businessName = 'Stocky'
+  businessName = 'Stocky',
+  issuedAt = null
 }) => {
   try {
     // ✅ PASO 1: Validar email
@@ -135,8 +136,8 @@ export const sendInvoiceEmailResend = async ({
                   <td style="padding: 5px; text-align: right;">${invoiceNumber}</td>
                 </tr>
                 <tr>
-                  <td style="padding: 5px;"><strong>Fecha:</strong></td>
-                  <td style="padding: 5px; text-align: right;">${new Date().toLocaleDateString('es-CO')}</td>
+                  <td style="padding: 5px;"><strong>Fecha de Emisión:</strong></td>
+                  <td style="padding: 5px; text-align: right;">${issuedAt ? new Date(issuedAt).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleDateString('es-CO')}</td>
                 </tr>
                 <tr>
                   <td style="padding: 5px;"><strong>Total:</strong></td>
@@ -205,14 +206,20 @@ export const sendInvoiceEmailResend = async ({
         customerName,
         total,
         items,
-        businessName
+        businessName,
+        issuedAt
       })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'Error al enviar email con Resend');
+      // Mensaje de error más claro
+      const errorMessage = data.configured === false 
+        ? '⚠️ Resend no está configurado. Por favor configura las variables de entorno RESEND_API_KEY y RESEND_FROM_EMAIL.'
+        : data.error || data.message || 'Error al enviar email con Resend';
+      
+      throw new Error(errorMessage);
     }
 
     // ✅ PASO 6: Log exitoso
@@ -247,8 +254,11 @@ export const sendInvoiceEmailResend = async ({
 
 /**
  * Verifica si Resend está configurado
+ * DESHABILITADO: Resend requiere dominio verificado en plan gratuito
+ * Usar EmailJS que no tiene esta restricción
  */
 export const isResendConfigured = () => {
-  return !!(import.meta.env.VITE_RESEND_API_KEY && 
-            import.meta.env.VITE_RESEND_FROM_EMAIL);
+  // Retorna false para usar EmailJS directamente
+  // Resend requiere verificar dominio para enviar a cualquier email
+  return false;
 };

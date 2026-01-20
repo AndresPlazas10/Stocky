@@ -7,8 +7,10 @@
  * Para facturación electrónica oficial, usar Siigo directamente.
  * 
  * Detecta automáticamente qué proveedor usar según la configuración:
- * 1. Resend (si está configurado) - RECOMENDADO para producción
- * 2. EmailJS (fallback) - Solo para desarrollo/testing
+ * 1. Resend (si está configurado) - Óptimo para alto volumen (3,000/mes)
+ * 2. EmailJS (fallback) - Funciona en producción (200/mes)
+ * 
+ * Ambos proveedores funcionan tanto en desarrollo como en producción.
  * 
  * Uso:
  * import { sendInvoiceEmail } from './emailService';
@@ -21,17 +23,11 @@ import { sendInvoiceEmail as sendInvoiceEmailJS } from './emailServiceSupabase';
 /**
  * Envía comprobante de venta usando el mejor proveedor disponible
  * IMPORTANTE: NO es factura electrónica válida ante DIAN
- * Prioridad: Resend > EmailJS
+ * Usando EmailJS (Resend deshabilitado porque requiere dominio verificado)
  */
 export const sendInvoiceEmail = async (params) => {
-  const provider = getEmailProvider();
-  
-  // 1. Intentar con Resend (mejor opción para producción)
-  if (isResendConfigured()) {
-    return await sendInvoiceEmailResend(params);
-  }
-
-  // 2. Fallback a EmailJS
+  // Usar EmailJS directamente
+  // Resend está deshabilitado porque requiere verificar dominio
   return await sendInvoiceEmailJS(params);
 };
 
