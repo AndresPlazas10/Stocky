@@ -16,7 +16,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email, invoiceNumber, customerName, total, items, businessName } = req.body;
+    // ✅ VALIDAR que la API Key esté configurada
+    if (!process.env.RESEND_API_KEY) {
+      return res.status(500).json({ 
+        error: 'Resend no está configurado. Configura RESEND_API_KEY en las variables de entorno de Vercel.',
+        configured: false 
+      });
+    }
+
+    const { email, invoiceNumber, customerName, total, items, businessName, issuedAt } = req.body;
+
+    // Validar datos requeridos
+    if (!email || !invoiceNumber || !customerName || !total || !items) {
+      return res.status(400).json({ 
+        error: 'Faltan datos requeridos: email, invoiceNumber, customerName, total, items' 
+      });
+    }
 
     // Formatear items
     const itemsHTML = items.map(item => `
@@ -49,6 +64,9 @@ export default async function handler(req, res) {
             <td style="padding: 30px; background-color: #ffffff;">
               <h2 style="color: #edb886; margin-top: 0;">Hola ${customerName},</h2>
               <p style="color: #666; font-size: 16px;">Gracias por tu compra. Aquí está el detalle de tu comprobante:</p>
+              <div style="background-color: #f0f0f0; padding: 12px; border-radius: 5px; margin: 15px 0;">
+                <p style="margin: 0; color: #666; font-size: 14px;"><strong>Fecha de Emisión:</strong> ${issuedAt ? new Date(issuedAt).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleDateString('es-CO')}</p>
+              </div>
               <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                 <thead>
                   <tr style="background-color: #edb886; color: white;">
@@ -102,13 +120,17 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'Error al enviar email');
+      console.error('Resend API Error:', data);
+      throw new Error(data.message || 'Error al enviar email con Resend API');
     }
 
     return res.status(200).json({ success: true, data });
 
   } catch (error) {
-    console.error('Error:', error);
-    return res.status(500).json({ error: error.message });
+    console.error('Error en send-email function:', error);
+    return res.status(500).json({ 
+      error: error.message,
+      details: error.stack 
+    });
   }
 }

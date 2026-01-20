@@ -29,7 +29,6 @@ import {
   X,
   Printer
 } from 'lucide-react';
-import PrimeraVentaModal from '../Modals/PrimeraVentaModal';
 import ComprobanteDisclaimer from '../Legal/ComprobanteDisclaimer';
 
 // Función helper pura fuera del componente (no se recrea en renders)
@@ -84,8 +83,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [invoiceCustomerIdNumber, setInvoiceCustomerIdNumber] = useState('');
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
   
-  // Modal educativo de primera venta
-  const [showFirstSaleModal, setShowFirstSaleModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Funciones de carga memoizadas SIN cache para evitar problemas de actualización
@@ -428,14 +425,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
       // Recargar ventas inmediatamente
       await loadVentas(currentFilters, { limit, offset: (page - 1) * limit });
-      
-      // Verificar si es la primera venta y mostrar modal educativo
-      const hideModal = localStorage.getItem('stockly_hide_first_sale_modal');
-      if (!hideModal && ventas.length === 0) {
-        setTimeout(() => {
-          setShowFirstSaleModal(true);
-        }, 1000); // Delay para que se vea primero el mensaje de éxito
-      }
       
     } catch (error) {
       
@@ -823,11 +812,11 @@ function Ventas({ businessId, userRole = 'admin' }) {
   // Generar factura desde una venta existente (memoizado)
   const generateInvoiceFromSale = useCallback(async () => {
     if (!invoiceCustomerEmail || !invoiceCustomerEmail.includes('@')) {
-      setError('⚠️ Debes ingresar un email válido para generar la factura');
+      setError('⚠️ Debes ingresar un email válido para enviar el comprobante');
       return;
     }
     if (!invoiceCustomerName) {
-      setError('⚠️ Debes ingresar el nombre del cliente para generar la factura');
+      setError('⚠️ Debes ingresar el nombre del cliente para enviar el comprobante');
       return;
     }
 
@@ -846,99 +835,40 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
       if (detailsError) throw detailsError;
 
-      // Obtener employee_id del usuario actual
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-      if (userError || !user?.id) {
-        setError('⚠️ Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-        setGeneratingInvoice(false);
-        setTimeout(() => window.location.href = '/login', 2000);
-        return;
-      }
-
-      const { data: employee } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
       const total = selectedSale.total;
 
-      // Generar número de factura
-      const { data: invNumber, error: numberError } = await supabase
-        .rpc('generate_invoice_number', { p_business_id: businessId });
+      // Generar número de comprobante (usando la venta existente)
+      const comprobanteNumber = `COMP-${selectedSale.id.substring(0, 8).toUpperCase()}`;
 
-      if (numberError) {
-        throw new Error('Error al generar número de factura: ' + numberError.message);
-      }
-
-      const invoiceNumber = invNumber;
-
-      // Crear factura
-      const { data: invoice, error: invoiceError } = await supabase
-        .from('invoices')
-        .insert({
-          business_id: businessId,
-          employee_id: employee?.id || null,
-          invoice_number: invoiceNumber,
-          customer_name: invoiceCustomerName,
-          customer_email: invoiceCustomerEmail,
-          customer_id_number: invoiceCustomerIdNumber || null,
-          payment_method: selectedSale.payment_method,
-          subtotal: total,
-          tax: 0,
-          total,
-          status: 'pending',
-          issued_at: new Date().toISOString()
-        })
-        .select()
-        .maybeSingle();
-
-      if (invoiceError) throw invoiceError;
-
-      // Crear items de factura
-      const invoiceItems = saleDetails.map(detail => ({
-        invoice_id: invoice.id,
-        product_id: detail.product_id,
-        product_name: detail.products?.name || 'Producto',
+      // Preparar items para el email
+      const emailItems = saleDetails.map(detail => ({
+        product_name: detail.products?.name || detail.product_name || 'Producto',
         quantity: detail.quantity,
-        unit_price: detail.unit_price,
-        total: detail.quantity * detail.unit_price,
-        created_at: new Date().toISOString()
+        unit_price: detail.unit_price
       }));
 
-      const { error: itemsError } = await supabase
-        .from('invoice_items')
-        .insert(invoiceItems);
+      // Obtener nombre del negocio
+      const { data: businessData } = await supabase
+        .from('businesses')
+        .select('name')
+        .eq('id', businessId)
+        .single();
 
-      if (itemsError) throw itemsError;
+      // Enviar comprobante por email
+      const emailResult = await sendInvoiceEmail({
+        email: invoiceCustomerEmail,
+        invoiceNumber: comprobanteNumber,
+        customerName: invoiceCustomerName,
+        total: total,
+        items: emailItems,
+        businessName: businessData?.name || 'Stocky',
+        issuedAt: selectedSale.created_at
+      });
 
-      // Enviar factura por email
-      try {
-        const emailResult = await sendInvoiceEmail({
-          email: invoiceCustomerEmail,
-          invoiceNumber: invoiceNumber,
-          customerName: invoiceCustomerName,
-          total: total,
-          items: invoiceItems
-        });
-
-        if (!emailResult.demo) {
-          await supabase
-            .from('invoices')
-            .update({ 
-              status: 'sent',
-              sent_at: new Date().toISOString()
-            })
-            .eq('id', invoice.id);
-        }
-
-        setSuccess(emailResult.demo 
-          ? `✅ Factura ${invoiceNumber} creada. ⚠️ Email NO enviado (configura EmailJS)`
-          : `✅ Factura ${invoiceNumber} generada y enviada a ${invoiceCustomerEmail}`
-        );
-      } catch (emailError) {
-        setSuccess(`✅ Factura ${invoiceNumber} generada (⚠️ error al enviar email)`);
+      if (emailResult.success) {
+        setSuccess(`✅ Comprobante enviado exitosamente a ${invoiceCustomerEmail}`);
+      } else {
+        throw new Error(emailResult.error || 'Error al enviar el comprobante');
       }
 
       // Cerrar modal y limpiar
@@ -949,7 +879,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setSelectedSale(null);
 
     } catch (error) {
-      setError('❌ ' + (error.message || 'No se pudo generar la factura. Por favor, intenta de nuevo.'));
+      setError('❌ ' + (error.message || 'No se pudo enviar el comprobante. Por favor, intenta de nuevo.'));
     } finally {
       setGeneratingInvoice(false);
     }
@@ -1716,11 +1646,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
         )}
       </AnimatePresence>
 
-      {/* Modal educativo de primera venta */}
-      <PrimeraVentaModal 
-        isOpen={showFirstSaleModal}
-        onClose={() => setShowFirstSaleModal(false)}
-      />
     </div>
   );
 }

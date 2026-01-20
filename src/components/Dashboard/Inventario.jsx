@@ -738,6 +738,16 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       <option value="Comida">Comida</option>
                       <option value="Otros">Otros</option>
                     </select>
+                    
+                    {/* Advertencia sobre recibos de cocina */}
+                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div className="flex gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-800">
+                          <span className="font-semibold">Nota importante:</span> Para que los productos aparezcan en los recibos de cocina, deben estar en la categoría <span className="font-semibold">"Platos"</span>. Los productos de otras categorías no se incluirán en dichos recibos.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1302,6 +1312,16 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       <option value="Comida">Comida</option>
                       <option value="Otros">Otros</option>
                     </select>
+                    
+                    {/* Advertencia sobre recibos de cocina */}
+                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div className="flex gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-800">
+                          <span className="font-semibold">Nota importante:</span> Para que los productos aparezcan en los recibos de cocina, deben estar en la categoría <span className="font-semibold">"Platos"</span>. Los productos de otras categorías no se incluirán en dichos recibos.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

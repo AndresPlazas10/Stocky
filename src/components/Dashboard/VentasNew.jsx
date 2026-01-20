@@ -34,7 +34,6 @@ import {
 } from 'lucide-react';
 
 // Importar componentes legales
-import PrimeraVentaModal from '../Modals/PrimeraVentaModal';
 import ComprobanteDisclaimer from '../Legal/ComprobanteDisclaimer';
 
 // Importar servicios
@@ -82,9 +81,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
   // Estados del modal de eliminación
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [saleToDelete, setSaleToDelete] = useState(null);
-  
-  // Modal educativo de primera venta
-  const [showFirstSaleModal, setShowFirstSaleModal] = useState(false);
   
   // Hook de facturación (DESHABILITADO - usar Siigo directamente)
   const { canGenerateElectronicInvoice, isLoading: invoicingLoading } = useInvoicing();
@@ -293,14 +289,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
       // Recargar datos
       await loadData();
-      
-      // Verificar si es la primera venta y mostrar modal educativo
-      const hideModal = localStorage.getItem('stockly_hide_first_sale_modal');
-      if (!hideModal && ventas.length === 0) {
-        setTimeout(() => {
-          setShowFirstSaleModal(true);
-        }, 1000);
-      }
 
     } catch (err) {
       // Error procesando venta
@@ -683,11 +671,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
         </div>
       )}
 
-      {/* Modal educativo de primera venta */}
-      <PrimeraVentaModal 
-        isOpen={showFirstSaleModal}
-        onClose={() => setShowFirstSaleModal(false)}
-      />
     </div>
   );
 }
