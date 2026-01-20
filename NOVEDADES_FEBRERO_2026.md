@@ -1,4 +1,4 @@
-# 🎉 Novedades - Lanzamiento 1 de Febrero 2026
+# 🎉 Novedades - Lanzamiento 20 de Enero 2026
 
 ## Stocky POS - Versión 2.0
 
@@ -21,36 +21,15 @@ Stocky ahora se enfoca en ser un **sistema POS puro y eficiente**, eliminando la
 ## 🎨 Mejoras Visuales y de Marca
 
 ### **Actualización de Identidad**
-- 🏷️ **Nueva imagen de marca**: Stocky con logo renovado
-- 🎨 **Logo optimizado**: Nuevo diseño profesional y moderno
+- 🏷️ **Nuevo nombre comercial**: Stocky (anteriormente Stocky)
 - 🌐 **Nuevo dominio**: www.stockypos.app
 - 🎯 **Diseño refinado**: Sombras y efectos visuales más sutiles y profesionales
-
-### **Mejoras de Interfaz**
-- 🕐 **Formato de 12 horas**: Ahora todas las horas se muestran en formato AM/PM para mayor claridad
-- 📱 **Logo de alta resolución**: Icono de la aplicación visible y profesional en todas las pestañas
-- ✨ **Orden consistente**: Los productos en mesas mantienen su posición sin movimientos inesperados
 
 ### **Recibos Renovados**
 - ✨ **Diseño limpio**: Eliminados disclaimers legales innecesarios
 - 💬 **Frase motivacional del día**: Cada recibo incluye una frase inspiradora que cambia diariamente (10 frases únicas)
 - 📄 **Formato profesional**: Comprobantes más claros y legibles
 - 🏢 **Branding consistente**: Logo y marca Stocky en todos los documentos
-
----
-
-## 🚀 Rendimiento Mejorado
-
-### **Sistema Más Rápido**
-- ⚡ **10x más rápido**: Consultas optimizadas que mejoran la velocidad general
-- 🎯 **97% menos recargas innecesarias**: La interfaz actualiza solo lo necesario
-- 💾 **80% menos consultas a la base de datos**: Sistema de caché inteligente
-- 🔄 **Actualización instantánea**: Cambios en tiempo real sin demoras
-
-### **Ventas más Ágiles**
-- 🚀 **Guardado de ventas 83% más rápido**: De 1.8 segundos a solo 0.3 segundos
-- 📊 **Búsquedas instantáneas**: Encuentra productos y ventas al instante (de 2.5s a 0.003s)
-- 🎮 **Interfaz más fluida**: Sin congelamientos ni esperas
 
 ---
 
@@ -112,12 +91,10 @@ Stocky ahora se enfoca en ser un **sistema POS puro y eficiente**, eliminando la
 
 ## 🛠️ Mejoras de Rendimiento
 
-- ⚡ **Sistema 10x más rápido** en operaciones principales
-- 🚀 **Ventas se guardan 83% más rápido** (de 1.8s a 0.3s)
-- 💨 **Búsquedas instantáneas** - 99.8% más rápidas (de 2.5s a 0.003s)
-- 🔄 **Actualización en tiempo real optimizada** sin recargas innecesarias
-- 💾 **80% menos consultas** gracias al sistema de caché inteligente
-- 📱 **Interfaz más fluida** - 97% menos renderizados innecesarios
+- ⚡ **50% menos consultas a DB** en proceso de ventas
+- 🚀 **Carga inicial más rápida** (menos datos que sincronizar)
+- 💾 **Menor uso de memoria** en navegador
+- 🔄 **Actualización en tiempo real optimizada**
 
 ---
 
@@ -178,12 +155,12 @@ Gracias por confiar en Stocky para gestionar tu negocio. Esta actualización rep
 
 Reporta bugs o sugerencias en:
 - 📧 Email: soporte@stockypos.app
-- 💬 WhatsApp: +57 318 824 6925
+- 💬 WhatsApp: [Próximamente]
 - 🌐 Portal de soporte: www.stockypos.app/soporte
 
 ---
 
-**Fecha de lanzamiento**: 1 de Febrero de 2026  
+**Fecha de lanzamiento**: 20 de Enero de 2026  
 **Versión**: 2.0.0  
 **Nombre código**: "Simplicity"
 

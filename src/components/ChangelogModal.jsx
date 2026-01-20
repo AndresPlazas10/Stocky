@@ -15,9 +15,9 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 
-const CHANGELOG_VERSION = 'v2.0.0-2026-02-01'; // Versión Simplicity - Lanzamiento 1 de Febrero
-const LAUNCH_DATE = new Date('2026-02-01'); // Modal activo desde esta fecha
-const MODAL_ENABLED = true; // ⚠️ CAMBIAR A false CUANDO QUIERAS DESACTIVAR EL MODAL PARA TODOS
+const CHANGELOG_VERSION = 'v2.0.0-2026-01-20'; // Versión Simplicity - Lanzamiento 20 de Enero
+const LAUNCH_DATE = new Date('2026-01-20'); // Modal activo desde esta fecha
+const MODAL_ENABLED = false; // ❌ Modal desactivado temporalmente
 
 function ChangelogModal({ forceOpen = false, onClose }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -166,7 +166,7 @@ function ChangelogModal({ forceOpen = false, onClose }) {
                     </div>
                     <div>
                       <h1 className="text-3xl font-bold">¡Bienvenido a Stocky 2.0!</h1>
-                      <p className="text-white/90 text-sm mt-1">Versión Simplicity - 1 de Febrero 2026</p>
+                      <p className="text-white/90 text-sm mt-1">Versión Simplicity - 20 de Enero 2026</p>
                     </div>
                   </div>
                   <button
