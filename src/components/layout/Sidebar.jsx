@@ -186,7 +186,7 @@ export const Sidebar = React.memo(function Sidebar({ activeSection, onSectionCha
               )}
 
               {isActive && (
-                <motion.div
+                <motion.span
                   layoutId="activeIndicator"
                   className="absolute right-2 w-1.5 h-1.5 rounded-full bg-white"
                   transition={{ duration: 0.2, ease: "easeInOut" }}

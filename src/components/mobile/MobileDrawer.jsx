@@ -1,4 +1,4 @@
-import { X, Home, ShoppingCart, ShoppingBag, Package, FileText, Users, Truck, BarChart3, Settings, LogOut, ChevronRight } from 'lucide-react';
+import { X, Home, ShoppingCart, ShoppingBag, Package, FileText, Users, Truck, BarChart3, Settings, LogOut, ChevronRight, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 /**
@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
  * - Gestos de swipe para cerrar
  * - Navegación completa del dashboard
  */
-export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userName, businessName, onSignOut }) {
+export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userName, businessName, onSignOut, onShowChangelog }) {
   const menuSections = [
     {
       title: 'Principal',
@@ -70,10 +70,10 @@ export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userNam
             className="fixed top-0 left-0 bottom-0 w-72 bg-white z-50 shadow-2xl flex flex-col sm:hidden"
           >
             {/* Header del drawer */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 gradient-primary">
+            <div className="flex items-center justify-between p-3 border-b border-gray-200 gradient-primary shrink-0">
               <div className="flex-1">
-                <h2 className="text-white font-bold text-lg">{businessName || 'Stocky'}</h2>
-                <p className="text-white/80 text-sm">{userName || 'Usuario'}</p>
+                <h2 className="text-white font-bold text-base">{businessName || 'Stocky'}</h2>
+                <p className="text-white/80 text-xs">{userName || 'Usuario'}</p>
               </div>
               <button
                 onClick={onClose}
@@ -85,10 +85,10 @@ export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userNam
             </div>
 
             {/* Contenido scrollable */}
-            <div className="flex-1 overflow-y-auto py-2">
+            <div className="flex-1 overflow-y-auto py-1 min-h-0">
               {menuSections.map((section) => (
-                <div key={section.title} className="mb-6">
-                  <h3 className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <div key={section.title} className="mb-4">
+                  <h3 className="px-4 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     {section.title}
                   </h3>
                   <div className="space-y-1 px-2">
@@ -101,7 +101,7 @@ export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userNam
                           key={item.id}
                           onClick={() => handleItemClick(item.id)}
                           className={`
-                            w-full flex items-center gap-3 px-3 py-3 rounded-lg
+                            w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg
                             transition-all duration-200
                             ${isActive 
                               ? 'bg-accent-500/10 text-accent-600 font-semibold' 
@@ -110,7 +110,7 @@ export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userNam
                           `}
                         >
                           <Icon 
-                            size={20} 
+                            size={18} 
                             className={isActive ? item.color : 'text-gray-500'}
                             strokeWidth={isActive ? 2.5 : 2}
                           />
@@ -126,14 +126,27 @@ export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userNam
               ))}
             </div>
 
-            {/* Footer con logout */}
-            <div className="border-t border-gray-200 p-4">
+            {/* Footer con botones de acción */}
+            <div className="border-t border-gray-200 p-3 space-y-1.5 shrink-0">
+              {/* Botón de novedades */}
+              <button
+                onClick={() => {
+                  onShowChangelog();
+                  onClose();
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 text-amber-600 border border-amber-500/20 transition-all"
+              >
+                <Sparkles size={16} />
+                <span className="text-xs font-medium">Ver novedades</span>
+              </button>
+              
+              {/* Botón de logout */}
               <button
                 onClick={onSignOut}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
               >
-                <LogOut size={20} />
-                <span className="text-sm font-medium">Cerrar sesión</span>
+                <LogOut size={16} />
+                <span className="text-xs font-medium">Cerrar sesión</span>
               </button>
             </div>
           </motion.div>

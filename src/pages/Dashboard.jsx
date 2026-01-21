@@ -119,12 +119,17 @@ function Dashboard() {
         finalBusiness = business;
       }
 
-      const { data: employee } = await supabase
+      const { data: employee, error: employeeError } = await supabase
         .from('employees')
         .select('id, business_id, role, is_active')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .maybeSingle();
+
+      // Ignorar error 406 si es por falta de datos (es válido no ser empleado)
+      if (employeeError && employeeError.code !== 'PGRST116') {
+        console.warn('Error al verificar empleado:', employeeError);
+      }
 
 
       // Si es empleado, redirigir al dashboard de empleados
