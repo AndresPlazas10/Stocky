@@ -43,8 +43,12 @@ function App() {
           <Route path='/employee-access' element={<EmployeeAccess />} />
           <Route path='/employee-dashboard' element={<EmployeeDashboard />} />
         </Routes>
-        <Analytics mode="production" debug={false} />
-        <SpeedInsights />
+        {import.meta.env.PROD && (
+          <>
+            <Analytics mode="production" debug={false} />
+            <SpeedInsights />
+          </>
+        )}
       </Suspense>
     </>
   );

@@ -38,7 +38,7 @@ export function MobileBottomNav({ currentView, onNavigate }) {
             >
               {/* Indicador visual superior para item activo */}
               {isActive && (
-                <motion.div
+                <motion.span
                   layoutId="bottomNavIndicator"
                   className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-1 bg-accent-500 rounded-full"
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
