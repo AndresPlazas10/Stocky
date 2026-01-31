@@ -17,7 +17,8 @@ import {
 import { Button } from './ui/button';
 
 const PRICING_VERSION = 'v1.0.0-pricing-2026'; // Cambiar esto cuando actualices precios
-const PAYMENT_DAY = 1; // Día del mes en que se muestra el recordatorio
+const START_DAY = 1; // Día del mes desde el que se muestra el recordatorio (incluido)
+const END_DAY = 5; // Día del mes hasta el que se muestra el recordatorio (incluido)
 const LAUNCH_DATE = new Date('2026-02-01'); // Empezar a mostrar desde el 1 de febrero
 
 function PricingAnnouncementModal({ forceOpen = false, onClose }) {
@@ -33,10 +34,10 @@ function PricingAnnouncementModal({ forceOpen = false, onClose }) {
     const todayString = today.toDateString();
     
     // Solo mostrar si:
-    // 1. Ya pasó la fecha de lanzamiento (20 de enero 2026)
-    // 2. Es día 1 del mes
+    // 1. Ya pasó la fecha de lanzamiento
+    // 2. Es entre el día 1 y el día 5 del mes (ambos incluidos)
     // 3. No se ha mostrado hoy
-    if (today >= LAUNCH_DATE && dayOfMonth === PAYMENT_DAY && lastShownDate !== todayString) {
+    if (today >= LAUNCH_DATE && dayOfMonth >= START_DAY && dayOfMonth <= END_DAY && lastShownDate !== todayString) {
       // Mostrar el modal después de 2 segundos (después del changelog)
       const timer = setTimeout(() => {
         setIsOpen(true);
