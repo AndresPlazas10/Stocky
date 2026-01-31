@@ -23,7 +23,8 @@ const PageLoader = () => (
   </div>
 );
 
-const [showBraveWarning, setShowBraveWarning] = useState(false);
+function App() {
+  const [showBraveWarning, setShowBraveWarning] = useState(false);
 
   useEffect(() => {
     // Detectar Brave y mostrar advertencia si es necesario
@@ -67,8 +68,6 @@ const [showBraveWarning, setShowBraveWarning] = useState(false);
           </div>
         </div>
       )}
-rn (
-    <>
       {/* Banner de estado de conexión */}
       <OfflineBanner />
       
@@ -98,4 +97,4 @@ rn (
   );
 }
 
-export default App
+    export default App;
