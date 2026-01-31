@@ -293,30 +293,8 @@ function PricingAnnouncementModal({ forceOpen = false, onClose }) {
 
             </div>
 
-            {/* Footer con botones */}
+            {/* Footer con botón principal */}
             <div className="p-6 bg-gray-50 border-t border-gray-200">
-              <div className="grid grid-cols-2 gap-4 mb-3">
-                <Button
-                  onClick={() => {
-                    handleClose();
-                    navigate('/dashboard?tab=inventario');
-                  }}
-                  className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:opacity-90 h-12 text-base font-semibold rounded-xl shadow-lg"
-                >
-                  <Package className="w-5 h-5 mr-2" />
-                  Ver Precios
-                </Button>
-                <Button
-                  onClick={() => {
-                    handleClose();
-                    navigate('/dashboard?tab=ventas');
-                  }}
-                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:opacity-90 h-12 text-base font-semibold rounded-xl shadow-lg"
-                >
-                  <ShoppingCart className="w-5 h-5 mr-2" />
-                  Ir a Ventas
-                </Button>
-              </div>
               <Button
                 onClick={handleClose}
                 className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:opacity-90 h-12 text-lg font-semibold rounded-xl shadow-lg"
