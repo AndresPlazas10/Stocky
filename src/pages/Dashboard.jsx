@@ -3,6 +3,7 @@ import { supabase } from '../supabase/Client.jsx';
 import { DashboardLayout } from '../components/layout/DashboardLayout.jsx';
 import PaymentWarningModal from '../components/PaymentWarningModal.jsx';
 import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
+import PricingAnnouncementModal from '../components/PricingAnnouncementModal.jsx';
 import { shouldShowPaymentWarning } from '../config/unpaidBusinesses.js';
 import Home from '../components/Dashboard/Home.jsx';
 import Ventas from '../components/Dashboard/Ventas.jsx';
@@ -301,6 +302,8 @@ function Dashboard() {
         onClose={() => setShowPaymentWarning(false)}
         businessName={business?.name}
       />
+      {/* Modal de planes y precios (se muestra según fecha: día 1-5 de cada mes) */}
+      <PricingAnnouncementModal />
       
       <DashboardLayout
         userName={business?.owner_name || 'Usuario'}

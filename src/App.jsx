@@ -74,8 +74,7 @@ function App() {
       {/* Modal de novedades - se muestra automáticamente para nuevas versiones */}
       <ChangelogModal />
       
-      {/* Modal de precios y planes */}
-      <PricingAnnouncementModal />
+      {/* Modal de precios y planes (se muestra solo en Dashboard) */}
       
       <Suspense fallback={<PageLoader />}>
         <Routes>
