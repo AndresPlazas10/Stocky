@@ -98,7 +98,7 @@ function PaymentWarningModal({ isOpen, onClose, businessName = 'su negocio' }) {
                     </div>
                     <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
                       <p className="text-xs text-yellow-900 leading-snug">
-                        <strong>⚠️ Importante:</strong> Enviar por Bre-B a la llave <strong>@APM331</strong> y escribir <strong>el nombre de su negocio</strong> para identificarlo.
+                        <strong>⚠️ Importante:</strong> Por favor, realice el envío a través de <strong>Bre-B</strong> a la llave <strong>@APM331</strong> y remita una fotografía del comprobante de pago por nuestro canal de WhatsApp, indicando el nombre de su negocio para poder identificarlo correctamente en nuestro sistema.
                       </p>
                     </div>
                   </div>

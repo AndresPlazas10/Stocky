@@ -137,7 +137,7 @@ WHERE id = 'abc-123-def-456';
 **Titular:** Andres Felipe  
 **Valor:** $50.000 COP  
 
-**⚠️ IMPORTANTE:** El cliente debe enviar por **Bre-B** a la llave **@APM331** y escribir el **nombre de su negocio** en la descripción de la transferencia para identificar el pago.
+**⚠️ IMPORTANTE:** Por favor, realice el envío a través de **Bre-B** a la llave **@APM331** y remita una fotografía del comprobante de pago por nuestro canal de WhatsApp, indicando el nombre de su negocio para poder identificarlo correctamente en nuestro sistema.
 
 ---
 

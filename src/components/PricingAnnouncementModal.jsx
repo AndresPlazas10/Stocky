@@ -205,8 +205,7 @@ function PricingAnnouncementModal({ forceOpen = false, onClose }) {
                       <div>
                         <div className="font-semibold text-yellow-900 mb-1">⚠️ Importante al Transferir</div>
                         <p className="text-sm text-yellow-800 leading-relaxed">
-                          Enviar por <strong>Bre-B</strong> a la llave <strong>@APM331</strong> y escribir <strong>el nombre de tu negocio</strong> en la descripción para 
-                          que podamos identificar y activar tu cuenta automáticamente.
+                          Por favor, realice el envío a través de <strong>Bre-B</strong> a la llave <strong>@APM331</strong> y remita una fotografía del comprobante de pago por nuestro canal de WhatsApp, indicando el nombre de su negocio para poder identificarlo correctamente en nuestro sistema.
                         </p>
                       </div>
                     </div>
