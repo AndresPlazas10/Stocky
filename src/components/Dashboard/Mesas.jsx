@@ -763,6 +763,8 @@ function Mesas({ businessId }) {
     setIsClosingOrder(true);
     setError(null);
     setShowSplitBillModal(false);
+    setShowCloseOrderChoiceModal(false);
+    setShowPaymentModal(false);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -845,6 +847,9 @@ function Mesas({ businessId }) {
       setShowOrderDetails(false);
       setSelectedMesa(null);
       setOrderItems([]);
+      setShowCloseOrderChoiceModal(false);
+      setShowSplitBillModal(false);
+      setShowPaymentModal(false);
 
       setTimeout(() => setSuccess(null), 5000);
     } catch (error) {
@@ -1776,7 +1781,6 @@ function Mesas({ businessId }) {
               setShowSplitBillModal(false);
               setShowCloseOrderChoiceModal(true);
             }}
-            onPayAll={handlePayAllTogether}
           />
         )}
       </AnimatePresence>
