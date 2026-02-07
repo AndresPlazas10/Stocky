@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice, formatNumber, formatDateTimeTicket } from '../../utils/formatters.js';
@@ -57,6 +57,12 @@ function Mesas({ businessId }) {
   
   // Estado para prevenir clics múltiples (almacena el ID del item siendo actualizado)
   const [updatingItemId, setUpdatingItemId] = useState(null);
+
+  // Ref para prevenir que el modal se reabra después de completar una venta
+  const justCompletedSaleRef = useRef(false);
+  
+  // Estado para bloquear completamente el renderizado del modal mientras se procesa la venta
+  const [canShowOrderModal, setCanShowOrderModal] = useState(true);
 
   const getCurrentUser = useCallback(async () => {
     try {
@@ -194,10 +200,20 @@ function Mesas({ businessId }) {
   }, []);
 
   const handleTableUpdate = useCallback((updatedTable) => {
+    // ❌ IGNORAR COMPLETAMENTE cualquier actualización si acabamos de completar una venta
+    if (justCompletedSaleRef.current) {
+      return;
+    }
+    
     setMesas(prev => prev.map(m => m.id === updatedTable.id ? updatedTable : m));
     // Si estamos viendo esta mesa, actualizar sus detalles
     setSelectedMesa(prev => {
       if (prev?.id === updatedTable.id) {
+        // Si la mesa se liberó (pasó a available), cerrar el modal
+        if (updatedTable.status === 'available' && !updatedTable.current_order_id) {
+          setShowOrderDetails(false);
+          return null;
+        }
         return { ...prev, ...updatedTable };
       }
       return prev;
@@ -232,6 +248,11 @@ function Mesas({ businessId }) {
     filter: { business_id: businessId },
     enabled: !!businessId,
     onUpdate: async (updatedOrder) => {
+      // NO procesar actualizaciones si acabamos de completar una venta
+      if (justCompletedSaleRef.current) {
+        return;
+      }
+      
       // Actualizar la mesa correspondiente en el estado global
       setMesas(prev => prev.map(mesa => {
         if (mesa.current_order_id === updatedOrder.id) {
@@ -267,6 +288,11 @@ function Mesas({ businessId }) {
       const mesaAfectada = prevMesas.find(m => m.current_order_id === orderId);
       if (!mesaAfectada) return prevMesas;
       
+      // NO actualizar si ya completamos una venta (bandera activa)
+      if (justCompletedSaleRef.current) {
+        return prevMesas;
+      }
+      
       // Recargar los detalles de la orden para actualizar el total (async)
       supabase
         .from('orders')
@@ -285,6 +311,11 @@ function Mesas({ businessId }) {
         .single()
         .then(({ data: updatedOrder }) => {
           if (updatedOrder) {
+            // NO actualizar si ya completamos una venta
+            if (justCompletedSaleRef.current) {
+              return;
+            }
+            
             // Actualizar el estado de mesas
             setMesas(prev => prev.map(mesa => {
               if (mesa.id === mesaAfectada.id) {
@@ -844,6 +875,11 @@ function Mesas({ businessId }) {
         });
 
       setSuccess(`✅ ${subAccounts.length} venta(s) registrada(s). Total: ${formatPrice(totalSold)}. Mesa liberada.`);
+      
+      // Establecer ambas banderas para prevenir que el modal se reabra
+      justCompletedSaleRef.current = true;
+      setCanShowOrderModal(false);  // ← Bloquear renderizado del modal
+      
       setShowOrderDetails(false);
       setSelectedMesa(null);
       setOrderItems([]);
@@ -851,7 +887,11 @@ function Mesas({ businessId }) {
       setShowSplitBillModal(false);
       setShowPaymentModal(false);
 
-      setTimeout(() => setSuccess(null), 5000);
+      setTimeout(() => {
+        setSuccess(null);
+        justCompletedSaleRef.current = false;
+        setCanShowOrderModal(true);  // ← Permitir renderizado nuevamente
+      }, 8000);
     } catch (error) {
       setError(`❌ Error al cerrar la orden: ${error.message || 'Error desconocido'}`);
     } finally {
@@ -997,6 +1037,11 @@ function Mesas({ businessId }) {
         });
 
       setSuccess(`✅ Venta registrada exitosamente. Total: ${formatPrice(saleTotal)}. Mesa liberada.`);
+      
+      // Establecer ambas banderas para prevenir que el modal se reabra
+      justCompletedSaleRef.current = true;
+      setCanShowOrderModal(false);  // ← Bloquear renderizado del modal
+      
       setShowPaymentModal(false);
       setShowOrderDetails(false);
       setSelectedMesa(null);
@@ -1004,10 +1049,12 @@ function Mesas({ businessId }) {
       setPaymentMethod('cash');
       setSelectedCustomer('');
 
-      // Mostrar mensaje por más tiempo
+      // Mostrar mensaje por más tiempo y resetear las banderas después (8 seg para asegurar realtime)
       setTimeout(() => {
         setSuccess(null);
-      }, 5000);
+        justCompletedSaleRef.current = false;
+        setCanShowOrderModal(true);  // ← Permitir renderizado nuevamente
+      }, 8000);
 
     } catch (error) {
       setError(`❌ Error al cerrar la orden: ${error.message || 'Error desconocido'}`);
@@ -1488,7 +1535,7 @@ function Mesas({ businessId }) {
 
       {/* Modal de detalles de la orden */}
       <AnimatePresence>
-        {showOrderDetails && selectedMesa && (
+        {showOrderDetails && selectedMesa && canShowOrderModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

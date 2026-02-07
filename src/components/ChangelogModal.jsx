@@ -15,9 +15,9 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 
-const CHANGELOG_VERSION = 'v2.0.0-2026-01-20'; // Versión Simplicity - Lanzamiento 20 de Enero
-const LAUNCH_DATE = new Date('2026-01-20'); // Modal activo desde esta fecha
-const MODAL_ENABLED = false; // ❌ Modal desactivado temporalmente
+const CHANGELOG_VERSION = 'v2.0.0-2026-02-07'; // Versión con División de Cuentas - Lanzamiento 7 de Febrero
+const LAUNCH_DATE = new Date('2026-02-07'); // Modal activo desde esta fecha
+const MODAL_ENABLED = true; // ✅ Modal habilitado
 
 function ChangelogModal({ forceOpen = false, onClose }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -58,78 +58,16 @@ function ChangelogModal({ forceOpen = false, onClose }) {
 
   const changes = [
     {
-      icon: Sparkles,
+      icon: Users,
       color: 'from-blue-500 to-cyan-500',
-      title: '🎨 Nueva Imagen de Marca',
-      description: 'Stocky con un diseño renovado, logo profesional y moderno.',
+      title: '💳 Dividir Cuentas en Mesas',
+      description: 'Ahora puedes separar pagos de múltiples clientes en una misma mesa.',
       items: [
-        'Logo optimizado de alta resolución',
-        'Icono visible y profesional en todas las pestañas del navegador',
-        'Diseño visual refinado y efectos más sutiles',
-        'Branding consistente en toda la plataforma'
-      ]
-    },
-    {
-      icon: Zap,
-      color: 'from-yellow-500 to-amber-500',
-      title: '⚡ Sistema 10x Más Rápido',
-      description: 'Optimizaciones que hacen tu día a día mucho más ágil.',
-      items: [
-        'Guardado de ventas 83% más rápido (de 1.8s a 0.3s)',
-        'Búsquedas instantáneas - 99.8% más rápidas (de 2.5s a 0.003s)',
-        '80% menos consultas gracias al sistema de caché inteligente',
-        'Interfaz 97% más fluida - sin congelamientos ni esperas',
-        'Actualización en tiempo real sin recargas innecesarias'
-      ]
-    },
-    {
-      icon: Settings,
-      color: 'from-purple-500 to-pink-500',
-      title: '🕐 Formato de 12 Horas',
-      description: 'Todas las horas ahora se muestran en formato AM/PM para mayor claridad.',
-      items: [
-        'Hora más clara y fácil de leer',
-        'Formato universal: 2:30 PM, 9:00 AM',
-        'Aplicado en toda la plataforma (ventas, tickets, reportes)',
-        'Sin confusión entre horarios'
-      ]
-    },
-    {
-      icon: CheckCircle2,
-      color: 'from-green-500 to-emerald-500',
-      title: '✨ Orden Consistente en Mesas',
-      description: 'Los productos mantienen su posición sin movimientos inesperados.',
-      items: [
-        'Productos siempre en el mismo orden',
-        'Sin cambios de posición al actualizar',
-        'Interfaz más predecible y confiable',
-        'Mejor experiencia de usuario'
-      ]
-    },
-    {
-      icon: Sparkles,
-      color: 'from-purple-500 to-pink-500',
-      title: '🎯 Sistema Simplificado',
-      description: 'Stocky ahora se enfoca 100% en ser tu mejor aliado POS.',
-      items: [
-        'Proceso de venta ultra-simplificado: Agregar → Pagar → Listo',
-        'Sin pasos adicionales ni campos innecesarios',
-        'Comprobantes informativos profesionales y limpios',
-        'Interfaz renovada, más ágil y sin distracciones',
-        'Integración con Siigo para facturación oficial (incluida en tu plan)'
-      ]
-    },
-    {
-      icon: MessageCircle,
-      color: 'from-green-500 to-teal-500',
-      title: '💬 Recibos con Frase del Día',
-      description: 'Cada comprobante incluye una frase motivacional que cambia diariamente.',
-      items: [
-        '10 frases únicas de inspiración empresarial',
-        'Rotación automática cada día del año',
-        'Diseño elegante con emojis y formato especial',
-        'Experiencia única para tus clientes',
-        'Mensajes positivos sobre servicio y excelencia'
+        'Ingresa directamente los valores para cada cuenta',
+        'Asigna productos específicos a diferentes pagadores',
+        'Soporta hasta 10 sub-cuentas por mesa',
+        'Cálculo automático del total por persona',
+        'Métodos de pago independientes para cada cuenta'
       ]
     }
   ];
@@ -165,8 +103,8 @@ function ChangelogModal({ forceOpen = false, onClose }) {
                       <Sparkles className="w-8 h-8" />
                     </div>
                     <div>
-                      <h1 className="text-3xl font-bold">¡Bienvenido a Stocky 2.0!</h1>
-                      <p className="text-white/90 text-sm mt-1">Versión Simplicity - 20 de Enero 2026</p>
+                      <h1 className="text-3xl font-bold">¡Nueva Función Disponible!</h1>
+                      <p className="text-white/90 text-sm mt-1">División de Cuentas en Mesas - 7 de Febrero 2026</p>
                     </div>
                   </div>
                   <button
@@ -221,27 +159,30 @@ function ChangelogModal({ forceOpen = false, onClose }) {
               {/* Mensaje final */}
               <div className="mt-8 p-6 bg-gradient-to-r from-blue-100 to-cyan-100 rounded-2xl border-2 border-blue-200">
                 <div className="flex items-center gap-3 mb-3">
-                  <Shield className="w-6 h-6 text-blue-600" />
+                  <Users className="w-6 h-6 text-blue-600" />
                   <h4 className="text-lg font-bold text-blue-900">
-                    💼 ¿Necesitas facturar electrónicamente?
+                    💳 Cómo Usar la División de Cuentas
                   </h4>
                 </div>
                 <p className="text-blue-800 mb-4">
-                  Tu plan incluye acceso a <strong>Siigo</strong>, líder en facturación electrónica en Colombia. 
-                  Contacta a soporte para activar tu cuenta y empieza a facturar oficialmente desde hoy.
+                  Cuando estés creando una venta con múltiples clientes en la misma mesa, abre el modal "Dividir cuenta" y asigna cada producto o cantidad a la persona que pagará. ¡Es así de simple!
                 </p>
                 <div className="flex flex-col gap-2 text-sm text-blue-700">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Plan Siigo incluido sin costo adicional</span>
+                    <span>Ingresa el valor directamente en los campos de cantidad</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Guía completa en Configuración → Facturación</span>
+                    <span>Cada cuenta puede pagar con diferente método</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Tus ventas se mantienen intactas, nada cambia en tu historial</span>
+                    <span>El total se calcula automáticamente por persona</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Todos los cambios se guardan en tiempo real</span>
                   </div>
                 </div>
               </div>
@@ -251,10 +192,10 @@ function ChangelogModal({ forceOpen = false, onClose }) {
             <div className="p-6 bg-gray-50 border-t border-gray-200">
               <Button
                 onClick={handleClose}
-                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:opacity-90 h-12 text-lg font-semibold rounded-xl shadow-lg"
+                className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:opacity-90 h-12 text-lg font-semibold rounded-xl shadow-lg"
               >
-                <Sparkles className="w-5 h-5 mr-2" />
-                ¡Entendido, empecemos! 🚀
+                <Users className="w-5 h-5 mr-2" />
+                ¡A dividir cuentas! 💳
               </Button>
             </div>
           </motion.div>
