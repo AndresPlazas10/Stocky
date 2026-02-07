@@ -19,6 +19,7 @@ import {
   Save,
   Printer
 } from 'lucide-react';
+import SplitBillModal from './SplitBillModal';
 
 function Mesas({ businessId }) {
   const [mesas, setMesas] = useState([]);
@@ -39,6 +40,8 @@ function Mesas({ businessId }) {
 
   // Estados para cerrar orden
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showCloseOrderChoiceModal, setShowCloseOrderChoiceModal] = useState(false);
+  const [showSplitBillModal, setShowSplitBillModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [clientes, setClientes] = useState([]);
@@ -739,8 +742,116 @@ function Mesas({ businessId }) {
   };
 
   const handleCloseOrder = () => {
-    // Abrir modal de pago en lugar de procesar directamente
+    // Mostrar elección: pagar todo junto o dividir cuenta
+    setShowCloseOrderChoiceModal(true);
+  };
+
+  const handlePayAllTogether = () => {
+    setShowCloseOrderChoiceModal(false);
+    setShowSplitBillModal(false);
     setShowPaymentModal(true);
+  };
+
+  const handleSplitBill = () => {
+    setShowCloseOrderChoiceModal(false);
+    setShowSplitBillModal(true);
+  };
+
+  const processSplitPaymentAndClose = async ({ subAccounts }) => {
+    if (isClosingOrder) return;
+
+    setIsClosingOrder(true);
+    setError(null);
+    setShowSplitBillModal(false);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No se pudo obtener información del usuario');
+
+      const { data: employee } = await supabase
+        .from('employees')
+        .select('full_name, role')
+        .eq('user_id', user.id)
+        .eq('business_id', businessId)
+        .maybeSingle();
+
+      const sellerName = employee && (employee.role === 'owner' || employee.role === 'admin')
+        ? 'Administrador'
+        : (employee?.full_name || 'Empleado');
+
+      let totalSold = 0;
+
+      for (const sub of subAccounts) {
+        if (!sub.items || sub.items.length === 0) continue;
+
+        const saleTotal = sub.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+        totalSold += saleTotal;
+
+        const { data: sale, error: saleError } = await supabase
+          .from('sales')
+          .insert([{
+            business_id: businessId,
+            user_id: user.id,
+            total: saleTotal,
+            payment_method: sub.paymentMethod || 'cash',
+            seller_name: sellerName,
+            created_at: new Date().toISOString()
+          }])
+          .select()
+          .maybeSingle();
+
+        if (saleError) throw new Error(`Error al crear venta (${sub.name}): ${saleError.message}`);
+        if (!sale?.id) throw new Error(`Venta sin id para ${sub.name}`);
+
+        const saleDetails = sub.items.map(item => ({
+          sale_id: sale.id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_price: item.price
+        }));
+
+        const { error: detailsError } = await supabase
+          .from('sale_details')
+          .insert(saleDetails);
+
+        if (detailsError) {
+          await supabase.from('sales').delete().eq('id', sale.id);
+          throw new Error(`Error al crear detalles (${sub.name}): ${detailsError.message}`);
+        }
+      }
+
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({ status: 'closed', closed_at: new Date().toISOString() })
+        .eq('id', selectedMesa.current_order_id);
+
+      if (orderError) throw orderError;
+
+      setMesas(prevMesas =>
+        prevMesas.map(m =>
+          m.id === selectedMesa.id ? { ...m, status: 'available', current_order_id: null } : m
+        )
+      );
+
+      supabase
+        .from('tables')
+        .update({ current_order_id: null, status: 'available' })
+        .eq('id', selectedMesa.id)
+        .then(({ error: tableError }) => {
+          if (tableError) loadMesas();
+        });
+
+      setSuccess(`✅ ${subAccounts.length} venta(s) registrada(s). Total: ${formatPrice(totalSold)}. Mesa liberada.`);
+      setShowOrderDetails(false);
+      setSelectedMesa(null);
+      setOrderItems([]);
+
+      setTimeout(() => setSuccess(null), 5000);
+    } catch (error) {
+      setError(`❌ Error al cerrar la orden: ${error.message || 'Error desconocido'}`);
+    } finally {
+      setIsClosingOrder(false);
+    }
   };
 
   const processPaymentAndClose = async () => {
@@ -1598,6 +1709,75 @@ function Mesas({ businessId }) {
               </Card>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de elección: pagar todo junto o dividir cuenta */}
+      <AnimatePresence>
+        {showCloseOrderChoiceModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[58] p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-3xl shadow-2xl max-w-md w-full"
+            >
+              <Card className="border-0">
+                <CardHeader className="border-b border-accent-100 bg-gradient-to-r from-primary-50 to-accent-50">
+                  <CardTitle className="text-xl font-bold text-primary-900">
+                    💳 ¿Cómo cerrar la orden?
+                  </CardTitle>
+                  <p className="text-sm text-primary-600 mt-1">
+                    Total: {formatPrice(orderTotal)}
+                  </p>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-3">
+                  <Button
+                    onClick={handlePayAllTogether}
+                    className="w-full h-12 gradient-primary text-white hover:opacity-90"
+                  >
+                    <CheckCircle2 className="w-5 h-5 mr-2" />
+                    Pagar todo junto
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleSplitBill}
+                    className="w-full h-12 border-2 border-accent-300 text-accent-700 hover:bg-accent-50"
+                  >
+                    <Layers className="w-5 h-5 mr-2" />
+                    Dividir cuenta
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowCloseOrderChoiceModal(false)}
+                    className="w-full h-10 text-primary-600 hover:bg-accent-50"
+                  >
+                    Cancelar
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal dividir cuenta */}
+      <AnimatePresence>
+        {showSplitBillModal && (
+          <SplitBillModal
+            orderItems={orderItems}
+            onConfirm={processSplitPaymentAndClose}
+            onCancel={() => {
+              setShowSplitBillModal(false);
+              setShowCloseOrderChoiceModal(true);
+            }}
+            onPayAll={handlePayAllTogether}
+          />
         )}
       </AnimatePresence>
 
