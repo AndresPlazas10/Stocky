@@ -4,7 +4,6 @@ import { Navbar } from './Navbar';
 import { motion } from 'framer-motion';
 import { MobileBottomNav, MobileHeader, MobileDrawer } from '../mobile';
 import { useViewport } from '../../hooks/useViewport';
-import ChangelogModal from '../ChangelogModal';
 
 export function DashboardLayout({ 
   children, 
@@ -21,7 +20,6 @@ export function DashboardLayout({
 }) {
   const { isMobile } = useViewport();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [showChangelog, setShowChangelog] = useState(false);
 
   // En móvil, usamos navegación inferior
   if (isMobile) {
@@ -44,7 +42,6 @@ export function DashboardLayout({
           userName={userName}
           businessName={businessName}
           onSignOut={onSignOut}
-          onShowChangelog={() => setShowChangelog(true)}
         />
 
         {/* Contenido principal con padding solo para header */}
@@ -57,13 +54,7 @@ export function DashboardLayout({
           {children}
         </motion.main>
 
-        {/* Changelog Modal */}
-        {showChangelog && (
-          <ChangelogModal 
-            forceOpen={true} 
-            onClose={() => setShowChangelog(false)} 
-          />
-        )}
+        {/* Changelog Modal removed */}
       </div>
     );
   }

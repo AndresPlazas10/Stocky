@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase/Client.jsx';
 import { Button } from '@/components/ui/button';
@@ -17,13 +17,6 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
-
-  useEffect(() => {
-    const initAuth = async () => {
-      await supabase.auth.signOut();
-    };
-    initAuth();
-  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -70,15 +63,12 @@ function Login() {
         .eq('created_by', data.user.id)
         .maybeSingle();
 
-      // Redireccionar según el rol
+      // Redireccionar según el rol (SPA, sin recargar)
       if (business) {
-        // Redirigiendo a dashboard de propietario
-        window.location.href = '/dashboard';
+        navigate('/dashboard', { replace: true });
       } else {
-        // Redirigiendo a dashboard de empleado
-        window.location.href = '/employee-dashboard';
+        navigate('/employee-dashboard', { replace: true });
       }
-      
     } catch (err) {
       setError(err.message);
       setLoading(false);

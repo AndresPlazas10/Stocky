@@ -77,7 +77,7 @@ function Register() {
       const { data: existingUsername } = await supabase
         .from('businesses')
         .select('id')
-        .eq('cleanUsername', cleanUsername)
+        .eq('username', cleanUsername)
         .maybeSingle();
 
       if (existingUsername) {

@@ -1,4 +1,4 @@
-import { X, Home, ShoppingCart, ShoppingBag, Package, FileText, Users, Truck, BarChart3, Settings, LogOut, ChevronRight, Sparkles } from 'lucide-react';
+import { X, Home, ShoppingCart, ShoppingBag, Package, FileText, Users, Truck, BarChart3, Settings, LogOut, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 /**
@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
  * - Gestos de swipe para cerrar
  * - Navegación completa del dashboard
  */
-export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userName, businessName, onSignOut, onShowChangelog }) {
+export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userName, businessName, onSignOut }) {
   const menuSections = [
     {
       title: 'Principal',
@@ -128,17 +128,7 @@ export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userNam
 
             {/* Footer con botones de acción */}
             <div className="border-t border-gray-200 p-3 space-y-1.5 shrink-0">
-              {/* Botón de novedades */}
-              <button
-                onClick={() => {
-                  onShowChangelog();
-                  onClose();
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 text-amber-600 border border-amber-500/20 transition-all"
-              >
-                <Sparkles size={16} />
-                <span className="text-xs font-medium">Ver novedades</span>
-              </button>
+              {/* What's New button removed */}
               
               {/* Botón de logout */}
               <button

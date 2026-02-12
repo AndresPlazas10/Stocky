@@ -335,16 +335,18 @@ export default function Facturas({ userRole = 'admin' }) {
         throw new Error('Error al crear items de factura: ' + itemsError.message);
       }
 
-      // Reducir stock de productos
-      const stockErrors = [];
-      for (const item of items) {
-        const { error: stockError } = await supabase.rpc('reduce_stock', {
-          p_product_id: item.product_id,
-          p_quantity: item.quantity
+      // Reducir stock de productos en batch (una sola llamada)
+      const productUpdates = items.map(item => ({
+        product_id: item.product_id,
+        quantity: Number(item.quantity) || 0
+      })).filter(p => p.quantity > 0);
+      if (productUpdates.length > 0) {
+        const { error: stockError } = await supabase.rpc('update_stock_batch', {
+          product_updates: productUpdates
         });
-        
         if (stockError) {
-          stockErrors.push(`${item.product_name}: ${stockError.message}`);
+          await supabase.from('invoices').delete().eq('id', invoice.id);
+          throw new Error('Error al actualizar inventario. No se creó la factura.');
         }
       }
 
