@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client';
 import { getFilteredSales } from '../../services/salesService';
+import { createSaleOptimized, recordSaleCreationTime } from '../../services/salesServiceOptimized';
 import SalesFilters from '../Filters/SalesFilters';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatNumber, formatDate, formatDateOnly, formatDateTimeTicket } from '../../utils/formatters.js';
@@ -11,6 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
+import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
+import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import Pagination from '../Pagination';
 import { 
   ShoppingCart, 
@@ -56,6 +59,9 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [showSaleModal, setShowSaleModal] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [successDetails, setSuccessDetails] = useState([]);
+  const [successTitle, setSuccessTitle] = useState('✨ Venta Registrada');
+  const [alertType, setAlertType] = useState('success'); // 'success' o 'error'
   const [sessionChecked, setSessionChecked] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false); // Verificar si es empleado
   
@@ -338,84 +344,38 @@ function Ventas({ businessId, userRole = 'admin' }) {
         throw new Error('⚠️ Verificando sesión...');
       }
 
-      // Obtener el usuario actual autenticado
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-      if (userError || !user?.id) {
-        throw new Error('⚠️ Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-      }
-
-      // Verificar si el user_id existe en la tabla employees del negocio actual
-      const { data: employee, error: employeeError } = await supabase
-        .from('employees')
-        .select('full_name, role')
-        .eq('user_id', user.id)
-        .eq('business_id', businessId)
-        .maybeSingle();
-
-      // Si existe en employees → usar full_name, SALVO que sea owner/admin
-      // Si NO existe en employees → es el dueño, usar "Administrador"
-      let sellerName = 'Administrador';
-      
-      if (employee) {
-        // Si es owner o admin, mostrar Administrador
-        if (employee.role === 'owner' || employee.role === 'admin') {
-          sellerName = 'Administrador';
-        } else {
-          // Si es empleado regular, usar su nombre
-          sellerName = employee.full_name || 'Empleado';
-        }
-      }
-
       // Calcular total del carrito
       const saleTotal = cart.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
 
-      // Datos a insertar
-      const saleData = {
-        business_id: businessId,
-        user_id: user.id,
-        seller_name: sellerName,
-        payment_method: paymentMethod,
-        total: saleTotal,
-        created_at: new Date().toISOString() // Establecer fecha actual explícitamente
-      };
+      // 🚀 USAR FUNCIÓN OPTIMIZADA: Una sola llamada RPC
+      const startTime = performance.now();
+      
+      const result = await createSaleOptimized({
+        businessId,
+        cart,
+        paymentMethod,
+        total: saleTotal
+      });
 
-      // 1. Crear la venta principal
-      const { data: sale, error: saleError } = await supabase
-        .from('sales')
-        .insert([saleData])
-        .select()
-        .maybeSingle();
-
-      if (saleError) {
-        throw new Error('Error al crear la venta: ' + (saleError.message || JSON.stringify(saleError)));
+      const elapsedMs = performance.now() - startTime;
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Error al procesar la venta');
       }
 
-      if (!sale || !sale.id) {
-        throw new Error('Venta creada sin id: la respuesta del insert no devolvió el id. Comprueba RLS/permisos y el objeto sale: ' + JSON.stringify(sale));
-      }
+      // Registrar latencia para debugging
+      recordSaleCreationTime(elapsedMs);
+      console.log(`✅ Venta creada en ${elapsedMs.toFixed(0)}ms`);
 
-      // 2. Crear los detalles de venta
-      const saleDetails = cart.map(item => ({
-        sale_id: sale.id,
-        product_id: item.product_id,
-        quantity: item.quantity,
-        unit_price: item.unit_price
-      }));
-
-      const { error: detailsError } = await supabase
-        .from('sale_details')
-        .insert(saleDetails);
-
-      if (detailsError) {
-        // Intentar rollback de la venta si los detalles fallan
-        await supabase.from('sales').delete().eq('id', sale.id);
-        throw detailsError;
-      }
-
-      // Código de éxito
-      const successMsg = `✅ Venta registrada exitosamente. Total: ${formatPrice(total)}`;
-      setSuccess(successMsg);
+      // Mostrar alerta con detalles de la venta
+      setSuccessTitle('✨ Venta Registrada');
+      setSuccessDetails([
+        { label: 'Total', value: formatPrice(saleTotal) },
+        { label: 'Tiempo', value: `${elapsedMs.toFixed(0)}ms` },
+        { label: 'Artículos', value: cart.length }
+      ]);
+      setAlertType('success');
+      setSuccess(true);
       
       // Limpiar el carrito y cerrar POS
       setCart([]);
@@ -469,8 +429,13 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
       if (deleteError) throw new Error('Error al eliminar venta: ' + deleteError.message);
 
-      setSuccess('✅ Venta eliminada exitosamente');
-      setTimeout(() => setSuccess(null), 4000);
+      setSuccessTitle('🗑️ Venta Eliminada');
+      setSuccessDetails([
+        { label: 'Acción', value: 'Venta eliminada correctamente' }
+      ]);
+      setAlertType('error');
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 4000);
 
       // Recargar ventas
       await loadVentas(currentFilters, { limit, offset: (page - 1) * limit });
@@ -651,7 +616,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
           <h1>═══════════════════════════════════</h1>
           <p style="margin: 10px 0; font-size: 9px; border-top: 1px dashed #000; padding-top: 8px;">
             Sistema Stocky<br>
-            ${formatDateTimeTicket(venta.created_at)}
+            ${venta.created_at ? formatDateTimeTicket(venta.created_at) : 'Fecha no disponible'}
           </p>
         </div>
         
@@ -862,7 +827,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
         total: total,
         items: emailItems,
         businessName: businessData?.name || 'Stocky',
-        issuedAt: selectedSale.created_at
+        issuedAt: selectedSale?.created_at || new Date().toISOString()
       });
 
       if (emailResult.success) {
@@ -952,21 +917,20 @@ function Ventas({ businessId, userRole = 'admin' }) {
             </Card>
           </motion.div>
         )}
-        {success && (
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Card className="bg-green-50 border-green-200 shadow-md rounded-2xl mb-4">
-              <div className="p-4 flex items-center gap-3">
-                <CheckCircle2 className="w-6 h-6 text-green-600" />
-                <p className="text-green-800 font-medium">{success}</p>
-              </div>
-            </Card>
-          </motion.div>
-        )}
+        <SaleSuccessAlert 
+          isVisible={success && alertType === 'success'}
+          onClose={() => setSuccess(false)}
+          title={successTitle}
+          details={successDetails}
+          duration={6000}
+        />
+        <SaleErrorAlert 
+          isVisible={success && alertType === 'error'}
+          onClose={() => setSuccess(false)}
+          title={successTitle}
+          details={successDetails}
+          duration={7000}
+        />
       </AnimatePresence>
 
       {!showSaleModal && (
@@ -1316,7 +1280,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                             <div className="flex items-center gap-2 text-accent-600">
                               <Calendar className="w-4 h-4 shrink-0" />
                               <span className="text-sm font-medium">
-                                {formatDate(venta.created_at)}
+                                {venta.created_at ? formatDate(venta.created_at) : 'Fecha no disponible'}
                               </span>
                             </div>
 
@@ -1454,7 +1418,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                     <div>
                       <h2 className="text-2xl font-bold">Enviar Comprobante de Pago</h2>
                       <p className="text-blue-100 mt-1">
-                        Venta del {formatDateOnly(selectedSale.created_at)} por {formatPrice(selectedSale.total)}
+                        Venta del {selectedSale?.created_at ? formatDateOnly(selectedSale.created_at) : 'fecha no disponible'} por {formatPrice(selectedSale.total)}
                       </p>
                     </div>
                   </div>

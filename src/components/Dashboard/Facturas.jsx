@@ -3,6 +3,8 @@ import { supabase } from '../../supabase/Client';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatNumber, formatDate } from '../../utils/formatters.js';
 import { motion, AnimatePresence } from 'framer-motion';
+import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
+import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { XCircle, AlertTriangle, Trash2 } from 'lucide-react';
 
 export default function Facturas({ userRole = 'admin' }) {
@@ -749,11 +751,22 @@ export default function Facturas({ userRole = 'admin' }) {
         </div>
       )}
 
-      {success && (
-        <div className="mb-4 p-4 bg-green-100 text-green-700 rounded-lg">
-          {success}
-        </div>
-      )}
+      {/* Alertas mejoradas */}
+      <SaleErrorAlert 
+        isVisible={!!error}
+        onClose={() => setError('')}
+        title="Error"
+        message={error}
+        duration={5000}
+      />
+
+      <SaleSuccessAlert 
+        isVisible={!!success}
+        onClose={() => setSuccess('')}
+        title="✨ Factura Creada"
+        details={[{ label: 'Acción', value: success }]}
+        duration={5000}
+      />
 
       {showForm && (
         <div ref={formRef} className="mb-6 bg-white p-6 rounded-lg shadow-md">

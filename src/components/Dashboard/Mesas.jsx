@@ -8,6 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
+import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
+import { SaleErrorAlert } from '../ui/SaleErrorAlert';
+import { SaleUpdateAlert } from '../ui/SaleUpdateAlert';
 import { 
   Plus, 
   Layers, 
@@ -28,6 +31,9 @@ function Mesas({ businessId }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [successDetails, setSuccessDetails] = useState([]);
+  const [successTitle, setSuccessTitle] = useState('✨ Acción Completada');
+  const [alertType, setAlertType] = useState('success'); // 'success', 'update', 'error'
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedMesa, setSelectedMesa] = useState(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
@@ -569,8 +575,14 @@ function Mesas({ businessId }) {
       setOrderItems([]);
       setSearchProduct('');
       
-      setSuccess('✅ Orden guardada correctamente');
-      setTimeout(() => setSuccess(null), 2000);
+      setSuccessTitle('✨ Mesa Actualizada');
+      setSuccessDetails([
+        { label: 'Mesa', value: `#${selectedMesa.table_number}` },
+        { label: 'Estado', value: 'Actualizada' }
+      ]);
+      setAlertType('update');
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
       setError('❌ No se pudo guardar la orden');
     }
@@ -837,10 +849,17 @@ function Mesas({ businessId }) {
 
         loadMesas().catch(() => {});
 
-        setSuccess(`✅ ${subAccounts.length} venta(s) registrada(s). Total: ${formatPrice(totalSold)}. Mesa liberada.`);
+        setSuccessDetails([
+          { label: 'Total', value: formatPrice(totalSold) },
+          { label: 'Mesa', value: `#${mesaSnapshot.table_number}` },
+          { label: 'Cuentas', value: subAccounts.length }
+        ]);
+        setSuccessTitle('✨ Mesa Cerrada');
+        setAlertType('success');
+        setSuccess(true);
 
         setTimeout(() => {
-          setSuccess(null);
+          setSuccess(false);
           justCompletedSaleRef.current = false;
           setCanShowOrderModal(true);
         }, 8000);
@@ -892,10 +911,17 @@ function Mesas({ businessId }) {
 
         loadMesas().catch(() => {});
 
-        setSuccess(`✅ Venta registrada exitosamente. Total: ${formatPrice(saleTotal)}. Mesa liberada.`);
+        setSuccessDetails([
+          { label: 'Total', value: formatPrice(saleTotal) },
+          { label: 'Mesa', value: `#${mesaSnapshot.table_number}` },
+          { label: 'Método', value: paymentMethod }
+        ]);
+        setSuccessTitle('✨ Mesa Cerrada');
+        setAlertType('success');
+        setSuccess(true);
 
         setTimeout(() => {
-          setSuccess(null);
+          setSuccess(false);
           justCompletedSaleRef.current = false;
           setCanShowOrderModal(true);
         }, 8000);
@@ -1214,17 +1240,32 @@ function Mesas({ businessId }) {
               </motion.div>
             )}
             
-            {success && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="mb-4 p-4 rounded-2xl bg-green-50 border-2 border-green-200 flex items-start gap-3"
-              >
-                <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-                <p className="text-sm text-green-700 font-medium">{success}</p>
-              </motion.div>
-            )}
+            {/* Alerta de éxito - verde */}
+            <SaleSuccessAlert 
+              isVisible={success && alertType === 'success'}
+              onClose={() => setSuccess(false)}
+              title={successTitle}
+              details={successDetails}
+              duration={6000}
+            />
+            
+            {/* Alerta de actualización - amarillo */}
+            <SaleUpdateAlert 
+              isVisible={success && alertType === 'update'}
+              onClose={() => setSuccess(false)}
+              title={successTitle}
+              details={successDetails}
+              duration={5000}
+            />
+            
+            {/* Alerta de error - rojo */}
+            <SaleErrorAlert 
+              isVisible={success && alertType === 'error'}
+              onClose={() => setSuccess(false)}
+              title={successTitle}
+              details={successDetails}
+              duration={7000}
+            />
           </AnimatePresence>
 
           {/* Formulario para agregar mesa */}

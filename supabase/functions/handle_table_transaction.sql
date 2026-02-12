@@ -1,6 +1,6 @@
 -- SQL: handle_table_transaction
 -- Ejecutar como role con privilegios (p. ej. postgres/service_role) para crear la función
--- Esta función realiza UPDATE en tables e INSERT en audit_logs en una sola transacción
+-- Esta función realiza UPDATE en tables e INSERT en audit_log en una sola transacción
 
 CREATE OR REPLACE FUNCTION public.handle_table_transaction(
   p_table_id uuid,
@@ -23,22 +23,25 @@ DECLARE
   v_status text;
   v_last_updated_by uuid;
   v_updated_at timestamptz;
-  v_table_tenant uuid;
-  v_user_tenant uuid;
+  v_table_business uuid;
+  v_jwt_business uuid;
 BEGIN
-  -- Tenant-aware checks: obtener tenant de la mesa y del usuario
-  SELECT tenant_id INTO v_table_tenant FROM public.tables WHERE id = p_table_id;
+  -- Business-aware checks: obtener business_id de la mesa
+  SELECT business_id INTO v_table_business FROM public.tables WHERE id = p_table_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'table with id % not found', p_table_id;
   END IF;
 
-  SELECT tenant_id INTO v_user_tenant FROM public.users WHERE id = p_user_id;
-  IF v_user_tenant IS NULL THEN
-    RAISE EXCEPTION 'user with id % not found or has no tenant', p_user_id;
-  END IF;
+  -- Obtener business desde los claims JWT de la sesión (Supabase sets jwt.claims)
+  BEGIN
+    v_jwt_business := (current_setting('jwt.claims', true)::json->>'business')::uuid;
+  EXCEPTION WHEN others THEN
+    RAISE EXCEPTION 'missing or invalid jwt.claims business claim';
+  END;
 
-  IF v_user_tenant <> v_table_tenant THEN
-    RAISE EXCEPTION 'permission denied: user tenant does not match table tenant';
+  -- Comprobaciones de seguridad: el caller (JWT) debe pertenecer al mismo business que la mesa
+  IF v_jwt_business IS NULL OR v_jwt_business <> v_table_business THEN
+    RAISE EXCEPTION 'permission denied: caller business does not match table business';
   END IF;
 
   -- Validar acción
@@ -60,8 +63,9 @@ BEGIN
   INTO v_id, v_name, v_status, v_last_updated_by, v_updated_at;
 
   -- Insertar registro de auditoría
-  INSERT INTO public.audit_logs (table_id, action_type, user_id, notes, created_at)
-  VALUES (p_table_id, lower(p_action_type), p_user_id, p_notes, timezone('utc', now()));
+  INSERT INTO public.audit_log (table_name, record_id, action, user_id, business_id, new_data, created_at)
+  VALUES ('tables', p_table_id, upper(p_action_type), p_user_id, v_table_business, 
+          jsonb_build_object('status', v_status, 'notes', p_notes), timezone('utc', now()));
 
   -- Devolver la fila actualizada (single-row result)
   RETURN QUERY SELECT v_id, v_name, v_status, v_last_updated_by, v_updated_at;

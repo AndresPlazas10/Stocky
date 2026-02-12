@@ -15,6 +15,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatPrice, formatNumber, formatDate } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
+import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
+import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -378,19 +380,24 @@ function Ventas({ businessId, userRole = 'admin' }) {
             <span>{error}</span>
           </motion.div>
         )}
-
-        {success && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center gap-2"
-          >
-            <CheckCircle2 className="w-5 h-5" />
-            <span>{success}</span>
-          </motion.div>
-        )}
       </AnimatePresence>
+
+      {/* Alertas mejoradas */}
+      <SaleErrorAlert 
+        isVisible={!!error}
+        onClose={() => setError('')}
+        title="Error"
+        message={error}
+        duration={5000}
+      />
+
+      <SaleSuccessAlert 
+        isVisible={!!success}
+        onClose={() => setSuccess('')}
+        title="✨ Venta Registrada"
+        details={[{ label: 'Acción', value: success }]}
+        duration={5000}
+      />
 
       {/* Header */}
       <div className="flex justify-between items-center">
@@ -464,7 +471,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                         {formatPrice(venta.total)}
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-600">
-                        {formatDate(venta.created_at)}
+                        {venta.created_at ? formatDate(venta.created_at) : 'Sin fecha'}
                       </td>
                       {userRole === 'admin' && (
                         <td className="py-3 px-4 text-center">
