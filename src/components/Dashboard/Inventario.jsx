@@ -1433,20 +1433,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                   </select>
                 </div>
 
-                <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-xl">
-                  <input 
-                    type="checkbox"
-                    name="is_active"
-                    checked={formData.is_active}
-                    onChange={handleChange}
-                    className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label className="text-sm font-medium text-gray-700">
-                    Producto activo
-                  </label>
-                </div>
-
-                <div className="flex gap-3 pt-4">
+                <div className="flex gap-3">
                   <Button
                     type="button"
                     onClick={() => {

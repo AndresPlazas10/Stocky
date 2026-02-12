@@ -122,7 +122,7 @@ export function ProductDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl w-full max-h-[calc(100vh-120px)] overflow-hidden">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
@@ -141,10 +141,10 @@ export function ProductDialog({
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6 mt-6">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           {/* Código y Nombre */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1">
               <Label htmlFor="code" className="text-primary font-medium">
                 Código *
               </Label>
@@ -170,7 +170,7 @@ export function ProductDialog({
               )}
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               <Label htmlFor="name" className="text-primary font-medium">
                 Nombre del Producto *
               </Label>
@@ -198,7 +198,7 @@ export function ProductDialog({
           </div>
 
           {/* Categoría */}
-          <div className="space-y-2">
+          <div className="space-y-1">
             <Label htmlFor="category" className="text-primary font-medium">
               Categoría *
             </Label>
@@ -243,8 +243,8 @@ export function ProductDialog({
           </div>
 
           {/* Precio y Costo */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1">
               <Label htmlFor="price" className="text-primary font-medium">
                 Precio de Venta *
               </Label>
@@ -277,7 +277,7 @@ export function ProductDialog({
               )}
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               <Label htmlFor="cost" className="text-primary font-medium">
                 Costo (opcional)
               </Label>
@@ -300,8 +300,8 @@ export function ProductDialog({
           </div>
 
           {/* Stock y Stock Mínimo */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1">
               <Label htmlFor="stock" className="text-primary font-medium">
                 Stock Actual *
               </Label>
@@ -328,7 +328,7 @@ export function ProductDialog({
               )}
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               <Label htmlFor="minStock" className="text-primary font-medium">
                 Stock Mínimo
               </Label>
@@ -345,7 +345,7 @@ export function ProductDialog({
           </div>
 
           {/* Descripción */}
-          <div className="space-y-2">
+          <div className="space-y-1">
             <Label htmlFor="description" className="text-primary font-medium">
               Descripción (opcional)
             </Label>
@@ -355,7 +355,7 @@ export function ProductDialog({
               value={formData.description}
               onChange={handleChange}
               placeholder="Descripción detallada del producto..."
-              rows={3}
+              rows={2}
               className="w-full px-3 py-2 rounded-xl border-2 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 resize-none"
             />
           </div>

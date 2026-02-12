@@ -45,12 +45,12 @@ export const ErrorPage = ({
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background-50 via-background-100 to-accent-100 p-4">
+    <div className="h-screen flex items-center justify-center bg-gradient-to-br from-background-50 via-background-100 to-accent-100 p-4 overflow-hidden">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="max-w-md w-full text-center"
+        className="max-w-md w-full text-center max-h-[calc(100vh-120px)] overflow-auto"
       >
         <motion.div
           initial={{ scale: 0 }}

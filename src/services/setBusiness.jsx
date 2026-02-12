@@ -13,7 +13,7 @@ export async function setBusiness(businessData) {
   try {
     // Validar campos requeridos
     if (!businessData.name) {
-      throw new Error('El nombre del negocio es requerido');
+      throw new Error('❌ El nombre del negocio es requerido');
     }
 
     // Obtener el usuario actual autenticado
@@ -22,7 +22,7 @@ export async function setBusiness(businessData) {
     if (userError) throw userError;
     
     if (!user) {
-      throw new Error('Usuario no autenticado');
+      throw new Error('❌ Usuario no autenticado');
     }
 
     // Validar si ya existe un negocio con el mismo email
@@ -38,7 +38,7 @@ export async function setBusiness(businessData) {
       }
 
       if (existingEmail) {
-        throw new Error('Ya existe un negocio registrado con este correo electrónico');
+        throw new Error('❌ Ya existe un negocio registrado con este correo electrónico');
       }
     }
 
@@ -82,7 +82,7 @@ export async function getBusinesses() {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError) throw userError;
-    if (!user) throw new Error('Usuario no autenticado');
+    if (!user) throw new Error('❌ Usuario no autenticado');
 
     const { data, error } = await supabase
       .from('businesses')
@@ -115,7 +115,7 @@ export async function getBusinesses() {
 export async function getBusinessById(businessId) {
   try {
     if (!businessId) {
-      throw new Error('El ID del negocio es requerido');
+      throw new Error('❌ El ID del negocio es requerido');
     }
 
     const { data, error } = await supabase
@@ -150,7 +150,7 @@ export async function getBusinessById(businessId) {
 export async function updateBusiness(businessId, updates) {
   try {
     if (!businessId) {
-      throw new Error('El ID del negocio es requerido');
+      throw new Error('❌ El ID del negocio es requerido');
     }
 
     const { data, error } = await supabase
@@ -184,7 +184,7 @@ export async function updateBusiness(businessId, updates) {
 export async function deleteBusiness(businessId) {
   try {
     if (!businessId) {
-      throw new Error('El ID del negocio es requerido');
+      throw new Error('❌ El ID del negocio es requerido');
     }
 
     const { error } = await supabase

@@ -10,7 +10,7 @@ export async function getCurrentBusiness() {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError) throw userError;
-    if (!user) throw new Error('Usuario no autenticado');
+    if (!user) throw new Error('❌ Usuario no autenticado');
 
     // Buscar el negocio por email del usuario
     const { data: business, error: businessError } = await supabase
@@ -45,7 +45,7 @@ export async function getAllBusinesses() {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError) throw userError;
-    if (!user) throw new Error('Usuario no autenticado');
+    if (!user) throw new Error('❌ Usuario no autenticado');
 
     const { data: businesses, error: businessError } = await supabase
       .from('businesses')
