@@ -4,7 +4,6 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { Loader2, AlertCircle, X } from 'lucide-react';
 import OfflineBanner from './components/OfflineBanner';
-import ChangelogModal from './components/ChangelogModal';
 import PricingAnnouncementModal from './components/PricingAnnouncementModal';
 import { isBraveBrowser } from './utils/braveDetection';
 
@@ -71,8 +70,7 @@ function App() {
       {/* Banner de estado de conexión */}
       <OfflineBanner />
       
-      {/* Modal de novedades - se muestra automáticamente para nuevas versiones */}
-      <ChangelogModal />
+      {/* Modal de novedades eliminado */}
       
       {/* Modal de precios y planes (se muestra solo en Dashboard) */}
       

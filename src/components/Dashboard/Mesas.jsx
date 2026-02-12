@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
+import { closeOrderAsSplit, closeOrderSingle } from '../../services/ordersService.js';
 import { formatPrice, formatNumber, formatDateTimeTicket } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -20,6 +21,7 @@ import {
   Printer
 } from 'lucide-react';
 import SplitBillModal from './SplitBillModal';
+import { closeModalImmediate } from '../../utils/closeModalImmediate';
 
 function Mesas({ businessId }) {
   const [mesas, setMesas] = useState([]);
@@ -29,6 +31,8 @@ function Mesas({ businessId }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedMesa, setSelectedMesa] = useState(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
+  // Nueva bandera: intención explícita de abrir el modal (evita aperturas automáticas)
+  const [modalOpenIntent, setModalOpenIntent] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false); // Verificar si es empleado
   
   // Estados para la orden
@@ -128,12 +132,13 @@ function Mesas({ businessId }) {
         .order('table_number', { ascending: true });
 
       if (error) {
+        setError('No se pudo cargar las mesas. Revisa tu conexión e intenta de nuevo.');
         return;
       }
       
       setMesas(data || []);
-    } catch (error) {
-      // Error handled silently
+    } catch (err) {
+      setError('No se pudo cargar las mesas. Revisa tu conexión e intenta de nuevo.');
     }
   }, [businessId]);
 
@@ -149,12 +154,13 @@ function Mesas({ businessId }) {
         // Removido el filtro de stock para permitir ventas incluso con stock negativo
 
       if (error) {
+        setError('No se pudo cargar los productos. Revisa tu conexión e intenta de nuevo.');
         return;
       }
       
       setProductos(data || []);
-    } catch (error) {
-      // Error silencioso
+    } catch (err) {
+      setError('No se pudo cargar los productos. Revisa tu conexión e intenta de nuevo.');
     }
   }, [businessId]);
 
@@ -212,6 +218,7 @@ function Mesas({ businessId }) {
         // Si la mesa se liberó (pasó a available), cerrar el modal
         if (updatedTable.status === 'available' && !updatedTable.current_order_id) {
           setShowOrderDetails(false);
+          setModalOpenIntent(false);
           return null;
         }
         return { ...prev, ...updatedTable };
@@ -228,6 +235,7 @@ function Mesas({ businessId }) {
     setSelectedMesa(prev => {
       if (prev?.id === deletedTable.id) {
         setShowOrderDetails(false);
+        setModalOpenIntent(false);
         return null;
       }
       return prev;
@@ -389,7 +397,7 @@ function Mesas({ businessId }) {
       
     } catch (error) {
       
-      setError('❌ Error al crear la mesa: ' + error.message);
+      setError('❌ No se pudo crear la mesa. Por favor, intenta de nuevo.');
     } finally {
       setIsCreatingTable(false); // SIEMPRE desbloquear
     }
@@ -415,7 +423,7 @@ function Mesas({ businessId }) {
         .maybeSingle();
 
       if (orderError) {
-        setError(`❌ No se pudo crear la orden: ${orderError.message || 'Error desconocido'}`);
+        setError('❌ No se pudo crear la orden. Por favor, intenta de nuevo.');
         throw orderError;
       }
 
@@ -429,12 +437,13 @@ function Mesas({ businessId }) {
         .eq('id', mesa.id);
 
       if (updateError) {
-        setError(`❌ No se pudo actualizar la mesa: ${updateError.message || 'Error desconocido'}`);
+        setError('❌ No se pudo actualizar la mesa. Por favor, intenta de nuevo.');
         throw updateError;
       }
 
       setSelectedMesa({ ...mesa, current_order_id: newOrder.id, orders: newOrder });
       setOrderItems([]);
+      setModalOpenIntent(true);
       setShowOrderDetails(true);
       await loadMesas();
     } catch (error) {
@@ -465,8 +474,7 @@ function Mesas({ businessId }) {
 
       setSelectedMesa({ ...mesa, orders: order });
       setOrderItems(order.order_items || []);
-      
-      
+      setModalOpenIntent(true);
       setShowOrderDetails(true);
     } catch (error) {
       setError('❌ No se pudieron cargar los detalles de la orden. Por favor, intenta de nuevo.');
@@ -476,6 +484,7 @@ function Mesas({ businessId }) {
   const handleOpenTable = useCallback(async (mesa) => {
     // Actualizar estado local inmediatamente para UI responsive
     setSelectedMesa(mesa);
+    setModalOpenIntent(true);
     setShowOrderDetails(true);
     
     if (mesa.status === 'occupied' && mesa.current_order_id) {
@@ -555,6 +564,7 @@ function Mesas({ businessId }) {
       
       // Cerrar el modal
       setShowOrderDetails(false);
+      setModalOpenIntent(false);
       setSelectedMesa(null);
       setOrderItems([]);
       setSearchProduct('');
@@ -734,42 +744,46 @@ function Mesas({ businessId }) {
     }
   }, [selectedMesa, updateOrderTotal, removeItem, updatingItemId]);
 
-  const handleCloseModal = async () => {
-    // Si la orden está vacía, eliminarla y liberar la mesa
-    if (orderItems.length === 0 && selectedMesa?.current_order_id) {
+  const handleCloseModal = () => {
+    // Capturar snapshot para uso en background o rollback
+    const mesaSnapshot = selectedMesa ? { ...selectedMesa } : null;
+    const itemsSnapshot = [...orderItems];
+
+    // Función que ejecuta la limpieza en background (elim/actualiza en DB)
+    const backgroundWork = async () => {
+      if (!mesaSnapshot) return;
       try {
-        // Actualización optimista: liberar mesa inmediatamente en UI
-        setMesas(prevMesas => 
-          prevMesas.map(m => 
-            m.id === selectedMesa.id 
-              ? { ...m, status: 'available', current_order_id: null }
-              : m
-          )
-        );
+        if (itemsSnapshot.length === 0 && mesaSnapshot.current_order_id) {
+          // Eliminar la orden vacía
+          await supabase.from('orders').delete().eq('id', mesaSnapshot.current_order_id);
 
-        // Eliminar la orden vacía en background
-        await supabase
-          .from('orders')
-          .delete()
-          .eq('id', selectedMesa.current_order_id);
-
-        // Liberar la mesa en DB
-        await supabase
-          .from('tables')
-          .update({
-            current_order_id: null,
-            status: 'available'
-          })
-          .eq('id', selectedMesa.id);
+          // Liberar la mesa en BD
+          await supabase
+            .from('tables')
+            .update({ current_order_id: null, status: 'available' })
+            .eq('id', mesaSnapshot.id);
+        }
       } catch (error) {
-        // Si falla, recargar para mantener consistencia
-        await loadMesas();
+        console.error('Background close modal failed', error);
+        // Rollback: recargar mesas para sincronizar estado
+        try { await loadMesas(); } catch (e) { /* no-op */ }
       }
+    };
+
+    // Aplicar actualización optimista de UI inmediatamente
+    if (itemsSnapshot.length === 0 && mesaSnapshot) {
+      setMesas(prevMesas => 
+        prevMesas.map(m => m.id === mesaSnapshot.id ? { ...m, status: 'available', current_order_id: null } : m)
+      );
     }
 
-    setShowOrderDetails(false);
-    setSelectedMesa(null);
-    setOrderItems([]);
+    // Cerrar modal y limpiar estado local inmediatamente, delegando trabajo a background
+    closeModalImmediate(() => {
+      setShowOrderDetails(false);
+      setModalOpenIntent(false);
+      setSelectedMesa(null);
+      setOrderItems([]);
+    }, backgroundWork);
   };
 
   const handleCloseOrder = () => {
@@ -793,274 +807,107 @@ function Mesas({ businessId }) {
 
     setIsClosingOrder(true);
     setError(null);
+
+    // Prepare snapshot
+    const mesaSnapshot = selectedMesa ? { ...selectedMesa } : null;
+
+    // Apply optimistic UI: mark mesa as available and close UI immediately
+    if (mesaSnapshot) {
+      setMesas(prevMesas => prevMesas.map(m => m.id === mesaSnapshot.id ? { ...m, status: 'available', current_order_id: null } : m));
+    }
     setShowSplitBillModal(false);
     setShowCloseOrderChoiceModal(false);
     setShowPaymentModal(false);
+    setShowOrderDetails(false);
+    setModalOpenIntent(false);
+    setSelectedMesa(null);
+    setOrderItems([]);
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No se pudo obtener información del usuario');
+    // Prevent realtime reopens while background processes
+    justCompletedSaleRef.current = true;
+    setCanShowOrderModal(false);
 
-      const { data: employee } = await supabase
-        .from('employees')
-        .select('full_name, role')
-        .eq('user_id', user.id)
-        .eq('business_id', businessId)
-        .maybeSingle();
-
-      const sellerName = employee && (employee.role === 'owner' || employee.role === 'admin')
-        ? 'Administrador'
-        : (employee?.full_name || 'Empleado');
-
-      let totalSold = 0;
-
-      for (const sub of subAccounts) {
-        if (!sub.items || sub.items.length === 0) continue;
-
-        const saleTotal = sub.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-        totalSold += saleTotal;
-
-        const { data: sale, error: saleError } = await supabase
-          .from('sales')
-          .insert([{
-            business_id: businessId,
-            user_id: user.id,
-            total: saleTotal,
-            payment_method: sub.paymentMethod || 'cash',
-            seller_name: sellerName,
-            created_at: new Date().toISOString()
-          }])
-          .select()
-          .maybeSingle();
-
-        if (saleError) throw new Error(`Error al crear venta (${sub.name}): ${saleError.message}`);
-        if (!sale?.id) throw new Error(`Venta sin id para ${sub.name}`);
-
-        const saleDetails = sub.items.map(item => ({
-          sale_id: sale.id,
-          product_id: item.product_id,
-          quantity: item.quantity,
-          unit_price: item.price
-        }));
-
-        const { error: detailsError } = await supabase
-          .from('sale_details')
-          .insert(saleDetails);
-
-        if (detailsError) {
-          await supabase.from('sales').delete().eq('id', sale.id);
-          throw new Error(`Error al crear detalles (${sub.name}): ${detailsError.message}`);
-        }
-      }
-
-      const { error: orderError } = await supabase
-        .from('orders')
-        .update({ status: 'closed', closed_at: new Date().toISOString() })
-        .eq('id', selectedMesa.current_order_id);
-
-      if (orderError) throw orderError;
-
-      setMesas(prevMesas =>
-        prevMesas.map(m =>
-          m.id === selectedMesa.id ? { ...m, status: 'available', current_order_id: null } : m
-        )
-      );
-
-      supabase
-        .from('tables')
-        .update({ current_order_id: null, status: 'available' })
-        .eq('id', selectedMesa.id)
-        .then(({ error: tableError }) => {
-          if (tableError) loadMesas();
+    (async () => {
+      try {
+        const { totalSold } = await closeOrderAsSplit(businessId, {
+          subAccounts,
+          orderId: mesaSnapshot.current_order_id,
+          tableId: mesaSnapshot.id
         });
 
-      setSuccess(`✅ ${subAccounts.length} venta(s) registrada(s). Total: ${formatPrice(totalSold)}. Mesa liberada.`);
-      
-      // Establecer ambas banderas para prevenir que el modal se reabra
-      justCompletedSaleRef.current = true;
-      setCanShowOrderModal(false);  // ← Bloquear renderizado del modal
-      
-      setShowOrderDetails(false);
-      setSelectedMesa(null);
-      setOrderItems([]);
-      setShowCloseOrderChoiceModal(false);
-      setShowSplitBillModal(false);
-      setShowPaymentModal(false);
+        loadMesas().catch(() => {});
 
-      setTimeout(() => {
-        setSuccess(null);
-        justCompletedSaleRef.current = false;
-        setCanShowOrderModal(true);  // ← Permitir renderizado nuevamente
-      }, 8000);
-    } catch (error) {
-      setError(`❌ Error al cerrar la orden: ${error.message || 'Error desconocido'}`);
-    } finally {
-      setIsClosingOrder(false);
-    }
+        setSuccess(`✅ ${subAccounts.length} venta(s) registrada(s). Total: ${formatPrice(totalSold)}. Mesa liberada.`);
+
+        setTimeout(() => {
+          setSuccess(null);
+          justCompletedSaleRef.current = false;
+          setCanShowOrderModal(true);
+        }, 8000);
+      } catch (error) {
+        console.error('processSplitPaymentAndClose background failed', error);
+        setError('❌ No se pudo cerrar la orden. Revirtiendo estado.');
+        // Rollback: reload mesas
+        try { await loadMesas(); } catch (e) { /* no-op */ }
+        try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch (e) {}
+      } finally {
+        setIsClosingOrder(false);
+      }
+    })();
   };
 
   const processPaymentAndClose = async () => {
     // Prevenir doble click
-    if (isClosingOrder) {
-      return;
-    }
+    if (isClosingOrder) return;
 
     setIsClosingOrder(true);
     setError(null);
 
-    try {
-      // Obtener usuario actual
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('No se pudo obtener información del usuario');
-      }
+    // Snapshot
+    const mesaSnapshot = selectedMesa ? { ...selectedMesa } : null;
 
-      // Obtener los items de la orden para crear la venta
-      const { data: orderData } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items (
-            *,
-            products (id, name)
-          )
-        `)
-        .eq('id', selectedMesa.current_order_id)
-        .maybeSingle();
+    // Optimistic UI: mark mesa available and close modal immediately
+    if (mesaSnapshot) {
+      setMesas(prevMesas => prevMesas.map(m => m.id === mesaSnapshot.id ? { ...m, status: 'available', current_order_id: null } : m));
+    }
+    setShowPaymentModal(false);
+    setShowOrderDetails(false);
+    setModalOpenIntent(false);
+    setSelectedMesa(null);
+    setOrderItems([]);
+    setPaymentMethod('cash');
+    setSelectedCustomer('');
 
-      if (!orderData || orderData.order_items.length === 0) {
-        throw new Error('⚠️ No hay productos en la orden para cerrar');
-      }
+    // Prevent realtime reopens while background processes
+    justCompletedSaleRef.current = true;
+    setCanShowOrderModal(false);
 
-      // 1. Determinar nombre del vendedor
-      const { data: employee, error: employeeError } = await supabase
-        .from('employees')
-        .select('full_name, role')
-        .eq('user_id', user.id)
-        .eq('business_id', businessId)
-        .maybeSingle();
-
-      let sellerName = 'Administrador';
-      
-      if (employee) {
-        // Si es owner o admin, mostrar Administrador
-        if (employee.role === 'owner' || employee.role === 'admin') {
-          sellerName = 'Administrador';
-        } else {
-          // Si es empleado regular, usar su nombre
-          sellerName = employee.full_name || 'Empleado';
-        }
-      }
-
-      // 2. Calcular total desde los items de la orden
-      const saleTotal = orderData.order_items.reduce((sum, item) => {
-        return sum + (item.quantity * item.price);
-      }, 0);
-
-      // 3. Crear la venta con el método de pago y cliente seleccionados
-      const { data: sale, error: saleError} = await supabase
-        .from('sales')
-        .insert([{
-          business_id: businessId,
-          user_id: user.id,
-          total: saleTotal,
-          payment_method: paymentMethod,
-          seller_name: sellerName,
-          created_at: new Date().toISOString()
-        }])
-        .select()
-        .maybeSingle();
-
-      if (saleError) {
-        throw new Error('Error al crear la venta: ' + (saleError.message || JSON.stringify(saleError)));
-      }
-
-      if (!sale || !sale.id) {
-        throw new Error('Venta creada sin id: la respuesta del insert no devolvió el id. Comprueba RLS/permisos y el objeto sale: ' + JSON.stringify(sale));
-      }
-
-      // 2. Crear los detalles de venta desde los items de la orden
-      const saleDetails = orderData.order_items.map(item => ({
-        sale_id: sale.id,
-        product_id: item.product_id,
-        quantity: item.quantity,
-        unit_price: item.price
-      }));
-
-      
-
-      const { error: detailsError } = await supabase
-        .from('sale_details')
-        .insert(saleDetails);
-
-      if (detailsError) {
-        // Rollback: eliminar venta si fallan los detalles
-        await supabase.from('sales').delete().eq('id', sale.id);
-        throw new Error('Error al crear los detalles de la venta: ' + detailsError.message);
-      }
-
-      // 3. Cerrar la orden
-      const { error: orderError } = await supabase
-        .from('orders')
-        .update({
-          status: 'closed',
-          closed_at: new Date().toISOString()
-        })
-        .eq('id', selectedMesa.current_order_id);
-
-      if (orderError) {
-        throw orderError;
-      }
-
-      // 4. Actualización optimista: liberar mesa inmediatamente en UI
-      setMesas(prevMesas => 
-        prevMesas.map(m => 
-          m.id === selectedMesa.id 
-            ? { ...m, status: 'available', current_order_id: null }
-            : m
-        )
-      );
-
-      // Liberar la mesa en DB (en background)
-      supabase
-        .from('tables')
-        .update({
-          current_order_id: null,
-          status: 'available'
-        })
-        .eq('id', selectedMesa.id)
-        .then(({ error: tableError }) => {
-          if (tableError) {
-            // Si falla, recargar para sincronizar
-            loadMesas();
-          }
+    (async () => {
+      try {
+        const { saleTotal } = await closeOrderSingle(businessId, {
+          orderId: mesaSnapshot.current_order_id,
+          tableId: mesaSnapshot.id,
+          paymentMethod
         });
 
-      setSuccess(`✅ Venta registrada exitosamente. Total: ${formatPrice(saleTotal)}. Mesa liberada.`);
-      
-      // Establecer ambas banderas para prevenir que el modal se reabra
-      justCompletedSaleRef.current = true;
-      setCanShowOrderModal(false);  // ← Bloquear renderizado del modal
-      
-      setShowPaymentModal(false);
-      setShowOrderDetails(false);
-      setSelectedMesa(null);
-      setOrderItems([]);
-      setPaymentMethod('cash');
-      setSelectedCustomer('');
+        loadMesas().catch(() => {});
 
-      // Mostrar mensaje por más tiempo y resetear las banderas después (8 seg para asegurar realtime)
-      setTimeout(() => {
-        setSuccess(null);
-        justCompletedSaleRef.current = false;
-        setCanShowOrderModal(true);  // ← Permitir renderizado nuevamente
-      }, 8000);
+        setSuccess(`✅ Venta registrada exitosamente. Total: ${formatPrice(saleTotal)}. Mesa liberada.`);
 
-    } catch (error) {
-      setError(`❌ Error al cerrar la orden: ${error.message || 'Error desconocido'}`);
-    } finally {
-      setIsClosingOrder(false);
-    }
+        setTimeout(() => {
+          setSuccess(null);
+          justCompletedSaleRef.current = false;
+          setCanShowOrderModal(true);
+        }, 8000);
+      } catch (error) {
+        console.error('processPaymentAndClose background failed', error);
+        setError('❌ No se pudo cerrar la orden. Revirtiendo estado.');
+        try { await loadMesas(); } catch (e) { /* no-op */ }
+        try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch (e) {}
+      } finally {
+        setIsClosingOrder(false);
+      }
+    })();
   };
 
   // Función para imprimir la orden (formato para cocina)
@@ -1245,39 +1092,47 @@ function Mesas({ businessId }) {
   const confirmDeleteTable = async () => {
     if (!mesaToDelete) return;
 
-    try {
-      // Primero, eliminar todas las órdenes asociadas a esta mesa
-      const { error: ordersError } = await supabase
-        .from('orders')
-        .delete()
-        .eq('table_id', mesaToDelete);
+    // Snapshot antes de eliminar
+    const mesaId = mesaToDelete;
+    const snapshotMesas = mesas.slice();
 
-      if (ordersError) throw ordersError;
+    // Aplicar cambio optimista: remover de UI inmediatamente
+    setMesas(prevMesas => prevMesas.filter(m => m.id !== mesaId));
+    setShowDeleteModal(false);
+    setMesaToDelete(null);
 
-      // Luego eliminar la mesa
-      const { error } = await supabase
-        .from('tables')
-        .delete()
-        .eq('id', mesaToDelete);
+    // Ejecutar eliminación en background
+    (async () => {
+      try {
+        // Primero, eliminar todas las órdenes asociadas a esta mesa
+        const { error: ordersError } = await supabase
+          .from('orders')
+          .delete()
+          .eq('table_id', mesaId);
 
-      if (error) throw error;
+        if (ordersError) throw ordersError;
 
-      // Actualizar el estado local removiendo la mesa eliminada
-      setMesas(prevMesas => prevMesas.filter(mesa => mesa.id !== mesaToDelete));
-      
-      setSuccess('✅ Mesa eliminada exitosamente');
-      
-      // Cerrar modal
-      setShowDeleteModal(false);
-      setMesaToDelete(null);
-      
-      // Recargar las mesas para asegurar sincronización
-      await loadMesas();
-    } catch (error) {
-      setError('❌ No se pudo eliminar la mesa. Verifica que esté disponible e intenta de nuevo.');
-      setShowDeleteModal(false);
-      setMesaToDelete(null);
-    }
+        // Luego eliminar la mesa
+        const { error } = await supabase
+          .from('tables')
+          .delete()
+          .eq('id', mesaId);
+
+        if (error) throw error;
+
+        setSuccess('✅ Mesa eliminada exitosamente');
+        setTimeout(() => setSuccess(null), 3000);
+
+        // Recargar mesas en background para asegurar sincronización
+        loadMesas().catch(() => {});
+      } catch (error) {
+        console.error('confirmDeleteTable background failed', error);
+        setError('❌ No se pudo eliminar la mesa. Revirtiendo estado.');
+        // Rollback: restaurar snapshot
+        setMesas(snapshotMesas);
+        setTimeout(() => setError(null), 5000);
+      }
+    })();
   };
 
   const filteredProducts = useMemo(() => {
@@ -1535,7 +1390,7 @@ function Mesas({ businessId }) {
 
       {/* Modal de detalles de la orden */}
       <AnimatePresence>
-        {showOrderDetails && selectedMesa && canShowOrderModal && (
+        {modalOpenIntent && showOrderDetails && selectedMesa && canShowOrderModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
