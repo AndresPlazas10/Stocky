@@ -5,6 +5,8 @@ import PurchaseFilters from '../Filters/PurchaseFilters';
 import { getFilteredPurchases } from '../../services/purchasesService';
 import { formatPrice, formatNumber, parseFormattedNumber, formatDate, formatDateOnly } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
+import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
+import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -547,19 +549,25 @@ function Compras({ businessId }) {
             <span>{error}</span>
           </motion.div>
         )}
-
-        {success && (
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="mb-4 p-4 bg-green-50 border-l-4 border-green-500 text-green-700 rounded-xl flex items-center gap-3"
-          >
-            <CheckCircle2 className="w-5 h-5" />
-            <span>{success}</span>
-          </motion.div>
-        )}
       </AnimatePresence>
+
+      {/* Alertas mejoradas */}
+      <SaleErrorAlert 
+        isVisible={!!error}
+        onClose={() => setError('')}
+        title="Error"
+        message={error}
+        duration={5000}
+      />
+
+      <SaleSuccessAlert 
+        isVisible={!!success}
+        onClose={() => setSuccess('')}
+        title="✨ Compra Registrada"
+        details={[{ label: 'Acción', value: success }]}
+        duration={5000}
+      />
+
         {/* Filtros */}
         <PurchaseFilters
           businessId={businessId}

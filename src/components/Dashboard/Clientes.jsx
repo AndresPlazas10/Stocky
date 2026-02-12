@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../supabase/Client.jsx';
+import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
+import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 
 function Clientes({ businessId }) {
   // NOTA: Tabla 'customers' fue eliminada de la base de datos
@@ -82,18 +84,22 @@ function Clientes({ businessId }) {
         </button>
       </div>
 
-      {/* Mensajes */}
-      {error && (
-        <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
-          {error}
-        </div>
-      )}
+      {/* Mensajes mejorados */}
+      <SaleErrorAlert 
+        isVisible={!!error}
+        onClose={() => setError('')}
+        title="Error"
+        message={error}
+        duration={5000}
+      />
 
-      {success && (
-        <div className="mb-4 p-4 bg-green-100 text-green-700 rounded-lg">
-          {success}
-        </div>
-      )}
+      <SaleSuccessAlert 
+        isVisible={!!success}
+        onClose={() => setSuccess('')}
+        title="✨ Éxito"
+        details={[{ label: 'Acción', value: success }]}
+        duration={4000}
+      />
 
       {/* Formulario */}
       {showForm && (

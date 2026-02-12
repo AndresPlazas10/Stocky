@@ -3,26 +3,29 @@
 
 -- Habilitar RLS
 ALTER TABLE IF EXISTS public.tables ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.audit_log ENABLE ROW LEVEL SECURITY;
 
--- Política para `tables`: permitir SELECT/UPDATE sólo si tenant_id coincide con el claim JWT
+-- Política para `tables`: permitir SELECT/UPDATE sólo si business_id coincide con el claim JWT
 -- Supabase expone los claims JWT con current_setting('jwt.claims', true)
--- Se asume que el claim contiene {"tenant": "<uuid>"}
-CREATE POLICY IF NOT EXISTS tables_tenant_policy ON public.tables
+-- Se asume que el claim contiene {"business": "<uuid>"}
+DROP POLICY IF EXISTS tables_business_policy ON public.tables CASCADE;
+CREATE POLICY tables_business_policy ON public.tables
   USING (
-    tenant_id = (current_setting('jwt.claims', true)::json->>'tenant')::uuid
+    business_id = (current_setting('jwt.claims', true)::json->>'business')::uuid
   )
   WITH CHECK (
-    tenant_id = (current_setting('jwt.claims', true)::json->>'tenant')::uuid
+    business_id = (current_setting('jwt.claims', true)::json->>'business')::uuid
   );
 
--- Política para `audit_logs`: permitir SELECT sólo a usuarios del mismo tenant
-CREATE POLICY IF NOT EXISTS audit_logs_tenant_policy ON public.audit_logs
+-- Política para `audit_log`: permitir SELECT sólo a usuarios del mismo business
+DROP POLICY IF EXISTS audit_log_business_policy ON public.audit_log CASCADE;
+CREATE POLICY audit_log_business_policy ON public.audit_log
   USING (
-    tenant_id = (current_setting('jwt.claims', true)::json->>'tenant')::uuid
+    business_id = (current_setting('jwt.claims', true)::json->>'business')::uuid
   );
 
 -- Nota: la función `handle_table_transaction` está marcada SECURITY DEFINER y
 -- ejecutada por el owner (p. ej. role de servicio). Si el owner tiene permisos
 -- suficientes, la función podrá realizar UPDATE/INSERT incluso cuando RLS esté activa.
+-- Asegúrate de que la función valida los claims/business (como hace la versión business-aware).
 -- Asegúrate de que la función valida los claims/tenant (como hace la versión tenant-aware).

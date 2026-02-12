@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client';
+import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
+import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 
 import { 
   Trash2, 
@@ -278,19 +280,24 @@ function Proveedores({ businessId }) {
               <span className="text-red-700">{error}</span>
             </motion.div>
           )}
-          
-          {success && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="bg-green-50 border-l-4 border-green-500 p-4 rounded-lg flex items-center gap-3"
-            >
-              <div className="w-5 h-5 text-green-500">✓</div>
-              <span className="text-green-700">{success}</span>
-            </motion.div>
-          )}
         </AnimatePresence>
+
+        {/* Alertas mejoradas */}
+        <SaleErrorAlert 
+          isVisible={!!error}
+          onClose={() => setError('')}
+          title="Error"
+          message={error}
+          duration={5000}
+        />
+
+        <SaleSuccessAlert 
+          isVisible={!!success}
+          onClose={() => setSuccess('')}
+          title="✨ Proveedor Guardado"
+          details={[{ label: 'Acción', value: success }]}
+          duration={5000}
+        />
 
         {/* Barra de búsqueda y estadísticas */}
         <motion.div

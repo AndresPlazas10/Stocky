@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
+import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
+import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { 
   Trash2, 
   Users, 
@@ -20,6 +22,7 @@ function Empleados({ businessId }) {
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [successDetails, setSuccessDetails] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [generatedCode, setGeneratedCode] = useState(null);
@@ -452,17 +455,24 @@ function Empleados({ businessId }) {
               {error}
             </motion.div>
           )}
-          {success && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-xl"
-            >
-              {success}
-            </motion.div>
-          )}
         </AnimatePresence>
+
+        {/* Alertas mejoradas */}
+        <SaleErrorAlert 
+          isVisible={!!error}
+          onClose={() => setError(null)}
+          title="Error"
+          message={error}
+          duration={5000}
+        />
+
+        <SaleSuccessAlert 
+          isVisible={!!success}
+          onClose={() => setSuccess(null)}
+          title="✨ Empleado Registrado"
+          details={successDetails}
+          duration={5000}
+        />
 
         {/* Formulario de invitación */}
         <AnimatePresence>

@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice, formatNumber } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
+import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
+import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -615,22 +617,24 @@ function Inventario({ businessId, userRole = 'admin' }) {
             </Card>
           </motion.div>
         )}
-        {success && (
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Card className="bg-green-50 border-green-200 shadow-md rounded-2xl mb-4">
-              <div className="p-4 flex items-center gap-3">
-                <CheckCircle2 className="w-6 h-6 text-green-600" />
-                <p className="text-green-800 font-medium">{success}</p>
-              </div>
-            </Card>
-          </motion.div>
-        )}
       </AnimatePresence>
+
+      {/* Alertas mejoradas */}
+      <SaleErrorAlert 
+        isVisible={!!error}
+        onClose={() => setError('')}
+        title="Error"
+        message={error}
+        duration={5000}
+      />
+
+      <SaleSuccessAlert 
+        isVisible={!!success}
+        onClose={() => setSuccess('')}
+        title="✨ Producto Guardado"
+        details={[{ label: 'Acción', value: success }]}
+        duration={5000}
+      />
 
       {/* Modal Formulario Agregar Producto */}
       <AnimatePresence>
