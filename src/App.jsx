@@ -17,7 +17,7 @@ const EmployeeDashboard = lazy(() => import('./pages/EmployeeDashboard.jsx'));
 
 // Componente de carga
 const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+  <div className="h-screen flex items-center justify-center bg-gray-50">
     <Loader2 className="w-10 h-10 text-primary-600 animate-spin" />
   </div>
 );

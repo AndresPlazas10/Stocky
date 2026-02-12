@@ -185,31 +185,10 @@ ALTER COLUMN created_at SET NOT NULL;
 -- ============================================================
 -- Ejecuta esto para verificar que todo está correcto
 
--- Ver si la función existe
-SELECT 
-  proname,
-  pg_get_userbyid(proowner) as owner
-FROM pg_proc 
-WHERE proname = 'create_sale_complete';
-
--- Ver últimas ventas y sus fechas
-SELECT 
-  id,
-  created_at,
-  total,
-  business_id
-FROM public.sales 
-ORDER BY created_at DESC 
-LIMIT 5;
-
--- Ver índices creados
-SELECT 
-  schemaname,
-  tablename,
-  indexname
-FROM pg_indexes 
-WHERE tablename IN ('products', 'sale_details', 'sales')
-  AND indexname LIKE 'idx_%';
+-- PASO 5: VERIFICACIÓN (OPCIONAL)
+-- NOTA: Se han eliminado las consultas de verificación que imprimían resultados
+-- al cliente. Usamos ahora mensajes/alertas dentro de la aplicación para
+-- informar al usuario, por lo que estas consultas no son necesarias.
 
 -- ============================================================
 -- LISTO!

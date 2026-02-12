@@ -520,12 +520,12 @@ function Proveedores({ businessId }) {
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             onClick={() => setShowModal(false)}
           >
-            <motion.div
+              <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden"
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[calc(100vh-40px)] overflow-visible"
             >
               {/* Header del modal */}
               <div className="gradient-primary text-white p-6">
@@ -549,8 +549,8 @@ function Proveedores({ businessId }) {
               </div>
 
               {/* Contenido del modal */}
-              <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-                <div className="space-y-6">
+              <form onSubmit={handleSubmit} className="p-4 overflow-visible max-h-full">
+                <div className="space-y-4">
                   
                   {/* Nombre de la empresa */}
                   <div>
@@ -635,36 +635,36 @@ function Proveedores({ businessId }) {
                     </div>
                   </div>
 
-                  {/* Dirección */}
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                      <MapPin className="w-4 h-4 text-accent-600" />
-                      Dirección
-                    </label>
-                    <input
-                      type="text"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleChange}
-                      placeholder="Calle 123 #45-67, Bogotá"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
-                    />
-                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                        <MapPin className="w-4 h-4 text-accent-600" />
+                        Dirección
+                      </label>
+                      <input
+                        type="text"
+                        name="address"
+                        value={formData.address}
+                        onChange={handleChange}
+                        placeholder="Calle 123 #45-67, Bogotá"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
+                      />
+                    </div>
 
-                  {/* Notas */}
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                      <FileText className="w-4 h-4 text-accent-600" />
-                      Notas
-                    </label>
-                    <textarea
-                      name="notes"
-                      value={formData.notes}
-                      onChange={handleChange}
-                      placeholder="Información adicional sobre el proveedor, términos de pago, etc..."
-                      rows="3"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all resize-none"
-                    />
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                        <FileText className="w-4 h-4 text-accent-600" />
+                        Notas
+                      </label>
+                      <textarea
+                        name="notes"
+                        value={formData.notes}
+                        onChange={handleChange}
+                        placeholder="Información adicional sobre el proveedor, términos de pago, etc..."
+                        rows="3"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all resize-none"
+                      />
+                    </div>
                   </div>
                 </div>
 

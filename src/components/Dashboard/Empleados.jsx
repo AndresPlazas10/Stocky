@@ -141,7 +141,7 @@ function Empleados({ businessId }) {
         .maybeSingle();
 
       if (existingEmployee) {
-        throw new Error('Este nombre de usuario ya está asociado a un empleado activo');
+        throw new Error('❌ Ya existe un empleado con este nombre de usuario');
       }
 
       // Verificar que no sea el username del negocio

@@ -18,8 +18,8 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
-          <div className="max-w-xl text-center">
+        <div className="h-screen flex items-center justify-center p-6 bg-gray-50 overflow-hidden">
+          <div className="max-w-xl text-center max-h-[calc(100vh-120px)] overflow-auto">
             <h1 className="text-2xl font-bold mb-2">Ha ocurrido un error inesperado</h1>
             <p className="text-sm text-gray-600 mb-4">Nuestro equipo ya fue notificado. Intenta recargar la página.</p>
             <pre className="text-xs text-left bg-white p-3 rounded border overflow-x-auto text-red-600">{String(this.state.error)}</pre>

@@ -19,12 +19,12 @@ export const LoadingSpinner = ({ size = 'md', text = 'Cargando...' }) => {
 
 export const LoadingPage = ({ text = 'Cargando...' }) => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background-50 via-background-100 to-accent-100">
+    <div className="h-screen flex items-center justify-center bg-gradient-to-br from-background-50 via-background-100 to-accent-100 overflow-hidden">
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.3 }}
-        className="flex flex-col items-center gap-6"
+        className="flex flex-col items-center gap-6 max-h-[calc(100vh-120px)] overflow-auto"
       >
         <div className="relative">
           <div className="w-20 h-20 rounded-full gradient-primary opacity-20 animate-ping absolute"></div>

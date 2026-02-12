@@ -7,7 +7,7 @@ import { supabase } from '../supabase/Client.jsx';
 
 async function getSellerName(businessId) {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('No se pudo obtener información del usuario');
+  if (!user) throw new Error('❌ No se pudo obtener información del usuario');
 
   const { data: employee } = await supabase
     .from('employees')
@@ -64,7 +64,7 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     });
 
     if (rpcError || !result?.[0]) {
-      throw new Error(rpcError?.message || `No se pudo registrar la venta ${i + 1}. Intenta de nuevo.`);
+      throw new Error(rpcError?.message || `❌ No se pudo registrar la venta ${i + 1}. Intenta de nuevo.`);
     }
   }
 
@@ -93,8 +93,8 @@ export async function closeOrderSingle(businessId, { orderId, tableId, paymentMe
     .eq('id', orderId)
     .maybeSingle();
 
-  if (orderFetchError || !orderData) throw new Error('No se pudo cargar la orden.');
-  if (!orderData.order_items?.length) throw new Error('No hay productos en la orden para cerrar.');
+  if (orderFetchError || !orderData) throw new Error('❌ No se pudo cargar la orden.');
+  if (!orderData.order_items?.length) throw new Error('❌ No hay productos en la orden para cerrar.');
 
   const saleTotal = orderData.order_items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
   
@@ -117,7 +117,7 @@ export async function closeOrderSingle(businessId, { orderId, tableId, paymentMe
   });
 
   if (rpcError || !result?.[0]) {
-    throw new Error(rpcError?.message || 'No se pudo registrar la venta. Intenta de nuevo.');
+    throw new Error(rpcError?.message || '❌ No se pudo registrar la venta. Intenta de nuevo.');
   }
 
   return { saleTotal };

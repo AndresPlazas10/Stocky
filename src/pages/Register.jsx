@@ -197,7 +197,7 @@ function Register() {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
+    <div className="h-screen relative overflow-hidden flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-indigo-100">
         <div className="absolute top-0 -left-4 w-72 h-72 bg-indigo-300/30 rounded-full mix-blend-multiply filter blur-xl animate-blob"></div>
         <div className="absolute top-0 -right-4 w-72 h-72 bg-blue-300/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000"></div>
@@ -223,7 +223,7 @@ function Register() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-2xl relative z-10"
+        className="w-full max-w-2xl relative z-10 max-h-[calc(100vh-120px)] overflow-auto"
       >
         <Card className="bg-white/90 backdrop-blur-xl border-white/50 shadow-2xl overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-white/10 pointer-events-none"></div>
