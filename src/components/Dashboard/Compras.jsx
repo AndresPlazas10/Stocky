@@ -44,7 +44,7 @@ const getPaymentMethodLabel = (method) => {
   return method || '-';
 };
 
-function Compras({ businessId }) {
+function Compras({ businessId, onNavigateSection }) {
   const [compras, setCompras] = useState([]);
   const [pagePurchases, setPagePurchases] = useState(1);
   const [limitPurchases, setLimitPurchases] = useState(50);
@@ -527,6 +527,15 @@ function Compras({ businessId }) {
     );
   }, [compras, searchTerm]);
 
+  const hasSuppliers = proveedores.length > 0;
+  const goToSuppliers = useCallback(() => {
+    if (typeof onNavigateSection === 'function') {
+      onNavigateSection('proveedores');
+      return;
+    }
+    setShowModal(false);
+  }, [onNavigateSection]);
+
   return (
     <AsyncStateWrapper
       loading={loading}
@@ -536,8 +545,36 @@ function Compras({ businessId }) {
       skeletonType="compras"
       hasFilters={Boolean(searchTerm.trim() || Object.keys(currentFiltersPurchases || {}).length > 0)}
       noResultsTitle="No hay compras para esos filtros"
-      emptyTitle="Aun no hay compras registradas"
-      emptyDescription="Registra la primera compra para empezar el historial."
+      noResultsDescription="Ajusta los filtros o registra una nueva compra."
+      noResultsAction={
+        <Button
+          type="button"
+          onClick={hasSuppliers ? () => setShowModal(true) : goToSuppliers}
+          className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
+        >
+          {hasSuppliers ? 'Nueva Compra' : 'Crear Primer Proveedor'}
+        </Button>
+      }
+      emptyTitle={hasSuppliers ? 'Aun no hay compras registradas' : 'No hay proveedores registrados'}
+      emptyDescription={hasSuppliers ? 'Registra la primera compra para empezar el historial.' : 'Crea el primer proveedor para poder registrar compras.'}
+      emptyAction={hasSuppliers ? (
+        <Button
+          type="button"
+          onClick={() => setShowModal(true)}
+          className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
+        >
+          Crear Primera Compra
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          onClick={goToSuppliers}
+          className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
+        >
+          Crear Primer Proveedor
+        </Button>
+      )}
+      bypassStateRendering={showModal}
       actionProcessing={isCreatingPurchase}
       className="min-h-screen bg-gradient-to-br from-light-bg-primary to-white p-6"
     >
@@ -560,11 +597,11 @@ function Compras({ businessId }) {
               </div>
             </div>
             <Button
-              onClick={() => setShowModal(true)}
+              onClick={hasSuppliers ? () => setShowModal(true) : goToSuppliers}
               className="w-full sm:w-auto gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-xl flex items-center justify-center gap-2 text-sm sm:text-base"
             >
               <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span>Nueva Compra</span>
+              <span>{hasSuppliers ? 'Nueva Compra' : 'Crear Proveedor'}</span>
             </Button>
           </div>
         </Card>
@@ -771,6 +808,24 @@ function Compras({ businessId }) {
                 </button>
               </div>
 
+              {!hasSuppliers ? (
+                <div className="p-4 sm:p-6">
+                  <Card className="border-dashed border-gray-300 bg-gray-50 shadow-none">
+                    <div className="p-8 text-center">
+                      <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                      <p className="text-lg font-semibold text-gray-700 mb-2">No hay proveedores registrados</p>
+                      <p className="text-sm text-gray-500 mb-5">Crea el primer proveedor para poder registrar compras.</p>
+                      <Button
+                        type="button"
+                        onClick={goToSuppliers}
+                        className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
+                      >
+                        Crear Primer Proveedor
+                      </Button>
+                    </div>
+                  </Card>
+                </div>
+              ) : (
               <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                 {/* Proveedor */}
                 <div>
@@ -940,6 +995,7 @@ function Compras({ businessId }) {
                   </Button>
                 </div>
               </form>
+              )}
             </motion.div>
           </motion.div>
         )}

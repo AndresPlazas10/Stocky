@@ -500,6 +500,16 @@ function Inventario({ businessId, userRole = 'admin' }) {
       skeletonType="inventario"
       emptyTitle="No hay productos en inventario"
       emptyDescription="Crea el primer producto para habilitar ventas y compras."
+      emptyAction={userRole === 'admin' ? (
+        <Button
+          type="button"
+          onClick={() => setShowForm(true)}
+          className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
+        >
+          Crear Primer Producto
+        </Button>
+      ) : null}
+      bypassStateRendering={showForm}
       actionProcessing={isSubmitting}
       className="min-h-screen bg-gradient-to-br from-light-bg-primary to-white p-6"
     >

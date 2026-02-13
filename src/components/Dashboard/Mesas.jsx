@@ -1198,6 +1198,16 @@ function Mesas({ businessId }) {
       skeletonType="mesas"
       emptyTitle="Aun no hay mesas creadas"
       emptyDescription="Crea tu primera mesa para empezar a registrar ordenes."
+      emptyAction={
+        <Button
+          type="button"
+          onClick={() => setShowAddForm(true)}
+          className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
+        >
+          Crear Primera Mesa
+        </Button>
+      }
+      bypassStateRendering={showAddForm}
     >
       <motion.section
         initial={{ opacity: 0, y: 20 }}
