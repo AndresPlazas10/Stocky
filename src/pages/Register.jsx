@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SaleErrorAlert } from '@/components/ui/SaleErrorAlert';
+import { SaleSuccessAlert } from '@/components/ui/SaleSuccessAlert';
 import { motion } from 'framer-motion';
-import { Store, Building2, MapPin, Phone, User, Lock, ArrowLeft, CheckCircle2, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Store, Building2, MapPin, Phone, User, Lock, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
 
 function Register() {
   const navigate = useNavigate();
@@ -154,6 +156,8 @@ function Register() {
 
       sessionStorage.setItem('justCreatedBusiness', businessData.id);
       sessionStorage.setItem('businessCreatedAt', Date.now().toString());
+      setError('');
+      setSuccess(true);
       
       // Redirigir al dashboard
       setTimeout(() => {
@@ -197,7 +201,7 @@ function Register() {
   };
 
   return (
-    <div className="h-screen relative overflow-hidden flex items-center justify-center p-4">
+    <div className="min-h-screen md:h-screen relative overflow-x-hidden overflow-y-auto md:overflow-y-hidden flex items-start md:items-center justify-center p-3">
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-indigo-100">
         <div className="absolute top-0 -left-4 w-72 h-72 bg-indigo-300/30 rounded-full mix-blend-multiply filter blur-xl animate-blob"></div>
         <div className="absolute top-0 -right-4 w-72 h-72 bg-blue-300/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000"></div>
@@ -207,11 +211,11 @@ function Register() {
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
-        className="absolute top-6 left-6 z-10"
+        className="fixed md:absolute top-3 left-3 z-10"
       >
         <Button
           variant="ghost"
-          className="bg-white/80 backdrop-blur-sm border-0 text-indigo-700 hover:bg-white shadow-md"
+          className="h-9 bg-white/80 backdrop-blur-sm border-0 text-indigo-700 hover:bg-white shadow-md"
           onClick={() => navigate('/')}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -223,63 +227,48 @@ function Register() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-2xl relative z-10 max-h-[calc(100vh-120px)] overflow-auto"
+        className="w-full max-w-5xl relative z-10 mt-12 md:mt-0 pb-4 md:pb-0"
       >
         <Card className="bg-white/90 backdrop-blur-xl border-white/50 shadow-2xl overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-white/10 pointer-events-none"></div>
           
-          <CardHeader className="space-y-4 text-center pb-8 relative">
+          <CardHeader className="space-y-2 text-center pb-4 pt-5 relative">
             <div className="flex justify-center">
-              <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-6 rounded-3xl shadow-2xl">
-                <Building2 className="h-14 w-14 text-white drop-shadow-md" />
+              <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-3 rounded-2xl shadow-xl">
+                <Building2 className="h-8 w-8 text-white drop-shadow-md" />
               </div>
             </div>
             <div>
-              <CardTitle className="text-3xl font-bold text-gray-900 mb-2">
+              <CardTitle className="text-2xl font-bold text-gray-900 mb-1">
                 Registrar Negocio
               </CardTitle>
-              <CardDescription className="text-base text-gray-600">
+              <CardDescription className="text-sm text-gray-600">
                 Completa la información de tu negocio para comenzar
               </CardDescription>
             </div>
           </CardHeader>
 
-          <CardContent className="space-y-6">
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-destructive/10 border-2 border-destructive/20 rounded-xl p-4 flex items-start gap-3"
-                role="alert"
-                aria-live="assertive"
-              >
-                <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-                <p className="text-sm text-destructive">{error}</p>
-              </motion.div>
-            )}
+          <CardContent className="space-y-4 pb-5">
+            <SaleErrorAlert
+              isVisible={!!error}
+              onClose={() => setError('')}
+              title="Error de registro"
+              message={error}
+              duration={5000}
+            />
 
-            {success && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-4 flex items-start gap-3"
-                role="alert"
-                aria-live="polite"
-              >
-                <CheckCircle2 className="h-5 w-5 text-indigo-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold text-indigo-700 mb-1">¡Negocio registrado!</p>
-                  <p className="text-sm text-gray-600">
-                    Redirigiendo al dashboard...
-                  </p>
-                </div>
-              </motion.div>
-            )}
+            <SaleSuccessAlert
+              isVisible={success}
+              onClose={() => setSuccess(false)}
+              title="✨ Negocio registrado"
+              details={[{ label: 'Estado', value: 'Redirigiendo al dashboard...' }]}
+              duration={2000}
+            />
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="name" className="text-base font-semibold">
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="space-y-1 lg:col-span-2">
+                  <Label htmlFor="name" className="text-sm font-semibold">
                     Nombre del Negocio <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
@@ -291,14 +280,14 @@ function Register() {
                       placeholder="Ej: Mi Cafetería"
                       value={formData.name}
                       onChange={handleChange}
-                      className="pl-10 h-12 text-base border-2 border-gray-200 focus:border-indigo-400"
+                      className="pl-10 h-10 border-2 border-gray-200 focus:border-indigo-400"
                       required
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="username" className="text-base font-semibold">
+                <div className="space-y-1 lg:col-span-2">
+                  <Label htmlFor="username" className="text-sm font-semibold">
                     Nombre de Usuario <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
@@ -310,19 +299,16 @@ function Register() {
                       placeholder="usuario_negocio"
                       value={formData.username}
                       onChange={handleChange}
-                      className="pl-10 h-12 text-base border-2 border-gray-200 focus:border-indigo-400"
+                      className="pl-10 h-10 border-2 border-gray-200 focus:border-indigo-400"
                       required
                       pattern="[a-z0-9_]{3,20}"
                       title="Solo letras minúsculas, números y guiones bajos (3-20 caracteres)"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Solo letras, números y guiones bajos (3-20 caracteres)
-                  </p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="nit" className="text-base font-semibold">
+                <div className="space-y-1">
+                  <Label htmlFor="nit" className="text-sm font-semibold">
                     NIT <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
                   </Label>
                   <div className="relative">
@@ -334,14 +320,14 @@ function Register() {
                       placeholder="900.123.456-7"
                       value={formData.nit}
                       onChange={handleChange}
-                      className="pl-10 h-12 text-base border-2 border-gray-200 focus:border-indigo-400"
+                      className="pl-10 h-10 border-2 border-gray-200 focus:border-indigo-400"
                     />
                   </div>
                 </div>
 
 
-                <div className="space-y-2">
-                  <Label htmlFor="phone" className="text-base font-semibold">
+                <div className="space-y-1">
+                  <Label htmlFor="phone" className="text-sm font-semibold">
                     Teléfono
                   </Label>
                   <div className="relative">
@@ -353,13 +339,13 @@ function Register() {
                       placeholder="+57 300 123 4567"
                       value={formData.phone}
                       onChange={handleChange}
-                      className="pl-10 h-12 text-base border-2 border-gray-200 focus:border-indigo-400"
+                      className="pl-10 h-10 border-2 border-gray-200 focus:border-indigo-400"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="address" className="text-base font-semibold">
+                <div className="space-y-1 lg:col-span-2">
+                  <Label htmlFor="address" className="text-sm font-semibold">
                     Dirección
                   </Label>
                   <div className="relative">
@@ -371,13 +357,13 @@ function Register() {
                       placeholder="Calle 123 #45-67"
                       value={formData.address}
                       onChange={handleChange}
-                      className="pl-10 h-12 text-base border-2 border-gray-200 focus:border-indigo-400"
+                      className="pl-10 h-10 border-2 border-gray-200 focus:border-indigo-400"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-base font-semibold">
+                <div className="space-y-1 lg:col-span-2">
+                  <Label htmlFor="password" className="text-sm font-semibold">
                     Contraseña <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
@@ -389,7 +375,7 @@ function Register() {
                       placeholder="Mínimo 6 caracteres"
                       value={formData.password}
                       onChange={handleChange}
-                      className="pl-10 pr-10 h-12 text-base border-2 border-gray-200 focus:border-indigo-400"
+                      className="pl-10 pr-10 h-10 border-2 border-gray-200 focus:border-indigo-400"
                       required
                       minLength={6}
                     />
@@ -403,8 +389,8 @@ function Register() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-base font-semibold">
+                <div className="space-y-1 lg:col-span-2">
+                  <Label htmlFor="confirmPassword" className="text-sm font-semibold">
                     Confirmar Contraseña <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
@@ -416,7 +402,7 @@ function Register() {
                       placeholder="Repite la contraseña"
                       value={formData.confirmPassword}
                       onChange={handleChange}
-                      className="pl-10 pr-10 h-12 text-base border-2 border-gray-200 focus:border-indigo-400"
+                      className="pl-10 pr-10 h-10 border-2 border-gray-200 focus:border-indigo-400"
                       required
                       minLength={6}
                     />
@@ -433,7 +419,7 @@ function Register() {
 
               <Button
                 type="submit"
-                className="w-full h-12 text-base font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg transition-all duration-300"
+                className="w-full h-10 text-sm font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg transition-all duration-300"
                 disabled={isSubmitting || success}
                 size="lg"
               >
@@ -463,22 +449,13 @@ function Register() {
 
             <Button
               variant="outline"
-              className="w-full h-12 text-base border-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+              className="w-full h-10 text-sm border-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
               onClick={() => navigate('/login')}
             >
               Iniciar sesión
             </Button>
           </CardContent>
         </Card>
-
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="text-center mt-6 text-primary/70 text-sm font-medium"
-        >
-          Al registrarte, aceptas nuestros términos y condiciones
-        </motion.p>
       </motion.div>
       
       <style>{`

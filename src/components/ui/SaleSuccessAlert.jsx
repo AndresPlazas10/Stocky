@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, X } from 'lucide-react';
 
@@ -13,6 +14,12 @@ export function SaleSuccessAlert({
   details = [],
   duration = 5000
 }) {
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Cierre automático después del tiempo especificado
   React.useEffect(() => {
     if (!isVisible) return;
@@ -21,7 +28,9 @@ export function SaleSuccessAlert({
     return () => clearTimeout(timer);
   }, [isVisible, duration, onClose]);
 
-  return (
+  if (!isMounted || typeof document === 'undefined') return null;
+
+  return createPortal((
     <AnimatePresence>
       {isVisible && (
         <motion.div
@@ -29,10 +38,10 @@ export function SaleSuccessAlert({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.3 }}
-          className="fixed top-2 right-2 left-2 sm:left-auto sm:right-4 z-50 sm:w-96 max-w-sm"
+          className="fixed top-2 right-2 left-2 sm:left-auto sm:right-4 z-[2147483647] sm:w-96 max-w-sm pointer-events-none"
         >
           {/* Contenedor principal con gradiente */}
-          <div className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-2xl overflow-hidden border border-green-300">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-2xl overflow-hidden border border-green-300 pointer-events-auto">
             {/* Barra superior con patrón */}
             <div className="h-1 bg-gradient-to-r from-green-400 to-emerald-400" />
             
@@ -87,5 +96,5 @@ export function SaleSuccessAlert({
         </motion.div>
       )}
     </AnimatePresence>
-  );
+  ), document.body);
 }

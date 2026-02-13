@@ -766,12 +766,6 @@ export default function Facturas({ userRole = 'admin' }) {
         </button>
       </div>
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
-          {error}
-        </div>
-      )}
-
       {/* Alertas mejoradas */}
       <SaleErrorAlert 
         isVisible={!!error}

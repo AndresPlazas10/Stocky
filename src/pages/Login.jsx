@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SaleErrorAlert } from '@/components/ui/SaleErrorAlert';
 import { motion } from 'framer-motion';
-import { Store, User, Lock, ArrowLeft, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Store, User, Lock, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
 function Login() {
   const navigate = useNavigate();
@@ -118,18 +119,13 @@ function Login() {
           </CardHeader>
 
           <CardContent>
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-destructive/10 border-2 border-destructive/20 rounded-xl p-4 flex items-start gap-3 mb-6"
-                role="alert"
-                aria-live="assertive"
-              >
-                <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-                <p className="text-sm text-destructive">{error}</p>
-              </motion.div>
-            )}
+            <SaleErrorAlert
+              isVisible={!!error}
+              onClose={() => setError(null)}
+              title="Error de acceso"
+              message={error || ''}
+              duration={5000}
+            />
 
             <form onSubmit={handleLogin} className="space-y-5">
               <div className="space-y-2">

@@ -429,10 +429,11 @@ function Inventario({ businessId, userRole = 'admin' }) {
         throw error;
       }
 
-      setSuccess('✅ Producto eliminado exitosamente');
-      await loadProductos();
+      setError(null);
       setShowDeleteModal(false);
       setProductToDelete(null);
+      setSuccess('✅ Producto eliminado exitosamente');
+      await loadProductos();
     } catch (error) {
       setError('❌ Error al eliminar el producto');
       setShowDeleteModal(false);
@@ -490,6 +491,16 @@ function Inventario({ businessId, userRole = 'admin' }) {
     if (stock <= minStock * 2) return 'bg-yellow-100 text-yellow-800';
     return 'bg-green-100 text-green-800';
   }, []);
+
+  const successTitle = useMemo(() => {
+    const normalized = String(success || '').toLowerCase();
+    if (normalized.includes('eliminad')) return '✨ Producto eliminado';
+    if (normalized.includes('desactivad')) return '✨ Producto desactivado';
+    if (normalized.includes('activad')) return '✨ Producto activado';
+    if (normalized.includes('actualizad')) return '✨ Producto actualizado';
+    if (normalized.includes('cread')) return '✨ Producto creado';
+    return '✨ Producto guardado';
+  }, [success]);
 
   return (
     <AsyncStateWrapper
@@ -573,25 +584,6 @@ function Inventario({ businessId, userRole = 'admin' }) {
         </Card>
       </motion.div>
 
-      {/* Mensajes */}
-      <AnimatePresence>
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Card className="bg-red-50 border-red-200 shadow-md rounded-2xl mb-4">
-              <div className="p-4 flex items-center gap-3">
-                <AlertCircle className="w-6 h-6 text-red-600" />
-                <p className="text-red-800 font-medium">{error}</p>
-              </div>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Alertas mejoradas */}
       <SaleErrorAlert 
         isVisible={!!error}
@@ -604,7 +596,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
       <SaleSuccessAlert 
         isVisible={!!success}
         onClose={() => setSuccess('')}
-        title="✨ Producto Guardado"
+        title={successTitle}
         details={[{ label: 'Acción', value: success }]}
         duration={5000}
       />

@@ -6,7 +6,6 @@ import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 
 import { 
   Trash2, 
-  AlertTriangle, 
   Plus, 
   Edit2, 
   Building2, 
@@ -19,7 +18,15 @@ import {
   Package
 } from 'lucide-react';
 
-const SUPPLIER_COLUMNS = 'id, business_id, business_name, contact_name, email, phone, address, nit, notes, is_active, created_at';
+const BASE_SUPPLIER_COLUMNS = 'id, business_id, business_name, contact_name, email, phone, address, notes, created_at';
+const isMissingColumnError = (err, columnName) => {
+  const text = `${err?.message || ''} ${err?.details || ''} ${err?.hint || ''}`.toLowerCase();
+  return (
+    err?.code === '42703' ||
+    err?.code === 'PGRST204' ||
+    (text.includes('column') && text.includes(columnName.toLowerCase()))
+  );
+};
 
 function Proveedores({ businessId }) {
   const [proveedores, setProveedores] = useState([]);
@@ -33,6 +40,7 @@ function Proveedores({ businessId }) {
   // Estados para modal de confirmación
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [supplierToDelete, setSupplierToDelete] = useState(null);
+  const [supplierTaxColumn, setSupplierTaxColumn] = useState('nit');
 
   // Estado del formulario
   const [formData, setFormData] = useState({
@@ -49,20 +57,46 @@ function Proveedores({ businessId }) {
   const loadProveedores = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select(SUPPLIER_COLUMNS)
-        .eq('business_id', businessId)
-        .order('created_at', { ascending: false });
+      const candidates = supplierTaxColumn === 'nit' ? ['nit', 'tax_id'] : ['tax_id', 'nit'];
+      let data = null;
+      let lastError = null;
+      let resolvedColumn = supplierTaxColumn;
 
-      if (error) throw error;
-      setProveedores(data || []);
+      for (const column of candidates) {
+        const result = await supabase
+          .from('suppliers')
+          .select(`${BASE_SUPPLIER_COLUMNS}, ${column}`)
+          .eq('business_id', businessId)
+          .order('created_at', { ascending: false });
+
+        if (!result.error) {
+          data = result.data;
+          resolvedColumn = column;
+          lastError = null;
+          break;
+        }
+
+        lastError = result.error;
+        if (!isMissingColumnError(result.error, column)) {
+          break;
+        }
+      }
+
+      if (lastError) throw lastError;
+      if (resolvedColumn !== supplierTaxColumn) {
+        setSupplierTaxColumn(resolvedColumn);
+      }
+
+      setProveedores((data || []).map((supplier) => ({
+        ...supplier,
+        nit: supplier.nit ?? supplier.tax_id ?? null
+      })));
     } catch (error) {
-      setError('❌ Error al cargar los proveedores');
+      setError(`❌ Error al cargar los proveedores: ${error?.message || 'Error desconocido'}`);
     } finally {
       setLoading(false);
     }
-  }, [businessId]);
+  }, [businessId, supplierTaxColumn]);
 
   useEffect(() => {
     if (businessId) {
@@ -79,45 +113,85 @@ function Proveedores({ businessId }) {
     setError('');
     
     try {
+      if (!businessId) {
+        throw new Error('No se detectó el negocio actual');
+      }
+
       if (!formData.business_name.trim()) {
         throw new Error('El nombre del negocio es obligatorio');
       }
 
+      const supplierPayload = {
+        business_name: formData.business_name,
+        contact_name: formData.contact_name || null,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        address: formData.address || null,
+        notes: formData.notes || null,
+        [supplierTaxColumn]: formData.nit || null
+      };
+      const fallbackTaxColumn = supplierTaxColumn === 'nit' ? 'tax_id' : 'nit';
+
       if (editingSupplier) {
         // Actualizar proveedor existente
-        const { data, error } = await supabase
+        let { error } = await supabase
           .from('suppliers')
-          .update({
-            business_name: formData.business_name,
-            contact_name: formData.contact_name || null,
-            email: formData.email || null,
-            phone: formData.phone || null,
-            address: formData.address || null,
-            nit: formData.nit || null,
-            notes: formData.notes || null
-          })
+          .update(supplierPayload)
           .eq('id', editingSupplier.id)
           .select()
           .maybeSingle();
 
+        if (error && isMissingColumnError(error, supplierTaxColumn)) {
+          const retryPayload = { ...supplierPayload };
+          delete retryPayload[supplierTaxColumn];
+          retryPayload[fallbackTaxColumn] = formData.nit || null;
+
+          const retry = await supabase
+            .from('suppliers')
+            .update(retryPayload)
+            .eq('id', editingSupplier.id)
+            .select()
+            .maybeSingle();
+
+          error = retry.error;
+          if (!retry.error) {
+            setSupplierTaxColumn(fallbackTaxColumn);
+          }
+        }
+
         if (error) throw error;
       } else {
         // Crear nuevo proveedor
-        const { data, error } = await supabase
+        let { error } = await supabase
           .from('suppliers')
           .insert({
             business_id: businessId,
-            business_name: formData.business_name,
-            contact_name: formData.contact_name || null,
-            email: formData.email || null,
-            phone: formData.phone || null,
-            address: formData.address || null,
-            nit: formData.nit || null,
-            notes: formData.notes || null,
+            ...supplierPayload,
             created_at: new Date().toISOString()
           })
           .select()
           .maybeSingle();
+
+        if (error && isMissingColumnError(error, supplierTaxColumn)) {
+          const retryPayload = { ...supplierPayload };
+          delete retryPayload[supplierTaxColumn];
+          retryPayload[fallbackTaxColumn] = formData.nit || null;
+
+          const retry = await supabase
+            .from('suppliers')
+            .insert({
+              business_id: businessId,
+              ...retryPayload,
+              created_at: new Date().toISOString()
+            })
+            .select()
+            .maybeSingle();
+
+          error = retry.error;
+          if (!retry.error) {
+            setSupplierTaxColumn(fallbackTaxColumn);
+          }
+        }
 
         if (error) throw error;
       }
@@ -134,7 +208,7 @@ function Proveedores({ businessId }) {
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear
     }
-  }, [editingSupplier, formData, businessId, loadProveedores, isSubmitting]);
+  }, [editingSupplier, formData, businessId, loadProveedores, isSubmitting, supplierTaxColumn]);
 
   const handleEdit = useCallback((supplier) => {
     setEditingSupplier(supplier);
@@ -233,6 +307,14 @@ function Proveedores({ businessId }) {
     );
   }, [proveedores, searchTerm]);
 
+  const successTitle = useMemo(() => {
+    const normalized = success.toLowerCase();
+    if (normalized.includes('eliminad')) return '✨ Proveedor eliminado';
+    if (normalized.includes('actualizad')) return '✨ Proveedor actualizado';
+    if (normalized.includes('cread')) return '✨ Proveedor creado';
+    return '✨ Proveedor guardado';
+  }, [success]);
+
 
 
   return (
@@ -269,21 +351,6 @@ function Proveedores({ businessId }) {
           </div>
         </motion.div>
 
-        {/* Alertas */}
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex items-center gap-3"
-            >
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              <span className="text-red-700">{error}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Alertas mejoradas */}
         <SaleErrorAlert 
           isVisible={!!error}
@@ -296,7 +363,7 @@ function Proveedores({ businessId }) {
         <SaleSuccessAlert 
           isVisible={!!success}
           onClose={() => setSuccess('')}
-          title="✨ Proveedor Guardado"
+          title={successTitle}
           details={[{ label: 'Acción', value: success }]}
           duration={5000}
         />

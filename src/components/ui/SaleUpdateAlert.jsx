@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertCircle, X } from 'lucide-react';
 
@@ -13,6 +14,12 @@ export function SaleUpdateAlert({
   details = [],
   duration = 5000
 }) {
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   React.useEffect(() => {
     if (!isVisible) return;
     
@@ -20,7 +27,9 @@ export function SaleUpdateAlert({
     return () => clearTimeout(timer);
   }, [isVisible, duration, onClose]);
 
-  return (
+  if (!isMounted || typeof document === 'undefined') return null;
+
+  return createPortal((
     <AnimatePresence>
       {isVisible && (
         <motion.div
@@ -28,10 +37,10 @@ export function SaleUpdateAlert({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.3 }}
-          className="fixed top-2 right-2 left-2 sm:left-auto sm:right-4 z-50 sm:w-96 max-w-sm"
+          className="fixed top-2 right-2 left-2 sm:left-auto sm:right-4 z-[2147483647] sm:w-96 max-w-sm pointer-events-none"
         >
           {/* Contenedor principal con gradiente amarillo suave */}
-          <div className="bg-gradient-to-r from-amber-400 to-yellow-400 rounded-lg shadow-2xl overflow-hidden border border-amber-300">
+          <div className="bg-gradient-to-r from-amber-400 to-yellow-400 rounded-lg shadow-2xl overflow-hidden border border-amber-300 pointer-events-auto">
             {/* Barra superior */}
             <div className="h-1 bg-gradient-to-r from-amber-300 to-yellow-300" />
             
@@ -86,5 +95,5 @@ export function SaleUpdateAlert({
         </motion.div>
       )}
     </AnimatePresence>
-  );
+  ), document.body);
 }
