@@ -234,7 +234,7 @@ function Dashboard() {
         return <Ventas key="ventas" businessId={business?.id} />;
       
       case 'compras':
-        return <Compras key="compras" businessId={business?.id} />;
+        return <Compras key="compras" businessId={business?.id} onNavigateSection={setActiveSection} />;
       
       case 'inventario':
         return <Inventario key="inventario" businessId={business?.id} userRole="admin" />;

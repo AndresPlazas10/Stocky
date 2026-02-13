@@ -838,8 +838,28 @@ function Ventas({ businessId, userRole = 'admin' }) {
       skeletonType="ventas"
       hasFilters={Boolean(currentFilters && Object.keys(currentFilters).length > 0)}
       noResultsTitle="No hay ventas para esos filtros"
+      noResultsDescription="Ajusta los filtros o registra una nueva venta."
+      noResultsAction={
+        <Button
+          type="button"
+          onClick={() => setShowSaleModal(true)}
+          className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
+        >
+          Nueva Venta
+        </Button>
+      }
       emptyTitle="Aun no hay ventas registradas"
       emptyDescription="Las ventas apareceran aqui en tiempo real cuando registres la primera."
+      emptyAction={
+        <Button
+          type="button"
+          onClick={() => setShowSaleModal(true)}
+          className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
+        >
+          Crear Primera Venta
+        </Button>
+      }
+      bypassStateRendering={showSaleModal}
       actionProcessing={isSubmitting || generatingInvoice}
       className="min-h-screen bg-gradient-to-br from-light-bg-primary to-white p-6"
     >
@@ -1000,9 +1020,9 @@ function Ventas({ businessId, userRole = 'admin' }) {
                 />
               </div>
               
-              <div className="grid gap-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                 {filteredProducts.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
+                  <div className="text-center py-12 text-gray-500 lg:col-span-2">
                     <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                     <p className="font-medium">No hay productos disponibles</p>
                   </div>
@@ -1014,14 +1034,18 @@ function Ventas({ businessId, userRole = 'admin' }) {
                       whileTap={{ scale: 0.98 }}
                       className="cursor-pointer"
                     >
-                      <Card 
-                        className="hover:shadow-lg transition-all duration-300 rounded-xl border-gray-200 bg-gradient-to-br from-white to-gray-50"
+                      <Card
+                        className="h-full hover:shadow-lg transition-all duration-300 rounded-xl border-gray-200 bg-gradient-to-br from-white to-gray-50 overflow-hidden"
                         onClick={() => addToCart(producto)}
                       >
-                        <div className="p-3 sm:p-4 flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="font-bold text-accent-600 text-lg">{producto.name}</p>
-                            <p className="text-sm text-gray-500 mt-1">Código: {producto.code}</p>
+                        <div className="p-3 sm:p-4 h-full flex flex-col gap-3">
+                          <div className="min-w-0">
+                            <p className="font-bold text-accent-600 text-base sm:text-lg truncate" title={producto.name}>
+                              {producto.name}
+                            </p>
+                            <p className="text-sm text-gray-500 mt-1 truncate" title={producto.code}>
+                              Código: {producto.code}
+                            </p>
                             <Badge 
                               className={`mt-2 ${
                                 producto.stock > 10 
@@ -1034,11 +1058,13 @@ function Ventas({ businessId, userRole = 'admin' }) {
                               Stock: {producto.stock}
                             </Badge>
                           </div>
-                          <div className="text-right ml-4">
-                            <p className="text-2xl font-bold text-secondary-600">
+                          <div className="mt-auto flex items-end justify-between gap-3">
+                            <p className="text-lg sm:text-xl font-bold text-secondary-600">
                               {formatPrice(producto.sale_price)}
                             </p>
-                            <Plus className="w-6 h-6 text-accent-600 mt-2 ml-auto" />
+                            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-accent-100 text-accent-700">
+                              <Plus className="w-5 h-5" />
+                            </span>
                           </div>
                         </div>
                       </Card>

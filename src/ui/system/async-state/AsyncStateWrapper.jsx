@@ -20,8 +20,11 @@ export function AsyncStateWrapper({
   skeletonType = 'table',
   emptyTitle,
   emptyDescription,
+  emptyAction = null,
   noResultsTitle = 'Sin resultados',
   noResultsDescription = 'Prueba ajustando filtros o términos de búsqueda.',
+  noResultsAction = null,
+  bypassStateRendering = false,
   className = ''
 }) {
   const isOnline = useOnlineStatus();
@@ -38,6 +41,14 @@ export function AsyncStateWrapper({
     syncingRealtime,
     actionProcessing
   });
+
+  if (bypassStateRendering) {
+    return (
+      <div className={className}>
+        {children}
+      </div>
+    );
+  }
 
   if (state === ASYNC_STATES.LOADING_INITIAL) {
     return (
@@ -71,7 +82,12 @@ export function AsyncStateWrapper({
   if (state === ASYNC_STATES.NO_RESULTS) {
     return (
       <div className={className}>
-        <EmptyState icon={Search} title={noResultsTitle} description={noResultsDescription} />
+        <EmptyState
+          icon={Search}
+          title={noResultsTitle}
+          description={noResultsDescription}
+          action={noResultsAction}
+        />
       </div>
     );
   }
@@ -83,6 +99,7 @@ export function AsyncStateWrapper({
           icon={Database}
           title={emptyTitle || 'Aun no hay informacion'}
           description={emptyDescription || 'Cuando registres datos, los veras en esta seccion.'}
+          action={emptyAction}
         />
       </div>
     );
