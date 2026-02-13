@@ -110,7 +110,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
         .select('id')
         .eq('user_id', user.id)
         .eq('business_id', businessId)
-        .single();
+        .maybeSingle();
 
       // Si existe en employees, es empleado (NO puede editar/eliminar)
       setIsEmployee(!!data);
@@ -839,7 +839,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                   </select>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="sticky bottom-4 bg-white flex flex-col sm:flex-row gap-2 sm:gap-3 mt-5 pt-3 pb-2 px-1 sm:px-0 border-t border-gray-200">
                   <Button
                     type="button"
                     onClick={() => {
@@ -857,14 +857,14 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       });
                       setGeneratedCode('');
                     }}
-                    className="flex-1 h-12 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl border-none font-medium"
+                    className="order-2 sm:order-1 w-full sm:flex-1 h-10 sm:h-12 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl border-none font-medium text-sm sm:text-base"
                   >
                     Cancelar
                   </Button>
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="flex-1 h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="order-1 sm:order-2 w-full sm:flex-1 h-10 sm:h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                   >
                     {isSubmitting ? (
                       <>

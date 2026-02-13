@@ -109,7 +109,7 @@ BEGIN
       RAISE EXCEPTION 'Cantidad debe ser mayor a 0';
     END IF;
 
-    -- Obtener stock actual y validar
+    -- Obtener stock actual y bloquear fila para evitar race conditions
     SELECT stock INTO v_current_stock
     FROM public.products
     WHERE id = v_product_id
@@ -119,11 +119,6 @@ BEGIN
 
     IF NOT FOUND THEN
       RAISE EXCEPTION 'Producto % no encontrado o no activo', v_product_id;
-    END IF;
-
-    IF v_current_stock < v_quantity THEN
-      RAISE EXCEPTION 'Stock insuficiente para producto %. Disponible: %, solicitado: %',
-        v_product_id, v_current_stock, v_quantity;
     END IF;
 
     -- Insertar detalle de venta
@@ -139,7 +134,7 @@ BEGIN
       v_unit_price
     );
 
-    -- Actualizar stock
+    -- Actualizar stock (permite stock negativo por requerimiento de negocio)
     UPDATE public.products
     SET stock = stock - v_quantity
     WHERE id = v_product_id;

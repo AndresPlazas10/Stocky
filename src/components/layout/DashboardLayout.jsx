@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
 import { motion } from 'framer-motion';
-import { MobileBottomNav, MobileHeader, MobileDrawer } from '../mobile';
+import { MobileHeader, MobileDrawer } from '../mobile';
 import { useViewport } from '../../hooks/useViewport';
 
 export function DashboardLayout({ 
