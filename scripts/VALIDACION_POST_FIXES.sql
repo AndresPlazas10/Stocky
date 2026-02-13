@@ -436,3 +436,55 @@ SELECT
   (SELECT n FROM duplicate_open_orders) AS duplicate_open_orders_per_table,
   (SELECT n FROM negative_stock) AS negative_stock_products;
 
+-- ------------------------------------------------------------
+-- 14) FUNCION create_product_with_generated_code DISPONIBLE
+-- Esperado: procedure_name NO NULL
+-- ------------------------------------------------------------
+SELECT
+  to_regprocedure(
+    'public.create_product_with_generated_code(uuid,text,text,numeric,numeric,integer,integer,text,uuid,boolean)'
+  ) AS procedure_name;
+
+-- ------------------------------------------------------------
+-- 15) CONSTRAINT GLOBAL PROHIBIDO (products_code_key)
+-- Esperado: 0 filas
+-- Si devuelve filas, hay riesgo de colision entre negocios.
+-- ------------------------------------------------------------
+SELECT
+  c.conname,
+  pg_get_constraintdef(c.oid) AS constraint_def
+FROM pg_constraint c
+JOIN pg_class t
+  ON t.oid = c.conrelid
+WHERE t.relname = 'products'
+  AND c.contype = 'u'
+  AND c.conname = 'products_code_key';
+
+-- ------------------------------------------------------------
+-- 16) INDICE UNICO POR NEGOCIO PARA CODE
+-- Esperado: >= 1 fila (ideal: idx_products_business_code_unique)
+-- ------------------------------------------------------------
+SELECT
+  schemaname,
+  tablename,
+  indexname,
+  indexdef
+FROM pg_indexes
+WHERE tablename = 'products'
+  AND indexdef ILIKE '%UNIQUE%'
+  AND indexdef ILIKE '%business_id%'
+  AND indexdef ILIKE '%code%';
+
+-- ------------------------------------------------------------
+-- 17) CODIGOS NO SECUENCIALES POR NEGOCIO (PRD-####)
+-- Esperado: 0 filas para negocios ya normalizados.
+-- ------------------------------------------------------------
+SELECT
+  pr.business_id,
+  count(*) AS non_sequential_codes
+FROM products pr
+WHERE pr.code IS NULL
+   OR pr.code !~ '^PRD-[0-9]{4}$'
+GROUP BY pr.business_id
+HAVING count(*) > 0
+ORDER BY non_sequential_codes DESC;

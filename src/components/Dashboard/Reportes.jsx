@@ -236,6 +236,15 @@ function Reportes({ businessId }) {
     return 'from-gray-500 to-gray-600';
   };
 
+  const getPaymentMethodLabel = (method) => {
+    const methodLower = method?.toLowerCase() || '';
+    if (methodLower.includes('cash') || methodLower.includes('efectivo')) return 'Efectivo';
+    if (methodLower.includes('card') || methodLower.includes('tarjeta')) return 'Tarjeta';
+    if (methodLower.includes('transfer') || methodLower.includes('transferencia')) return 'Transferencia';
+    if (methodLower.includes('mixed') || methodLower.includes('mixto')) return 'Mixto';
+    return method || 'Otro';
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#ffe498]/10 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -294,13 +303,13 @@ function Reportes({ businessId }) {
           onRetry={loadReportes}
           skeletonType="reportes"
         >
-          <div>
+          <div className="space-y-6 sm:space-y-8">
             {/* Métricas Principales */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6"
             >
               {/* Ventas Totales */}
               <motion.div
@@ -398,7 +407,7 @@ function Reportes({ businessId }) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="grid grid-cols-1 md:grid-cols-3 gap-6"
+              className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6"
             >
               {/* Productos Activos */}
               <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
@@ -473,7 +482,7 @@ function Reportes({ businessId }) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+              className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6"
             >
               {/* Top 5 Productos */}
               <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
@@ -560,7 +569,7 @@ function Reportes({ businessId }) {
                             <div className={`p-2 bg-gradient-to-br ${getPaymentMethodColor(metodo.method)} rounded-lg text-white`}>
                               {getPaymentMethodIcon(metodo.method)}
                             </div>
-                            <span className="font-semibold text-gray-800 capitalize">{metodo.method}</span>
+                            <span className="font-semibold text-gray-800">{getPaymentMethodLabel(metodo.method)}</span>
                           </div>
                           <span className="text-lg font-bold text-green-600">
                             {formatPrice(metodo.total)}
