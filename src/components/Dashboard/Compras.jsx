@@ -26,6 +26,7 @@ import {
   AlertCircle,
   Search
 } from 'lucide-react';
+import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 
 // Función helper para obtener el nombre del responsable
 const getResponsableName = (compra) => {
@@ -373,16 +374,38 @@ function Compras({ businessId }) {
         throw detailsError;
       }
 
-      // Actualizar stock
-      for (const item of cart) {
-        const producto = productos.find(p => p.id === item.product_id);
-        const newStock = (producto.stock || 0) + item.quantity;
-        const { error: updateError } = await supabase
-          .from('products')
-          .update({ stock: newStock })
-          .eq('id', item.product_id);
-        if (updateError) throw updateError;
-      }
+      // Actualizar stock y costo de forma consistente para todo el negocio
+      const productIds = [...new Set(cart.map(item => item.product_id))];
+      const { data: freshProducts, error: productsFetchError } = await supabase
+        .from('products')
+        .select('id, stock')
+        .eq('business_id', businessId)
+        .in('id', productIds);
+
+      if (productsFetchError) throw productsFetchError;
+
+      const stockMap = new Map((freshProducts || []).map(product => [product.id, Number(product.stock || 0)]));
+      const purchaseItemMap = new Map(cart.map(item => [item.product_id, item]));
+
+      const updateResults = await Promise.all(
+        productIds.map(productId => {
+          const item = purchaseItemMap.get(productId);
+          const currentStock = stockMap.get(productId) || 0;
+          const newStock = currentStock + Number(item.quantity || 0);
+
+          return supabase
+            .from('products')
+            .update({
+              stock: newStock,
+              purchase_price: Number(item.unit_price || 0)
+            })
+            .eq('id', productId)
+            .eq('business_id', businessId);
+        })
+      );
+
+      const failedUpdate = updateResults.find(result => result.error);
+      if (failedUpdate?.error) throw failedUpdate.error;
 
       setSuccess('✅ Compra registrada exitosamente');
       resetForm();
@@ -495,19 +518,21 @@ function Compras({ businessId }) {
     );
   }, [compras, searchTerm]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#edb886] mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando compras...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary to-white p-6">
+    <AsyncStateWrapper
+      loading={loading}
+      error={filteredCompras.length === 0 ? error : null}
+      dataCount={filteredCompras.length}
+      onRetry={() => loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (pagePurchases - 1) * limitPurchases })}
+      skeletonType="compras"
+      hasFilters={Boolean(searchTerm.trim() || Object.keys(currentFiltersPurchases || {}).length > 0)}
+      noResultsTitle="No hay compras para esos filtros"
+      emptyTitle="Aun no hay compras registradas"
+      emptyDescription="Registra la primera compra para empezar el historial."
+      actionProcessing={isCreatingPurchase}
+      className="min-h-screen bg-gradient-to-br from-light-bg-primary to-white p-6"
+    >
+    <div>
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -1069,6 +1094,7 @@ function Compras({ businessId }) {
         )}
       </AnimatePresence>
     </div>
+    </AsyncStateWrapper>
   );
 }
 

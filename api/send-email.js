@@ -120,17 +120,14 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Resend API Error:', data);
       throw new Error(data.message || 'Error al enviar email con Resend API');
     }
 
     return res.status(200).json({ success: true, data });
 
   } catch (error) {
-    console.error('Error en send-email function:', error);
     return res.status(500).json({ 
-      error: error.message,
-      details: error.stack 
+      error: error.message
     });
   }
 }

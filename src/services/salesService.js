@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '../supabase/Client';
+import { isAdminRole } from '../utils/roles.js';
 
 /**
  * Valida y obtiene la sesión actual del usuario
@@ -85,7 +86,7 @@ export async function getSales(businessId) {
                       String(userId).trim() === String(business.created_by).trim();
       
       // Determinar si es admin
-      const isAdmin = employee?.role === 'admin';
+      const isAdmin = isAdminRole(employee?.role);
 
       return {
         ...sale,
@@ -157,7 +158,6 @@ export async function getFilteredSales(businessId, filters = {}, pagination = {}
       .from('employees')
       .select('user_id, full_name, role')
       .eq('business_id', businessId)
-      .eq('is_active', true)
       .limit(100);
 
     // Obtener created_by del negocio para identificar owner
@@ -183,7 +183,7 @@ export async function getFilteredSales(businessId, filters = {}, pagination = {}
       const employee = sale.user_id ? employeeMap.get(sale.user_id) : null;
       const isOwner = sale.user_id && business?.created_by && 
                       String(sale.user_id).trim() === String(business.created_by).trim();
-      const isAdmin = employee?.role === 'admin';
+      const isAdmin = isAdminRole(employee?.role);
 
       return {
         ...sale,
@@ -229,19 +229,34 @@ export async function createSale({
       return { success: false, error: 'El carrito está vacío' };
     }
 
-    // 3. Obtener info del empleado
-    const { data: employee } = await supabase
-      .from('employees')
-      .select('id, full_name')
-      .eq('user_id', user.id)
-      .eq('business_id', businessId)
-      .maybeSingle();
+    // 3. Obtener info del empleado (incluye role) y created_by del negocio
+    const [{ data: employee }, { data: business }] = await Promise.all([
+      supabase
+        .from('employees')
+        .select('id, full_name, role')
+        .eq('user_id', user.id)
+        .eq('business_id', businessId)
+        .maybeSingle(),
+      supabase
+        .from('businesses')
+        .select('created_by')
+        .eq('id', businessId)
+        .maybeSingle()
+    ]);
 
     // 4. Preparar datos de venta
+    // Determinar nombre del vendedor: si es owner/admin -> 'Administrador'
+    const isOwner = user.id && business?.created_by && String(user.id).trim() === String(business.created_by).trim();
+    const isAdmin = isAdminRole(employee?.role);
+
+    const sellerName = isOwner || isAdmin
+      ? 'Administrador'
+      : (employee?.full_name || user.email || 'Vendedor');
+
     const saleData = {
       business_id: businessId,
       user_id: user.id,
-      seller_name: employee?.full_name || user.email || 'Vendedor',
+      seller_name: sellerName,
       payment_method: paymentMethod || 'cash',
       total: total || 0
     };
@@ -371,7 +386,6 @@ export async function deleteSale(saleId) {
       
       if (restoreError) {
         // Log error pero no fallar (venta ya fue eliminada)
-        console.error('Error restaurando stock:', restoreError);
       }
     }
 

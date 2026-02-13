@@ -26,6 +26,7 @@ import {
   X,
   Edit
 } from 'lucide-react';
+import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 
 function Inventario({ businessId, userRole = 'admin' }) {
   const [productos, setProductos] = useState([]);
@@ -528,19 +529,19 @@ function Inventario({ businessId, userRole = 'admin' }) {
     return 'bg-green-100 text-green-800';
   }, []);
 
-  if (loading && productos.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-light-bg-primary to-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#edb886] mx-auto mb-4"></div>
-          <p className="text-secondary-600 font-medium">Cargando inventario...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary to-white p-6">
+    <AsyncStateWrapper
+      loading={loading}
+      error={productos.length === 0 ? error : null}
+      dataCount={productos.length}
+      onRetry={loadProductos}
+      skeletonType="inventario"
+      emptyTitle="No hay productos en inventario"
+      emptyDescription="Crea el primer producto para habilitar ventas y compras."
+      actionProcessing={isSubmitting}
+      className="min-h-screen bg-gradient-to-br from-light-bg-primary to-white p-6"
+    >
+    <div>
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -932,14 +933,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        {loading ? (
-          <Card className="shadow-xl rounded-2xl bg-white border-none p-12">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#edb886] mx-auto mb-4"></div>
-              <p className="text-gray-600">Cargando inventario...</p>
-            </div>
-          </Card>
-        ) : productos.length === 0 ? (
+        {productos.length === 0 ? (
           <Card className="shadow-xl rounded-2xl bg-white border-none">
             <div className="p-12 text-center">
               <Package className="w-16 h-16 mx-auto mb-4 text-gray-300" />
@@ -1468,6 +1462,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
         )}
       </AnimatePresence>
     </div>
+    </AsyncStateWrapper>
   );
 }
 

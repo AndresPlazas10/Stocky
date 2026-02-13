@@ -159,7 +159,6 @@ export function useDaneCities() {
       const { data } = await query
       setCities(data || [])
     } catch (error) {
-      console.error('Error cargando ciudades:', error)
       setCities([])
     } finally {
       setLoading(false)

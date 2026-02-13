@@ -15,6 +15,7 @@ import Facturas from '../components/Dashboard/Facturas.jsx';
 import Clientes from '../components/Dashboard/Clientes.jsx';
 import Reportes from '../components/Dashboard/Reportes.jsx';
 import Configuracion from '../components/Dashboard/Configuracion.jsx';
+import { AsyncStateWrapper } from '../ui/system/async-state/index.js';
 
 function Dashboard() {
   const [business, setBusiness] = useState(null);
@@ -129,7 +130,6 @@ function Dashboard() {
 
       // Ignorar error 406 si es por falta de datos (es válido no ser empleado)
       if (employeeError && employeeError.code !== 'PGRST116') {
-        console.warn('Error al verificar empleado:', employeeError);
       }
 
 
@@ -262,34 +262,23 @@ function Dashboard() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-lg text-gray-700 font-medium">Cargando...</p>
-        </div>
-      </div>
-    );
-  }
-
   // 🔒 Si el negocio está deshabilitado, mostrar modal bloqueante
   if (isBusinessDisabled) {
     return <BusinessDisabledModal businessName={business?.name} onSignOut={handleSignOut} />;
   }
 
-  if (error) {
+  if (loading || error) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-        <div className="text-center p-8 bg-white rounded-2xl shadow-lg">
-          <p className="text-red-600 mb-4">{error}</p>
-          <button 
-            onClick={handleSignOut}
-            className="px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:shadow-lg transition-all"
-          >
-            Cerrar sesión
-          </button>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-6">
+        <AsyncStateWrapper
+          loading={loading}
+          error={error}
+          dataCount={business ? 1 : 0}
+          onRetry={checkAuthAndLoadBusiness}
+          skeletonType="dashboard"
+          emptyTitle="Preparando tu negocio"
+          emptyDescription="Estamos cargando tu configuracion y permisos."
+        />
       </div>
     );
   }

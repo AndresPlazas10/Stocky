@@ -56,7 +56,6 @@ class QueryCache {
       return null;
     }
     
-    console.log('[Cache HIT]', key);
     return entry.data;
   }
   
@@ -69,7 +68,6 @@ class QueryCache {
       data,
       timestamp: Date.now()
     });
-    console.log('[Cache SET]', key);
   }
   
   /**
@@ -83,7 +81,6 @@ class QueryCache {
       }
     }
     keysToDelete.forEach(key => this.cache.delete(key));
-    console.log('[Cache INVALIDATE]', tableName, `(${keysToDelete.length} entries)`);
   }
   
   /**
@@ -91,7 +88,6 @@ class QueryCache {
    */
   clear() {
     this.cache.clear();
-    console.log('[Cache CLEAR] All entries deleted');
   }
   
   /**
@@ -126,7 +122,6 @@ class RequestDeduplicator {
   async execute(key, queryFn) {
     // Si ya hay query pendiente con esta key
     if (this.pending.has(key)) {
-      console.log('[Dedup] Waiting for pending query:', key);
       return this.pending.get(key);
     }
     

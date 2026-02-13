@@ -33,9 +33,15 @@ import {
   Printer
 } from 'lucide-react';
 import ComprobanteDisclaimer from '../Legal/ComprobanteDisclaimer';
+import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 
 // Función helper pura fuera del componente (no se recrea en renders)
 const getVendedorName = (venta) => {
+  // Prioridad 1: rol resuelto por joins (evita mostrar "Empleado" si el user es admin/owner)
+  if (venta?.employees?.role === 'owner' || venta?.employees?.role === 'admin') {
+    return 'Administrador';
+  }
+
   // Prioridad 1: seller_name guardado en la venta (ventas nuevas)
   if (venta?.seller_name && typeof venta.seller_name === 'string' && venta.seller_name.trim() !== '') {
     return venta.seller_name;
@@ -190,41 +196,15 @@ function Ventas({ businessId, userRole = 'admin' }) {
   useRealtimeSubscription('sales', {
     filter: { business_id: businessId },
     enabled: !!businessId,
-    onInsert: async (newSale) => {
-      // Cargar employee y customer data
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: business } = await supabase
-        .from('businesses')
-        .select('created_by')
-        .eq('id', businessId)
-        .single();
+    onInsert: (newSale) => {
+      const sellerName = typeof newSale?.seller_name === 'string' ? newSale.seller_name.trim() : '';
+      const isAdminSeller = sellerName.toLowerCase() === 'administrador';
 
-      const { data: employeesData } = await supabase
-        .from('employees')
-        .select('user_id, full_name, role')
-        .eq('business_id', businessId);
-
-      const employeeMap = new Map();
-      employeesData?.forEach(emp => {
-        employeeMap.set(emp.user_id, { full_name: emp.full_name || 'Usuario', role: emp.role });
-      });
-
-      const employee = employeeMap.get(newSale.user_id);
-      const userId = String(newSale.user_id || '').trim();
-      const createdBy = String(business?.created_by || '').trim();
-      const currentUserId = String(user?.id || '').trim();
-      
-      // Es owner si: created_by coincide O es el usuario actual y userRole es admin
-      const isOwner = userId === createdBy || (userId === currentUserId && userRole === 'admin');
-      const isAdmin = employee?.role === 'admin';
-      
       const saleWithDetails = {
         ...newSale,
-        employees: isOwner
+        employees: isAdminSeller
           ? { full_name: 'Administrador', role: 'owner' }
-          : isAdmin
-          ? { full_name: 'Administrador', role: 'admin' }
-          : employee || { full_name: 'Vendedor desconocido', role: 'employee' }
+          : { full_name: sellerName || 'Vendedor desconocido', role: 'employee' }
       };
 
       // Verificar si la venta ya existe antes de agregarla
@@ -365,7 +345,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
       // Registrar latencia para debugging
       recordSaleCreationTime(elapsedMs);
-      console.log(`✅ Venta creada en ${elapsedMs.toFixed(0)}ms`);
 
       // Mostrar alerta con detalles de la venta
       setSuccessTitle('✨ Venta Registrada');
@@ -627,7 +606,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
           </div>
           <div class="info-row">
             <span><strong>Vendedor:</strong></span>
-            <span>${venta.employees?.full_name || 'N/A'}</span>
+            <span>${getVendedorName(venta)}</span>
           </div>
           <div class="info-row">
             <span><strong>Cliente:</strong></span>
@@ -850,19 +829,21 @@ function Ventas({ businessId, userRole = 'admin' }) {
     }
   }, [businessId, selectedSale, invoiceCustomerName, invoiceCustomerEmail, invoiceCustomerIdNumber]);
 
-  if (loading && ventas.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-light-bg-primary to-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#edb886] mx-auto mb-4"></div>
-          <p className="text-secondary-600 font-medium">Cargando ventas...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary to-white p-6">
+    <AsyncStateWrapper
+      loading={loading}
+      error={ventas.length === 0 ? error : null}
+      dataCount={ventas.length}
+      onRetry={loadData}
+      skeletonType="ventas"
+      hasFilters={Boolean(currentFilters && Object.keys(currentFilters).length > 0)}
+      noResultsTitle="No hay ventas para esos filtros"
+      emptyTitle="Aun no hay ventas registradas"
+      emptyDescription="Las ventas apareceran aqui en tiempo real cuando registres la primera."
+      actionProcessing={isSubmitting || generatingInvoice}
+      className="min-h-screen bg-gradient-to-br from-light-bg-primary to-white p-6"
+    >
+    <div>
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -1611,6 +1592,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       </AnimatePresence>
 
     </div>
+    </AsyncStateWrapper>
   );
 }
 

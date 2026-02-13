@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
+import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { 
   Trash2, 
   Users, 
@@ -232,7 +233,7 @@ function Empleados({ businessId }) {
         
         // Función no existe
         if (errorMsg.includes('function') && errorMsg.includes('does not exist')) {
-          throw new Error('❌ Error de configuración. Ejecuta FUNCIONES_EMPLEADOS_SECURITY_DEFINER.sql en Supabase');
+          throw new Error('❌ Error de configuración. Ejecuta las migraciones de hardening de empleados en Supabase');
         }
         
         // Error genérico
@@ -287,24 +288,28 @@ function Empleados({ businessId }) {
     try {
       // ✅ CORREGIDO: Solo manejar empleados activos (ya no hay invitaciones pendientes)
       
-      // Primero eliminar el usuario de Auth usando la función SQL
-      if (employeeToDelete.user_id) {
-        const { error: authError } = await supabase.rpc('delete_auth_user', {
-          user_id_to_delete: employeeToDelete.user_id
-        });
+      // Camino principal: función segura versionada para eliminar empleado.
+      let empError = null;
+      const { error: deleteEmployeeError } = await supabase.rpc('delete_employee', {
+        p_employee_id: employeeToDelete.id
+      });
 
-        if (authError) {
-          // Error al eliminar usuario de Auth
-          // Continuar aunque falle (el admin puede eliminarlo manualmente)
+      if (deleteEmployeeError) {
+        const missingDeleteEmployeeFn = deleteEmployeeError?.message?.includes('delete_employee')
+          && deleteEmployeeError?.message?.includes('does not exist');
+
+        if (missingDeleteEmployeeFn) {
+          // Fallback temporal en entornos aún sin migración.
+          const { error } = await supabase
+            .from('employees')
+            .delete()
+            .eq('id', employeeToDelete.id)
+            .eq('business_id', businessId);
+          empError = error;
+        } else {
+          empError = deleteEmployeeError;
         }
       }
-
-      // Eliminar el registro de employees
-      const { error: empError } = await supabase
-        .from('employees')
-        .delete()
-        .eq('id', employeeToDelete.id)
-        .eq('business_id', businessId);
 
       if (empError) {
         // Error al eliminar empleado
@@ -593,22 +598,18 @@ function Empleados({ businessId }) {
 
         {/* Lista de empleados */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-          {loading ? (
-            <div className="p-12 text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-500 mx-auto"></div>
-              <p className="text-gray-600 mt-4">Cargando empleados...</p>
-            </div>
-          ) : filteredEmpleados.length === 0 ? (
-            <div className="p-12 text-center">
-              <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-600">
-                {searchTerm ? 'No se encontraron empleados' : 'No hay invitaciones aún'}
-              </p>
-              <p className="text-sm text-gray-500 mt-2">
-                {!searchTerm && 'Haz clic en "Invitar Empleado" para crear la primera invitación'}
-              </p>
-            </div>
-          ) : (
+          <AsyncStateWrapper
+            loading={loading}
+            error={filteredEmpleados.length === 0 ? error : null}
+            dataCount={filteredEmpleados.length}
+            onRetry={loadEmpleados}
+            skeletonType="empleados"
+            hasFilters={Boolean(searchTerm.trim())}
+            noResultsTitle="No se encontraron empleados"
+            emptyTitle="Aun no hay empleados"
+            emptyDescription='Haz clic en "Invitar Empleado" para crear el primero.'
+            actionProcessing={isSubmitting}
+          >
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
@@ -686,7 +687,7 @@ function Empleados({ businessId }) {
                 </tbody>
               </table>
             </div>
-          )}
+          </AsyncStateWrapper>
         </div>
       </div>
 
