@@ -6,6 +6,65 @@
 import { supabase } from '../supabase/Client';
 import { isAdminRole } from '../utils/roles.js';
 
+const SALES_LIST_COLUMNS = `
+  id,
+  business_id,
+  user_id,
+  seller_name,
+  payment_method,
+  customer_id,
+  customer_name,
+  customer_email,
+  customer_id_number,
+  notes,
+  total,
+  created_at
+`;
+
+const SALES_RPC_NOT_AVAILABLE = 'SALES_RPC_NOT_AVAILABLE';
+
+function isMissingSalesRpcError(error) {
+  const code = String(error?.code || '');
+  const message = String(error?.message || '').toLowerCase();
+  return code === 'PGRST202' || code === '42883' || message.includes('get_sales_enriched');
+}
+
+function mapRpcSalesRows(rows = [], includeCount = true) {
+  const data = rows.map((row) => {
+    const employeeRole = row.employee_role || 'employee';
+    const isOwner = !!row.is_owner;
+    const isAdmin = isAdminRole(employeeRole);
+
+    return {
+      id: row.id,
+      business_id: row.business_id,
+      user_id: row.user_id,
+      seller_name: row.seller_name,
+      payment_method: row.payment_method,
+      customer_id: row.customer_id,
+      customer_name: row.customer_name,
+      customer_email: row.customer_email,
+      customer_id_number: row.customer_id_number,
+      notes: row.notes,
+      total: row.total,
+      created_at: row.created_at,
+      employees: isOwner
+        ? { full_name: 'Administrador', role: 'owner' }
+        : isAdmin
+        ? { full_name: 'Administrador', role: 'admin' }
+        : {
+            full_name: row.employee_full_name || row.seller_name || 'Empleado',
+            role: employeeRole
+          }
+    };
+  });
+
+  return {
+    data,
+    count: includeCount ? Number(rows[0]?.total_count || 0) : null
+  };
+}
+
 /**
  * Valida y obtiene la sesión actual del usuario
  * @returns {Promise<{user: object, error: null} | {user: null, error: string}>}
@@ -44,25 +103,25 @@ export async function getSales(businessId) {
     // 2. Obtener ventas
     const { data: sales, error: salesError } = await supabase
       .from('sales')
-      .select('*')
+      .select(SALES_LIST_COLUMNS)
       .eq('business_id', businessId)
       .order('created_at', { ascending: false })
       .limit(50);
 
     if (salesError) throw salesError;
 
-    // 3. Obtener info del negocio
-    const { data: business } = await supabase
-      .from('businesses')
-      .select('created_by, name')
-      .eq('id', businessId)
-      .maybeSingle();
-
-    // 4. Obtener empleados del negocio
-    const { data: employees } = await supabase
-      .from('employees')
-      .select('user_id, full_name, role')
-      .eq('business_id', businessId);
+    // 3-4. Obtener info adicional en paralelo
+    const [{ data: business }, { data: employees }] = await Promise.all([
+      supabase
+        .from('businesses')
+        .select('created_by, name')
+        .eq('id', businessId)
+        .maybeSingle(),
+      supabase
+        .from('employees')
+        .select('user_id, full_name, role')
+        .eq('business_id', businessId)
+    ]);
 
     // 5. Crear mapa de empleados
     const employeeMap = new Map();
@@ -111,7 +170,7 @@ export async function getSales(businessId) {
 /**
  * Obtiene ventas aplicando filtros en la base de datos (no en memoria).
  * @param {string} businessId - ID del negocio (requerido)
- * @param {object} filters - { fromDate, toDate, paymentMethod, employeeId, minAmount, maxAmount, invoiceNumber, status, customerId }
+ * @param {object} filters - { fromDate, toDate, paymentMethod, employeeId, minAmount, maxAmount, customerId }
  * @param {object} pagination - { limit = 50, offset = 0 }
  * @returns {Promise<{data: Array, count: number}>}
  */
@@ -121,22 +180,55 @@ export async function getFilteredSales(businessId, filters = {}, pagination = {}
 
     const limit = Number(pagination.limit || 50);
     const offset = Number(pagination.offset || 0);
+    const includeCount = pagination.includeCount !== false;
+    const countMode = pagination.countMode || 'exact';
+
+    const toDateIso = filters.toDate
+      ? (() => {
+          const endDate = new Date(filters.toDate);
+          endDate.setHours(23, 59, 59, 999);
+          return endDate.toISOString();
+        })()
+      : null;
+
+    try {
+      const { data: rpcRows, error: rpcError } = await supabase.rpc('get_sales_enriched', {
+        p_business_id: businessId,
+        p_limit: limit,
+        p_offset: offset,
+        p_from_date: filters.fromDate || null,
+        p_to_date: toDateIso,
+        p_payment_method: filters.paymentMethod || null,
+        p_user_id: filters.employeeId || null,
+        p_customer_id: filters.customerId || null,
+        p_min_amount: filters.minAmount ?? null,
+        p_max_amount: filters.maxAmount ?? null,
+        p_include_count: includeCount
+      });
+
+      if (rpcError) {
+        if (isMissingSalesRpcError(rpcError)) {
+          throw new Error(SALES_RPC_NOT_AVAILABLE);
+        }
+        throw rpcError;
+      }
+
+      return mapRpcSalesRows(rpcRows || [], includeCount);
+    } catch (rpcErr) {
+      if (rpcErr.message !== SALES_RPC_NOT_AVAILABLE) {
+        throw rpcErr;
+      }
+    }
 
     // Construir query optimizada - solo seleccionar campos necesarios
-    let query = supabase
-      .from('sales')
-      .select('*', { count: 'exact' })
-      .eq('business_id', businessId)
-      .order('created_at', { ascending: false });
+    let query = supabase.from('sales').eq('business_id', businessId).order('created_at', { ascending: false });
+    query = includeCount
+      ? query.select(SALES_LIST_COLUMNS, { count: countMode })
+      : query.select(SALES_LIST_COLUMNS);
 
     // Aplicar filtros de fecha primero (mejor uso de índices)
     if (filters.fromDate) query = query.gte('created_at', filters.fromDate);
-    if (filters.toDate) {
-      // Añadir tiempo al final del día para incluir todo el día
-      const endDate = new Date(filters.toDate);
-      endDate.setHours(23, 59, 59, 999);
-      query = query.lte('created_at', endDate.toISOString());
-    }
+    if (filters.toDate) query = query.lte('created_at', toDateIso);
 
     // Otros filtros
     if (filters.paymentMethod) query = query.eq('payment_method', filters.paymentMethod);
@@ -153,19 +245,23 @@ export async function getFilteredSales(businessId, filters = {}, pagination = {}
     const { data: sales, error, count } = await query;
     if (error) throw error;
 
-    // Enriquecer con empleados de forma optimizada
-    const { data: employees } = await supabase
-      .from('employees')
-      .select('user_id, full_name, role')
-      .eq('business_id', businessId)
-      .limit(100);
+    if (!sales || sales.length === 0) {
+      return { data: [], count: includeCount ? (count || 0) : null };
+    }
 
-    // Obtener created_by del negocio para identificar owner
-    const { data: business } = await supabase
-      .from('businesses')
-      .select('created_by')
-      .eq('id', businessId)
-      .maybeSingle();
+    // Enriquecer con empleados de forma optimizada
+    const [{ data: employees }, { data: business }] = await Promise.all([
+      supabase
+        .from('employees')
+        .select('user_id, full_name, role')
+        .eq('business_id', businessId)
+        .limit(100),
+      supabase
+        .from('businesses')
+        .select('created_by')
+        .eq('id', businessId)
+        .maybeSingle()
+    ]);
 
     // Crear mapa de empleados para acceso O(1)
     const employeeMap = new Map();
@@ -198,7 +294,7 @@ export async function getFilteredSales(businessId, filters = {}, pagination = {}
       };
     });
 
-    return { data: enriched, count: count || 0 };
+    return { data: enriched, count: includeCount ? (count || 0) : null };
   } catch (error) {
     
     return { data: [], count: 0 };
@@ -331,7 +427,7 @@ export async function getAvailableProducts(businessId) {
   try {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select('id, code, name, sale_price, stock, category, is_active')
       .eq('business_id', businessId)
       .eq('is_active', true)
       .gt('stock', 0)

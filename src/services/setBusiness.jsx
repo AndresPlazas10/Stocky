@@ -1,5 +1,18 @@
 import { supabase } from '../supabase/Client.jsx';
 
+const BUSINESS_COLUMNS = `
+  id,
+  name,
+  username,
+  email,
+  phone,
+  address,
+  created_by,
+  is_active,
+  created_at,
+  updated_at
+`;
+
 /**
  * Crea un nuevo negocio en la tabla businesses
  * @param {Object} businessData - Datos del negocio
@@ -86,7 +99,7 @@ export async function getBusinesses() {
 
     const { data, error } = await supabase
       .from('businesses')
-      .select('*')
+      .select(BUSINESS_COLUMNS)
       .eq('created_by', user.id)
       .order('created_at', { ascending: false });
 
@@ -120,7 +133,7 @@ export async function getBusinessById(businessId) {
 
     const { data, error } = await supabase
       .from('businesses')
-      .select('*')
+      .select(BUSINESS_COLUMNS)
       .eq('id', businessId)
       .single();
 

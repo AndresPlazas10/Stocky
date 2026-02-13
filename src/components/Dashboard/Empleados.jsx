@@ -17,6 +17,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+const EMPLOYEE_LIST_COLUMNS = 'id, business_id, user_id, full_name, username, role, is_active, created_at';
+
 function Empleados({ businessId }) {
   const [empleados, setEmpleados] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +50,7 @@ function Empleados({ businessId }) {
       // ✅ CORREGIDO: Cargar solo empleados (ya no existe employee_invitations)
       const { data: employees, error: empError } = await supabase
         .from('employees')
-        .select('*')
+        .select(EMPLOYEE_LIST_COLUMNS)
         .eq('business_id', businessId)
         .order('created_at', { ascending: false });
 

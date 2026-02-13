@@ -8,6 +8,28 @@ import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { XCircle, AlertTriangle, Trash2 } from 'lucide-react';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 
+const INVOICE_LIST_COLUMNS = `
+  id,
+  business_id,
+  employee_id,
+  invoice_number,
+  customer_name,
+  customer_email,
+  customer_id_number,
+  payment_method,
+  subtotal,
+  tax,
+  total,
+  notes,
+  status,
+  issued_at,
+  created_at,
+  sent_at,
+  cancelled_at
+`;
+
+const PRODUCT_INVOICE_COLUMNS = 'id, code, name, sale_price, stock, business_id, is_active';
+
 export default function Facturas({ userRole = 'admin' }) {
   const [facturas, setFacturas] = useState([]);
   const [productos, setProductos] = useState([]);
@@ -47,7 +69,7 @@ export default function Facturas({ userRole = 'admin' }) {
     const { data, error } = await supabase
       .from('invoices')
       .select(`
-        *,
+        ${INVOICE_LIST_COLUMNS},
         invoice_items (
           id,
           product_name,
@@ -97,15 +119,15 @@ export default function Facturas({ userRole = 'admin' }) {
       }
 
       // Cargar facturas
-      await loadFacturas(businessId);
-
-      // Cargar productos
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select('*')
-        .eq('business_id', businessId)
-        .eq('is_active', true)
-        .order('name');
+      const [, { data: productsData, error: productsError }] = await Promise.all([
+        loadFacturas(businessId),
+        supabase
+          .from('products')
+          .select(PRODUCT_INVOICE_COLUMNS)
+          .eq('business_id', businessId)
+          .eq('is_active', true)
+          .order('name')
+      ]);
 
       if (productsError) throw productsError;
       setProductos(productsData || []);
@@ -264,17 +286,19 @@ export default function Facturas({ userRole = 'admin' }) {
         throw new Error('No se encontró información del negocio');
       }
 
-      // Verificar stock disponible
-      for (const item of items) {
-        const { data: product, error: stockError } = await supabase
-          .from('products')
-          .select('stock, name')
-          .eq('id', item.product_id)
-          .maybeSingle();
+      // Verificar stock disponible en una sola consulta
+      const productIds = [...new Set(items.map(item => item.product_id).filter(Boolean))];
+      const { data: stockProducts, error: stockError } = await supabase
+        .from('products')
+        .select('id, stock, name')
+        .in('id', productIds);
 
-        if (stockError) throw new Error(`Error al verificar stock del producto ${item.product_name}`);
-        
-        if (!product || product.stock < item.quantity) {
+      if (stockError) throw new Error('Error al verificar stock de productos: ' + stockError.message);
+
+      const stockById = new Map((stockProducts || []).map((p) => [p.id, p]));
+      for (const item of items) {
+        const product = stockById.get(item.product_id);
+        if (!product || Number(product.stock || 0) < Number(item.quantity || 0)) {
           throw new Error(
             `Stock insuficiente de "${item.product_name}". Disponible: ${product?.stock || 0}, Solicitado: ${item.quantity}`
           );

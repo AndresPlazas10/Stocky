@@ -102,12 +102,21 @@ function Ventas({ businessId, userRole = 'admin' }) {
     try {
       const lim = Number(pagination.limit ?? limit);
       const off = Number(pagination.offset ?? ((page - 1) * lim));
+      const includeCount = pagination.includeCount !== false;
+      const countMode = pagination.countMode || 'exact';
       
       // SIEMPRE cargar datos frescos - sin caché
-      const { data, count } = await getFilteredSales(businessId, filters, { limit: lim, offset: off });
+      const { data, count } = await getFilteredSales(businessId, filters, {
+        limit: lim,
+        offset: off,
+        includeCount,
+        countMode
+      });
       
       setVentas(data || []);
-      setTotalCount(count || 0);
+      if (typeof count === 'number') {
+        setTotalCount(count);
+      }
     } catch (err) {
       setVentas([]);
       setTotalCount(0);
@@ -367,7 +376,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setShowSaleModal(false);
 
       // Recargar ventas inmediatamente
-      await loadVentas(currentFilters, { limit, offset: (page - 1) * limit });
+      await loadVentas(currentFilters, { limit, offset: (page - 1) * limit, includeCount: false });
       
     } catch (error) {
       
@@ -421,7 +430,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setTimeout(() => setSuccess(false), 4000);
 
       // Recargar ventas
-      await loadVentas(currentFilters, { limit, offset: (page - 1) * limit });
+      await loadVentas(currentFilters, { limit, offset: (page - 1) * limit, includeCount: false });
 
       setShowDeleteModal(false);
       setSaleToDelete(null);
@@ -944,12 +953,12 @@ function Ventas({ businessId, userRole = 'admin' }) {
           onApply={(filters) => {
             setCurrentFilters(filters || {});
             setPage(1);
-            loadVentas(filters || {}, { limit, offset: 0 });
+            loadVentas(filters || {}, { limit, offset: 0, includeCount: true, countMode: 'exact' });
           }}
           onClear={() => {
             setCurrentFilters({});
             setPage(1);
-            loadVentas({}, { limit, offset: 0 });
+            loadVentas({}, { limit, offset: 0, includeCount: true, countMode: 'exact' });
           }}
         />
       )}
@@ -1273,7 +1282,11 @@ function Ventas({ businessId, userRole = 'admin' }) {
                   itemsPerPage={limit}
                   onPageChange={async (newPage) => {
                     setPage(newPage);
-                    await loadVentas(currentFilters, { limit, offset: (newPage - 1) * limit });
+                    await loadVentas(currentFilters, {
+                      limit,
+                      offset: (newPage - 1) * limit,
+                      includeCount: false
+                    });
                   }}
                   disabled={loading}
                 />
