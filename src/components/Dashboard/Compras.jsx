@@ -29,7 +29,7 @@ import {
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 
 const PRODUCT_LIST_COLUMNS = 'id, name, purchase_price, supplier_id, stock, is_active';
-const SUPPLIER_LIST_COLUMNS = 'id, business_name, contact_name, email, phone, is_active';
+const SUPPLIER_LIST_COLUMNS = 'id, business_name, contact_name';
 
 // Función helper para obtener el nombre del responsable
 const getResponsableName = (compra) => {
@@ -59,6 +59,7 @@ function Compras({ businessId }) {
   const [selectedPurchase, setSelectedPurchase] = useState(null);
   const [productos, setProductos] = useState([]);
   const [proveedores, setProveedores] = useState([]);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -167,6 +168,7 @@ function Compras({ businessId }) {
 
   const loadProveedores = useCallback(async () => {
     try {
+      setLoadingSuppliers(true);
       const { data, error } = await supabase
         .from('suppliers')
         .select(SUPPLIER_LIST_COLUMNS)
@@ -175,7 +177,10 @@ function Compras({ businessId }) {
       if (error) throw error;
       setProveedores(data || []);
     } catch (error) {
-      // Error silencioso
+      setProveedores([]);
+      setError(`❌ Error al cargar proveedores: ${error?.message || 'Error desconocido'}`);
+    } finally {
+      setLoadingSuppliers(false);
     }
   }, [businessId]);
 
@@ -890,7 +895,7 @@ function Compras({ businessId }) {
                 </button>
               </div>
 
-              {!hasSuppliers ? (
+              {!hasSuppliers && !loadingSuppliers ? (
                 <div className="p-4 sm:p-6">
                   <Card className="border-dashed border-gray-300 bg-gray-50 shadow-none">
                     <div className="p-8 text-center">
@@ -904,6 +909,15 @@ function Compras({ businessId }) {
                       >
                         Entendido
                       </Button>
+                    </div>
+                  </Card>
+                </div>
+              ) : loadingSuppliers ? (
+                <div className="p-4 sm:p-6">
+                  <Card className="border-dashed border-gray-300 bg-gray-50 shadow-none">
+                    <div className="p-8 text-center">
+                      <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-400 animate-pulse" />
+                      <p className="text-lg font-semibold text-gray-700 mb-2">Cargando proveedores...</p>
                     </div>
                   </Card>
                 </div>
