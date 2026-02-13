@@ -916,21 +916,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
       {/* Mensajes */}
       <AnimatePresence>
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Card className="bg-red-50 border-red-200 shadow-md rounded-2xl mb-4">
-              <div className="p-4 flex items-center gap-3">
-                <AlertCircle className="w-6 h-6 text-red-600" />
-                <p className="text-red-800 font-medium">{error}</p>
-              </div>
-            </Card>
-          </motion.div>
-        )}
         <SaleSuccessAlert 
           isVisible={success && alertType === 'success'}
           onClose={() => setSuccess(false)}

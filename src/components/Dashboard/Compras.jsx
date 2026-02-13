@@ -700,21 +700,6 @@ function Compras({ businessId }) {
         </Card>
       </motion.div>
 
-      {/* Mensajes */}
-      <AnimatePresence>
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="mb-4 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-xl flex items-center gap-3"
-          >
-            <AlertCircle className="w-5 h-5" />
-            <span>{error}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Alertas mejoradas */}
       <SaleErrorAlert 
         isVisible={!!error}

@@ -1236,18 +1236,6 @@ function Mesas({ businessId }) {
         <CardContent className="pt-6">
           {/* Alertas */}
           <AnimatePresence>
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="mb-4 p-4 rounded-2xl bg-destructive/10 border-2 border-destructive/20 flex items-start gap-3"
-              >
-                <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-                <p className="text-sm text-destructive font-medium">{error}</p>
-              </motion.div>
-            )}
-            
             {/* Alerta de éxito - verde */}
             <SaleSuccessAlert 
               isVisible={success && alertType === 'success'}

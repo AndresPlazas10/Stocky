@@ -143,21 +143,6 @@ function Configuracion({ user, business, onBusinessUpdate }) {
           </div>
         </motion.div>
 
-        {/* Alertas */}
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex items-center gap-3"
-            >
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              <span className="text-red-700">{error}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Alertas mejoradas */}
         <SaleErrorAlert 
           isVisible={!!error}

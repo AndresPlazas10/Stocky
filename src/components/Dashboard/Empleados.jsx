@@ -442,20 +442,6 @@ function Empleados({ businessId }) {
           </motion.div>
         </div>
 
-        {/* Mensajes de error/éxito */}
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl"
-            >
-              {error}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Alertas mejoradas */}
         <SaleErrorAlert 
           isVisible={!!error}
