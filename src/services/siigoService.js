@@ -251,7 +251,6 @@ export const siigoService = {
 
       return data
     } catch (error) {
-      console.error('Error obteniendo ciudades:', error)
       return []
     }
   },

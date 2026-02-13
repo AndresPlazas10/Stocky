@@ -92,7 +92,6 @@ export default function InvoicingActivationFlow({
           setSending(false)
           return
         }
-        console.error('Error guardando solicitud:', dbError)
         // Continuar con WhatsApp/Email aunque falle la BD
       }
 
@@ -106,7 +105,6 @@ export default function InvoicingActivationFlow({
       setRequestSent(true)
       
     } catch (err) {
-      console.error('Error:', err)
       // Continuar con contacto aunque falle
       if (contactMethod === 'whatsapp') {
         handleContactWhatsApp()

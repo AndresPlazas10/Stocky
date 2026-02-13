@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../supabase/Client.jsx';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
+import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 
 function Clientes({ businessId }) {
   // NOTA: Tabla 'customers' fue eliminada de la base de datos
@@ -200,14 +201,16 @@ function Clientes({ businessId }) {
       )}
 
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-gray-500">Cargando clientes...</div>
-        ) : clientes.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            No hay clientes registrados. Haz clic en "Agregar Cliente" para comenzar.
-          </div>
-        ) : (
-          <>
+        <AsyncStateWrapper
+          loading={loading}
+          error={null}
+          dataCount={clientes.length}
+          onRetry={loadClientes}
+          skeletonType="clientes"
+          emptyTitle="Clientes no disponibles"
+          emptyDescription="Este modulo quedo en modo informativo y no tiene registros activos."
+        >
+          <div>
             {/* Vista móvil - Cards */}
             <div className="block sm:hidden divide-y">
               {clientes.map(cliente => (
@@ -247,8 +250,8 @@ function Clientes({ businessId }) {
                 ))}
               </tbody>
             </table>
-          </>
-        )}
+          </div>
+        </AsyncStateWrapper>
       </div>
     </div>
   );

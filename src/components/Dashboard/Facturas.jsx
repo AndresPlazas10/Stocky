@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { XCircle, AlertTriangle, Trash2 } from 'lucide-react';
+import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 
 export default function Facturas({ userRole = 'admin' }) {
   const [facturas, setFacturas] = useState([]);
@@ -546,21 +547,17 @@ export default function Facturas({ userRole = 'admin' }) {
 
       if (cancelError) throw new Error('Error al cancelar factura: ' + cancelError.message);
 
-      // Si el trigger no está configurado, restaurar stock manualmente
+      // Restaurar stock en batch si el trigger no lo hizo automáticamente
       if (invoiceItems && invoiceItems.length > 0) {
         try {
-          const { error: restoreError } = await supabase.rpc('restore_stock_from_invoice', {
-            p_invoice_id: invoiceToCancel
+          const { error: restoreError } = await supabase.rpc('restore_stock_batch', {
+            product_updates: invoiceItems.map(item => ({
+              product_id: item.product_id,
+              quantity: Number(item.quantity || 0)
+            }))
           });
           
           if (restoreError) {
-            // Si la función RPC no existe, restaurar manualmente
-            for (const item of invoiceItems) {
-              await supabase.rpc('increase_stock', {
-                p_product_id: item.product_id,
-                p_quantity: item.quantity
-              });
-            }
           }
         } catch (restoreErr) {
           // Advertencia al restaurar stock
@@ -985,14 +982,18 @@ export default function Facturas({ userRole = 'admin' }) {
 
       {/* Lista de Facturas */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        {loading && !showForm ? (
-          <div className="p-8 text-center text-gray-500">Cargando...</div>
-        ) : filteredFacturas.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            No hay facturas para mostrar
-          </div>
-        ) : (
-          <>
+        <AsyncStateWrapper
+          loading={loading && !showForm}
+          error={filteredFacturas.length === 0 ? error : null}
+          dataCount={filteredFacturas.length}
+          onRetry={loadData}
+          skeletonType="facturas"
+          hasFilters={Boolean(searchTerm.trim())}
+          noResultsTitle="No hay facturas para esos filtros"
+          emptyTitle="No hay facturas para mostrar"
+          emptyDescription="Cuando generes una factura, aparecera en esta lista."
+        >
+          <div>
             {/* Vista móvil - Cards */}
             <div className="block sm:hidden divide-y">
               {filteredFacturas.map(factura => (
@@ -1197,10 +1198,10 @@ export default function Facturas({ userRole = 'admin' }) {
                   </td>
                 </tr>
               ))}
-            </tbody>
-          </table>
-          </>
-        )}
+              </tbody>
+            </table>
+          </div>
+        </AsyncStateWrapper>
       </div>
 
       {/* Modal de confirmación de cancelación de factura */}

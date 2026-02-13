@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '../supabase/Client';
+import { isAdminRole } from '../utils/roles.js';
 
 /**
  * Crea una venta completa en UNA SOLA LLAMADA RPC
@@ -34,15 +35,24 @@ export async function createSaleOptimized({
       };
     }
 
-    // 3. Obtener nombre del empleado (en paralelo con la llamada RPC)
-    const { data: employee } = await supabase
-      .from('employees')
-      .select('full_name')
-      .eq('user_id', user.id)
-      .eq('business_id', businessId)
-      .maybeSingle();
+    // 3. Obtener nombre del empleado y role + created_by del negocio para detectar admin/owner
+    const [{ data: employee }, { data: business }] = await Promise.all([
+      supabase
+        .from('employees')
+        .select('full_name, role')
+        .eq('user_id', user.id)
+        .eq('business_id', businessId)
+        .maybeSingle(),
+      supabase
+        .from('businesses')
+        .select('created_by')
+        .eq('id', businessId)
+        .maybeSingle()
+    ]);
 
-    const sellerName = employee?.full_name || user.email || 'Vendedor';
+    const isOwner = user.id && business?.created_by && String(user.id).trim() === String(business.created_by).trim();
+    const isAdmin = isAdminRole(employee?.role);
+    const sellerName = isOwner || isAdmin ? 'Administrador' : (employee?.full_name || user.email || 'Vendedor');
 
     // 4. Preparar items en formato esperado por la función RPC
     const itemsForRpc = cart.map(item => ({
@@ -50,12 +60,6 @@ export async function createSaleOptimized({
       quantity: item.quantity,
       unit_price: item.unit_price
     }));
-
-    console.log('📦 Creando venta con RPC (inicio):', {
-      itemsCount: itemsForRpc.length,
-      total: total,
-      sellerName
-    });
 
     const startTime = performance.now();
 
@@ -69,10 +73,8 @@ export async function createSaleOptimized({
     });
 
     const elapsed = performance.now() - startTime;
-    console.log(`✅ Venta creada en ${elapsed.toFixed(0)}ms`, data);
 
     if (error) {
-      console.error('❌ Error en RPC:', error);
       return { 
         success: false, 
         error: error.message 
@@ -97,7 +99,6 @@ export async function createSaleOptimized({
     };
 
   } catch (err) {
-    console.error('❌ Error en createSaleOptimized:', err);
     return { 
       success: false, 
       error: err.message || 'Error al crear la venta' 
@@ -120,8 +121,6 @@ export function recordSaleCreationTime(milliseconds) {
     
     localStorage.setItem(key, JSON.stringify(times));
     
-    const avg = times.reduce((a, b) => a + b, 0) / times.length;
-    console.log(`📊 Latencia promedio de ventas: ${avg.toFixed(0)}ms (últimas ${times.length})`);
   } catch (e) {
     // Ignorar errores de localStorage
   }

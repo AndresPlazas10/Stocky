@@ -38,7 +38,6 @@ function App() {
           }
         }
       } catch (error) {
-        console.warn('Error en detección de Brave:', error);
       }
     }
     detectBrave();

@@ -5,7 +5,6 @@ export function closeModalImmediate(closeFn, backgroundFn) {
   try {
     closeFn();
   } catch (e) {
-    console.error('closeFn failed', e);
   }
 
   // Deferir trabajo que puede bloquear el cierre
@@ -13,7 +12,6 @@ export function closeModalImmediate(closeFn, backgroundFn) {
     try {
       if (typeof backgroundFn === 'function') backgroundFn();
     } catch (e) {
-      console.error('backgroundFn failed', e);
     }
   };
 

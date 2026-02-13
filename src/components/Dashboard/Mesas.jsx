@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import SplitBillModal from './SplitBillModal';
 import { closeModalImmediate } from '../../utils/closeModalImmediate';
+import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
+import { normalizeTableRecord } from '../../utils/tableStatus.js';
 
 function Mesas({ businessId }) {
   const [mesas, setMesas] = useState([]);
@@ -142,7 +144,7 @@ function Mesas({ businessId }) {
         return;
       }
       
-      setMesas(data || []);
+      setMesas((data || []).map(normalizeTableRecord));
     } catch (err) {
       setError('No se pudo cargar las mesas. Revisa tu conexión e intenta de nuevo.');
     }
@@ -200,34 +202,36 @@ function Mesas({ businessId }) {
 
   // Callbacks memoizados para Realtime
   const handleTableInsert = useCallback((newTable) => {
+    const normalizedTable = normalizeTableRecord(newTable);
     setMesas(prev => {
-      const exists = prev.some(m => m.id === newTable.id);
+      const exists = prev.some(m => m.id === normalizedTable.id);
       if (exists) {
         return prev;
       }
-      return [...prev, newTable].sort((a, b) => a.table_number - b.table_number);
+      return [...prev, normalizedTable].sort((a, b) => a.table_number - b.table_number);
     });
-    setSuccess(`✨ Nueva mesa #${newTable.table_number} agregada`);
+    setSuccess(`✨ Nueva mesa #${normalizedTable.table_number} agregada`);
     setTimeout(() => setSuccess(null), 3000);
   }, []);
 
   const handleTableUpdate = useCallback((updatedTable) => {
+    const normalizedTable = normalizeTableRecord(updatedTable);
     // ❌ IGNORAR COMPLETAMENTE cualquier actualización si acabamos de completar una venta
     if (justCompletedSaleRef.current) {
       return;
     }
     
-    setMesas(prev => prev.map(m => m.id === updatedTable.id ? updatedTable : m));
+    setMesas(prev => prev.map(m => m.id === normalizedTable.id ? normalizedTable : m));
     // Si estamos viendo esta mesa, actualizar sus detalles
     setSelectedMesa(prev => {
-      if (prev?.id === updatedTable.id) {
+      if (prev?.id === normalizedTable.id) {
         // Si la mesa se liberó (pasó a available), cerrar el modal
-        if (updatedTable.status === 'available' && !updatedTable.current_order_id) {
+        if (normalizedTable.status === 'available' && !normalizedTable.current_order_id) {
           setShowOrderDetails(false);
           setModalOpenIntent(false);
           return null;
         }
-        return { ...prev, ...updatedTable };
+        return { ...prev, ...normalizedTable };
       }
       return prev;
     });
@@ -776,7 +780,6 @@ function Mesas({ businessId }) {
             .eq('id', mesaSnapshot.id);
         }
       } catch (error) {
-        console.error('Background close modal failed', error);
         // Rollback: recargar mesas para sincronizar estado
         try { await loadMesas(); } catch (e) { /* no-op */ }
       }
@@ -864,7 +867,6 @@ function Mesas({ businessId }) {
           setCanShowOrderModal(true);
         }, 8000);
       } catch (error) {
-        console.error('processSplitPaymentAndClose background failed', error);
         setError('❌ No se pudo cerrar la orden. Revirtiendo estado.');
         // Rollback: reload mesas
         try { await loadMesas(); } catch (e) { /* no-op */ }
@@ -926,7 +928,6 @@ function Mesas({ businessId }) {
           setCanShowOrderModal(true);
         }, 8000);
       } catch (error) {
-        console.error('processPaymentAndClose background failed', error);
         setError('❌ No se pudo cerrar la orden. Revirtiendo estado.');
         try { await loadMesas(); } catch (e) { /* no-op */ }
         try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch (e) {}
@@ -1152,7 +1153,6 @@ function Mesas({ businessId }) {
         // Recargar mesas en background para asegurar sincronización
         loadMesas().catch(() => {});
       } catch (error) {
-        console.error('confirmDeleteTable background failed', error);
         setError('❌ No se pudo eliminar la mesa. Revirtiendo estado.');
         // Rollback: restaurar snapshot
         setMesas(snapshotMesas);
@@ -1197,16 +1197,24 @@ function Mesas({ businessId }) {
   }, [error, success]);
 
 
-  if (loading) return <div className="loading">Cargando mesas...</div>;
-
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: 0.1 }}
-      className="space-y-6"
+    <AsyncStateWrapper
+      loading={loading}
+      error={mesas.length === 0 ? error : null}
+      dataCount={mesas.length}
+      onRetry={loadData}
+      skeletonType="mesas"
+      emptyTitle="Aun no hay mesas creadas"
+      emptyDescription="Crea tu primera mesa para empezar a registrar ordenes."
+      actionProcessing={isCreatingTable || isClosingOrder || !!updatingItemId}
     >
-      <Card className="border-accent-200 shadow-lg">
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+        className="space-y-6"
+      >
+        <Card className="border-accent-200 shadow-lg">
         <CardHeader className="border-b border-accent-100 bg-gradient-to-r from-primary-50 to-accent-50">
           <div className="flex items-center justify-between">
             <CardTitle className="text-2xl font-bold text-primary-900 flex items-center gap-3">
@@ -1909,7 +1917,8 @@ function Mesas({ businessId }) {
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.section>
+      </motion.section>
+    </AsyncStateWrapper>
   );
 }
 

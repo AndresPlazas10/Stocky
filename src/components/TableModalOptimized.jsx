@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { closeModalImmediate } from '../utils/closeModalImmediate';
+import { isTableAvailable, isTableOccupied, normalizeTableStatus } from '../utils/tableStatus';
 
 // Ejemplo de modal que cierra inmediatamente y hace la mutación en background
 export default function TableModalOptimized({ table, tenantId, userId, isOpen, setIsOpen, updateLocalTable }) {
@@ -13,7 +14,7 @@ export default function TableModalOptimized({ table, tenantId, userId, isOpen, s
       fetch('/api/open-close-table', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ table_id: table.id, action, user_id: userId, tenant_id: tenantId }),
+        body: JSON.stringify({ table_id: table.id, action, user_id: userId, business_id: tenantId }),
         signal: controller.signal
       })
         .then(async (res) => {
@@ -24,7 +25,6 @@ export default function TableModalOptimized({ table, tenantId, userId, isOpen, s
         })
         .catch((err) => {
           // On error, revert or notify user
-          console.error('Background mutation failed', err);
           // Optionally: refetch or rollback using snapshot stored elsewhere
         })
         .finally(() => setBusy(false));
@@ -32,15 +32,17 @@ export default function TableModalOptimized({ table, tenantId, userId, isOpen, s
       // Optional: timeout to abort if connection stalls (non-blocking)
       setTimeout(() => controller.abort(), 30_000);
     } catch (err) {
-      console.error('doServerAction error', err);
       setBusy(false);
     }
   };
 
   const handleCloseAndAction = (action) => {
     // Apply optimistic local change immediately
-    const snapshot = { ...table };
-    const optimistic = { ...table, status: action === 'open' ? 'open' : 'closed', updated_at: new Date().toISOString() };
+    const optimistic = {
+      ...table,
+      status: action === 'open' ? 'occupied' : 'available',
+      updated_at: new Date().toISOString()
+    };
     updateLocalTable(table.id, optimistic);
 
     // Close modal immediately and run server call in background
@@ -55,11 +57,11 @@ export default function TableModalOptimized({ table, tenantId, userId, isOpen, s
     <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)' }}>
       <div style={{ width: 480, background: 'white', borderRadius: 8, padding: 16 }}>
         <h3>Mesa {table.name}</h3>
-        <p>Estado: {table.status} {busy ? '· sincronizando…' : ''}</p>
+        <p>Estado: {normalizeTableStatus(table.status)} {busy ? '· sincronizando…' : ''}</p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button onClick={() => setIsOpen(false)}>Cancelar</button>
-          <button disabled={busy || table.status === 'open'} onClick={() => handleCloseAndAction('open')}>Abrir</button>
-          <button disabled={busy || table.status === 'closed'} onClick={() => handleCloseAndAction('close')}>Cerrar</button>
+          <button disabled={busy || isTableOccupied(table.status)} onClick={() => handleCloseAndAction('open')}>Abrir</button>
+          <button disabled={busy || isTableAvailable(table.status)} onClick={() => handleCloseAndAction('close')}>Cerrar</button>
         </div>
       </div>
     </div>

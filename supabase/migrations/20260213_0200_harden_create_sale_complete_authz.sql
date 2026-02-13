@@ -1,22 +1,9 @@
 -- ============================================================
--- SCRIPT COMPLETO PARA EJECUTAR EN SUPABASE SQL EDITOR
+-- HARDENING P0 - Step 2
+-- Fecha: 2026-02-13
+-- Objetivo: endurecer autorización y aislamiento multi-tenant
+-- de la RPC create_sale_complete
 -- ============================================================
--- 
--- INSTRUCCIONES:
--- 1. Abre Supabase Dashboard → SQL Editor
--- 2. Copia CADA SECCIÓN por separado
--- 3. Ejecuta como superusuario
--- 4. Espera a que termine antes de pasar a la siguiente
---
--- ============================================================
-
--- ============================================================
--- PASO 1: CREAR FUNCIÓN RPC create_sale_complete
--- ============================================================
--- Copia TODO desde "CREATE OR REPLACE FUNCTION" hasta el último "$$;"
--- Este es el contenido completo de supabase/functions/create_sale_complete.sql
--- Eliminar posibles sobrecargas antiguas que causan ambigüedad al referenciar
-DROP FUNCTION IF EXISTS public.create_sale_complete(uuid, uuid, text, text, jsonb);
 
 CREATE OR REPLACE FUNCTION public.create_sale_complete(
   p_business_id uuid,
@@ -35,6 +22,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   v_sale_id uuid;
@@ -51,8 +39,80 @@ DECLARE
   v_business_owner uuid;
   v_current_stock numeric;
   v_item_count integer := 0;
+
+  v_auth_uid uuid;
+  v_order_business uuid;
+  v_table_business uuid;
 BEGIN
-  -- Resolver rol/owner en servidor y forzar seller_name correcto para admins
+  -- ========== AUTORIZACIÓN Y AISLAMIENTO TENANT ==========
+  v_auth_uid := auth.uid();
+
+  IF p_business_id IS NULL OR p_user_id IS NULL THEN
+    RAISE EXCEPTION 'p_business_id y p_user_id son obligatorios';
+  END IF;
+
+  IF v_auth_uid IS NULL THEN
+    RAISE EXCEPTION 'Sesión inválida: auth.uid() es NULL';
+  END IF;
+
+  -- El caller autenticado debe coincidir con el usuario reportado.
+  IF v_auth_uid <> p_user_id THEN
+    RAISE EXCEPTION 'No autorizado: p_user_id no coincide con auth.uid()';
+  END IF;
+
+  -- El caller debe pertenecer al negocio objetivo.
+  IF NOT public.can_access_business(p_business_id) THEN
+    RAISE EXCEPTION 'No autorizado para operar en este negocio';
+  END IF;
+
+  -- Si llega orden, debe existir y pertenecer al mismo negocio.
+  IF p_order_id IS NOT NULL THEN
+    SELECT o.business_id
+    INTO v_order_business
+    FROM public.orders o
+    WHERE o.id = p_order_id
+    LIMIT 1;
+
+    IF v_order_business IS NULL THEN
+      RAISE EXCEPTION 'Orden % no encontrada', p_order_id;
+    END IF;
+
+    IF v_order_business <> p_business_id THEN
+      RAISE EXCEPTION 'Orden % no pertenece al negocio %', p_order_id, p_business_id;
+    END IF;
+  END IF;
+
+  -- Si llega mesa, debe existir y pertenecer al mismo negocio.
+  IF p_table_id IS NOT NULL THEN
+    SELECT t.business_id
+    INTO v_table_business
+    FROM public.tables t
+    WHERE t.id = p_table_id
+    LIMIT 1;
+
+    IF v_table_business IS NULL THEN
+      RAISE EXCEPTION 'Mesa % no encontrada', p_table_id;
+    END IF;
+
+    IF v_table_business <> p_business_id THEN
+      RAISE EXCEPTION 'Mesa % no pertenece al negocio %', p_table_id, p_business_id;
+    END IF;
+  END IF;
+
+  -- Si llega mesa y orden, deben estar vinculadas.
+  IF p_order_id IS NOT NULL AND p_table_id IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.tables t
+      WHERE t.id = p_table_id
+        AND t.business_id = p_business_id
+        AND t.current_order_id = p_order_id
+    ) THEN
+      RAISE EXCEPTION 'La mesa % no está asociada a la orden %', p_table_id, p_order_id;
+    END IF;
+  END IF;
+
+  -- Resolver rol/owner en servidor y forzar seller_name correcto para admins.
   SELECT full_name, role INTO v_emp_full_name, v_emp_role
   FROM public.employees
   WHERE user_id = p_user_id
@@ -81,6 +141,7 @@ BEGIN
     END IF;
   END IF;
 
+  -- ========== VALIDACIONES ==========
   IF p_items IS NULL OR jsonb_array_length(p_items) = 0 THEN
     RAISE EXCEPTION 'La venta debe tener al menos un producto';
   END IF;
@@ -92,6 +153,7 @@ BEGIN
   INTO v_total_preview
   FROM jsonb_array_elements(p_items) AS item;
 
+  -- ========== CREAR VENTA ==========
   INSERT INTO public.sales (
     business_id,
     user_id,
@@ -108,6 +170,7 @@ BEGIN
     timezone('utc', now())
   ) RETURNING id INTO v_sale_id;
 
+  -- ========== PROCESAR CADA ITEM ==========
   FOR v_item IN SELECT jsonb_array_elements(p_items)
   LOOP
     v_product_id := (v_item->>'product_id')::uuid;
@@ -148,27 +211,32 @@ BEGIN
 
     UPDATE public.products
     SET stock = stock - v_quantity
-    WHERE id = v_product_id;
+    WHERE id = v_product_id
+      AND business_id = p_business_id;
 
     v_total := v_total + (v_quantity * v_unit_price);
     v_item_count := v_item_count + 1;
   END LOOP;
 
+  -- ========== ACTUALIZAR TOTAL EN VENTA ==========
   UPDATE public.sales
   SET total = v_total
-  WHERE id = v_sale_id;
+  WHERE id = v_sale_id
+    AND business_id = p_business_id;
 
-  -- Cerrar orden y liberar mesa si aplica
+  -- ========== CERRAR ORDEN Y LIBERAR MESA (si aplica) ==========
   IF p_order_id IS NOT NULL THEN
     UPDATE public.orders
     SET status = 'closed', closed_at = timezone('utc', now())
-    WHERE id = p_order_id;
+    WHERE id = p_order_id
+      AND business_id = p_business_id;
   END IF;
 
   IF p_table_id IS NOT NULL THEN
     UPDATE public.tables
     SET current_order_id = NULL, status = 'available'
-    WHERE id = p_table_id;
+    WHERE id = p_table_id
+      AND business_id = p_business_id;
   END IF;
 
   RETURN QUERY SELECT
@@ -182,64 +250,9 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
--- ============================================================
--- PASO 2: CREAR ÍNDICES DE OPTIMIZACIÓN
--- ============================================================
+REVOKE ALL ON FUNCTION public.create_sale_complete(uuid,uuid,text,text,jsonb,uuid,uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.create_sale_complete(uuid,uuid,text,text,jsonb,uuid,uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.create_sale_complete(uuid,uuid,text,text,jsonb,uuid,uuid) TO authenticated;
 
-CREATE INDEX IF NOT EXISTS idx_products_id_business_stock 
-  ON public.products (id, business_id, stock);
-
-CREATE INDEX IF NOT EXISTS idx_sale_details_sale_id 
-  ON public.sale_details (sale_id);
-
-CREATE INDEX IF NOT EXISTS idx_sales_business_created 
-  ON public.sales (business_id, created_at DESC);
-
--- ============================================================
--- PASO 3: ASIGNAR PERMISOS Y CONFIGURACIÓN
--- ============================================================
--- Ejecuta estos 3 comandos UNO por UNO
-
--- Referenciar la firma completa (incluye p_order_id y p_table_id) para evitar
--- que PostgreSQL no pueda elegir entre sobrecargas.
-ALTER FUNCTION public.create_sale_complete(uuid, uuid, text, text, jsonb, uuid, uuid)
-  OWNER TO postgres;
-
-ALTER FUNCTION public.create_sale_complete(uuid, uuid, text, text, jsonb, uuid, uuid)
-  SET search_path = public;
-
-GRANT EXECUTE ON FUNCTION public.create_sale_complete(uuid, uuid, text, text, jsonb, uuid, uuid)
-  TO authenticated;
-
--- ============================================================
--- PASO 4: FIX DE FECHAS EN SALES
--- ============================================================
--- Asegurar que created_at siempre tiene valor
-
-ALTER TABLE public.sales
-ALTER COLUMN created_at SET DEFAULT NOW();
-
-UPDATE public.sales 
-SET created_at = COALESCE(created_at, NOW() - INTERVAL '1 day')
-WHERE created_at IS NULL;
-
-ALTER TABLE public.sales
-ALTER COLUMN created_at SET NOT NULL;
-
--- ============================================================
--- PASO 5: VERIFICACIÓN (OPCIONAL)
--- ============================================================
--- Ejecuta esto para verificar que todo está correcto
-
--- PASO 5: VERIFICACIÓN (OPCIONAL)
--- NOTA: Se han eliminado las consultas de verificación que imprimían resultados
--- al cliente. Usamos ahora mensajes/alertas dentro de la aplicación para
--- informar al usuario, por lo que estas consultas no son necesarias.
-
--- ============================================================
--- LISTO!
--- ============================================================
--- Ahora puedes:
--- 1. Crear una venta desde la app
--- 2. Ver que aparece en ~100-150ms (antes era ~1000ms)
--- 3. Verificar que la fecha (created_at) aparece en el listado
+COMMENT ON FUNCTION public.create_sale_complete(uuid,uuid,text,text,jsonb,uuid,uuid)
+IS 'Crea venta completa con validación explícita de auth.uid, acceso a negocio y consistencia orden/mesa.';

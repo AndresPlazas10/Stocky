@@ -22,7 +22,6 @@ export async function isBraveBrowser() {
     return await Promise.race([bravePromise, timeoutPromise]);
   } catch (error) {
     // Si hay error, asumir que no es Brave para no romper la app
-    console.warn('Error detectando Brave:', error);
     return false;
   }
 }

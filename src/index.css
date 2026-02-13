@@ -223,6 +223,12 @@ body {
   }
 }
 
+@keyframes async-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.4s ease-out;
 }
@@ -741,4 +747,3 @@ body {
     font-size: 16px !important;
   }
 }
-

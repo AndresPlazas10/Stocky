@@ -24,18 +24,61 @@ SECURITY DEFINER
 AS $$
 DECLARE
   v_sale_id uuid;
+  v_total_preview numeric := 0;
   v_total numeric := 0;
   v_item jsonb;
   v_product_id uuid;
   v_quantity numeric;
   v_unit_price numeric;
+  v_seller_name text;
+  v_emp_full_name text;
+  v_emp_role text;
+  v_emp_role_norm text;
+  v_business_owner uuid;
   v_current_stock numeric;
   v_item_count integer := 0;
 BEGIN
+  -- Resolver rol/owner en servidor y forzar seller_name correcto para admins.
+  -- Esto evita depender del valor enviado por el cliente.
+  SELECT full_name, role INTO v_emp_full_name, v_emp_role
+  FROM public.employees
+  WHERE user_id = p_user_id
+    AND business_id = p_business_id
+  LIMIT 1;
+
+  SELECT created_by INTO v_business_owner
+  FROM public.businesses
+  WHERE id = p_business_id
+  LIMIT 1;
+
+  v_emp_role_norm := lower(trim(coalesce(v_emp_role, '')));
+
+  IF (p_user_id IS NOT NULL AND v_business_owner IS NOT NULL AND p_user_id = v_business_owner)
+     OR v_emp_role_norm IN ('owner', 'admin', 'administrador', 'propietario')
+     OR position('admin' in v_emp_role_norm) > 0 THEN
+    v_seller_name := 'Administrador';
+  ELSE
+    -- Determinar seller_name en servidor si el cliente no provee uno útil
+  v_seller_name := NULLIF(trim(coalesce(p_seller_name, '')), '');
+  IF v_seller_name IS NULL OR lower(v_seller_name) IN ('empleado','vendedor','vendedor desconocido','usuario') THEN
+    IF v_emp_full_name IS NOT NULL THEN
+      v_seller_name := v_emp_full_name;
+    ELSE
+      v_seller_name := 'Empleado';
+    END IF;
+  END IF;
+  END IF;
   -- ========== VALIDACIONES ==========
   IF p_items IS NULL OR jsonb_array_length(p_items) = 0 THEN
     RAISE EXCEPTION 'La venta debe tener al menos un producto';
   END IF;
+
+  -- Precalcular total para insertar la venta con el monto correcto desde el inicio
+  SELECT COALESCE(SUM(
+    ((item->>'quantity')::numeric) * ((item->>'unit_price')::numeric)
+  ), 0)
+  INTO v_total_preview
+  FROM jsonb_array_elements(p_items) AS item;
 
   -- ========== CREAR VENTA ==========
   INSERT INTO public.sales (
@@ -48,9 +91,9 @@ BEGIN
   ) VALUES (
     p_business_id,
     p_user_id,
-    p_seller_name,
+    v_seller_name,
     COALESCE(p_payment_method, 'cash'),
-    0,  -- Se calcula después
+    v_total_preview,
     timezone('utc', now())
   ) RETURNING id INTO v_sale_id;
 

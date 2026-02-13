@@ -17,6 +17,7 @@ import {
   BarChart3,
   PieChart
 } from 'lucide-react';
+import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 
 function Reportes({ businessId }) {
   const [loading, setLoading] = useState(true);
@@ -286,15 +287,14 @@ function Reportes({ businessId }) {
           )}
         </AnimatePresence>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="flex flex-col items-center gap-4">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#ffe498] border-t-transparent"></div>
-              <p className="text-gray-600">Cargando reportes...</p>
-            </div>
-          </div>
-        ) : (
-          <>
+        <AsyncStateWrapper
+          loading={loading}
+          error={error}
+          dataCount={loading ? 0 : 1}
+          onRetry={loadReportes}
+          skeletonType="reportes"
+        >
+          <div>
             {/* Métricas Principales */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -572,8 +572,8 @@ function Reportes({ businessId }) {
                 </div>
               </div>
             </motion.div>
-          </>
-        )}
+          </div>
+        </AsyncStateWrapper>
       </div>
     </div>
   );
