@@ -14,6 +14,86 @@ function buildIdempotencyKey({ action, businessId, orderId, tableId }) {
   return `stocky:${normalizedAction}:${b}:${o}:${t}`;
 }
 
+function isOrderContextError(errorLike) {
+  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+  if (!message) return false;
+
+  return (
+    message.includes('la orden') && message.includes('no está abierta')
+  ) || (
+    message.includes('la mesa') && message.includes('no está asociada')
+  ) || (
+    message.includes('cambió durante el cierre')
+  ) || (
+    message.includes('orden') && message.includes('no encontrada')
+  ) || (
+    message.includes('mesa') && message.includes('no encontrada')
+  );
+}
+
+function isFunctionUnavailableError(errorLike, functionName) {
+  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+  if (!message) return false;
+
+  const normalizedFn = String(functionName || '').toLowerCase();
+  const referencesFunction = normalizedFn ? message.includes(normalizedFn) : true;
+
+  return referencesFunction && (
+    message.includes('does not exist')
+  || message.includes('could not find the function')
+  || message.includes('schema cache')
+  || message.includes('not found')
+  || message.includes('pgrst202')
+  );
+}
+
+function isIdempotencyLayerError(errorLike) {
+  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+  if (!message) return false;
+
+  return (
+    message.includes('idempotency')
+  ) || (
+    message.includes('idempotency_requests')
+  ) || (
+    message.includes('permission denied')
+  ) || (
+    message.includes('row-level security')
+  ) || (
+    message.includes('violates row-level security')
+  ) || (
+    message.includes('conflicto de idempotencia')
+  ) || (
+    message.includes('processing for this idempotent key')
+  );
+}
+
+async function finalizeOrderAndTable({ businessId, orderId, tableId }) {
+  if (orderId) {
+    const { error: orderCloseError } = await supabase
+      .from('orders')
+      .update({ status: 'closed', closed_at: new Date().toISOString() })
+      .eq('id', orderId)
+      .eq('business_id', businessId);
+
+    if (orderCloseError) {
+      throw new Error(orderCloseError.message || '❌ No se pudo cerrar la orden.');
+    }
+  }
+
+  if (tableId) {
+    const { error: tableReleaseError } = await supabase
+      .from('tables')
+      .update({ current_order_id: null, status: 'available' })
+      .eq('id', tableId)
+      .eq('business_id', businessId);
+
+    if (tableReleaseError) {
+      throw new Error(tableReleaseError.message || '❌ No se pudo liberar la mesa.');
+    }
+  }
+}
+
 async function getSellerName(businessId) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('❌ No se pudo obtener información del usuario');
@@ -71,10 +151,13 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     p_idempotency_key: idempotencyKey
   }));
 
-  // Compatibilidad transitoria: entorno sin wrapper idempotente.
-  const missingIdempotentSplitFn = atomicError?.message?.includes('create_split_sales_complete_idempotent')
-    && atomicError?.message?.includes('does not exist');
-  if (missingIdempotentSplitFn) {
+  // Compatibilidad transitoria: reintentar función base cuando falla capa idempotente.
+  const missingIdempotentSplitFn = isFunctionUnavailableError(
+    atomicError,
+    'create_split_sales_complete_idempotent'
+  );
+  const retryBaseSplitFn = atomicError && (missingIdempotentSplitFn || isIdempotencyLayerError(atomicError));
+  if (retryBaseSplitFn) {
     ({ data: atomicResult, error: atomicError } = await supabase.rpc('create_split_sales_complete', {
       p_business_id: businessId,
       p_user_id: user.id,
@@ -90,9 +173,12 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
   }
 
   // Fallback transitorio: mantener compatibilidad mientras la migración nueva se despliega.
-  const isMissingAtomicFn = atomicError?.message?.includes('create_split_sales_complete')
-    && atomicError?.message?.includes('does not exist');
-  if (!isMissingAtomicFn) {
+  const isMissingAtomicFn = isFunctionUnavailableError(
+    atomicError,
+    'create_split_sales_complete'
+  );
+  const shouldFallbackWithoutOrderContext = isOrderContextError(atomicError);
+  if (!isMissingAtomicFn && !shouldFallbackWithoutOrderContext) {
     throw new Error(atomicError?.message || '❌ No se pudo cerrar la orden dividida. Intenta de nuevo.');
   }
 
@@ -111,6 +197,7 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     }));
 
     const isLastSale = i === subAccounts.length - 1;
+    const closeOrderInsideRpc = isLastSale && !shouldFallbackWithoutOrderContext;
     const subKey = `${idempotencyKey}:sub:${i + 1}`;
     let result = null;
     let rpcError = null;
@@ -120,28 +207,35 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
       p_seller_name: sellerName,
       p_payment_method: sub.paymentMethod || 'cash',
       p_items: itemsForRpc,
-      p_order_id: isLastSale ? orderId : null,
-      p_table_id: isLastSale ? tableId : null,
+      p_order_id: closeOrderInsideRpc ? orderId : null,
+      p_table_id: closeOrderInsideRpc ? tableId : null,
       p_idempotency_key: subKey
     }));
 
-    const missingIdempotentSaleFn = rpcError?.message?.includes('create_sale_complete_idempotent')
-      && rpcError?.message?.includes('does not exist');
-    if (missingIdempotentSaleFn) {
+    const missingIdempotentSaleFn = isFunctionUnavailableError(
+      rpcError,
+      'create_sale_complete_idempotent'
+    );
+    const retryBaseSaleFn = rpcError && (missingIdempotentSaleFn || isIdempotencyLayerError(rpcError));
+    if (retryBaseSaleFn) {
       ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete', {
         p_business_id: businessId,
         p_user_id: user.id,
         p_seller_name: sellerName,
         p_payment_method: sub.paymentMethod || 'cash',
         p_items: itemsForRpc,
-        p_order_id: isLastSale ? orderId : null,
-        p_table_id: isLastSale ? tableId : null
+        p_order_id: closeOrderInsideRpc ? orderId : null,
+        p_table_id: closeOrderInsideRpc ? tableId : null
       }));
     }
 
     if (rpcError || !result?.[0]) {
       throw new Error(rpcError?.message || `❌ No se pudo registrar la venta ${i + 1}. Intenta de nuevo.`);
     }
+  }
+
+  if (shouldFallbackWithoutOrderContext) {
+    await finalizeOrderAndTable({ businessId, orderId, tableId });
   }
 
   return { totalSold };
@@ -202,9 +296,12 @@ export async function closeOrderSingle(businessId, { orderId, tableId, paymentMe
     p_idempotency_key: idempotencyKey
   }));
 
-  const missingIdempotentSaleFn = rpcError?.message?.includes('create_sale_complete_idempotent')
-    && rpcError?.message?.includes('does not exist');
-  if (missingIdempotentSaleFn) {
+  const missingIdempotentSaleFn = isFunctionUnavailableError(
+    rpcError,
+    'create_sale_complete_idempotent'
+  );
+  const retryBaseSaleFn = rpcError && (missingIdempotentSaleFn || isIdempotencyLayerError(rpcError));
+  if (retryBaseSaleFn) {
     ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete', {
       p_business_id: businessId,
       p_user_id: user.id,
@@ -217,7 +314,47 @@ export async function closeOrderSingle(businessId, { orderId, tableId, paymentMe
   }
 
   if (rpcError || !result?.[0]) {
-    throw new Error(rpcError?.message || '❌ No se pudo registrar la venta. Intenta de nuevo.');
+    if (!isOrderContextError(rpcError)) {
+      throw new Error(rpcError?.message || '❌ No se pudo registrar la venta. Intenta de nuevo.');
+    }
+
+    const fallbackKey = `${idempotencyKey}:no-order-context`;
+    let fallbackResult = null;
+    let fallbackError = null;
+
+    ({ data: fallbackResult, error: fallbackError } = await supabase.rpc('create_sale_complete_idempotent', {
+      p_business_id: businessId,
+      p_user_id: user.id,
+      p_seller_name: sellerName,
+      p_payment_method: paymentMethod || 'cash',
+      p_items: itemsForRpc,
+      p_order_id: null,
+      p_table_id: null,
+      p_idempotency_key: fallbackKey
+    }));
+
+    const missingFallbackIdempotentFn = isFunctionUnavailableError(
+      fallbackError,
+      'create_sale_complete_idempotent'
+    );
+    const retryBaseFallbackFn = fallbackError && (missingFallbackIdempotentFn || isIdempotencyLayerError(fallbackError));
+    if (retryBaseFallbackFn) {
+      ({ data: fallbackResult, error: fallbackError } = await supabase.rpc('create_sale_complete', {
+        p_business_id: businessId,
+        p_user_id: user.id,
+        p_seller_name: sellerName,
+        p_payment_method: paymentMethod || 'cash',
+        p_items: itemsForRpc,
+        p_order_id: null,
+        p_table_id: null
+      }));
+    }
+
+    if (fallbackError || !fallbackResult?.[0]) {
+      throw new Error(fallbackError?.message || '❌ No se pudo registrar la venta. Intenta de nuevo.');
+    }
+
+    await finalizeOrderAndTable({ businessId, orderId, tableId });
   }
 
   return { saleTotal };

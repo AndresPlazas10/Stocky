@@ -120,49 +120,6 @@ function Inventario({ businessId, userRole = 'admin' }) {
     }
   }, [businessId]);
 
-  // ✅ OPTIMIZADO: Generación de código único sin intentos fallidos
-  const generateProductCode = useCallback(async () => {
-    try {
-      // Obtener TODOS los códigos PRD-#### del negocio para encontrar el máximo
-      const { data: products, error } = await supabase
-        .from('products')
-        .select('code')
-        .eq('business_id', businessId)
-        .ilike('code', 'PRD-%');
-      
-      if (error) throw error;
-      
-      let maxNumber = 0;
-      
-      // Encontrar el número más alto entre códigos secuenciales (PRD-0001, PRD-0002, etc.)
-      // ✅ MEJORADO: Ignorar códigos con timestamp (6 dígitos como PRD-897571)
-      if (products && products.length > 0) {
-        products.forEach(product => {
-          if (product.code) {
-            // ✅ Solo aceptar códigos de 4 dígitos (PRD-0001 a PRD-9999)
-            const match = product.code.match(/^PRD-(\d{4})$/);
-            if (match) {
-              const num = parseInt(match[1], 10);
-              if (num > maxNumber) {
-                maxNumber = num;
-              }
-            }
-          }
-        });
-      }
-      
-      // El siguiente código es maxNumber + 1
-      const nextNumber = maxNumber + 1;
-      const newCode = `PRD-${String(nextNumber).padStart(4, '0')}`;
-      
-      setGeneratedCode(newCode);
-    } catch (error) {
-      
-      // Fallback: usar timestamp para garantizar unicidad
-      setGeneratedCode(`PRD-${Date.now().toString().slice(-6)}`);
-    }
-  }, [businessId]);
-
   // useEffects optimizados
   useEffect(() => {
     if (businessId) {
@@ -172,12 +129,6 @@ function Inventario({ businessId, userRole = 'admin' }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId, loadProductos, loadProveedores]); // checkIfEmployee no debe estar aquí
-
-  useEffect(() => {
-    if (showForm && businessId) {
-      generateProductCode();
-    }
-  }, [showForm, businessId, generateProductCode]);
 
   // Cleanup de mensajes
   useEffect(() => {
@@ -277,15 +228,8 @@ function Inventario({ businessId, userRole = 'admin' }) {
         return;
       }
 
-      // ✅ VALIDAR código generado (solo para creación)
-      if (!generatedCode || !generatedCode.startsWith('PRD-')) {
-        throw new Error('Error al generar código del producto. Recarga la página.');
-      }
-
-      // ✅ CORREGIDO: Insertar con el código pre-generado (evita 409)
       const productData = {
         name: formData.name.trim(),
-        code: generatedCode, // ✅ Usar el código ya generado
         category: formData.category.trim(),
         purchase_price: parseFloat(formData.purchase_price) || 0,
         sale_price: parseFloat(formData.sale_price),
@@ -294,26 +238,44 @@ function Inventario({ businessId, userRole = 'admin' }) {
         unit: formData.unit || 'unit',
         supplier_id: formData.supplier_id || null,
         business_id: businessId,
-        is_active: true,
-        created_at: new Date().toISOString()
+        is_active: true
       };
 
-      const { data: insertedProduct, error: insertError } = await supabase
-        .from('products')
-        .insert([productData])
-        .select()
-        .maybeSingle();
+      // Camino principal: generación de código atómica en DB
+      let insertError = null;
+      ({ error: insertError } = await supabase.rpc('create_product_with_generated_code', {
+        p_business_id: productData.business_id,
+        p_name: productData.name,
+        p_category: productData.category,
+        p_purchase_price: productData.purchase_price,
+        p_sale_price: productData.sale_price,
+        p_stock: productData.stock,
+        p_min_stock: productData.min_stock,
+        p_unit: productData.unit,
+        p_supplier_id: productData.supplier_id,
+        p_is_active: productData.is_active
+      }));
       
       if (insertError) {
-        // ✅ Manejo inteligente de error 409 (conflicto de código único)
-        if (insertError.code === '23505') {
-          // Regenerar código con timestamp para garantizar unicidad
+        const insertMessage = String(insertError?.message || '');
+        const insertMessageLower = insertMessage.toLowerCase();
+        const missingAtomicCreateFn = insertMessageLower.includes('create_product_with_generated_code')
+          && (
+            insertMessageLower.includes('does not exist')
+            || insertMessageLower.includes('could not find the function')
+            || insertMessageLower.includes('schema cache')
+          );
+
+        // Compatibilidad transitoria: entorno aún sin la migración nueva.
+        if (missingAtomicCreateFn) {
           const fallbackCode = `PRD-${Date.now().toString().slice(-6)}`;
-          productData.code = fallbackCode;
-          
-          const { data: retryData, error: retryError } = await supabase
+          const { error: retryError } = await supabase
             .from('products')
-            .insert([productData])
+            .insert([{
+              ...productData,
+              code: fallbackCode,
+              created_at: new Date().toISOString()
+            }])
             .select()
             .maybeSingle();
           
@@ -377,7 +339,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear
     }
-  }, [businessId, formData, generatedCode, loadProductos, isSubmitting, editingProduct]);
+  }, [businessId, formData, loadProductos, isSubmitting, editingProduct]);
 
   const handleUpdate = useCallback(async () => {
     try {
@@ -743,15 +705,15 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       <option value="Comida">Comida</option>
                       <option value="Otros">Otros</option>
                     </select>
-                    
-                    {/* Advertencia sobre recibos de cocina */}
-                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <div className="flex gap-2">
-                        <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                        <p className="text-xs text-amber-800">
-                          <span className="font-semibold">Nota importante:</span> Para que los productos aparezcan en los recibos de cocina, deben estar en la categoría <span className="font-semibold">"Platos"</span>. Los productos de otras categorías no se incluirán en dichos recibos.
-                        </p>
-                      </div>
+                  </div>
+
+                  {/* Advertencia sobre recibos de cocina */}
+                  <div className="md:col-span-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-800">
+                        <span className="font-semibold">Nota importante:</span> Para que los productos aparezcan en los recibos de cocina, deben estar en la categoría <span className="font-semibold">"Platos"</span>. Los productos de otras categorías no se incluirán en dichos recibos.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -865,19 +827,6 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       </option>
                     ))}
                   </select>
-                </div>
-
-                <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-xl">
-                  <input 
-                    type="checkbox"
-                    name="is_active"
-                    checked={formData.is_active}
-                    onChange={handleChange}
-                    className="w-5 h-5 rounded border-gray-300 text-accent-600 focus:ring-[#edb886]"
-                  />
-                  <label className="text-sm font-medium text-gray-700">
-                    Producto activo
-                  </label>
                 </div>
 
                 <div className="flex gap-3">
@@ -1310,15 +1259,15 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       <option value="Comida">Comida</option>
                       <option value="Otros">Otros</option>
                     </select>
-                    
-                    {/* Advertencia sobre recibos de cocina */}
-                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <div className="flex gap-2">
-                        <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                        <p className="text-xs text-amber-800">
-                          <span className="font-semibold">Nota importante:</span> Para que los productos aparezcan en los recibos de cocina, deben estar en la categoría <span className="font-semibold">"Platos"</span>. Los productos de otras categorías no se incluirán en dichos recibos.
-                        </p>
-                      </div>
+                  </div>
+
+                  {/* Advertencia sobre recibos de cocina */}
+                  <div className="md:col-span-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-800">
+                        <span className="font-semibold">Nota importante:</span> Para que los productos aparezcan en los recibos de cocina, deben estar en la categoría <span className="font-semibold">"Platos"</span>. Los productos de otras categorías no se incluirán en dichos recibos.
+                      </p>
                     </div>
                   </div>
                 </div>

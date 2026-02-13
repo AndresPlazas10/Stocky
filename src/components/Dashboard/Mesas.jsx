@@ -712,14 +712,6 @@ function Mesas({ businessId }) {
         return;
       }
 
-      // Aviso transitorio si la cantidad nueva supera el stock del producto
-      const existing = orderItems.find(i => i.id === itemId);
-      if (existing) {
-        const prod = productos.find(p => p.id === existing.product_id);
-        if (prod && typeof prod.stock === 'number' && newQuantity > prod.stock) {
-          setError(`⚠️ Stock insuficiente para ${prod.name}. Disponibles: ${prod.stock}. Considera crear una compra.`);
-        }
-      }
       // Marcar como actualizando
       setUpdatingItemId(itemId);
 
@@ -867,7 +859,7 @@ function Mesas({ businessId }) {
           setCanShowOrderModal(true);
         }, 8000);
       } catch (error) {
-        setError('❌ No se pudo cerrar la orden. Revirtiendo estado.');
+        setError(`❌ ${error?.message || 'No se pudo cerrar la orden. Revirtiendo estado.'}`);
         // Rollback: reload mesas
         try { await loadMesas(); } catch (e) { /* no-op */ }
         try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch (e) {}
@@ -928,7 +920,7 @@ function Mesas({ businessId }) {
           setCanShowOrderModal(true);
         }, 8000);
       } catch (error) {
-        setError('❌ No se pudo cerrar la orden. Revirtiendo estado.');
+        setError(`❌ ${error?.message || 'No se pudo cerrar la orden. Revirtiendo estado.'}`);
         try { await loadMesas(); } catch (e) { /* no-op */ }
         try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch (e) {}
       } finally {
@@ -1206,7 +1198,6 @@ function Mesas({ businessId }) {
       skeletonType="mesas"
       emptyTitle="Aun no hay mesas creadas"
       emptyDescription="Crea tu primera mesa para empezar a registrar ordenes."
-      actionProcessing={isCreatingTable || isClosingOrder || !!updatingItemId}
     >
       <motion.section
         initial={{ opacity: 0, y: 20 }}
@@ -1505,7 +1496,7 @@ function Mesas({ businessId }) {
                               className="p-4 cursor-pointer border-b border-accent-100 last:border-0 hover:bg-accent-50 transition-colors flex justify-between items-center"
                             >
                               <span className="font-semibold text-primary-900">
-                                {producto.name} <span className="text-sm text-accent-600">({producto.code})</span>
+                                {producto.name}
                               </span>
                               <span className="text-lg font-bold text-green-600">
                                 ${producto.sale_price || producto.price}
@@ -1528,7 +1519,7 @@ function Mesas({ businessId }) {
                         <p className="text-accent-600">No hay productos en esta orden</p>
                       </div>
                     ) : (
-                      <div className="space-y-3">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                         {orderItems.map((item, index) => (
                           <motion.div
                             key={item.id || `temp-${item.product_id}-${index}`}
@@ -1539,83 +1530,62 @@ function Mesas({ businessId }) {
                             <Card className="border-accent-200 hover:shadow-md transition-shadow">
                               <CardContent className="pt-4">
                                 <div className="flex flex-col gap-3">
-                                  {/* Nombre y precio - Siempre visible completo */}
-                                  <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1 min-w-0">
                                       <h4 className="font-semibold text-primary-900 text-sm sm:text-base leading-tight">
                                         {item.products?.name}
                                       </h4>
-                                      <p className="text-xs sm:text-sm text-accent-600 mt-1">
-                                        {formatPrice(parseFloat(item.price))} c/u
-                                      </p>
+                                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium">
+                                          {formatPrice(parseFloat(item.price))} por unidad
+                                        </span>
+                                      </div>
                                     </div>
                                     <div className="text-right shrink-0">
-                                      <p className="text-base sm:text-lg font-bold text-primary-900">
+                                      <p className="text-lg font-bold text-primary-900">
                                         {formatPrice(parseFloat(item.subtotal))}
                                       </p>
+                                      <p className="text-[11px] text-accent-600">Subtotal</p>
                                     </div>
                                   </div>
-                                  
-                                  {/* Controles - Cantidad y eliminar */}
+
                                   <div className="flex items-center justify-between pt-2 border-t border-accent-100">
-                                    <div className="flex items-center gap-2 sm:gap-3">
-                                      <span className="text-xs sm:text-sm text-accent-600 font-medium">Cantidad:</span>
-                                      <div className="flex items-center gap-1 sm:gap-2">
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => updateItemQuantity(item.id, item.quantity - 1)}
-                                          disabled={updatingItemId !== null}
-                                          className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                          -
-                                        </Button>
-                                        <span className="w-10 sm:w-12 text-center font-bold text-primary-900">
-                                          {item.quantity}
-                                        </span>
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
-                                          disabled={updatingItemId !== null}
-                                          className="h-8 w-8 p-0 border-green-300 text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                          +
-                                        </Button>
-                                      </div>
+                                    <div className="inline-flex items-center gap-1.5 rounded-xl border border-accent-200 bg-white p-1">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => updateItemQuantity(item.id, item.quantity - 1)}
+                                        disabled={updatingItemId !== null}
+                                        className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        -
+                                      </Button>
+                                      <span className="w-10 text-center font-bold text-primary-900">
+                                        {item.quantity}
+                                      </span>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
+                                        disabled={updatingItemId !== null}
+                                        className="h-8 w-8 p-0 border-green-300 text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        +
+                                      </Button>
                                     </div>
 
                                     <Button
                                       size="sm"
                                       variant="ghost"
                                       onClick={() => removeItem(item.id)}
-                                      className="h-9 px-3 hover:bg-red-100 hover:text-red-600 text-xs sm:text-sm"
+                                      className="h-9 px-2.5 sm:px-3 hover:bg-red-100 hover:text-red-600 text-xs sm:text-sm"
                                     >
-                                      <Trash2 className="w-4 h-4 mr-1.5" />
-                                      Eliminar
+                                      <Trash2 className="w-4 h-4 sm:mr-1.5" />
+                                      <span className="hidden sm:inline">Eliminar</span>
                                     </Button>
                                   </div>
                                 </div>
                               </CardContent>
-                              {/* Aviso inline si cantidad excede stock */}
-                              {(() => {
-                                const prod = productos.find(p => p.id === item.product_id);
-                                const prodStock = prod ? prod.stock : null;
-                                if (typeof prodStock === 'number' && item.quantity > prodStock) {
-                                  return (
-                                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
-                                      <div className="flex items-center gap-3">
-                                        <AlertCircle className="w-5 h-5 text-red-600" />
-                                        <div>
-                                          <p className="text-sm font-semibold text-red-800">⚠️ Stock insuficiente</p>
-                                          <p className="text-xs text-red-700">Disponibles: {prodStock} — Pedido: {item.quantity}</p>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              })()}
                             </Card>
                           </motion.div>
                         ))}

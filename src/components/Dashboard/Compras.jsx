@@ -35,6 +35,15 @@ const getResponsableName = (compra) => {
   return compra.employees.full_name || 'Responsable desconocido';
 };
 
+const getPaymentMethodLabel = (method) => {
+  const value = String(method || '').toLowerCase();
+  if (value === 'cash') return 'Efectivo';
+  if (value === 'card') return 'Tarjeta';
+  if (value === 'transfer') return 'Transferencia';
+  if (value === 'mixed') return 'Mixto';
+  return method || '-';
+};
+
 function Compras({ businessId }) {
   const [compras, setCompras] = useState([]);
   const [pagePurchases, setPagePurchases] = useState(1);
@@ -680,7 +689,7 @@ function Compras({ businessId }) {
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-600">Método de pago</span>
                       <Badge className="bg-blue-100 text-blue-800 capitalize">
-                        {compra.payment_method}
+                        {getPaymentMethodLabel(compra.payment_method)}
                       </Badge>
                     </div>
 
@@ -986,7 +995,7 @@ function Compras({ businessId }) {
                   <div className="p-4 bg-gray-50 rounded-xl">
                     <p className="text-sm text-gray-600 mb-1">Método de pago</p>
                     <p className="font-semibold text-gray-800 capitalize">
-                      {selectedPurchase.payment_method}
+                      {getPaymentMethodLabel(selectedPurchase.payment_method)}
                     </p>
                   </div>
                 </div>

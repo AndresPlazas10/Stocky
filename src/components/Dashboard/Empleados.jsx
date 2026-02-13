@@ -122,6 +122,7 @@ function Empleados({ businessId }) {
 
       const cleanUsername = formData.username.toLowerCase().trim();
       const cleanPassword = formData.password.trim();
+      const fixedRole = 'employee';
 
       // Validar que el usuario no sea solo números
       if (/^\d+$/.test(cleanUsername)) {
@@ -172,7 +173,7 @@ function Empleados({ businessId }) {
         options: {
           data: {
             full_name: formData.full_name.trim(),
-            role: formData.role
+            role: fixedRole
           }
         }
       });
@@ -202,7 +203,7 @@ function Empleados({ businessId }) {
         .rpc('create_employee', {
           p_business_id: businessId,
           p_user_id: authData.user.id,
-          p_role: formData.role,
+          p_role: fixedRole,
           p_full_name: formData.full_name.trim(),
           p_email: cleanEmail,
           p_username: cleanUsername,
@@ -389,25 +390,16 @@ function Empleados({ businessId }) {
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-gray-800">Empleados</h1>
-                <p className="text-gray-600">Gestiona invitaciones y accesos</p>
+                <p className="text-gray-600">Gestiona empleados y accesos</p>
               </div>
             </div>
             
             <button
-              onClick={() => setShowForm(!showForm)}
+              onClick={() => setShowForm(true)}
               className="flex items-center gap-2 px-6 py-3 gradient-primary text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300"
             >
-              {showForm ? (
-                <>
-                  <XCircle className="w-5 h-5" />
-                  Cancelar
-                </>
-              ) : (
-                <>
-                  <UserPlus className="w-5 h-5" />
-                  Invitar Empleado
-                </>
-              )}
+              <UserPlus className="w-5 h-5" />
+              Invitar Empleado
             </button>
           </div>
         </motion.div>
@@ -478,109 +470,6 @@ function Empleados({ businessId }) {
           details={successDetails}
           duration={5000}
         />
-
-        {/* Formulario de invitación */}
-        <AnimatePresence>
-          {showForm && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100"
-            >
-              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <UserPlus className="w-6 h-6 text-accent-500" />
-                Nuevo Empleado
-              </h2>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nombre Completo
-                  </label>
-                  <input
-                    type="text"
-                    name="full_name"
-                    value={formData.full_name}
-                    onChange={handleChange}
-                    placeholder="Ej: Juan Pérez"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Usuario
-                  </label>
-                  <input
-                    type="text"
-                    name="username"
-                    value={formData.username}
-                    onChange={handleChange}
-                    placeholder="juan_perez"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent lowercase"
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Solo letras minúsculas, números y guiones bajos
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Contraseña
-                  </label>
-                  <input
-                    type="text"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    placeholder="Mínimo 6 caracteres"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                    required
-                    minLength={6}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Esta será la contraseña que el empleado usará para acceder
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Rol
-                  </label>
-                  <select
-                    name="role"
-                    value={formData.role}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                  >
-                    <option value="employee">Empleado</option>
-                    <option value="admin">Administrador</option>
-                  </select>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full px-6 py-3 gradient-primary text-white rounded-xl font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Clock className="h-4 w-4 animate-spin" />
-                      Creando empleado...
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="h-4 w-4" />
-                      Crear Empleado
-                    </>
-                  )}
-                </button>
-              </form>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Buscador */}
         <div className="bg-white rounded-xl shadow p-4 border border-gray-100">
@@ -690,6 +579,120 @@ function Empleados({ businessId }) {
           </AsyncStateWrapper>
         </div>
       </div>
+
+      {/* Modal de nuevo empleado */}
+      <AnimatePresence>
+        {showForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[55]"
+            onClick={() => !isSubmitting && setShowForm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+            >
+              <div className="p-6 border-b border-accent-100 bg-gradient-to-r from-primary-50 to-accent-50 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <UserPlus className="w-6 h-6 text-accent-500" />
+                  Nuevo Empleado
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => !isSubmitting && setShowForm(false)}
+                  className="h-9 w-9 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-600"
+                  disabled={isSubmitting}
+                >
+                  <XCircle className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre Completo
+                  </label>
+                  <input
+                    type="text"
+                    name="full_name"
+                    value={formData.full_name}
+                    onChange={handleChange}
+                    placeholder="Ej: Juan Pérez"
+                    className="w-full h-12 px-4 border-2 border-accent-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Usuario
+                  </label>
+                  <input
+                    type="text"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleChange}
+                    placeholder="juan_perez"
+                    className="w-full h-12 px-4 border-2 border-accent-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all lowercase"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Solo letras minúsculas, números y guiones bajos
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Contraseña
+                  </label>
+                  <input
+                    type="text"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Mínimo 6 caracteres"
+                    className="w-full h-12 px-4 border-2 border-accent-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                    required
+                    minLength={6}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Esta será la contraseña que el empleado usará para acceder
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-accent-50 border border-accent-200">
+                  <p className="text-sm text-primary-700">
+                    Rol asignado: <span className="font-semibold">Empleado</span>
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full px-6 py-3 gradient-primary text-white rounded-xl font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Clock className="h-4 w-4 animate-spin" />
+                      Creando empleado...
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="h-4 w-4" />
+                      Crear Empleado
+                    </>
+                  )}
+                </button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Modal de código generado */}
       <AnimatePresence>
