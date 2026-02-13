@@ -1,5 +1,18 @@
 import { supabase } from '../supabase/Client.jsx';
 
+const BUSINESS_COLUMNS = `
+  id,
+  name,
+  username,
+  email,
+  phone,
+  address,
+  created_by,
+  is_active,
+  created_at,
+  updated_at
+`;
+
 /**
  * Obtiene la información del negocio del usuario autenticado
  * @returns {Promise<Object>} - Información del negocio
@@ -15,7 +28,7 @@ export async function getCurrentBusiness() {
     // Buscar el negocio por email del usuario
     const { data: business, error: businessError } = await supabase
       .from('businesses')
-      .select('*')
+      .select(BUSINESS_COLUMNS)
       .eq('email', user.email)
       .single();
 
@@ -49,7 +62,7 @@ export async function getAllBusinesses() {
 
     const { data: businesses, error: businessError } = await supabase
       .from('businesses')
-      .select('*')
+      .select(BUSINESS_COLUMNS)
       .eq('created_by', user.id)
       .order('created_at', { ascending: false });
 

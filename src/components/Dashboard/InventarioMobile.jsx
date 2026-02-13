@@ -34,6 +34,8 @@ import {
   Trash2
 } from 'lucide-react';
 
+const MOBILE_PRODUCTS_COLUMNS = 'id, name, category, purchase_price, sale_price, stock, min_stock, supplier_id, unit, is_active, created_at';
+
 function InventarioMobile({ businessId }) {
   const [productos, setProductos] = useState([]);
   const [proveedores, setProveedores] = useState([]);
@@ -75,7 +77,7 @@ function InventarioMobile({ businessId }) {
   const loadProductos = async () => {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select(MOBILE_PRODUCTS_COLUMNS)
       .eq('business_id', businessId)
       .eq('is_active', true)
       .order('created_at', { ascending: false });

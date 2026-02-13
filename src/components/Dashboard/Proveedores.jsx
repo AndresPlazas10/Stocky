@@ -19,6 +19,8 @@ import {
   Package
 } from 'lucide-react';
 
+const SUPPLIER_COLUMNS = 'id, business_id, business_name, contact_name, email, phone, address, nit, notes, is_active, created_at';
+
 function Proveedores({ businessId }) {
   const [proveedores, setProveedores] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +51,7 @@ function Proveedores({ businessId }) {
       setLoading(true);
       const { data, error } = await supabase
         .from('suppliers')
-        .select('*')
+        .select(SUPPLIER_COLUMNS)
         .eq('business_id', businessId)
         .order('created_at', { ascending: false });
 

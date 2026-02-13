@@ -28,6 +28,9 @@ import {
 } from 'lucide-react';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 
+const PRODUCT_LIST_COLUMNS = 'id, name, purchase_price, supplier_id, stock, is_active';
+const SUPPLIER_LIST_COLUMNS = 'id, business_name, contact_name, email, phone, is_active';
+
 // Función helper para obtener el nombre del responsable
 const getResponsableName = (compra) => {
   if (!compra.employees) return 'Responsable desconocido';
@@ -75,13 +78,40 @@ function Compras({ businessId }) {
       setLoading(true);
       const lim = Number(pagination.limit ?? limitPurchases);
       const off = Number(pagination.offset ?? ((pagePurchases - 1) * lim));
-      const { data: purchasesData, count } = await getFilteredPurchases(businessId, filters, { limit: lim, offset: off });
+      const includeCount = pagination.includeCount !== false;
+      const countMode = pagination.countMode || 'exact';
+      const { data: purchasesData, count } = await getFilteredPurchases(businessId, filters, {
+        limit: lim,
+        offset: off,
+        includeCount,
+        countMode
+      });
+
+      if (!purchasesData || purchasesData.length === 0) {
+        setCompras([]);
+        if (typeof count === 'number') {
+          setTotalCountPurchases(count);
+        }
+        return;
+      }
+
+      const alreadyEnriched = Array.isArray(purchasesData) && purchasesData.length > 0
+        && !!purchasesData[0].supplier
+        && !!purchasesData[0].employees;
+
+      if (alreadyEnriched) {
+        setCompras(purchasesData);
+        if (typeof count === 'number') {
+          setTotalCountPurchases(count);
+        }
+        return;
+      }
 
       // Obtener business y datos relacionados
       const [businessResult, employeesResult, suppliersResult] = await Promise.all([
         supabase.from('businesses').select('created_by').eq('id', businessId).maybeSingle(),
         supabase.from('employees').select('user_id, full_name, role').eq('business_id', businessId),
-        supabase.from('suppliers').select('*').eq('business_id', businessId)
+        supabase.from('suppliers').select(SUPPLIER_LIST_COLUMNS).eq('business_id', businessId)
       ]);
 
       const business = businessResult.data;
@@ -110,7 +140,9 @@ function Compras({ businessId }) {
       });
 
       setCompras(purchasesWithEmployees);
-      setTotalCountPurchases(count || 0);
+      if (typeof count === 'number') {
+        setTotalCountPurchases(count);
+      }
     } catch (error) {
       setError('❌ Error al cargar las compras');
     } finally {
@@ -122,7 +154,7 @@ function Compras({ businessId }) {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select(PRODUCT_LIST_COLUMNS)
         .eq('business_id', businessId)
         .eq('is_active', true);
 
@@ -137,7 +169,7 @@ function Compras({ businessId }) {
     try {
       const { data, error } = await supabase
         .from('suppliers')
-        .select('*')
+        .select(SUPPLIER_LIST_COLUMNS)
         .eq('business_id', businessId);
 
       if (error) throw error;
@@ -470,10 +502,42 @@ function Compras({ businessId }) {
     setSuccess('');
     
     try {
-      // El trigger 'trigger_reduce_stock_on_purchase_delete' en la DB 
-      // se encargará automáticamente de revertir el stock al eliminar purchase_details
-      
-      // Eliminar detalles de compra (el trigger reducirá el stock automáticamente)
+      // Obtener detalles y stock previo para validar si el trigger de DELETE existe.
+      const { data: purchaseDetails, error: detailsFetchError } = await supabase
+        .from('purchase_details')
+        .select('product_id, quantity')
+        .eq('purchase_id', purchaseToDelete);
+
+      if (detailsFetchError) throw new Error('Error al consultar detalles: ' + detailsFetchError.message);
+
+      const groupedDetailsMap = new Map();
+      (purchaseDetails || []).forEach((detail) => {
+        const productId = detail.product_id;
+        const quantity = Number(detail.quantity || 0);
+        if (!productId || quantity <= 0) return;
+        groupedDetailsMap.set(productId, (groupedDetailsMap.get(productId) || 0) + quantity);
+      });
+
+      const groupedDetails = Array.from(groupedDetailsMap.entries()).map(([product_id, quantity]) => ({
+        product_id,
+        quantity
+      }));
+
+      const productIds = groupedDetails.map((item) => item.product_id);
+      let stockBeforeMap = new Map();
+
+      if (productIds.length > 0) {
+        const { data: productsBefore, error: productsBeforeError } = await supabase
+          .from('products')
+          .select('id, stock')
+          .eq('business_id', businessId)
+          .in('id', productIds);
+
+        if (productsBeforeError) throw new Error('Error al consultar stock previo: ' + productsBeforeError.message);
+        stockBeforeMap = new Map((productsBefore || []).map((p) => [p.id, Number(p.stock || 0)]));
+      }
+
+      // Eliminar detalles de compra (si existe trigger, aquí se revertirá automáticamente).
       const { error: deleteDetailsError } = await supabase
         .from('purchase_details')
         .delete()
@@ -489,7 +553,52 @@ function Compras({ businessId }) {
 
       if (deleteError) throw new Error('Error al eliminar compra: ' + deleteError.message);
 
-      setSuccess('✅ Compra eliminada exitosamente y stock revertido');
+      let appliedManualFallback = false;
+
+      // Fallback: si el stock no cambió, ajustar manualmente (ambientes sin trigger DELETE).
+      if (productIds.length > 0) {
+        const { data: productsAfter, error: productsAfterError } = await supabase
+          .from('products')
+          .select('id, stock')
+          .eq('business_id', businessId)
+          .in('id', productIds);
+
+        if (productsAfterError) throw new Error('Error al consultar stock posterior: ' + productsAfterError.message);
+
+        const stockAfterMap = new Map((productsAfter || []).map((p) => [p.id, Number(p.stock || 0)]));
+        const noStockChanged = groupedDetails.every((item) => {
+          const before = stockBeforeMap.get(item.product_id);
+          const after = stockAfterMap.get(item.product_id);
+          return Number.isFinite(before) && Number.isFinite(after) && before === after;
+        });
+
+        if (noStockChanged) {
+          const fallbackUpdates = groupedDetails.map((item) => {
+            const currentStock = stockAfterMap.get(item.product_id);
+            if (!Number.isFinite(currentStock)) {
+              return Promise.resolve({ error: new Error(`Stock no disponible para ${item.product_id}`) });
+            }
+
+            return supabase
+              .from('products')
+              .update({ stock: currentStock - item.quantity })
+              .eq('id', item.product_id)
+              .eq('business_id', businessId);
+          });
+
+          const fallbackResults = await Promise.all(fallbackUpdates);
+          const fallbackError = fallbackResults.find((result) => result.error)?.error;
+          if (fallbackError) throw new Error('Error al ajustar stock manualmente: ' + fallbackError.message);
+
+          appliedManualFallback = true;
+        }
+      }
+
+      setSuccess(
+        appliedManualFallback
+          ? '✅ Compra eliminada y stock ajustado manualmente'
+          : '✅ Compra eliminada exitosamente y stock revertido'
+      );
       setTimeout(() => setSuccess(''), 4000);
 
       // Recargar datos
@@ -629,12 +738,12 @@ function Compras({ businessId }) {
           onApply={(filters) => {
             setCurrentFiltersPurchases(filters || {});
             setPagePurchases(1);
-            loadCompras(filters || {}, { limit: limitPurchases, offset: 0 });
+            loadCompras(filters || {}, { limit: limitPurchases, offset: 0, includeCount: true, countMode: 'exact' });
           }}
           onClear={() => {
             setCurrentFiltersPurchases({});
             setPagePurchases(1);
-            loadCompras({}, { limit: limitPurchases, offset: 0 });
+            loadCompras({}, { limit: limitPurchases, offset: 0, includeCount: true, countMode: 'exact' });
           }}
         />
 
@@ -751,7 +860,11 @@ function Compras({ businessId }) {
             itemsPerPage={limitPurchases}
             onPageChange={async (newPage) => {
               setPagePurchases(newPage);
-              await loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (newPage - 1) * limitPurchases });
+              await loadCompras(currentFiltersPurchases, {
+                limit: limitPurchases,
+                offset: (newPage - 1) * limitPurchases,
+                includeCount: false
+              });
             }}
             disabled={loading}
           />

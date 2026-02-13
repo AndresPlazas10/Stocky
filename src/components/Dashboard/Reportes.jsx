@@ -39,12 +39,6 @@ function Reportes({ businessId }) {
   const [topProductos, setTopProductos] = useState([]);
   const [ventasPorMetodo, setVentasPorMetodo] = useState([]);
 
-  useEffect(() => {
-    if (businessId) {
-      loadReportes();
-    }
-  }, [businessId, selectedPeriod]);
-
   const getDateRange = useCallback(() => {
     const now = new Date();
     let startDate = new Date();
@@ -75,17 +69,67 @@ function Reportes({ businessId }) {
       setError('');
       const { start, end } = getDateRange();
 
-      const { data: ventas, error: ventasError } = await supabase
-        .from('sales')
-        .select('total, payment_method')
-        .eq('business_id', businessId)
-        .gte('created_at', start)
-        .lte('created_at', end);
+      const [
+        { data: ventas, error: ventasError },
+        { data: compras, error: comprasError },
+        { data: productos, error: productosError },
+        { count: totalProveedores, error: proveedoresError },
+        { count: totalFacturas, error: facturasError },
+        { data: saleDetails, error: saleDetailsError }
+      ] = await Promise.all([
+        supabase
+          .from('sales')
+          .select('total, payment_method')
+          .eq('business_id', businessId)
+          .gte('created_at', start)
+          .lte('created_at', end),
+        supabase
+          .from('purchases')
+          .select('total')
+          .eq('business_id', businessId)
+          .gte('created_at', start)
+          .lte('created_at', end),
+        supabase
+          .from('products')
+          .select('stock, min_stock')
+          .eq('business_id', businessId)
+          .eq('is_active', true),
+        supabase
+          .from('suppliers')
+          .select('id', { count: 'exact', head: true })
+          .eq('business_id', businessId),
+        supabase
+          .from('invoices')
+          .select('id', { count: 'exact', head: true })
+          .eq('business_id', businessId)
+          .gte('created_at', start)
+          .lte('created_at', end),
+        supabase
+          .from('sale_details')
+          .select(`
+            quantity,
+            unit_price,
+            products!inner(name, purchase_price),
+            sales!inner(business_id, created_at)
+          `)
+          .eq('sales.business_id', businessId)
+          .gte('sales.created_at', start)
+          .lte('sales.created_at', end)
+      ]);
 
       if (ventasError) throw ventasError;
+      if (comprasError) throw comprasError;
+      if (productosError) throw productosError;
+      if (proveedoresError) throw proveedoresError;
+      if (facturasError) throw facturasError;
+      if (saleDetailsError) throw saleDetailsError;
 
       const totalVentas = ventas?.reduce((sum, v) => sum + (v.total || 0), 0) || 0;
       const cantidadVentas = ventas?.length || 0;
+      const totalCompras = compras?.reduce((sum, c) => sum + (c.total || 0), 0) || 0;
+      const cantidadCompras = compras?.length || 0;
+      const productosStock = productos?.length || 0;
+      const productosLowStock = productos?.filter(p => p.stock <= p.min_stock).length || 0;
 
       const paymentMethods = {};
       ventas?.forEach(v => {
@@ -95,61 +139,6 @@ function Reportes({ businessId }) {
       setVentasPorMetodo(
         Object.entries(paymentMethods).map(([method, total]) => ({ method, total }))
       );
-
-      const { data: compras, error: comprasError } = await supabase
-        .from('purchases')
-        .select('total')
-        .eq('business_id', businessId)
-        .gte('created_at', start)
-        .lte('created_at', end);
-
-      if (comprasError) throw comprasError;
-
-      const totalCompras = compras?.reduce((sum, c) => sum + (c.total || 0), 0) || 0;
-      const cantidadCompras = compras?.length || 0;
-
-      const { data: productos, error: productosError } = await supabase
-        .from('products')
-        .select('stock, min_stock, is_active')
-        .eq('business_id', businessId)
-        .eq('is_active', true);
-
-      if (productosError) throw productosError;
-
-      const productosStock = productos?.length || 0;
-      const productosLowStock = productos?.filter(p => p.stock <= p.min_stock).length || 0;
-
-      const { count: totalProveedores, error: proveedoresError } = await supabase
-        .from('suppliers')
-        .select('id', { count: 'exact', head: true })
-        .eq('business_id', businessId);
-
-      if (proveedoresError) throw proveedoresError;
-
-      const { count: totalFacturas, error: facturasError } = await supabase
-        .from('invoices')
-        .select('id', { count: 'exact', head: true })
-        .eq('business_id', businessId)
-        .gte('created_at', start)
-        .lte('created_at', end);
-
-      if (facturasError) throw facturasError;
-
-      // 6. Top productos más vendidos y cálculo de ganancia real
-      const { data: saleDetails, error: saleDetailsError } = await supabase
-        .from('sale_details')
-        .select(`
-          quantity,
-          unit_price,
-          sale_id,
-          products!inner(name, purchase_price),
-          sales!inner(business_id, created_at)
-        `)
-        .eq('sales.business_id', businessId)
-        .gte('sales.created_at', start)
-        .lte('sales.created_at', end);
-
-      if (saleDetailsError) throw saleDetailsError;
 
       const productMap = {};
       let costoProductosVendidos = 0;
