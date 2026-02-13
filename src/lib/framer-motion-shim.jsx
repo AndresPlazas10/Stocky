@@ -9,7 +9,33 @@ import { forwardRef } from 'react';
 
 // Componente base sin animaciones
 const createMotionComponent = (tag) => {
-  return forwardRef(({ children, className, style, onClick, onSubmit, initial, animate, exit, transition, variants, whileHover, whileTap, drag, dragConstraints, ...props }, ref) => {
+  return forwardRef(({
+    children,
+    className,
+    style,
+    onClick,
+    onSubmit,
+    initial,
+    animate,
+    exit,
+    transition,
+    variants,
+    whileHover,
+    whileTap,
+    whileInView,
+    whileFocus,
+    whileDrag,
+    layout,
+    layoutId,
+    drag,
+    dragConstraints,
+    dragElastic,
+    dragMomentum,
+    viewport,
+    onAnimationStart,
+    onAnimationComplete,
+    ...props
+  }, ref) => {
     const Element = tag || 'div';
     return (
       <Element 

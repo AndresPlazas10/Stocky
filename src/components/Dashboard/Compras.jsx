@@ -44,7 +44,7 @@ const getPaymentMethodLabel = (method) => {
   return method || '-';
 };
 
-function Compras({ businessId, onNavigateSection }) {
+function Compras({ businessId }) {
   const [compras, setCompras] = useState([]);
   const [pagePurchases, setPagePurchases] = useState(1);
   const [limitPurchases, setLimitPurchases] = useState(50);
@@ -528,14 +528,6 @@ function Compras({ businessId, onNavigateSection }) {
   }, [compras, searchTerm]);
 
   const hasSuppliers = proveedores.length > 0;
-  const goToSuppliers = useCallback(() => {
-    if (typeof onNavigateSection === 'function') {
-      onNavigateSection('proveedores');
-      return;
-    }
-    setShowModal(false);
-  }, [onNavigateSection]);
-
   return (
     <AsyncStateWrapper
       loading={loading}
@@ -549,15 +541,15 @@ function Compras({ businessId, onNavigateSection }) {
       noResultsAction={
         <Button
           type="button"
-          onClick={hasSuppliers ? () => setShowModal(true) : goToSuppliers}
+          onClick={() => setShowModal(true)}
           className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
         >
-          {hasSuppliers ? 'Nueva Compra' : 'Crear Primer Proveedor'}
+          Nueva Compra
         </Button>
       }
-      emptyTitle={hasSuppliers ? 'Aun no hay compras registradas' : 'No hay proveedores registrados'}
-      emptyDescription={hasSuppliers ? 'Registra la primera compra para empezar el historial.' : 'Crea el primer proveedor para poder registrar compras.'}
-      emptyAction={hasSuppliers ? (
+      emptyTitle="No hay compras registradas"
+      emptyDescription="Crea la primer compra para poder visualizarlas."
+      emptyAction={
         <Button
           type="button"
           onClick={() => setShowModal(true)}
@@ -565,15 +557,7 @@ function Compras({ businessId, onNavigateSection }) {
         >
           Crear Primera Compra
         </Button>
-      ) : (
-        <Button
-          type="button"
-          onClick={goToSuppliers}
-          className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
-        >
-          Crear Primer Proveedor
-        </Button>
-      )}
+      }
       bypassStateRendering={showModal}
       actionProcessing={isCreatingPurchase}
       className="min-h-screen bg-gradient-to-br from-light-bg-primary to-white p-6"
@@ -597,11 +581,11 @@ function Compras({ businessId, onNavigateSection }) {
               </div>
             </div>
             <Button
-              onClick={hasSuppliers ? () => setShowModal(true) : goToSuppliers}
+              onClick={() => setShowModal(true)}
               className="w-full sm:w-auto gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-xl flex items-center justify-center gap-2 text-sm sm:text-base"
             >
               <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span>{hasSuppliers ? 'Nueva Compra' : 'Crear Proveedor'}</span>
+              <span>Nueva Compra</span>
             </Button>
           </div>
         </Card>
@@ -782,7 +766,7 @@ function Compras({ businessId, onNavigateSection }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto"
             style={{ zIndex: 9999 }}
             onClick={() => setShowModal(false)}
           >
@@ -791,7 +775,7 @@ function Compras({ businessId, onNavigateSection }) {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-[95vw] sm:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto"
+              className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-[95vw] sm:max-w-3xl lg:max-w-4xl max-h-[92vh] overflow-hidden my-1 sm:my-0"
             >
               <div className="sticky top-0 gradient-primary text-white p-4 sm:p-6 rounded-t-xl sm:rounded-t-2xl flex items-center justify-between z-10">
                 <div className="flex items-center gap-3">
@@ -814,19 +798,19 @@ function Compras({ businessId, onNavigateSection }) {
                     <div className="p-8 text-center">
                       <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-400" />
                       <p className="text-lg font-semibold text-gray-700 mb-2">No hay proveedores registrados</p>
-                      <p className="text-sm text-gray-500 mb-5">Crea el primer proveedor para poder registrar compras.</p>
+                      <p className="text-sm text-gray-500 mb-5">No es posible registrar compras hasta que exista al menos un proveedor.</p>
                       <Button
                         type="button"
-                        onClick={goToSuppliers}
+                        onClick={() => setShowModal(false)}
                         className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
                       >
-                        Crear Primer Proveedor
+                        Entendido
                       </Button>
                     </div>
                   </Card>
                 </div>
               ) : (
-              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-h-[calc(92vh-86px)] overflow-y-auto">
                 {/* Proveedor */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
@@ -914,35 +898,41 @@ function Compras({ businessId, onNavigateSection }) {
                     </h4>
                     <div className="space-y-3">
                       {cart.map(item => (
-                        <div key={item.product_id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                          <div className="flex-1">
-                            <p className="font-medium text-gray-800">{item.product_name}</p>
+                        <div key={item.product_id} className="p-3 bg-gray-50 rounded-xl space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-medium text-gray-800 break-words">{item.product_name}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeFromCart(item.product_id)}
+                              className="p-2 hover:bg-red-100 rounded-lg text-red-600 transition-colors shrink-0"
+                              aria-label="Eliminar producto"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={item.quantity}
-                            onChange={(e) => updateQuantity(item.product_id, e.target.value)}
-                            className="w-20 h-9 text-center border-gray-300"
-                          />
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={item.unit_price}
-                            onChange={(e) => updatePrice(item.product_id, e.target.value)}
-                            className="w-28 h-9 border-gray-300"
-                          />
-                          <span className="w-24 text-right font-semibold text-gray-700">
-                            {formatPrice(item.quantity * item.unit_price)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => removeFromCart(item.product_id)}
-                            className="p-2 hover:bg-red-100 rounded-lg text-red-600 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-[88px_120px_1fr] gap-2 sm:gap-3 items-center">
+                            <Input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => updateQuantity(item.product_id, e.target.value)}
+                              className="w-full h-10 text-center border-gray-300"
+                            />
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.unit_price}
+                              onChange={(e) => updatePrice(item.product_id, e.target.value)}
+                              className="w-full h-10 border-gray-300"
+                            />
+                            <span className="text-left sm:text-right font-semibold text-gray-700">
+                              {formatPrice(item.quantity * item.unit_price)}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -968,18 +958,18 @@ function Compras({ businessId, onNavigateSection }) {
                 </div>
 
                 {/* Botones */}
-                <div className="flex gap-3">
+                <div className="sticky bottom-0 bg-white flex flex-col sm:flex-row gap-2 sm:gap-3 pt-3 border-t border-gray-200">
                   <Button
                     type="button"
                     onClick={() => setShowModal(false)}
-                    className="flex-1 h-12 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl border-none"
+                    className="order-2 sm:order-1 w-full sm:flex-1 h-10 sm:h-12 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl border-none"
                   >
                     Cancelar
                   </Button>
                   <Button
                     type="submit"
                     disabled={cart.length === 0 || isCreatingPurchase}
-                    className="flex-1 h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed border-none"
+                    className="order-1 sm:order-2 w-full sm:flex-1 h-10 sm:h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed border-none"
                   >
                     {isCreatingPurchase ? (
                       <>

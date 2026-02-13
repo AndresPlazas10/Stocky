@@ -1,8 +1,8 @@
 -- ============================================================
--- BLOCK 2 - Concurrencia en cierre simple
+-- Permitir ventas con stock negativo
 -- Fecha: 2026-02-13
--- Objetivo: evitar doble cierre concurrente de mesa/orden
--- en create_sale_complete mediante locks y estado esperado.
+-- Objetivo: habilitar ventas aunque el stock actual sea menor
+-- al solicitado, manteniendo validaciones de auth y concurrencia.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.create_sale_complete(
@@ -176,6 +176,7 @@ BEGIN
       RAISE EXCEPTION 'Cantidad debe ser mayor a 0';
     END IF;
 
+    -- Lock del producto para concurrencia, sin bloquear por stock.
     SELECT stock INTO v_current_stock
     FROM public.products
     WHERE id = v_product_id
@@ -185,11 +186,6 @@ BEGIN
 
     IF NOT FOUND THEN
       RAISE EXCEPTION 'Producto % no encontrado o no activo', v_product_id;
-    END IF;
-
-    IF v_current_stock < v_quantity THEN
-      RAISE EXCEPTION 'Stock insuficiente para producto %. Disponible: %, solicitado: %',
-        v_product_id, v_current_stock, v_quantity;
     END IF;
 
     INSERT INTO public.sale_details (
@@ -204,6 +200,7 @@ BEGIN
       v_unit_price
     );
 
+    -- Permite stock negativo.
     UPDATE public.products
     SET stock = stock - v_quantity
     WHERE id = v_product_id
@@ -218,7 +215,6 @@ BEGIN
   WHERE id = v_sale_id
     AND business_id = p_business_id;
 
-  -- Cerrar orden/liberar mesa después de crear venta.
   IF p_order_id IS NOT NULL THEN
     UPDATE public.orders o
     SET status = 'closed',
@@ -261,4 +257,4 @@ REVOKE ALL ON FUNCTION public.create_sale_complete(uuid,uuid,text,text,jsonb,uui
 GRANT EXECUTE ON FUNCTION public.create_sale_complete(uuid,uuid,text,text,jsonb,uuid,uuid) TO authenticated;
 
 COMMENT ON FUNCTION public.create_sale_complete(uuid,uuid,text,text,jsonb,uuid,uuid)
-IS 'Crea venta completa con validación multi-tenant y locks de concurrencia para cierre de orden/mesa.';
+IS 'Crea venta completa con validación multi-tenant y concurrencia. Permite ventas con stock negativo.';

@@ -146,7 +146,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
         .select('id')
         .eq('user_id', user.id)
         .eq('business_id', businessId)
-        .single();
+        .maybeSingle();
 
       // Si existe en employees, es empleado (NO puede eliminar ventas)
       setIsEmployee(!!data);
@@ -237,9 +237,20 @@ function Ventas({ businessId, userRole = 'admin' }) {
     enabled: !!businessId,
     onUpdate: (updatedProduct) => {
       setProductos(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+      // Mantener stock disponible del carrito sincronizado con cambios en tiempo real
+      setCart(prevCart => prevCart.map(item =>
+        item.product_id === updatedProduct.id
+          ? { ...item, available_stock: updatedProduct.stock }
+          : item
+      ));
     },
     onDelete: (deletedProduct) => {
       setProductos(prev => prev.filter(p => p.id !== deletedProduct.id));
+      setCart(prevCart => prevCart.map(item =>
+        item.product_id === deletedProduct.id
+          ? { ...item, available_stock: 0 }
+          : item
+      ));
     }
   });
 
@@ -249,19 +260,11 @@ function Ventas({ businessId, userRole = 'admin' }) {
       const existingItem = prevCart.find(item => item.product_id === producto.id);
       
       if (existingItem) {
-        const newCart = prevCart.map(item =>
+        return prevCart.map(item =>
           item.product_id === producto.id
             ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.unit_price }
             : item
         );
-
-        // Aviso transitorio si superamos stock disponible
-        const newQty = existingItem.quantity + 1;
-        if (typeof producto.stock === 'number' && newQty > producto.stock) {
-          setError(`⚠️ Stock insuficiente para ${producto.name}. Considera crear una compra.`);
-        }
-
-        return newCart;
       } else {
         return [...prevCart, {
           product_id: producto.id,
@@ -288,12 +291,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
     }
 
     setCart(prevCart => {
-      const item = prevCart.find(i => i.product_id === productId);
-      // Si la nueva cantidad supera el stock disponible, mostrar aviso transitorio (no bloquear)
-      if (item && typeof item.available_stock === 'number' && newQuantity > item.available_stock) {
-        setError(`⚠️ Stock insuficiente para ${item.name}. Disponibles: ${item.available_stock}. Considera crear una compra.`);
-      }
-
       return prevCart.map(item =>
         item.product_id === productId
           ? { ...item, quantity: newQuantity, subtotal: newQuantity * item.unit_price }
@@ -306,6 +303,13 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const total = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.subtotal, 0);
   }, [cart]);
+
+  // Stock en vivo por producto para evitar desincronización en carrito
+  const stockByProductId = useMemo(() => {
+    const map = new Map();
+    productos.forEach((producto) => map.set(producto.id, Number(producto.stock ?? 0)));
+    return map;
+  }, [productos]);
 
   const processSale = useCallback(async () => {
     if (isSubmitting) return; // Prevenir doble click
@@ -958,7 +962,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto"
             onClick={() => {
               setShowSaleModal(false);
               // Limpiar carrito al cerrar
@@ -973,14 +977,14 @@ function Ventas({ businessId, userRole = 'admin' }) {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden"
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[94vh] overflow-hidden my-1 sm:my-0"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header del Modal */}
-              <div className="gradient-primary p-6 flex justify-between items-center">
+              <div className="gradient-primary p-4 sm:p-6 flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                  <ShoppingCart className="w-6 h-6 text-white" />
-                  <h2 className="text-2xl font-bold text-white">Nueva Venta</h2>
+                  <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                  <h2 className="text-xl sm:text-2xl font-bold text-white">Nueva Venta</h2>
                 </div>
                 <button
                   onClick={() => {
@@ -997,8 +1001,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
               </div>
 
               {/* Contenido del Modal */}
-              <div className="p-6 overflow-y-auto max-h-[calc(95vh-88px)]">
-                <div className="grid xl:grid-cols-2 gap-4 sm:gap-6">
+              <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(94vh-80px)]">
+                <div className="grid xl:grid-cols-2 gap-3 sm:gap-6">
           {/* Panel izquierdo - Productos */}
           <Card className="shadow-xl rounded-2xl bg-white border-none">
             <div className="p-4 sm:p-6">
@@ -1020,7 +1024,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                 />
               </div>
               
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 max-h-[42vh] sm:max-h-[600px] overflow-y-auto pr-1 sm:pr-2 custom-scrollbar">
                 {filteredProducts.length === 0 ? (
                   <div className="text-center py-12 text-gray-500 lg:col-span-2">
                     <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
@@ -1128,7 +1132,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
               <div className="border-t border-gray-200 pt-4 mb-4">
                 <p className="text-sm font-medium text-gray-700 mb-3">Items en el carrito:</p>
-                <div className="space-y-2 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="space-y-2 max-h-[34vh] sm:max-h-[280px] overflow-y-auto pr-1 sm:pr-2 custom-scrollbar">
                   {cart.length === 0 ? (
                     <div className="text-center py-8 text-gray-400">
                       <ShoppingCart className="w-12 h-12 mx-auto mb-3 text-gray-300" />
@@ -1158,8 +1162,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                              <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1 w-fit">
                                 <button
                                   onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
                                   className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold transition-colors"
@@ -1184,13 +1188,19 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                 {formatPrice(item.subtotal)}
                               </p>
                             </div>
-                            {typeof item.available_stock === 'number' && item.quantity > item.available_stock && (
+                            {(() => {
+                              const liveStock = stockByProductId.get(item.product_id);
+                              const available = Number.isFinite(liveStock) ? liveStock : item.available_stock;
+                              return typeof available === 'number' && item.quantity > available;
+                            })() && (
                               <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
                                 <div className="flex items-center gap-3">
                                   <AlertCircle className="w-5 h-5 text-red-600" />
                                   <div>
-                                    <p className="text-sm font-semibold text-red-800">⚠️ Stock insuficiente</p>
-                                    <p className="text-xs text-red-700">Disponibles: {item.available_stock} — Pedido: {item.quantity}</p>
+                                    <p className="text-sm font-semibold text-red-800">⚠️ Stock quedará negativo</p>
+                                    <p className="text-xs text-red-700">
+                                      Disponibles: {Number.isFinite(stockByProductId.get(item.product_id)) ? stockByProductId.get(item.product_id) : item.available_stock} — Pedido: {item.quantity}
+                                    </p>
                                   </div>
                                 </div>
                               </div>
@@ -1203,7 +1213,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                 </div>
               </div>
 
-              <Card className="gradient-primary text-white shadow-lg rounded-xl border-none mb-4">
+              <Card className="gradient-primary text-white shadow-lg rounded-xl border-none mb-3 sm:mb-4">
                 <div className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <DollarSign className="w-6 h-6" />
@@ -1216,7 +1226,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
               <Button
                 onClick={processSale}
                 disabled={cart.length === 0 || isSubmitting}
-                className="w-full h-12 sm:h-14 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold text-base sm:text-lg rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 sm:gap-3"
+                className="w-full h-11 sm:h-14 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold text-sm sm:text-lg rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 sm:gap-3"
               >
                 {isSubmitting ? (
                   <>

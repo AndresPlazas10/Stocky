@@ -517,7 +517,7 @@ function Proveedores({ businessId }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start sm:items-center justify-center z-[60] p-3 sm:p-4 overflow-y-auto"
             onClick={() => setShowModal(false)}
           >
               <motion.div
@@ -525,10 +525,10 @@ function Proveedores({ businessId }) {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[calc(100vh-40px)] overflow-visible"
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden my-2 sm:my-0"
             >
               {/* Header del modal */}
-              <div className="gradient-primary text-white p-6">
+              <div className="gradient-primary text-white p-4 sm:p-6 sticky top-0 z-10">
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
                     {editingSupplier ? (
@@ -549,8 +549,8 @@ function Proveedores({ businessId }) {
               </div>
 
               {/* Contenido del modal */}
-              <form onSubmit={handleSubmit} className="p-4 overflow-visible max-h-full">
-                <div className="space-y-4">
+              <form onSubmit={handleSubmit} className="max-h-[calc(92vh-96px)] overflow-y-auto">
+                <div className="p-4 sm:p-6 space-y-4">
                   
                   {/* Nombre de la empresa */}
                   <div>
@@ -669,7 +669,7 @@ function Proveedores({ businessId }) {
                 </div>
 
                 {/* Botones */}
-                <div className="flex gap-3 mt-8 pt-6 border-t border-gray-200">
+                <div className="sticky bottom-4 bg-white flex flex-col sm:flex-row gap-2 mt-5 pt-3 pb-2 px-2 sm:px-2 border-t border-gray-200">
                   <button
                     type="button"
                     onClick={() => {
@@ -677,23 +677,23 @@ function Proveedores({ businessId }) {
                       resetForm();
                     }}
                     disabled={isSubmitting}
-                    className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50"
+                    className="order-2 sm:order-1 w-full sm:flex-1 h-10 sm:h-10 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium text-sm transition-all duration-300 disabled:opacity-50"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="flex-1 px-6 py-3 gradient-primary hover:from-[#f1c691] hover:to-[#edb886] text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="order-1 sm:order-2 w-full sm:flex-1 h-10 sm:h-10 px-4 gradient-primary hover:from-[#f1c691] hover:to-[#edb886] text-white rounded-lg font-medium text-sm transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                   >
                     {isSubmitting ? (
                       <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                        <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent"></div>
                         Guardando...
                       </>
                     ) : (
                       <>
-                        {editingSupplier ? <Edit2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                        {editingSupplier ? <Edit2 className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
                         {editingSupplier ? 'Actualizar' : 'Crear Proveedor'}
                       </>
                     )}
@@ -776,4 +776,3 @@ function Proveedores({ businessId }) {
 }
 
 export default Proveedores;
-

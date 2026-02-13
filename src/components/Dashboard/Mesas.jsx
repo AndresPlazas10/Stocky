@@ -29,6 +29,7 @@ import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { normalizeTableRecord } from '../../utils/tableStatus.js';
 
 function Mesas({ businessId }) {
+  const MODAL_REOPEN_GUARD_MS = 600;
   const [mesas, setMesas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -106,7 +107,7 @@ function Mesas({ businessId }) {
         .select('id')
         .eq('user_id', user.id)
         .eq('business_id', businessId)
-        .single();
+        .maybeSingle();
 
       // Si existe en employees, es empleado (NO puede eliminar mesas)
       setIsEmployee(!!data);
@@ -854,10 +855,9 @@ function Mesas({ businessId }) {
         setSuccess(true);
 
         setTimeout(() => {
-          setSuccess(false);
           justCompletedSaleRef.current = false;
           setCanShowOrderModal(true);
-        }, 8000);
+        }, MODAL_REOPEN_GUARD_MS);
       } catch (error) {
         setError(`❌ ${error?.message || 'No se pudo cerrar la orden. Revirtiendo estado.'}`);
         // Rollback: reload mesas
@@ -915,10 +915,9 @@ function Mesas({ businessId }) {
         setSuccess(true);
 
         setTimeout(() => {
-          setSuccess(false);
           justCompletedSaleRef.current = false;
           setCanShowOrderModal(true);
-        }, 8000);
+        }, MODAL_REOPEN_GUARD_MS);
       } catch (error) {
         setError(`❌ ${error?.message || 'No se pudo cerrar la orden. Revirtiendo estado.'}`);
         try { await loadMesas(); } catch (e) { /* no-op */ }
