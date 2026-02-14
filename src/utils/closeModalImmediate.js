@@ -4,14 +4,14 @@ export function closeModalImmediate(closeFn, backgroundFn) {
   // Cerrar UI inmediatamente
   try {
     closeFn();
-  } catch (e) {
+  } catch {
   }
 
   // Deferir trabajo que puede bloquear el cierre
   const runBackground = () => {
     try {
       if (typeof backgroundFn === 'function') backgroundFn();
-    } catch (e) {
+    } catch {
     }
   };
 

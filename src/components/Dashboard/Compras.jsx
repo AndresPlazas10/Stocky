@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
 import PurchaseFilters from '../Filters/PurchaseFilters';
 import { getFilteredPurchases } from '../../services/purchasesService';
-import { formatPrice, formatNumber, parseFormattedNumber, formatDate, formatDateOnly } from '../../utils/formatters.js';
+import { formatPrice, formatDateOnly } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
@@ -28,15 +28,10 @@ import {
 } from 'lucide-react';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 
+const _motionLintUsage = motion;
+
 const PRODUCT_LIST_COLUMNS = 'id, name, purchase_price, supplier_id, stock, is_active';
 const SUPPLIER_LIST_COLUMNS = 'id, business_name, contact_name';
-
-// Función helper para obtener el nombre del responsable
-const getResponsableName = (compra) => {
-  if (!compra.employees) return 'Responsable desconocido';
-  if (compra.employees.role === 'owner' || compra.employees.role === 'admin') return 'Administrador';
-  return compra.employees.full_name || 'Responsable desconocido';
-};
 
 const getPaymentMethodLabel = (method) => {
   const value = String(method || '').toLowerCase();
@@ -50,7 +45,7 @@ const getPaymentMethodLabel = (method) => {
 function Compras({ businessId }) {
   const [compras, setCompras] = useState([]);
   const [pagePurchases, setPagePurchases] = useState(1);
-  const [limitPurchases, setLimitPurchases] = useState(50);
+  const [limitPurchases] = useState(50);
   const [totalCountPurchases, setTotalCountPurchases] = useState(0);
   const [currentFiltersPurchases, setCurrentFiltersPurchases] = useState({});
   const [loading, setLoading] = useState(true);
@@ -81,12 +76,15 @@ function Compras({ businessId }) {
       const off = Number(pagination.offset ?? ((pagePurchases - 1) * lim));
       const includeCount = pagination.includeCount !== false;
       const countMode = pagination.countMode || 'exact';
-      const { data: purchasesData, count } = await getFilteredPurchases(businessId, filters, {
+      const { data: purchasesData, count, error: purchasesError } = await getFilteredPurchases(businessId, filters, {
         limit: lim,
         offset: off,
         includeCount,
         countMode
       });
+      if (purchasesError) {
+        throw new Error(purchasesError);
+      }
 
       if (!purchasesData || purchasesData.length === 0) {
         setCompras([]);
@@ -145,7 +143,7 @@ function Compras({ businessId }) {
         setTotalCountPurchases(count);
       }
     } catch (error) {
-      setError('❌ Error al cargar las compras');
+      setError(`❌ Error al cargar las compras: ${error?.message || 'Error desconocido'}`);
     } finally {
       setLoading(false);
     }
@@ -161,7 +159,7 @@ function Compras({ businessId }) {
 
       if (error) throw error;
       setProductos(data || []);
-    } catch (error) {
+    } catch {
       // Error silencioso
     }
   }, [businessId]);
@@ -209,8 +207,8 @@ function Compras({ businessId }) {
         const isAdminRole = employeeResult.data?.role === 'admin';
         
         setIsAdmin(isOwner || isAdminRole);
-      } catch (error) {
-        
+      } catch {
+        // no-op
       }
     };
 
@@ -223,7 +221,15 @@ function Compras({ businessId }) {
       loadProductos();
       loadProveedores();
     }
-  }, [businessId, loadCompras, loadProductos, loadProveedores]);
+  }, [
+    businessId,
+    currentFiltersPurchases,
+    limitPurchases,
+    pagePurchases,
+    loadCompras,
+    loadProductos,
+    loadProveedores
+  ]);
 
   // 🔥 TIEMPO REAL: Suscripción a cambios en compras
   useRealtimeSubscription('purchases', {
@@ -460,12 +466,24 @@ function Compras({ businessId }) {
       loadProductos();
       
     } catch (err) {
-      
       setError('❌ Error al registrar la compra: ' + err.message);
     } finally {
       setIsCreatingPurchase(false);
     }
-  }, [isCreatingPurchase, supplierId, cart, total, businessId, paymentMethod, notes, productos, loadCompras, loadProductos]);
+  }, [
+    isCreatingPurchase,
+    supplierId,
+    cart,
+    total,
+    businessId,
+    paymentMethod,
+    notes,
+    currentFiltersPurchases,
+    limitPurchases,
+    pagePurchases,
+    loadCompras,
+    loadProductos
+  ]);
 
   const resetForm = () => {
     setSupplierId('');
@@ -488,7 +506,7 @@ function Compras({ businessId }) {
       if (error) throw error;
       setSelectedPurchase({ ...purchase, details: data });
       setShowDetailsModal(true);
-    } catch (error) {
+    } catch {
       setError('❌ Error al cargar los detalles de la compra');
     }
   }, []);
@@ -614,7 +632,6 @@ function Compras({ businessId }) {
       setPurchaseToDelete(null);
 
     } catch (error) {
-      
       setError('❌ ' + (error.message || 'Error al eliminar la compra'));
       setTimeout(() => setError(''), 8000);
       setShowDeleteModal(false);

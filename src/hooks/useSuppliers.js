@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/supabase/Client';
 
 /**
@@ -11,7 +11,7 @@ export function useSuppliers(businessId) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const loadSuppliers = async () => {
+  const loadSuppliers = useCallback(async () => {
     if (!businessId) {
       setLoading(false);
       return;
@@ -36,11 +36,11 @@ export function useSuppliers(businessId) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [businessId]);
 
   useEffect(() => {
     loadSuppliers();
-  }, [businessId]);
+  }, [loadSuppliers]);
 
   return { 
     suppliers, 

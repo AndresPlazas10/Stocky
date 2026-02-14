@@ -1,5 +1,4 @@
 import { ChevronRight } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 /**
  * Card optimizada para móvil

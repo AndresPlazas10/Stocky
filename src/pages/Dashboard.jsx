@@ -132,7 +132,6 @@ function Dashboard() {
       if (employeeError && employeeError.code !== 'PGRST116') {
       }
 
-
       // Si es empleado, redirigir al dashboard de empleados
       if (!finalBusiness && employee) {
         window.location.href = '/employee-dashboard';
@@ -176,7 +175,7 @@ function Dashboard() {
 
       // Tabla users (public) no existe - no crear registro
       
-    } catch (err) {
+    } catch {
       setError('❌ Error al cargar la información del negocio');
     } finally {
       setLoading(false);
@@ -198,7 +197,7 @@ function Dashboard() {
       
       // Redirigir siempre, incluso si hay error
       window.location.href = '/login';
-    } catch (error) {
+    } catch {
       // Error inesperado al cerrar sesión
       // Forzar redirección de todas formas
       window.location.href = '/login';
@@ -220,7 +219,7 @@ function Dashboard() {
       // Actualizar estado local
       setBusinessLogo(newLogoUrl);
       setBusiness({ ...business, logo_url: newLogoUrl });
-    } catch (error) {
+    } catch {
       setError('Error al actualizar el logo');
     }
   };

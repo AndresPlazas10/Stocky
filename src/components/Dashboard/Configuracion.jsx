@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useCallback } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
@@ -107,7 +107,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       window.location.href = '/';
-    } catch (error) {
+    } catch {
       setError('❌ No se pudo cerrar la sesión correctamente');
     }
   }, []);

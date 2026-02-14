@@ -15,25 +15,25 @@ const createMotionComponent = (tag) => {
     style,
     onClick,
     onSubmit,
-    initial,
-    animate,
-    exit,
-    transition,
-    variants,
-    whileHover,
-    whileTap,
-    whileInView,
-    whileFocus,
-    whileDrag,
-    layout,
-    layoutId,
-    drag,
-    dragConstraints,
-    dragElastic,
-    dragMomentum,
-    viewport,
-    onAnimationStart,
-    onAnimationComplete,
+    initial: _initial,
+    animate: _animate,
+    exit: _exit,
+    transition: _transition,
+    variants: _variants,
+    whileHover: _whileHover,
+    whileTap: _whileTap,
+    whileInView: _whileInView,
+    whileFocus: _whileFocus,
+    whileDrag: _whileDrag,
+    layout: _layout,
+    layoutId: _layoutId,
+    drag: _drag,
+    dragConstraints: _dragConstraints,
+    dragElastic: _dragElastic,
+    dragMomentum: _dragMomentum,
+    viewport: _viewport,
+    onAnimationStart: _onAnimationStart,
+    onAnimationComplete: _onAnimationComplete,
     ...props
   }, ref) => {
     const Element = tag || 'div';
@@ -80,7 +80,7 @@ export const motion = {
 };
 
 // AnimatePresence sin animación - solo renderiza children
-export const AnimatePresence = ({ children, mode, initial, onExitComplete }) => {
+export const AnimatePresence = ({ children, mode: _mode, initial: _initial, onExitComplete: _onExitComplete }) => {
   return <>{children}</>;
 };
 

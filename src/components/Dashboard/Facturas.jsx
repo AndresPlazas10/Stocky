@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../../supabase/Client';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
-import { formatPrice, formatNumber, formatDate } from '../../utils/formatters.js';
-import { motion, AnimatePresence } from 'framer-motion';
+import { formatPrice, formatDate } from '../../utils/formatters.js';
+import { AnimatePresence } from 'framer-motion';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { XCircle, AlertTriangle, Trash2 } from 'lucide-react';
@@ -418,7 +418,6 @@ export default function Facturas({ userRole = 'admin' }) {
       await loadFacturas(businessId);
       
     } catch (error) {
-      
       
       // Si es error de sesión, redirigir
       if (error.message.includes('sesión ha expirado')) {

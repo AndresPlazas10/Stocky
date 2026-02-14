@@ -3,7 +3,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Calendar, Filter, X, ShoppingCart } from 'lucide-react';
 
-const PurchaseFilters = React.memo(function PurchaseFilters({ businessId, onApply, onClear }) {
+const PurchaseFilters = React.memo(function PurchaseFilters({ _businessId, onApply, onClear }) {
   const [monthYear, setMonthYear] = useState('');
   const [loading, setLoading] = useState(false);
 

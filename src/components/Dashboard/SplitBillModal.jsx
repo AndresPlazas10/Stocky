@@ -4,8 +4,8 @@
  * Ej: 3 hamburguesas → 1 a Cuenta A, 2 a Cuenta B.
  */
 
-import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useMemo, useCallback } from 'react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -116,10 +116,10 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel })
     }, [accounts, orderItems, itemAssignments]);
   }, [accounts, orderItems, itemAssignments]);
 
-  const getAssignedSum = (itemId) => {
+  const getAssignedSum = useCallback((itemId) => {
     const byAccount = itemAssignments[itemId] || {};
     return Object.values(byAccount).reduce((s, q) => s + q, 0);
-  };
+  }, [itemAssignments]);
 
   const validationErrors = useMemo(() => {
     const errors = [];
@@ -135,7 +135,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel })
       }
     });
     return errors;
-  }, [orderItems, itemAssignments]);
+  }, [orderItems, getAssignedSum]);
 
   const canConfirm =
     subAccounts.some((sa) => sa.items.length > 0) && validationErrors.length === 0;

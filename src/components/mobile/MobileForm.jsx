@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 
 /**
  * Input optimizado para móvil

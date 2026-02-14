@@ -1,6 +1,5 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
 
 export function ModernTable({ columns, data, onRowClick, loading, emptyMessage = "No hay datos para mostrar" }) {
   if (loading) {

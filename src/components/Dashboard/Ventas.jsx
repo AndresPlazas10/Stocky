@@ -5,9 +5,8 @@ import { getFilteredSales } from '../../services/salesService';
 import { createSaleOptimized, recordSaleCreationTime } from '../../services/salesServiceOptimized';
 import SalesFilters from '../Filters/SalesFilters';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
-import { formatPrice, formatNumber, formatDate, formatDateOnly, formatDateTimeTicket } from '../../utils/formatters.js';
+import { formatPrice, formatDate, formatDateOnly, formatDateTimeTicket } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
-import { queryCache } from '../../utils/queryCache.js';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -35,6 +34,8 @@ import {
 import ComprobanteDisclaimer from '../Legal/ComprobanteDisclaimer';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 
+const _motionLintUsage = motion;
+
 // Función helper pura fuera del componente (no se recrea en renders)
 const getVendedorName = (venta) => {
   // Prioridad 1: rol resuelto por joins (evita mostrar "Empleado" si el user es admin/owner)
@@ -53,14 +54,22 @@ const getVendedorName = (venta) => {
   return venta.employees.full_name || 'Empleado';
 };
 
+const getPaymentMethodLabel = (method) => {
+  if (method === 'cash') return 'Efectivo';
+  if (method === 'card') return 'Tarjeta';
+  if (method === 'transfer') return 'Transferencia';
+  if (method === 'mixed') return 'Mixto';
+  return method || '-';
+};
+
 function Ventas({ businessId, userRole = 'admin' }) {
   const [ventas, setVentas] = useState([]);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(50);
+  const [limit] = useState(50);
   const [totalCount, setTotalCount] = useState(0);
   const [currentFilters, setCurrentFilters] = useState({});
   const [productos, setProductos] = useState([]);
-  const [clientes, setClientes] = useState([]);
+  const clientes = [];
   const [loading, setLoading] = useState(true);
   const [showSaleModal, setShowSaleModal] = useState(false);
   const [error, setError] = useState(null);
@@ -81,12 +90,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [searchProduct, setSearchProduct] = useState('');
   
-  // Estados para facturación electrónica
-  const [generateInvoice, setGenerateInvoice] = useState(false);
-  const [customerEmail, setCustomerEmail] = useState('');
-  const [customerIdNumber, setCustomerIdNumber] = useState('');
-  const [customerName, setCustomerName] = useState('');
-  
   // Modal de facturación
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
@@ -106,12 +109,15 @@ function Ventas({ businessId, userRole = 'admin' }) {
       const countMode = pagination.countMode || 'exact';
       
       // SIEMPRE cargar datos frescos - sin caché
-      const { data, count } = await getFilteredSales(businessId, filters, {
+      const { data, count, error: salesError } = await getFilteredSales(businessId, filters, {
         limit: lim,
         offset: off,
         includeCount,
         countMode
       });
+      if (salesError) {
+        throw new Error(salesError);
+      }
       
       setVentas(data || []);
       if (typeof count === 'number') {
@@ -120,6 +126,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     } catch (err) {
       setVentas([]);
       setTotalCount(0);
+      setError(`❌ Error al cargar las ventas: ${err?.message || 'Error desconocido'}`);
     }
   }, [businessId, page, limit, currentFilters]);
 
@@ -136,11 +143,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
     setProductos(data || []);
   }, [businessId]);
 
-  const loadClientes = useCallback(async () => {
-    // Tabla customers eliminada - ya no se usa
-    setClientes([]);
-  }, []);
-
   // Verificar si el usuario autenticado es empleado
   const checkIfEmployee = useCallback(async () => {
     try {
@@ -150,7 +152,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
         return;
       }
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('employees')
         .select('id')
         .eq('user_id', user.id)
@@ -159,7 +161,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
       // Si existe en employees, es empleado (NO puede eliminar ventas)
       setIsEmployee(!!data);
-    } catch (error) {
+    } catch {
       // Si hay error, asumimos que NO es empleado (es admin)
       setIsEmployee(false);
     }
@@ -188,12 +190,12 @@ function Ventas({ businessId, userRole = 'admin' }) {
         loadProductos(),
         checkIfEmployee()
       ]);
-    } catch (error) {
+    } catch {
       setError('⚠️ No se pudo cargar la información. Por favor, intenta recargar la página.');
     } finally {
       setLoading(false);
     }
-  }, [loadVentas, loadProductos]);
+  }, [loadVentas, loadProductos, checkIfEmployee]);
 
   useEffect(() => {
     if (businessId) {
@@ -308,17 +310,16 @@ function Ventas({ businessId, userRole = 'admin' }) {
     });
   }, [removeFromCart]);
 
-  // Memoizar cálculo de total
-  const total = useMemo(() => {
-    return cart.reduce((sum, item) => sum + item.subtotal, 0);
-  }, [cart]);
-
   // Stock en vivo por producto para evitar desincronización en carrito
   const stockByProductId = useMemo(() => {
     const map = new Map();
     productos.forEach((producto) => map.set(producto.id, Number(producto.stock ?? 0)));
     return map;
   }, [productos]);
+
+  const total = useMemo(() => {
+    return cart.reduce((sum, item) => sum + item.subtotal, 0);
+  }, [cart]);
 
   const processSale = useCallback(async () => {
     if (isSubmitting) return; // Prevenir doble click
@@ -363,6 +364,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setSuccessTitle('✨ Venta Registrada');
       setSuccessDetails([
         { label: 'Total', value: formatPrice(saleTotal) },
+        { label: 'Método', value: getPaymentMethodLabel(paymentMethod) },
         { label: 'Tiempo', value: `${elapsedMs.toFixed(0)}ms` },
         { label: 'Artículos', value: cart.length }
       ]);
@@ -390,7 +392,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear
     }
-  }, [cart, sessionChecked, businessId, paymentMethod, total, loadVentas, isSubmitting]);
+  }, [cart, sessionChecked, businessId, paymentMethod, loadVentas, isSubmitting, currentFilters, limit, page]);
 
   // Funciones de eliminación de venta (solo admin)
   const handleDeleteSale = (saleId) => {
@@ -746,26 +748,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
     }
   }, [error]);
 
-  // Memoizar función de modal de factura
-  const openInvoiceModal = useCallback(async (venta) => {
-    // Campos de cliente vacíos (tabla customers eliminada)
-    setInvoiceCustomerName('');
-    setInvoiceCustomerEmail('');
-    setInvoiceCustomerIdNumber('');
-
-    // Cargar detalles de la venta
-    const { data: saleDetails } = await supabase
-      .from('sale_details')
-      .select(`
-        *,
-        products(name)
-      `)
-      .eq('sale_id', venta.id);
-    
-    setSelectedSale({ ...venta, sale_details: saleDetails || [] });
-    setShowInvoiceModal(true);
-  }, []);
-
   // Generar factura desde una venta existente (memoizado)
   const generateInvoiceFromSale = useCallback(async () => {
     if (!invoiceCustomerEmail || !invoiceCustomerEmail.includes('@')) {
@@ -840,7 +822,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     } finally {
       setGeneratingInvoice(false);
     }
-  }, [businessId, selectedSale, invoiceCustomerName, invoiceCustomerEmail, invoiceCustomerIdNumber]);
+  }, [businessId, selectedSale, invoiceCustomerName, invoiceCustomerEmail]);
 
   return (
     <AsyncStateWrapper

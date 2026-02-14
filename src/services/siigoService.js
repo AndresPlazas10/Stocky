@@ -51,7 +51,7 @@ export const siigoService = {
    * @param {string} businessId - ID del negocio
    * @returns {Promise<{canInvoice: boolean, message?: string}>}
    */
-  async canBusinessInvoice(businessId) {
+  async canBusinessInvoice(_businessId) {
     return {
       canInvoice: false,
       message: 'Stocky ya no es proveedor de facturación electrónica. Los negocios facturan directamente en Siigo.',
@@ -63,7 +63,7 @@ export const siigoService = {
    * @param {Object} invoiceData - Datos de la factura
    * @returns {Promise<Object>} Siempre retorna error
    */
-  async createInvoice(invoiceData) {
+  async createInvoice(_invoiceData) {
     return {
       success: false,
       isInformativeOnly: true,
@@ -219,7 +219,7 @@ export const siigoService = {
    * @param {string} toDate - Fecha fin (YYYY-MM-DD)
    * @returns {Promise<Object>} Siempre retorna estadísticas en cero
    */
-  async getInvoiceStats(businessId, fromDate, toDate) {
+  async getInvoiceStats(_businessId, _fromDate, _toDate) {
     return {
       total_invoices: 0,
       successful_invoices: 0,
@@ -250,7 +250,7 @@ export const siigoService = {
       if (error) throw error
 
       return data
-    } catch (error) {
+    } catch {
       return []
     }
   },
@@ -260,7 +260,7 @@ export const siigoService = {
    * @param {string} businessId - ID del negocio
    * @returns {Promise<Object>} Siempre retorna no configurado
    */
-  async getCredentialsStatus(businessId) {
+  async getCredentialsStatus(_businessId) {
     return { 
       configured: false,
       message: 'Stocky ya no gestiona credenciales Siigo. Los negocios deben configurar Siigo directamente.',

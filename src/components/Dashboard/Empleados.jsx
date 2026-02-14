@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 
 const EMPLOYEE_LIST_COLUMNS = 'id, business_id, user_id, full_name, username, role, is_active, created_at';
+const _motionLintUsage = motion;
 
 function Empleados({ businessId }) {
   const [empleados, setEmpleados] = useState([]);
@@ -25,7 +26,6 @@ function Empleados({ businessId }) {
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [successDetails, setSuccessDetails] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [generatedCode, setGeneratedCode] = useState(null);
@@ -64,7 +64,7 @@ function Empleados({ businessId }) {
       }));
       
       setEmpleados(employeesWithStatus);
-    } catch (error) {
+    } catch {
       // Error al cargar empleados
       setError('❌ Error al cargar la lista de empleados');
     } finally {
@@ -324,7 +324,7 @@ function Empleados({ businessId }) {
       await loadEmpleados();
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
-    } catch (error) {
+    } catch {
       // Error al eliminar
       setError('❌ Error al eliminar la invitación');
       setShowDeleteModal(false);
@@ -342,7 +342,7 @@ function Empleados({ businessId }) {
       await navigator.clipboard.writeText(text);
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 2000);
-    } catch (error) {
+    } catch {
       // Error al copiar
     }
   };
@@ -455,7 +455,7 @@ function Empleados({ businessId }) {
           isVisible={!!success}
           onClose={() => setSuccess(null)}
           title="✨ Empleado Registrado"
-          details={successDetails}
+          details={[]}
           duration={5000}
         />
 
@@ -509,7 +509,7 @@ function Empleados({ businessId }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {filteredEmpleados.map((empleado, index) => {
+                  {filteredEmpleados.map((empleado) => {
                     return (
                       <tr
                         key={empleado.id}
@@ -751,7 +751,7 @@ function Empleados({ businessId }) {
 
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
                   <p className="text-sm text-yellow-800">
-                    El empleado puede iniciar sesión inmediatamente en <strong>/login</strong> con estas credenciales.
+                    El empleado puede iniciar sesión inmediatamente en iniciar sesión con estas credenciales.
                   </p>
                 </div>
 

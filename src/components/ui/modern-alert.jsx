@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { AlertCircle, CheckCircle2, Info, XCircle } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 
 export function ModernAlert({ type = "info", title, message, onClose, className }) {
   const types = {

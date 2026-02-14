@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 // import Facturas from '../components/Dashboard/Facturas.jsx'; // DESHABILITADO
 
+const _motionLintUsage = motion;
+
 function EmployeeDashboard() {
   const [employee, setEmployee] = useState(null);
   const [business, setBusiness] = useState(null);
@@ -28,7 +30,6 @@ function EmployeeDashboard() {
   const [activeSection, setActiveSection] = useState('home');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showPaymentWarning, setShowPaymentWarning] = useState(false);
-  const [hasUnpaidBusiness, setHasUnpaidBusiness] = useState(false);
   const [isBusinessDisabled, setIsBusinessDisabled] = useState(false);
 
   useEffect(() => {
@@ -104,7 +105,6 @@ function EmployeeDashboard() {
       
       // 🚨 VERIFICAR SI HOY ES DÍA DE ADVERTENCIA DE PAGO (para todos los negocios)
       if (shouldShowPaymentWarning()) {
-        setHasUnpaidBusiness(true);
         // Mostrar el modal de advertencia después de 1 segundo
         setTimeout(() => {
           setShowPaymentWarning(true);
@@ -113,7 +113,7 @@ function EmployeeDashboard() {
       
       setLoading(false);
 
-    } catch (err) {
+    } catch {
       // Error en checkEmployeeAuth
       setError('❌ Error al cargar información del empleado');
       setLoading(false);
@@ -135,7 +135,7 @@ function EmployeeDashboard() {
       
       // Redirigir siempre, incluso si hay error
       window.location.href = '/';
-    } catch (error) {
+    } catch {
       // Error inesperado al cerrar sesión
       // Forzar redirección de todas formas
       window.location.href = '/';

@@ -20,7 +20,7 @@ export async function isBraveBrowser() {
     const bravePromise = navigator.brave.isBrave();
     
     return await Promise.race([bravePromise, timeoutPromise]);
-  } catch (error) {
+  } catch {
     // Si hay error, asumir que no es Brave para no romper la app
     return false;
   }
@@ -39,7 +39,7 @@ export async function checkBraveShields() {
         message: 'Brave detectado. Si tienes problemas, desactiva Shields para este sitio.'
       }
     };
-  } catch (error) {
+  } catch {
     return { isBrave: true, error: 'No se pudo verificar Brave Shields' };
   }
 }

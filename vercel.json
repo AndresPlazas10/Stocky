@@ -6,7 +6,7 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/:path((?!assets).*)",
+      "source": "/:path((?!api|assets).*)",
       "destination": "/index.html"
     }
   ],

@@ -48,7 +48,7 @@ export const isValidEmailFormat = (email) => {
   }
 
   // Regex RFC 5322 simplificado pero estricto
-  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
   
   return emailRegex.test(email.trim());
 };
@@ -248,7 +248,7 @@ export const logEmailAttempt = ({
     logs.push(logData);
     // Mantener solo los últimos 50 logs
     localStorage.setItem('email_logs', JSON.stringify(logs.slice(-50)));
-  } catch (e) {
+  } catch {
     // Ignorar errores de localStorage
   }
 };
@@ -268,7 +268,7 @@ export const getEmailStats = () => {
       skipped: logs.filter(l => l.skipped).length,
       lastAttempt: logs[logs.length - 1] || null
     };
-  } catch (e) {
+  } catch {
     return {
       total: 0,
       success: 0,
@@ -285,7 +285,7 @@ export const getEmailStats = () => {
 export const clearEmailLogs = () => {
   try {
     localStorage.removeItem('email_logs');
-  } catch (e) {
+  } catch {
     // Silencioso en producción
   }
 };

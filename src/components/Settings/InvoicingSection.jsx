@@ -2,7 +2,7 @@
 // Ubicacion: src/components/Settings/InvoicingSection.jsx
 
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
 import { useInvoicing } from '../../context/InvoicingContext'
 import { 
   FileText, 

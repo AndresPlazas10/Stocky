@@ -12,13 +12,13 @@ const IS_DEVELOPMENT = import.meta.env.DEV;
 export const logger = {
   log: (...args) => {
     if (IS_DEVELOPMENT) {
-      
+      console.log(...args);
     }
   },
   
   error: (message, error) => {
     if (IS_DEVELOPMENT) {
-      
+      console.error(message, error);
     }
     // En producción, podrías enviar a un servicio como Sentry
     if (IS_PRODUCTION && error) {
@@ -28,13 +28,13 @@ export const logger = {
   
   warn: (...args) => {
     if (IS_DEVELOPMENT) {
-      
+      console.warn(...args);
     }
   },
   
   info: (...args) => {
     if (IS_DEVELOPMENT) {
-      
+      console.info(...args);
     }
   }
 };
@@ -46,7 +46,7 @@ export const logger = {
  */
 export const handleError = (error, context = '') => {
   if (IS_DEVELOPMENT) {
-    
+    console.error('Error:', context, error);
   }
   
   // En producción, registrar sin exponer detalles al usuario

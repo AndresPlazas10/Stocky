@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+
 import { X, Save, Package } from 'lucide-react';
 import {
   Dialog,
@@ -113,7 +113,7 @@ export function ProductDialog({
 
       await onSave(dataToSave);
       onClose();
-    } catch (error) {
+    } catch {
       // Error handled silently
     } finally {
       setIsSubmitting(false);

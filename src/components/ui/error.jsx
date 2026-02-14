@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Home, ArrowLeft, RefreshCw } from 'lucide-react';
 import { Button } from './button';

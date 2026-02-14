@@ -34,7 +34,7 @@ export default function TableRowOptimistic({ table, tenantId, userId, updateLoca
       // Reconciliar con la respuesta del servidor (si devuelve timestamps/version)
       updateLocalTable(table.id, { ...optimistic, ...body.data });
       setSaving(false);
-    } catch (err) {
+    } catch {
       // Revertir en caso de error
       updateLocalTable(table.id, snapshot);
       setSaving(false);

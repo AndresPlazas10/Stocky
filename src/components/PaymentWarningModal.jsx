@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { AlertTriangle, X, CreditCard, Calendar, Phone, Mail } from 'lucide-react';
 import { Button } from './ui/button';
 

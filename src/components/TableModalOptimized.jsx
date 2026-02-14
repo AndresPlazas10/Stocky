@@ -23,7 +23,7 @@ export default function TableModalOptimized({ table, tenantId, userId, isOpen, s
           // Reconcile local state with server response
           updateLocalTable(table.id, { ...table, ...body.data });
         })
-        .catch((err) => {
+        .catch((_err) => {
           // On error, revert or notify user
           // Optionally: refetch or rollback using snapshot stored elsewhere
         })
@@ -31,7 +31,7 @@ export default function TableModalOptimized({ table, tenantId, userId, isOpen, s
 
       // Optional: timeout to abort if connection stalls (non-blocking)
       setTimeout(() => controller.abort(), 30_000);
-    } catch (err) {
+    } catch {
       setBusy(false);
     }
   };

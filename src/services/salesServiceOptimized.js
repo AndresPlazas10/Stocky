@@ -121,7 +121,7 @@ export function recordSaleCreationTime(milliseconds) {
     
     localStorage.setItem(key, JSON.stringify(times));
     
-  } catch (e) {
+  } catch {
     // Ignorar errores de localStorage
   }
 }
@@ -136,7 +136,7 @@ export function getSaleCreationMetrics() {
     const max = Math.max(...times);
     
     return { avg, min, max, count: times.length };
-  } catch (e) {
+  } catch {
     return null;
   }
 }
