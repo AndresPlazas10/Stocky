@@ -61,6 +61,24 @@ const mergeOrderItemsPreservingPosition = (previousItems = [], incomingItems = [
   return [...newItemsFirst, ...preserved];
 };
 
+const normalizeTableIdentifier = (value) => String(value ?? '').trim();
+
+const compareTableIdentifiers = (left, right) => {
+  const a = normalizeTableIdentifier(left?.table_number);
+  const b = normalizeTableIdentifier(right?.table_number);
+
+  const aIsInteger = /^\d+$/.test(a);
+  const bIsInteger = /^\d+$/.test(b);
+
+  if (aIsInteger && bIsInteger) {
+    return Number(a) - Number(b);
+  }
+  if (aIsInteger && !bIsInteger) return -1;
+  if (!aIsInteger && bIsInteger) return 1;
+
+  return a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' });
+};
+
 // eslint helper: `no-unused-vars` no detecta consistentemente `<motion.* />` en esta config.
 const _motionLintUsage = motion;
 
@@ -214,7 +232,7 @@ function Mesas({ businessId }) {
         return;
       }
       
-      setMesas((data || []).map(normalizeTableRecord));
+      setMesas((data || []).map(normalizeTableRecord).sort(compareTableIdentifiers));
     } catch {
       setError('No se pudo cargar las mesas. Revisa tu conexión e intenta de nuevo.');
     }
@@ -278,7 +296,7 @@ function Mesas({ businessId }) {
       if (exists) {
         return prev;
       }
-      return [...prev, normalizedTable].sort((a, b) => a.table_number - b.table_number);
+      return [...prev, normalizedTable].sort(compareTableIdentifiers);
     });
     setSuccess(`✨ Nueva mesa #${normalizedTable.table_number} agregada`);
     setTimeout(() => setSuccess(null), 3000);
@@ -457,16 +475,16 @@ function Mesas({ businessId }) {
     setSuccess(null);
     
     try {
-      const tableNum = parseInt(newTableNumber);
-      if (isNaN(tableNum) || tableNum <= 0) {
-        throw new Error('Ingresa un número de mesa válido');
+      const tableIdentifier = normalizeTableIdentifier(newTableNumber);
+      if (!tableIdentifier) {
+        throw new Error('Ingresa un identificador de mesa válido');
       }
 
       const { error } = await supabase
         .from('tables')
         .insert([{
           business_id: businessId,
-          table_number: tableNum,
+          table_number: tableIdentifier,
           status: 'available'
         }])
         .select()
@@ -474,7 +492,7 @@ function Mesas({ businessId }) {
 
       if (error) {
         if (error.code === '23505') {
-          throw new Error('Este número de mesa ya existe');
+          throw new Error('Este identificador de mesa ya existe');
         }
         throw error;
       }
@@ -1430,14 +1448,13 @@ function Mesas({ businessId }) {
                     <form onSubmit={handleCreateTable} className="flex flex-col sm:flex-row gap-4 sm:items-end">
                       <div className="flex-1">
                         <label className="block text-sm font-semibold text-primary-700 mb-2">
-                          Número de Mesa *
+                          Identificador de Mesa *
                         </label>
                         <Input
-                          type="number"
-                          min="1"
+                          type="text"
                           value={newTableNumber}
                           onChange={(e) => setNewTableNumber(e.target.value)}
-                          placeholder="Ej: 1, 2, 3..."
+                          placeholder="Ej: 1, A1, Terraza-2..."
                           className="h-12 border-accent-300"
                           required
                         />
