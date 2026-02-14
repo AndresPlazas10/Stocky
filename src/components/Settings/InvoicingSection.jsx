@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 // Seccion de Facturacion Electronica
 // Ubicacion: src/components/Settings/InvoicingSection.jsx
 

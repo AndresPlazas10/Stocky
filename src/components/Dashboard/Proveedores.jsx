@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
@@ -15,7 +16,8 @@ import {
   MapPin, 
   FileText,
   Search,
-  Package
+  Package,
+  AlertTriangle
 } from 'lucide-react';
 
 const BASE_SUPPLIER_COLUMNS = 'id, business_id, business_name, contact_name, email, phone, address, notes, created_at';

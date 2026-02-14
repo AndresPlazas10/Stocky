@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 // ============================================
 // 📜 Página de Términos y Condiciones
 // ============================================

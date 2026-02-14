@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice } from '../../utils/formatters.js';

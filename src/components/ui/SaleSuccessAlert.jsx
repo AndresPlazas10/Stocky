@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { AnimatePresence } from 'framer-motion';
 import { CheckCircle2, X } from 'lucide-react';
