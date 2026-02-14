@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
-import { formatPrice, formatNumber } from '../../utils/formatters.js';
+import { formatPrice } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
@@ -27,6 +27,8 @@ import {
   Edit
 } from 'lucide-react';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
+
+const _motionLintUsage = motion;
 
 function Inventario({ businessId, userRole = 'admin' }) {
   const [productos, setProductos] = useState([]);
@@ -74,7 +76,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
       if (error) throw error;
       
       setProductos(data || []);
-    } catch (error) {
+    } catch {
       setError('❌ Error al cargar el inventario');
     } finally {
       setLoading(false);
@@ -91,7 +93,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
 
       if (error) throw error;
       setProveedores(data || []);
-    } catch (error) {
+    } catch {
       // Error silencioso
     }
   }, [businessId]);
@@ -105,7 +107,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
         return;
       }
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('employees')
         .select('id')
         .eq('user_id', user.id)
@@ -114,7 +116,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
 
       // Si existe en employees, es empleado (NO puede editar/eliminar)
       setIsEmployee(!!data);
-    } catch (error) {
+    } catch {
       // Si hay error, asumimos que NO es empleado (es admin)
       setIsEmployee(false);
     }
@@ -339,6 +341,8 @@ function Inventario({ businessId, userRole = 'admin' }) {
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear
     }
+  // handleUpdate se define más abajo y solo se invoca en submit de edición.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId, formData, loadProductos, isSubmitting, editingProduct]);
 
   const handleUpdate = useCallback(async () => {
@@ -355,7 +359,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
         is_active: formData.is_active
       };
 
-      const { data: updatedProduct, error: updateError } = await supabase
+      const { error: updateError } = await supabase
         .from('products')
         .update(productData)
         .eq('id', editingProduct.id)
@@ -382,8 +386,6 @@ function Inventario({ businessId, userRole = 'admin' }) {
       setGeneratedCode('');
       setSuccess('✅ Producto actualizado exitosamente');
       setTimeout(() => setSuccess(null), 3000);
-    } catch (error) {
-      throw error;
     } finally {
       setIsSubmitting(false);
     }
@@ -434,7 +436,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
       setProductToDelete(null);
       setSuccess('✅ Producto eliminado exitosamente');
       await loadProductos();
-    } catch (error) {
+    } catch {
       setError('❌ Error al eliminar el producto');
       setShowDeleteModal(false);
       setProductToDelete(null);
@@ -456,7 +458,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
       await loadProductos();
       setShowDeactivateModal(false);
       setProductToDelete(null);
-    } catch (error) {
+    } catch {
       setError('❌ Error al desactivar el producto');
       setShowDeactivateModal(false);
       setProductToDelete(null);
@@ -480,7 +482,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
 
       setSuccess(`✅ Producto ${!currentStatus ? 'activado' : 'desactivado'} exitosamente`);
       await loadProductos();
-    } catch (error) {
+    } catch {
       setError('❌ Error al actualizar el estado del producto');
     }
   }, [loadProductos]);

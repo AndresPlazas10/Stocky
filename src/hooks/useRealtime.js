@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../supabase/Client';
 
 const IS_DEV = import.meta.env.DEV;
@@ -36,16 +36,19 @@ export function useRealtimeSubscription(table, options = {}) {
     if (onDelete && payload.old) onDelete(payload.old);
   }, [onDelete]);
 
+  const filterKey = useMemo(() => JSON.stringify(filter || {}), [filter]);
+
   useEffect(() => {
     if (!enabled || !table) return;
 
-    const businessId = filter?.business_id || 'global';
+    const parsedFilter = JSON.parse(filterKey || '{}');
+    const businessId = parsedFilter?.business_id || 'global';
     const channelName = `realtime:${table}:${businessId}`;
     const channel = supabase.channel(channelName);
 
     // Construir filtro para Supabase
-    const filterString = Object.keys(filter).length > 0
-      ? Object.entries(filter).map(([key, value]) => `${key}=eq.${value}`).join(',')
+    const filterString = Object.keys(parsedFilter).length > 0
+      ? Object.entries(parsedFilter).map(([key, value]) => `${key}=eq.${value}`).join(',')
       : undefined;
 
     // Suscripción a cambios de Postgres
@@ -82,7 +85,7 @@ export function useRealtimeSubscription(table, options = {}) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [table, enabled, JSON.stringify(filter || {}), handleInsert, handleUpdate, handleDelete]);
+  }, [table, enabled, filterKey, handleInsert, handleUpdate, handleDelete]);
 }
 
 /**
@@ -95,7 +98,7 @@ export function useRealtimeSubscriptions(subscriptions = [], enabled = true) {
 
     const channels = [];
 
-    subscriptions.forEach((sub) => {
+    subscriptions.forEach((sub, index) => {
       const { table, filter = {}, onInsert, onUpdate, onDelete } = sub;
       
       const channelName = `realtime:${table}:${index}:${Date.now()}`;

@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useCallback } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
-import { formatPrice, formatNumber } from '../../utils/formatters.js';
+import { formatPrice } from '../../utils/formatters.js';
 import {
   TrendingUp,
   TrendingDown,
@@ -181,7 +181,7 @@ function Reportes({ businessId }) {
         gananciaBruta
       });
 
-    } catch (error) {
+    } catch {
       setError('❌ Error al cargar los reportes');
     } finally {
       setLoading(false);

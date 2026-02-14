@@ -37,7 +37,7 @@ function App() {
             sessionStorage.setItem('braveWarningShown', 'true');
           }
         }
-      } catch (error) {
+      } catch {
       }
     }
     detectBrave();

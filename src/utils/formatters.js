@@ -133,7 +133,7 @@ export const formatDate = (timestamp, options = {}) => {
     };
     
     return date.toLocaleString('es-CO', defaultOptions);
-  } catch (error) {
+  } catch {
     
     return 'Error de formato';
   }
@@ -164,7 +164,7 @@ export const formatDateOnly = (timestamp) => {
       day: 'numeric',
       timeZone: 'America/Bogota'
     });
-  } catch (error) {
+  } catch {
     
     return 'Fecha inválida';
   }
@@ -195,7 +195,7 @@ export const formatTimeOnly = (timestamp) => {
       hour12: true, // Formato de 12 horas con AM/PM
       timeZone: 'America/Bogota'
     });
-  } catch (error) {
+  } catch {
     
     return 'Hora inválida';
   }
@@ -229,7 +229,7 @@ export const formatDateLong = (timestamp) => {
       hour12: true, // Formato de 12 horas con AM/PM
       timeZone: 'America/Bogota'
     });
-  } catch (error) {
+  } catch {
     
     return 'Fecha inválida';
   }
@@ -272,7 +272,7 @@ export const formatDateTimeTicket = (timestamp) => {
     const timePart = date.toLocaleTimeString('es-CO', timeOptions);
     
     return `${datePart} - ${timePart}`;
-  } catch (error) {
+  } catch {
     return 'Fecha inválida';
   }
 };
@@ -300,7 +300,7 @@ export const formatTimeCompact = (timestamp) => {
       hour12: true,
       timeZone: 'America/Bogota'
     });
-  } catch (error) {
+  } catch {
     return 'Hora inválida';
   }
 };
@@ -334,7 +334,7 @@ export const formatDateTimeReport = (timestamp) => {
     });
     
     return `${day}/${month}/${year} ${timeFormatted}`;
-  } catch (error) {
+  } catch {
     return 'Fecha inválida';
   }
 };

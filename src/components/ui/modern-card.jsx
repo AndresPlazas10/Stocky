@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+
 import { cn } from '@/lib/utils';
 
 export function ModernCard({ 
@@ -56,7 +56,7 @@ export function ModernCardContent({ children, className, ...props }) {
   );
 }
 
-export function StatCard({ icon: Icon, title, value, subtitle, trend, color = "primary" }) {
+export function StatCard({ icon: _Icon, title, value, subtitle, trend, color = "primary" }) {
   const colorClasses = {
     primary: "from-primary-600 to-primary-900",
     accent: "from-accent-500 to-accent-700",

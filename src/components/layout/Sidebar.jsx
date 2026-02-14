@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard,
   Package,
@@ -47,7 +47,6 @@ export const Sidebar = React.memo(function Sidebar({ activeSection, onSectionCha
     
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        setError('El archivo es muy grande. Máximo 2MB.');
         return;
       }
       
@@ -58,8 +57,6 @@ export const Sidebar = React.memo(function Sidebar({ activeSection, onSectionCha
         if (onLogoChange) {
           onLogoChange(logoUrl);
         }
-        
-        setShowLogoUpload(false);
       };
       reader.readAsDataURL(file);
     }

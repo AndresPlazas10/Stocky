@@ -7,7 +7,7 @@
 // contactando al equipo de Stocky
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+
 import { 
   X, 
   FileText, 
@@ -104,7 +104,7 @@ export default function InvoicingActivationFlow({
       
       setRequestSent(true)
       
-    } catch (err) {
+    } catch {
       // Continuar con contacto aunque falle
       if (contactMethod === 'whatsapp') {
         handleContactWhatsApp()

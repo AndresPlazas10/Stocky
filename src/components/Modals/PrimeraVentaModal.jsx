@@ -7,7 +7,7 @@
 // Explica cómo funciona la facturación electrónica y las obligaciones fiscales
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { 
   CheckCircle2, 
   FileText, 

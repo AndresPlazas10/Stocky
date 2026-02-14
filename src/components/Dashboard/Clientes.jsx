@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '../../supabase/Client.jsx';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
@@ -26,7 +25,7 @@ function Clientes({ businessId }) {
     // Tabla customers eliminada - no hacer nada
     setLoading(false);
     setClientes([]);
-  }, [businessId]);
+  }, []);
 
   useEffect(() => {
     if (businessId) {

@@ -17,7 +17,7 @@
  * await sendInvoiceEmail({ email, invoiceNumber, customerName, total, items });
  */
 
-import { sendInvoiceEmailResend, isResendConfigured } from './emailServiceResend';
+import { isResendConfigured } from './emailServiceResend';
 import { sendInvoiceEmail as sendInvoiceEmailJS } from './emailServiceSupabase';
 
 /**

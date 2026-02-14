@@ -1,4 +1,4 @@
-import { supabase } from '../supabase/Client';
+
 import emailjs from '@emailjs/browser';
 import { 
   validateEmail, 

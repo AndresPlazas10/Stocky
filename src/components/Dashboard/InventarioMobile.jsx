@@ -11,7 +11,7 @@
  * 4. Cards de estadísticas → MobileStatCard
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice } from '../../utils/formatters.js';
 import { useViewport } from '../../hooks/useViewport';
@@ -54,27 +54,7 @@ function InventarioMobile({ businessId }) {
     supplier_id: ''
   });
 
-  useEffect(() => {
-    if (businessId) {
-      loadData();
-    }
-  }, [businessId]);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      await Promise.all([
-        loadProductos(),
-        loadProveedores()
-      ]);
-    } catch (error) {
-      // Error handled silently
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadProductos = async () => {
+  const loadProductos = useCallback(async () => {
     const { data, error } = await supabase
       .from('products')
       .select(MOBILE_PRODUCTS_COLUMNS)
@@ -85,9 +65,9 @@ function InventarioMobile({ businessId }) {
     if (!error && data) {
       setProductos(data);
     }
-  };
+  }, [businessId]);
 
-  const loadProveedores = async () => {
+  const loadProveedores = useCallback(async () => {
     const { data, error } = await supabase
       .from('suppliers')
       .select('id, name')
@@ -97,7 +77,27 @@ function InventarioMobile({ businessId }) {
     if (!error && data) {
       setProveedores(data);
     }
-  };
+  }, [businessId]);
+
+  useEffect(() => {
+    if (!businessId) return;
+
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        await Promise.all([
+          loadProductos(),
+          loadProveedores()
+        ]);
+      } catch {
+        // Error handled silently
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [businessId, loadProductos, loadProveedores]);
 
   const handleSave = async () => {
     try {
@@ -105,7 +105,7 @@ function InventarioMobile({ businessId }) {
       await loadProductos();
       setShowAddModal(false);
       resetForm();
-    } catch (error) {
+    } catch {
       // Error handled silently
     }
   };

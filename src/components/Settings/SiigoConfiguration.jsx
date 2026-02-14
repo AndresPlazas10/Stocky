@@ -6,7 +6,7 @@
 // ⚠️ DEPRECATED: Stocky ya NO es proveedor de facturación electrónica.
 // Este componente muestra solo un mensaje informativo.
 
-export default function SiigoConfiguration({ businessId }) {
+export default function SiigoConfiguration({ _businessId }) {
   return (
     <div className="space-y-6">
       {/* Header */}

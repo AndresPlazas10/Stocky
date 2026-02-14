@@ -13,9 +13,6 @@ const SALES_LIST_COLUMNS = `
   seller_name,
   payment_method,
   customer_id,
-  customer_name,
-  customer_email,
-  customer_id_number,
   notes,
   total,
   created_at
@@ -97,7 +94,7 @@ export async function getCurrentUser() {
 export async function getSales(businessId) {
   try {
     // 1. Validar sesión
-    const { user, error: userError } = await getCurrentUser();
+    const { error: userError } = await getCurrentUser();
     if (userError) throw new Error(userError);
 
     // 2. Obtener ventas
@@ -161,7 +158,7 @@ export async function getSales(businessId) {
     });
 
     return enrichedSales;
-  } catch (error) {
+  } catch {
     // Error en getSales
     return [];
   }
@@ -175,129 +172,116 @@ export async function getSales(businessId) {
  * @returns {Promise<{data: Array, count: number}>}
  */
 export async function getFilteredSales(businessId, filters = {}, pagination = {}) {
+  if (!businessId) return { data: [], count: 0, error: null };
+
+  const limit = Number(pagination.limit || 50);
+  const offset = Number(pagination.offset || 0);
+  const includeCount = pagination.includeCount !== false;
+  const countMode = pagination.countMode || 'exact';
+
+  const toDateIso = filters.toDate
+    ? (() => {
+        const endDate = new Date(filters.toDate);
+        endDate.setHours(23, 59, 59, 999);
+        return endDate.toISOString();
+      })()
+    : null;
+
   try {
-    if (!businessId) return { data: [], count: 0 };
+    const { data: rpcRows, error: rpcError } = await supabase.rpc('get_sales_enriched', {
+      p_business_id: businessId,
+      p_limit: limit,
+      p_offset: offset,
+      p_from_date: filters.fromDate || null,
+      p_to_date: toDateIso,
+      p_payment_method: filters.paymentMethod || null,
+      p_user_id: filters.employeeId || null,
+      p_customer_id: filters.customerId || null,
+      p_min_amount: filters.minAmount ?? null,
+      p_max_amount: filters.maxAmount ?? null,
+      p_include_count: includeCount
+    });
 
-    const limit = Number(pagination.limit || 50);
-    const offset = Number(pagination.offset || 0);
-    const includeCount = pagination.includeCount !== false;
-    const countMode = pagination.countMode || 'exact';
+    if (rpcError) {
+      if (isMissingSalesRpcError(rpcError)) {
+        throw new Error(SALES_RPC_NOT_AVAILABLE);
+      }
+      throw rpcError;
+    }
 
-    const toDateIso = filters.toDate
-      ? (() => {
-          const endDate = new Date(filters.toDate);
-          endDate.setHours(23, 59, 59, 999);
-          return endDate.toISOString();
-        })()
-      : null;
-
+    const mapped = mapRpcSalesRows(rpcRows || [], includeCount);
+    return { ...mapped, error: null };
+  } catch (rpcErr) {
     try {
-      const { data: rpcRows, error: rpcError } = await supabase.rpc('get_sales_enriched', {
-        p_business_id: businessId,
-        p_limit: limit,
-        p_offset: offset,
-        p_from_date: filters.fromDate || null,
-        p_to_date: toDateIso,
-        p_payment_method: filters.paymentMethod || null,
-        p_user_id: filters.employeeId || null,
-        p_customer_id: filters.customerId || null,
-        p_min_amount: filters.minAmount ?? null,
-        p_max_amount: filters.maxAmount ?? null,
-        p_include_count: includeCount
+      let query = includeCount
+        ? supabase.from('sales').select(SALES_LIST_COLUMNS, { count: countMode })
+        : supabase.from('sales').select(SALES_LIST_COLUMNS);
+      query = query.eq('business_id', businessId).order('created_at', { ascending: false });
+
+      if (filters.fromDate) query = query.gte('created_at', filters.fromDate);
+      if (filters.toDate) query = query.lte('created_at', toDateIso);
+      if (filters.paymentMethod) query = query.eq('payment_method', filters.paymentMethod);
+      if (filters.employeeId) query = query.eq('user_id', filters.employeeId);
+      if (filters.customerId) query = query.eq('customer_id', filters.customerId);
+      if (filters.minAmount) query = query.gte('total', filters.minAmount);
+      if (filters.maxAmount) query = query.lte('total', filters.maxAmount);
+
+      query = query.range(offset, offset + limit - 1);
+
+      const { data: sales, error, count } = await query;
+      if (error) throw error;
+
+      if (!sales || sales.length === 0) {
+        return { data: [], count: includeCount ? (count || 0) : null, error: null };
+      }
+
+      const [{ data: employees }, { data: business }] = await Promise.all([
+        supabase
+          .from('employees')
+          .select('user_id, full_name, role')
+          .eq('business_id', businessId)
+          .limit(100),
+        supabase
+          .from('businesses')
+          .select('created_by')
+          .eq('id', businessId)
+          .maybeSingle()
+      ]);
+
+      const employeeMap = new Map();
+      employees?.forEach(emp => {
+        if (emp.user_id) {
+          employeeMap.set(emp.user_id, {
+            full_name: emp.full_name || 'Empleado',
+            role: emp.role
+          });
+        }
       });
 
-      if (rpcError) {
-        if (isMissingSalesRpcError(rpcError)) {
-          throw new Error(SALES_RPC_NOT_AVAILABLE);
-        }
-        throw rpcError;
-      }
+      const enriched = (sales || []).map(sale => {
+        const employee = sale.user_id ? employeeMap.get(sale.user_id) : null;
+        const isOwner = sale.user_id && business?.created_by &&
+                        String(sale.user_id).trim() === String(business.created_by).trim();
+        const isAdmin = isAdminRole(employee?.role);
 
-      return mapRpcSalesRows(rpcRows || [], includeCount);
-    } catch (rpcErr) {
-      if (rpcErr.message !== SALES_RPC_NOT_AVAILABLE) {
-        throw rpcErr;
-      }
+        return {
+          ...sale,
+          employees: isOwner
+            ? { full_name: 'Administrador', role: 'owner' }
+            : isAdmin
+            ? { full_name: 'Administrador', role: 'admin' }
+            : employee || {
+                full_name: sale.seller_name || 'Empleado',
+                role: 'employee'
+              }
+        };
+      });
+
+      return { data: enriched, count: includeCount ? (count || 0) : null, error: null };
+    } catch (legacyError) {
+      const normalizedError = legacyError?.message || rpcErr?.message || 'Error al obtener ventas';
+      return { data: [], count: 0, error: normalizedError };
     }
-
-    // Construir query optimizada - solo seleccionar campos necesarios
-    let query = supabase.from('sales').eq('business_id', businessId).order('created_at', { ascending: false });
-    query = includeCount
-      ? query.select(SALES_LIST_COLUMNS, { count: countMode })
-      : query.select(SALES_LIST_COLUMNS);
-
-    // Aplicar filtros de fecha primero (mejor uso de índices)
-    if (filters.fromDate) query = query.gte('created_at', filters.fromDate);
-    if (filters.toDate) query = query.lte('created_at', toDateIso);
-
-    // Otros filtros
-    if (filters.paymentMethod) query = query.eq('payment_method', filters.paymentMethod);
-    if (filters.employeeId) query = query.eq('user_id', filters.employeeId);
-    if (filters.customerId) query = query.eq('customer_id', filters.customerId);
-
-    // Filtros de monto
-    if (filters.minAmount) query = query.gte('total', filters.minAmount);
-    if (filters.maxAmount) query = query.lte('total', filters.maxAmount);
-
-    // Aplicar paginación
-    query = query.range(offset, offset + limit - 1);
-
-    const { data: sales, error, count } = await query;
-    if (error) throw error;
-
-    if (!sales || sales.length === 0) {
-      return { data: [], count: includeCount ? (count || 0) : null };
-    }
-
-    // Enriquecer con empleados de forma optimizada
-    const [{ data: employees }, { data: business }] = await Promise.all([
-      supabase
-        .from('employees')
-        .select('user_id, full_name, role')
-        .eq('business_id', businessId)
-        .limit(100),
-      supabase
-        .from('businesses')
-        .select('created_by')
-        .eq('id', businessId)
-        .maybeSingle()
-    ]);
-
-    // Crear mapa de empleados para acceso O(1)
-    const employeeMap = new Map();
-    employees?.forEach(emp => {
-      if (emp.user_id) {
-        employeeMap.set(emp.user_id, { 
-          full_name: emp.full_name || 'Empleado', 
-          role: emp.role 
-        });
-      }
-    });
-
-    // Enriquecer ventas
-    const enriched = (sales || []).map(sale => {
-      const employee = sale.user_id ? employeeMap.get(sale.user_id) : null;
-      const isOwner = sale.user_id && business?.created_by && 
-                      String(sale.user_id).trim() === String(business.created_by).trim();
-      const isAdmin = isAdminRole(employee?.role);
-
-      return {
-        ...sale,
-        employees: isOwner 
-          ? { full_name: 'Administrador', role: 'owner' } 
-          : isAdmin 
-          ? { full_name: 'Administrador', role: 'admin' } 
-          : employee || { 
-              full_name: sale.seller_name || 'Empleado', 
-              role: 'employee' 
-            }
-      };
-    });
-
-    return { data: enriched, count: includeCount ? (count || 0) : null };
-  } catch (error) {
-    
-    return { data: [], count: 0 };
   }
 }
 
@@ -310,8 +294,7 @@ export async function createSale({
   businessId,
   cart,
   paymentMethod,
-  total,
-  customerData = null
+  total
 }) {
   try {
     // 1. Validar sesión
@@ -392,7 +375,7 @@ export async function createSale({
 
     // 7. Reducir stock de productos en BATCH (OPTIMIZADO)
     // CAMBIO: De 10 queries secuenciales a 1 sola llamada RPC
-    const { data: stockResults, error: stockError } = await supabase.rpc('update_stock_batch', {
+    const { error: stockError } = await supabase.rpc('update_stock_batch', {
       product_updates: cart.map(item => ({
         product_id: item.product_id,
         quantity: item.quantity
@@ -435,7 +418,7 @@ export async function getAvailableProducts(businessId) {
 
     if (error) throw error;
     return data || [];
-  } catch (error) {
+  } catch {
     // Error obteniendo productos
     return [];
   }
@@ -449,7 +432,7 @@ export async function getAvailableProducts(businessId) {
 export async function deleteSale(saleId) {
   try {
     // Validar sesión
-    const { user, error: userError } = await getCurrentUser();
+    const { error: userError } = await getCurrentUser();
     if (userError) {
       return { success: false, error: userError };
     }

@@ -1,72 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabase/Client.jsx';
 
 export function useNotifications(businessId) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!businessId) return;
-
-    loadNotifications();
-
-    // Suscribirse a cambios en tiempo real
-    const salesChannel = supabase
-      .channel('sales-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'sales',
-          filter: `business_id=eq.${businessId}`
-        },
-        () => {
-          loadNotifications();
-        }
-      )
-      .subscribe();
-
-    const purchasesChannel = supabase
-      .channel('purchases-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'purchases',
-          filter: `business_id=eq.${businessId}`
-        },
-        () => {
-          loadNotifications();
-        }
-      )
-      .subscribe();
-
-    const productsChannel = supabase
-      .channel('products-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'products',
-          filter: `business_id=eq.${businessId}`
-        },
-        () => {
-          loadNotifications();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      salesChannel.unsubscribe();
-      purchasesChannel.unsubscribe();
-      productsChannel.unsubscribe();
-    };
-  }, [businessId]);
-
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     try {
       const allNotifications = [];
 
@@ -158,12 +97,73 @@ export function useNotifications(businessId) {
       });
 
       setNotifications(allNotifications);
-    } catch (error) {
+    } catch {
       // Error handled silently
     } finally {
       setLoading(false);
     }
-  };
+  }, [businessId]);
+
+  useEffect(() => {
+    if (!businessId) return;
+
+    loadNotifications();
+
+    // Suscribirse a cambios en tiempo real
+    const salesChannel = supabase
+      .channel('sales-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'sales',
+          filter: `business_id=eq.${businessId}`
+        },
+        () => {
+          loadNotifications();
+        }
+      )
+      .subscribe();
+
+    const purchasesChannel = supabase
+      .channel('purchases-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'purchases',
+          filter: `business_id=eq.${businessId}`
+        },
+        () => {
+          loadNotifications();
+        }
+      )
+      .subscribe();
+
+    const productsChannel = supabase
+      .channel('products-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'products',
+          filter: `business_id=eq.${businessId}`
+        },
+        () => {
+          loadNotifications();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      salesChannel.unsubscribe();
+      purchasesChannel.unsubscribe();
+      productsChannel.unsubscribe();
+    };
+  }, [businessId, loadNotifications]);
 
   const getTimeAgo = (date) => {
     const now = new Date();

@@ -14,7 +14,7 @@ import { ID_TYPES, PAYMENT_METHODS, TAX_RATES } from '../services/siigoService'
  * @param {string} businessId - ID del negocio
  * @returns {Object} Estado y funciones (todas deshabilitadas)
  */
-export function useSiigoInvoice(businessId) {
+export function useSiigoInvoice(_businessId) {
   // Estados
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('La facturación electrónica a través de Stocky ya no está disponible')
@@ -31,7 +31,7 @@ export function useSiigoInvoice(businessId) {
   /**
    * ⚠️ DEPRECATED - Siempre retorna error
    */
-  const createInvoice = useCallback(async (invoiceData) => {
+  const createInvoice = useCallback(async (_invoiceData) => {
     return {
       success: false,
       isInformativeOnly: true,
@@ -43,7 +43,7 @@ export function useSiigoInvoice(businessId) {
   /**
    * ⚠️ DEPRECATED - Siempre retorna error
    */
-  const createInvoiceFromSale = useCallback(async (sale, customer) => {
+  const createInvoiceFromSale = useCallback(async (_sale, _customer) => {
     return {
       success: false,
       isInformativeOnly: true,
@@ -92,7 +92,7 @@ export function useSiigoInvoice(businessId) {
  * @param {string} businessId - ID del negocio
  * @returns {Object} Estado vacío
  */
-export function useSiigoHistory(businessId) {
+export function useSiigoHistory(_businessId) {
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState({
@@ -112,7 +112,7 @@ export function useSiigoHistory(businessId) {
   /**
    * ⚠️ DEPRECATED - Ya no carga estadísticas
    */
-  const loadStats = useCallback(async (fromDate, toDate) => {
+  const loadStats = useCallback(async (_fromDate, _toDate) => {
     setStats({
       total_invoices: 0,
       successful_invoices: 0,
@@ -158,7 +158,7 @@ export function useDaneCities() {
 
       const { data } = await query
       setCities(data || [])
-    } catch (error) {
+    } catch {
       setCities([])
     } finally {
       setLoading(false)

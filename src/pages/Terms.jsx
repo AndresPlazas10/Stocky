@@ -3,7 +3,6 @@
 // ============================================
 // Ubicación: src/pages/Terms.jsx
 
-import { motion } from 'framer-motion';
 import { Shield, FileText, AlertTriangle, CheckCircle2, Info, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -308,7 +307,7 @@ export default function TermsAndConditions() {
 }
 
 // Componente de sección
-function Section({ number, title, icon: Icon, color, children, highlighted = false }) {
+function Section({ number, title, icon: _Icon, color, children, highlighted = false }) {
   const colorClasses = {
     green: 'from-green-500 to-emerald-500',
     blue: 'from-blue-500 to-cyan-500',

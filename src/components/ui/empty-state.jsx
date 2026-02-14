@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+
 import { Package, FileText, Inbox } from 'lucide-react';
 
 export const EmptyState = ({

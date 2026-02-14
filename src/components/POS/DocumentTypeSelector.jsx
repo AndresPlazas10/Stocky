@@ -7,7 +7,7 @@
 // Solo muestra factura electrónica si está habilitada
 
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
 import { 
   FileText, 
   Receipt, 
@@ -261,7 +261,7 @@ function DocumentTypeCard({
 // ============================================
 // Opción compacta del dropdown
 // ============================================
-function CompactOption({ type, label, description, icon: Icon, selected, disabled, onClick }) {
+function CompactOption({ _type, label, description, icon: _Icon, selected, disabled, onClick }) {
   return (
     <button
       type="button"

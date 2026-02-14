@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { motion } from "framer-motion";
+
 import {
   Store,
   Package,
@@ -36,7 +36,7 @@ function Home() {
     const signOut = async () => {
       try {
         await supabase.auth.signOut();
-      } catch (error) {
+      } catch {
         // Error silencioso
       }
     };

@@ -8,7 +8,6 @@
 // Los negocios facturan directamente en Siigo (incluido en su plan).
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { supabase } from '../supabase/Client'
 
 // Contexto
 const InvoicingContext = createContext(null)
@@ -23,7 +22,7 @@ export function useInvoicing() {
 }
 
 // Provider
-export function InvoicingProvider({ children, businessId }) {
+export function InvoicingProvider({ children, _businessId }) {
   // Estado principal
   const [invoicingStatus, setInvoicingStatus] = useState({
     isLoading: true,
@@ -67,7 +66,7 @@ export function InvoicingProvider({ children, businessId }) {
       requestDate: null,
       error: null,
     })
-  }, [businessId])
+  }, [])
 
   // Cargar al montar
   useEffect(() => {

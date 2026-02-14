@@ -170,7 +170,6 @@ CREATE POLICY sales_select_policy ON sales
       AND (
         b.created_by = (select auth.uid())
         OR EXISTS (
-        OR EXISTS (
           SELECT 1 FROM employees e
           WHERE e.business_id = b.id
           AND e.user_id = (select auth.uid())
@@ -209,7 +208,6 @@ CREATE POLICY sales_update_policy ON sales
       AND (
         b.created_by = (select auth.uid())
         OR EXISTS (
-        OR EXISTS (
           SELECT 1 FROM employees e
           WHERE e.business_id = b.id
           AND e.user_id = (select auth.uid())
@@ -228,7 +226,6 @@ CREATE POLICY sales_delete_policy ON sales
       WHERE b.id = sales.business_id
       AND (
         b.created_by = (select auth.uid())
-        OR EXISTS (
         OR EXISTS (
           SELECT 1 FROM employees e
           WHERE e.business_id = b.id
@@ -253,7 +250,6 @@ CREATE POLICY sale_details_access_policy ON sale_details
       WHERE s.id = sale_details.sale_id
       AND (
         b.created_by = (select auth.uid())
-        OR EXISTS (
         OR EXISTS (
           SELECT 1 FROM employees e
           WHERE e.business_id = b.id
@@ -283,7 +279,6 @@ CREATE POLICY purchases_access_policy ON purchases
       AND (
         b.created_by = (select auth.uid())
         OR EXISTS (
-        OR EXISTS (
           SELECT 1 FROM employees e
           WHERE e.business_id = b.id
           AND e.user_id = (select auth.uid())
@@ -312,7 +307,6 @@ CREATE POLICY purchase_details_access_policy ON purchase_details
       WHERE p.id = purchase_details.purchase_id
       AND (
         b.created_by = (select auth.uid())
-        OR EXISTS (
         OR EXISTS (
           SELECT 1 FROM employees e
           WHERE e.business_id = b.id
@@ -382,7 +376,6 @@ CREATE POLICY invoices_access_policy ON invoices
       AND (
         b.created_by = (select auth.uid())
         OR EXISTS (
-        OR EXISTS (
           SELECT 1 FROM employees e
           WHERE e.business_id = b.id
           AND e.user_id = (select auth.uid())
@@ -412,7 +405,6 @@ CREATE POLICY invoice_items_access_policy ON invoice_items
       AND (
         b.created_by = (select auth.uid())
         OR EXISTS (
-        OR EXISTS (
           SELECT 1 FROM employees e
           WHERE e.business_id = b.id
           AND e.user_id = (select auth.uid())
@@ -440,7 +432,6 @@ CREATE POLICY customers_access_policy ON customers
       WHERE b.id = customers.business_id
       AND (
         b.created_by = (select auth.uid())
-        OR EXISTS (
         OR EXISTS (
           SELECT 1 FROM employees e
           WHERE e.business_id = b.id
@@ -528,7 +519,6 @@ CREATE POLICY siigo_invoice_logs_read_policy ON siigo_invoice_logs
       WHERE b.id = siigo_invoice_logs.business_id
       AND (
         b.created_by = (select auth.uid())
-        OR EXISTS (
         OR EXISTS (
           SELECT 1 FROM employees e
           WHERE e.business_id = b.id

@@ -93,10 +93,11 @@ async function getFilteredPurchasesLegacy(businessId, filters, pagination) {
   const limit = Number(pagination.limit || 50);
   const offset = Number(pagination.offset || 0);
 
-  let query = supabase.from('purchases').eq('business_id', businessId).order('created_at', { ascending: false });
-  query = includeCount
-    ? query.select(PURCHASE_LIST_COLUMNS, { count: countMode })
-    : query.select(PURCHASE_LIST_COLUMNS);
+  let query = includeCount
+    ? supabase.from('purchases').select(PURCHASE_LIST_COLUMNS, { count: countMode })
+    : supabase.from('purchases').select(PURCHASE_LIST_COLUMNS);
+
+  query = query.eq('business_id', businessId).order('created_at', { ascending: false });
 
   if (filters.fromDate) query = query.gte('created_at', filters.fromDate);
   if (filters.toDate) {
@@ -125,19 +126,19 @@ async function getFilteredPurchasesLegacy(businessId, filters, pagination) {
  * @param {object} pagination - { limit = 50, offset = 0 }
  */
 export async function getFilteredPurchases(businessId, filters = {}, pagination = {}) {
+  if (!businessId) return { data: [], count: 0, error: null };
+
   try {
-    if (!businessId) return { data: [], count: 0 };
+    const rpcResult = await getFilteredPurchasesViaRpc(businessId, filters, pagination);
+    return { ...rpcResult, error: null };
+  } catch (rpcError) {
     try {
-      return await getFilteredPurchasesViaRpc(businessId, filters, pagination);
-    } catch (rpcError) {
-      if (rpcError.message !== RPC_NOT_AVAILABLE) {
-        throw rpcError;
-      }
-      return await getFilteredPurchasesLegacy(businessId, filters, pagination);
+      const legacyResult = await getFilteredPurchasesLegacy(businessId, filters, pagination);
+      return { ...legacyResult, error: null };
+    } catch (legacyError) {
+      const normalizedError = legacyError?.message || rpcError?.message || 'Error al obtener compras';
+      return { data: [], count: 0, error: normalizedError };
     }
-  } catch (error) {
-    
-    return { data: [], count: 0 };
   }
 }
 

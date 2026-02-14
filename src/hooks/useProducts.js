@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/supabase/Client';
 
 /**
@@ -19,7 +19,7 @@ export function useProducts(businessId, options = {}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     if (!businessId) {
       setLoading(false);
       return;
@@ -51,11 +51,11 @@ export function useProducts(businessId, options = {}) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [businessId, activeOnly, includeInactive, orderBy, orderDirection]);
 
   useEffect(() => {
     loadProducts();
-  }, [businessId, activeOnly, includeInactive, orderBy, orderDirection]);
+  }, [loadProducts]);
 
   return { 
     products, 

@@ -79,7 +79,7 @@ class IdempotencyManager {
       }
 
       return data.status === 'in_progress';
-    } catch (error) {
+    } catch {
       
       return false;
     }
@@ -108,7 +108,7 @@ class IdempotencyManager {
           key
         });
       }
-    } catch (error) {
+    } catch {
       
     }
 
@@ -138,7 +138,7 @@ class IdempotencyManager {
           result
         });
       }
-    } catch (error) {
+    } catch {
       
     }
   }
@@ -166,7 +166,7 @@ class IdempotencyManager {
           error: data.error
         });
       }
-    } catch (error) {
+    } catch {
       
     }
   }
@@ -177,7 +177,7 @@ class IdempotencyManager {
   clear() {
     try {
       sessionStorage.removeItem(this.storageKey);
-    } catch (error) {
+    } catch {
       
     }
   }
@@ -190,7 +190,7 @@ class IdempotencyManager {
       const stored = sessionStorage.getItem(this.storageKey);
       if (!stored) return null;
       return JSON.parse(stored);
-    } catch (error) {
+    } catch {
       
       return null;
     }
@@ -334,7 +334,6 @@ export function useIdempotentSubmit({
 
         } catch (err) {
           
-
           // Verificar si el componente se desmontó
           if (isUnmountedRef.current) {
             return;
@@ -379,7 +378,7 @@ export function useIdempotentSubmit({
         }
       }, debounceMs);
     });
-  }, [isSubmitting, actionName, debounceMs, enableRetry, maxRetries, retryCount, onSubmit, onSuccess, onError]);
+  }, [isSubmitting, debounceMs, enableRetry, maxRetries, retryCount, onSubmit, onSuccess, onError]);
 
   /**
    * Función para resetear el estado manualmente

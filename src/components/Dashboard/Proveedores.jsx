@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
@@ -252,7 +252,7 @@ function Proveedores({ businessId }) {
       loadProveedores();
       setShowDeleteModal(false);
       setSupplierToDelete(null);
-    } catch (error) {
+    } catch {
       setError('❌ Error al eliminar el proveedor');
       setShowDeleteModal(false);
       setSupplierToDelete(null);
@@ -314,8 +314,6 @@ function Proveedores({ businessId }) {
     if (normalized.includes('cread')) return '✨ Proveedor creado';
     return '✨ Proveedor guardado';
   }, [success]);
-
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#ffe498]/10 p-4 md:p-6">
