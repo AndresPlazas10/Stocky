@@ -29,7 +29,8 @@ import {
   Calendar,
   CreditCard,
   X,
-  Printer
+  Printer,
+  Eye
 } from 'lucide-react';
 import ComprobanteDisclaimer from '../Legal/ComprobanteDisclaimer';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
@@ -97,6 +98,9 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [invoiceCustomerEmail, setInvoiceCustomerEmail] = useState('');
   const [invoiceCustomerIdNumber, setInvoiceCustomerIdNumber] = useState('');
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
+  const [showSaleDetailsModal, setShowSaleDetailsModal] = useState(false);
+  const [saleDetailsLoading, setSaleDetailsLoading] = useState(false);
+  const [saleDetailsError, setSaleDetailsError] = useState('');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -447,13 +451,45 @@ function Ventas({ businessId, userRole = 'admin' }) {
     }
   };
 
-  // Función para imprimir factura física
-  const handlePrintInvoice = async (venta) => {
-    // Cargar detalles de la venta
-    const { data: saleDetails } = await supabase
+  const fetchSaleDetails = useCallback(async (saleId) => {
+    if (!saleId) return [];
+
+    const { data, error } = await supabase
       .from('sale_details')
-      .select('*, products(name, code)')
-      .eq('sale_id', venta.id);
+      .select('quantity, unit_price, subtotal, products(name, code)')
+      .eq('sale_id', saleId);
+
+    if (error) throw error;
+    return data || [];
+  }, []);
+
+  const openSaleDetailsModal = useCallback(async (venta) => {
+    setSelectedSale({ ...venta, sale_details: [] });
+    setShowSaleDetailsModal(true);
+    setSaleDetailsError('');
+
+    try {
+      setSaleDetailsLoading(true);
+      const details = await fetchSaleDetails(venta.id);
+      setSelectedSale({ ...venta, sale_details: details });
+    } catch (err) {
+      setSaleDetailsError(err?.message || 'No se pudieron cargar los detalles de la venta');
+    } finally {
+      setSaleDetailsLoading(false);
+    }
+  }, [fetchSaleDetails]);
+
+  // Función para imprimir factura física
+  const handlePrintInvoice = useCallback(async (venta) => {
+    // Cargar detalles de la venta
+    let saleDetails = [];
+    try {
+      saleDetails = await fetchSaleDetails(venta.id);
+    } catch {
+      setError('No se pudieron cargar los detalles de la venta');
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
 
     if (!saleDetails || saleDetails.length === 0) {
       setError('No se pudieron cargar los detalles de la venta');
@@ -716,7 +752,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setError('No se pudo abrir la ventana de impresión. Verifica los permisos del navegador.');
       setTimeout(() => setError(null), 3000);
     }
-  };
+  }, [fetchSaleDetails]);
 
   const cancelDelete = () => {
     setShowDeleteModal(false);
@@ -1339,13 +1375,12 @@ function Ventas({ businessId, userRole = 'admin' }) {
                             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                               <Button
                                 onClick={async () => {
-                                  // Cargar detalles de la venta
-                                  const { data: saleDetails } = await supabase
-                                    .from('sale_details')
-                                    .select('*, products(name)')
-                                    .eq('sale_id', venta.id);
-                                  
-                                  setSelectedSale({ ...venta, sale_details: saleDetails || [] });
+                                  try {
+                                    const saleDetails = await fetchSaleDetails(venta.id);
+                                    setSelectedSale({ ...venta, sale_details: saleDetails });
+                                  } catch {
+                                    setSelectedSale({ ...venta, sale_details: [] });
+                                  }
                                   setInvoiceCustomerName('');
                                   setInvoiceCustomerEmail('');
                                   setInvoiceCustomerIdNumber('');
@@ -1354,23 +1389,30 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                 className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
                               >
                                 <Mail className="w-4 h-4" />
-                                <span className="text-sm">Enviar Comprobante</span>
+                                <span className="text-sm">Enviar por correo</span>
+                              </Button>
+                              <Button
+                                onClick={() => openSaleDetailsModal(venta)}
+                                disabled={saleDetailsLoading}
+                                className="bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto disabled:opacity-60"
+                              >
+                                <Eye className="w-4 h-4" />
+                                <span className="text-sm">Ver Detalles</span>
                               </Button>
                               <Button
                                 onClick={() => handlePrintInvoice(venta)}
                                 className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
                               >
                                 <Printer className="w-4 h-4" />
-                                <span className="text-sm">Imprimir Comprobante</span>
+                                <span className="text-sm">Imprimir</span>
                               </Button>
                               {userRole === 'admin' && !isEmployee && (
                                 <Button
                                   onClick={() => handleDeleteSale(venta.id)}
-                                  className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
+                                  className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
                                   title="Eliminar venta"
                                 >
                                   <Trash2 className="w-4 h-4" />
-                                  <span className="text-sm sm:hidden lg:inline">Eliminar</span>
                                 </Button>
                               )}
                             </div>
@@ -1544,6 +1586,115 @@ function Ventas({ businessId, userRole = 'admin' }) {
                     El presente comprobante es informativo. La responsabilidad tributaria recae exclusivamente en el establecimiento emisor.
                   </p>
                 </div>
+              </Card>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de detalle de venta */}
+      <AnimatePresence>
+        {showSaleDetailsModal && selectedSale && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => {
+              setShowSaleDetailsModal(false);
+              setSaleDetailsError('');
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+            >
+              <Card className="bg-white shadow-2xl rounded-2xl border-none">
+                <CardHeader className="bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-t-2xl">
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Eye className="w-5 h-5" />
+                    Detalle de Venta
+                  </CardTitle>
+                  <p className="text-sm text-slate-100">
+                    {selectedSale?.created_at ? formatDate(selectedSale.created_at) : 'Fecha no disponible'} • {getPaymentMethodLabel(selectedSale?.payment_method)}
+                  </p>
+                </CardHeader>
+
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs text-slate-500 uppercase">Vendedor</p>
+                      <p className="font-semibold text-slate-900">{getVendedorName(selectedSale)}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs text-slate-500 uppercase">Items</p>
+                      <p className="font-semibold text-slate-900">{selectedSale?.sale_details?.length || 0}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs text-slate-500 uppercase">Total</p>
+                      <p className="font-semibold text-slate-900">{formatPrice(selectedSale?.total || 0)}</p>
+                    </div>
+                  </div>
+
+                  {saleDetailsLoading ? (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-700 text-sm">
+                      Cargando detalle de venta...
+                    </div>
+                  ) : saleDetailsError ? (
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800 text-sm">
+                      {saleDetailsError}
+                    </div>
+                  ) : !selectedSale.sale_details || selectedSale.sale_details.length === 0 ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 text-sm">
+                      Esta venta no tiene items de detalle disponibles.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border border-slate-200">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200">
+                            <th className="px-4 py-3 text-left font-semibold text-slate-700">Producto</th>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-700">Código</th>
+                            <th className="px-4 py-3 text-center font-semibold text-slate-700">Cantidad</th>
+                            <th className="px-4 py-3 text-right font-semibold text-slate-700">Unitario</th>
+                            <th className="px-4 py-3 text-right font-semibold text-slate-700">Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedSale.sale_details.map((item, idx) => (
+                            <tr key={`${selectedSale.id}-${idx}`} className="border-b border-slate-100 last:border-b-0">
+                              <td className="px-4 py-3 text-slate-800">{item.products?.name || 'Producto'}</td>
+                              <td className="px-4 py-3 text-slate-600">{item.products?.code || '-'}</td>
+                              <td className="px-4 py-3 text-center text-slate-700">{item.quantity}</td>
+                              <td className="px-4 py-3 text-right text-slate-700">{formatPrice(item.unit_price)}</td>
+                              <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                                {formatPrice(item.subtotal ?? (Number(item.quantity || 0) * Number(item.unit_price || 0)))}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  <div className="pt-5 flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setShowSaleDetailsModal(false);
+                        setSaleDetailsError('');
+                      }}
+                      className="bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl px-5 py-2"
+                    >
+                      Cerrar
+                    </Button>
+                  </div>
+                </CardContent>
               </Card>
             </motion.div>
           </motion.div>
