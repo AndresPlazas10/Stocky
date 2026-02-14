@@ -1,4 +1,5 @@
 import { Menu, Bell, Search } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 /**
  * Header optimizado para móvil

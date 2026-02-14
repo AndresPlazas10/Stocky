@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '../../supabase/Client.jsx';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
@@ -42,6 +43,19 @@ function Empleados({ businessId }) {
     role: 'employee'
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isolatedAuthClient = useMemo(() => (
+    createClient(
+      import.meta.env.VITE_SUPABASE_URL,
+      import.meta.env.VITE_SUPABASE_ANON_KEY,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false
+        }
+      }
+    )
+  ), []);
 
   const loadEmpleados = useCallback(async () => {
     try {
@@ -168,8 +182,9 @@ function Empleados({ businessId }) {
         throw new Error('No hay sesión activa de administrador');
       }
 
-      // Crear cuenta Auth para el empleado
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Crear cuenta Auth para el empleado en cliente aislado
+      // para no reemplazar la sesión activa del administrador.
+      const { data: authData, error: authError } = await isolatedAuthClient.auth.signUp({
         email: cleanEmail,
         password: cleanPassword,
         options: {
@@ -247,19 +262,6 @@ function Empleados({ businessId }) {
         throw new Error('No se pudo crear el empleado (función retornó null)');
       }
 
-      // 🔄 RESTAURAR SESIÓN DEL ADMIN
-      
-      const { error: restoreError } = await supabase.auth.setSession({
-        access_token: adminSession.access_token,
-        refresh_token: adminSession.refresh_token
-      });
-
-      if (restoreError) {
-        // No lanzar error aquí - el empleado se creó correctamente
-        // Solo advertir al usuario
-        setError('⚠️ Empleado creado pero la sesión cambió. Recarga la página.');
-      }
-
       // Código de éxito
       setGeneratedCode({
         username: cleanUsername,
@@ -278,7 +280,7 @@ function Empleados({ businessId }) {
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear
     }
-  }, [businessId, formData, loadEmpleados, isSubmitting]);
+  }, [businessId, formData, loadEmpleados, isSubmitting, isolatedAuthClient]);
 
   const handleDelete = useCallback((empleado) => {
     setEmployeeToDelete(empleado);
@@ -326,7 +328,7 @@ function Empleados({ businessId }) {
       setEmployeeToDelete(null);
     } catch {
       // Error al eliminar
-      setError('❌ Error al eliminar la invitación');
+      setError('❌ Error al eliminar el empleado');
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
     }
@@ -364,6 +366,14 @@ function Empleados({ businessId }) {
     active: empleados.filter(e => e.is_active).length,
     inactive: empleados.filter(e => !e.is_active).length
   }), [empleados]);
+
+  const successTitle = useMemo(() => {
+    if (!success) return '✨ Operación exitosa';
+    const normalized = success.toLowerCase();
+    if (normalized.includes('eliminad')) return '✨ Empleado eliminado';
+    if (normalized.includes('cread')) return '✨ Empleado registrado';
+    return '✨ Operación exitosa';
+  }, [success]);
 
   useEffect(() => {
     let errorTimer, successTimer;
@@ -454,7 +464,7 @@ function Empleados({ businessId }) {
         <SaleSuccessAlert 
           isVisible={!!success}
           onClose={() => setSuccess(null)}
-          title="✨ Empleado Registrado"
+          title={successTitle}
           details={[]}
           duration={5000}
         />

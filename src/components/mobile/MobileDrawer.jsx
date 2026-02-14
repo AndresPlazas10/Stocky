@@ -1,4 +1,5 @@
 import { X, Home, ShoppingCart, ShoppingBag, Package, FileText, Users, Truck, BarChart3, Settings, LogOut, ChevronRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
 
 /**

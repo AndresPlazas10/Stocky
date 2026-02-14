@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 /**
  * Modal para dividir la cuenta de una mesa entre múltiples sub-cuentas.
  * Permite asignar cada UNIDAD de un producto a sub-cuentas distintas.

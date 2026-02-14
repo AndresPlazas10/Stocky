@@ -1,4 +1,5 @@
 import { Home, ShoppingCart, Package, FileText, Users, Settings } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 /**
  * Bottom Navigation para móvil

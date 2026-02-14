@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 // ============================================
 // 🎉 Modal Educativo - Primera Venta
 // ============================================

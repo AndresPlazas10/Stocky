@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { motion } from 'framer-motion';
 import { supabase } from '../../supabase/Client';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatDate } from '../../utils/formatters.js';

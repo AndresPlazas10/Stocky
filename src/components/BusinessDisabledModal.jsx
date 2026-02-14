@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 
 import { Lock, AlertTriangle, CreditCard } from 'lucide-react';
 import { Button } from './ui/button';
