@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 
 import { Lock, AlertTriangle, CreditCard } from 'lucide-react';
 import { Button } from './ui/button';
+import paymentQr from '../assets/QR.jpeg';
 
 /**
  * Modal bloqueante para negocios deshabilitados por falta de pago
@@ -19,20 +20,20 @@ function BusinessDisabledModal({ businessName = 'su negocio', onSignOut }) {
       <motion.div
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl"
       >
         {/* Header bloqueado */}
-        <div className="bg-gradient-to-r from-red-700 to-red-900 p-6 text-white relative overflow-hidden">
+        <div className="bg-gradient-to-r from-red-700 to-red-900 p-5 text-white relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32" />
           <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full -ml-24 -mb-24" />
           
           <div className="relative z-10 text-center">
-            <div className="flex items-center justify-center mb-3">
-              <div className="p-3 bg-white/20 rounded-full backdrop-blur-sm">
-                <Lock className="w-12 h-12" />
+            <div className="flex items-center justify-center mb-2">
+              <div className="p-2.5 bg-white/20 rounded-full backdrop-blur-sm">
+                <Lock className="w-10 h-10" />
               </div>
             </div>
-            <h1 className="text-2xl font-bold mb-1">
+            <h1 className="text-xl font-bold mb-1">
               🔒 Acceso Bloqueado
             </h1>
             <p className="text-white/90">
@@ -42,8 +43,8 @@ function BusinessDisabledModal({ businessName = 'su negocio', onSignOut }) {
         </div>
 
         {/* Contenido */}
-        <div className="p-6">
-          <div className="bg-red-50 border-l-4 border-red-600 p-3 rounded-lg mb-4">
+        <div className="p-4 md:p-5">
+          <div className="bg-red-50 border-l-4 border-red-600 p-3 rounded-lg mb-3">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div>
@@ -59,34 +60,47 @@ function BusinessDisabledModal({ businessName = 'su negocio', onSignOut }) {
           </div>
 
           {/* Información de pago */}
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-400 p-4 rounded-xl mb-4">
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-400 p-3 rounded-xl mb-3">
             <div className="flex items-center gap-2 mb-2">
               <CreditCard className="w-5 h-5 text-green-700" />
               <h4 className="font-bold text-green-900 text-sm">Realizar Pago Para Reactivar</h4>
             </div>
-            <div className="space-y-1.5 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-gray-900">• Valor:</span>
-                <span className="text-gray-800 font-bold">$50.000 COP</span>
+            <div className="grid md:grid-cols-[1fr_auto] gap-3 items-start">
+              <div className="space-y-1.5 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-gray-900">• Valor:</span>
+                  <span className="text-gray-800 font-bold">$50.000 COP</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-gray-900">• Nu (Bre-B):</span>
+                  <span className="text-gray-800 font-mono font-bold">0091676591</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-gray-900">• Titular:</span>
+                  <span className="text-gray-800">StockyPos</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-gray-900">• Nu (Bre-B):</span>
-                <span className="text-gray-800 font-mono font-bold">@APM331</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-gray-900">• Titular:</span>
-                <span className="text-gray-800">Andres Felipe</span>
-              </div>
-              <div className="bg-yellow-50 border border-yellow-300 rounded p-2 mt-2">
-                <p className="text-xs text-yellow-900 font-medium leading-snug">
-                  <strong>⚠️ Importante:</strong> Por favor, realice el envío a través de <strong>Bre-B</strong> a la llave <strong>@APM331</strong> y remita una fotografía del comprobante de pago por nuestro canal de WhatsApp, indicando el nombre de su negocio para poder identificarlo correctamente en nuestro sistema.
+              <div className="bg-white border border-green-300 rounded-lg p-2.5">
+                <p className="text-xs text-gray-700 font-medium text-center mb-2">
+                  Escanea el QR para pagar.
                 </p>
+                <img
+                  src={paymentQr}
+                  alt="QR de pago de Stocky"
+                  className="w-full max-w-[210px] md:max-w-[230px] mx-auto rounded-md border border-gray-200"
+                  loading="lazy"
+                />
               </div>
+            </div>
+            <div className="bg-yellow-50 border border-yellow-300 rounded p-2 mt-2">
+              <p className="text-xs text-yellow-900 font-medium leading-snug">
+                  <strong>⚠️ Importante:</strong> Por favor, realice el envío a través de <strong>Bre-B</strong> a la llave <strong>0091676591</strong> y remita una fotografía del comprobante de pago por nuestro canal de WhatsApp, indicando el nombre de su negocio para poder identificarlo correctamente en nuestro sistema.
+              </p>
             </div>
           </div>
 
           {/* Nota importante */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 mb-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-3">
             <p className="text-blue-900 text-xs text-center leading-snug">
               💡 Una vez realizado el pago, su servicio será reactivado en las próximas horas.
             </p>
