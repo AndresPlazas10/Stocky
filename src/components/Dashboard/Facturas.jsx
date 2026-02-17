@@ -389,7 +389,8 @@ export default function Facturas({ userRole = 'admin' }) {
             invoiceNumber: invoiceNumber,
             customerName: customerData.customer_name || 'Cliente',
             total: totalFactura,
-            items: invoiceItems
+            items: invoiceItems,
+            businessId
           });
           
           if (!emailResult.demo) {
@@ -480,7 +481,8 @@ export default function Facturas({ userRole = 'admin' }) {
           invoiceNumber: factura.invoice_number,
           customerName: factura.customer_name || 'Cliente',
           total: factura.total,
-          items: factura.invoice_items || []
+          items: factura.invoice_items || [],
+          businessId: factura.business_id
         });
         
         // Actualizar estado de la factura a 'sent'

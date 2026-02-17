@@ -31,6 +31,7 @@ import {
   shouldSendEmail, 
   logEmailAttempt 
 } from './emailValidation';
+import { supabase } from '../supabase/Client.jsx';
 
 /**
  * Envía comprobante de venta por email usando Resend API vía Vercel Function
@@ -44,6 +45,7 @@ export const sendInvoiceEmailResend = async ({
   total,
   items = [],
   businessName = 'Stocky',
+  businessId,
   issuedAt = null
 }) => {
   try {
@@ -195,10 +197,17 @@ export const sendInvoiceEmailResend = async ({
       ? 'http://localhost:3000/api/send-email'  // Desarrollo local
       : '/api/send-email';  // Producción en Vercel
 
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+    if (!accessToken) {
+      throw new Error('Sesión inválida para enviar correo');
+    }
+
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         email: targetEmail,
@@ -207,6 +216,7 @@ export const sendInvoiceEmailResend = async ({
         total,
         items,
         businessName,
+        businessId,
         issuedAt
       })
     });

@@ -6,6 +6,33 @@
 import { supabase } from '../supabase/Client';
 import { isAdminRole } from '../utils/roles.js';
 
+function isFunctionUnavailableError(errorLike, functionName) {
+  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+  if (!message) return false;
+
+  const normalizedFn = String(functionName || '').toLowerCase();
+  const referencesFunction = normalizedFn ? message.includes(normalizedFn) : true;
+
+  return referencesFunction && (
+    message.includes('does not exist')
+    || message.includes('could not find the function')
+    || message.includes('schema cache')
+    || message.includes('not found')
+    || message.includes('pgrst202')
+  );
+}
+
+function getFriendlySaleErrorMessage(errorLike) {
+  const rawMessage = String(errorLike?.message || errorLike || '').trim();
+  const normalized = rawMessage.toLowerCase();
+
+  if (normalized.includes('idx_sales_prevent_duplicates')) {
+    return 'La venta ya estaba siendo procesada o ya fue registrada. Actualiza y verifica en Ventas.';
+  }
+
+  return rawMessage || 'Error al procesar la venta';
+}
+
 /**
  * Crea una venta completa en UNA SOLA LLAMADA RPC
  * @param {object} params
@@ -15,7 +42,8 @@ export async function createSaleOptimized({
   businessId,
   cart,
   paymentMethod = 'cash',
-  total
+  total,
+  idempotencyKey = null
 }) {
   try {
     // 1. Validar inputs
@@ -63,21 +91,38 @@ export async function createSaleOptimized({
 
     const startTime = performance.now();
 
-    // 5. LLAMADA RPC ÚNICA - Todo sucede en la BD
-    const { data, error } = await supabase.rpc('create_sale_complete', {
+    // 5. LLAMADA RPC (idempotente por defecto)
+    let data = null;
+    let error = null;
+    ({ data, error } = await supabase.rpc('create_sale_complete_idempotent', {
       p_business_id: businessId,
       p_user_id: user.id,
       p_seller_name: sellerName,
       p_payment_method: paymentMethod,
-      p_items: itemsForRpc
-    });
+      p_items: itemsForRpc,
+      p_idempotency_key: idempotencyKey
+    }));
+
+    const missingIdempotentFn = isFunctionUnavailableError(
+      error,
+      'create_sale_complete_idempotent'
+    );
+    if (error && missingIdempotentFn) {
+      ({ data, error } = await supabase.rpc('create_sale_complete', {
+        p_business_id: businessId,
+        p_user_id: user.id,
+        p_seller_name: sellerName,
+        p_payment_method: paymentMethod,
+        p_items: itemsForRpc
+      }));
+    }
 
     const elapsed = performance.now() - startTime;
 
     if (error) {
       return { 
         success: false, 
-        error: error.message 
+        error: getFriendlySaleErrorMessage(error)
       };
     }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client';
 import { getFilteredSales } from '../../services/salesService';
@@ -7,6 +7,7 @@ import SalesFilters from '../Filters/SalesFilters';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatDate, formatDateOnly, formatDateTimeTicket } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
+import { getThermalPaperWidthMm } from '../../utils/printer.js';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -63,6 +64,12 @@ const getPaymentMethodLabel = (method) => {
   return method || '-';
 };
 
+const toNumberOrNull = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 function Ventas({ businessId, userRole = 'admin' }) {
   const [ventas, setVentas] = useState([]);
   const [page, setPage] = useState(1);
@@ -103,6 +110,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [saleDetailsError, setSaleDetailsError] = useState('');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const saleIntentKeyRef = useRef(null);
+  const saleIntentSignatureRef = useRef('');
 
   // Funciones de carga memoizadas SIN cache para evitar problemas de actualización
   const loadVentas = useCallback(async (filters = currentFilters, pagination = {}) => {
@@ -325,6 +334,29 @@ function Ventas({ businessId, userRole = 'admin' }) {
     return cart.reduce((sum, item) => sum + item.subtotal, 0);
   }, [cart]);
 
+  const saleIntentSignature = useMemo(() => {
+    const normalizedItems = [...cart]
+      .map((item) => ({
+        product_id: item.product_id,
+        quantity: Number(item.quantity || 0),
+        unit_price: Number(item.unit_price || 0)
+      }))
+      .sort((a, b) => String(a.product_id).localeCompare(String(b.product_id)));
+
+    return JSON.stringify({
+      businessId,
+      paymentMethod,
+      items: normalizedItems
+    });
+  }, [businessId, paymentMethod, cart]);
+
+  useEffect(() => {
+    if (cart.length === 0) {
+      saleIntentKeyRef.current = null;
+      saleIntentSignatureRef.current = '';
+    }
+  }, [cart.length]);
+
   const processSale = useCallback(async () => {
     if (isSubmitting) return; // Prevenir doble click
     
@@ -347,12 +379,17 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
       // 🚀 USAR FUNCIÓN OPTIMIZADA: Una sola llamada RPC
       const startTime = performance.now();
+      if (saleIntentSignatureRef.current !== saleIntentSignature) {
+        saleIntentSignatureRef.current = saleIntentSignature;
+        saleIntentKeyRef.current = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`);
+      }
       
       const result = await createSaleOptimized({
         businessId,
         cart,
         paymentMethod,
-        total: saleTotal
+        total: saleTotal,
+        idempotencyKey: saleIntentKeyRef.current
       });
 
       const elapsedMs = performance.now() - startTime;
@@ -380,6 +417,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setSelectedCustomer('');
       setPaymentMethod('cash');
       setShowSaleModal(false);
+      saleIntentKeyRef.current = null;
+      saleIntentSignatureRef.current = '';
 
       // Recargar ventas inmediatamente
       await loadVentas(currentFilters, { limit, offset: (page - 1) * limit, includeCount: false });
@@ -396,7 +435,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear
     }
-  }, [cart, sessionChecked, businessId, paymentMethod, loadVentas, isSubmitting, currentFilters, limit, page]);
+  }, [cart, sessionChecked, businessId, paymentMethod, loadVentas, isSubmitting, currentFilters, limit, page, saleIntentSignature]);
 
   // Funciones de eliminación de venta (solo admin)
   const handleDeleteSale = (saleId) => {
@@ -471,7 +510,27 @@ function Ventas({ businessId, userRole = 'admin' }) {
     try {
       setSaleDetailsLoading(true);
       const details = await fetchSaleDetails(venta.id);
-      setSelectedSale({ ...venta, sale_details: details });
+      let saleInfo = {};
+      try {
+        const { data: infoData, error: infoError } = await supabase
+          .from('sales')
+          .select('amount_received, change_amount, change_breakdown')
+          .eq('id', venta.id)
+          .maybeSingle();
+        if (!infoError && infoData) {
+          saleInfo = infoData;
+        }
+      } catch {
+        // No bloquear el detalle por metadatos adicionales de pago.
+      }
+
+      setSelectedSale({
+        ...venta,
+        amount_received: saleInfo.amount_received ?? venta.amount_received ?? null,
+        change_amount: saleInfo.change_amount ?? venta.change_amount ?? null,
+        change_breakdown: saleInfo.change_breakdown ?? venta.change_breakdown ?? [],
+        sale_details: details
+      });
     } catch (err) {
       setSaleDetailsError(err?.message || 'No se pudieron cargar los detalles de la venta');
     } finally {
@@ -498,6 +557,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     }
 
     // Crear contenido HTML para impresión
+    const printerWidthMm = getThermalPaperWidthMm();
     const printContent = `
       <!DOCTYPE html>
       <html>
@@ -507,12 +567,18 @@ function Ventas({ businessId, userRole = 'admin' }) {
         <style>
           @media print {
             @page {
-              size: 80mm auto;
-              margin: 0;
+              size: ${printerWidthMm}mm auto;
+              margin: 2mm;
             }
-            body {
+            html, body {
+              width: ${printerWidthMm}mm !important;
+              height: auto !important;
               margin: 0;
               padding: 0;
+            }
+            .receipt {
+              break-inside: avoid;
+              page-break-inside: avoid;
             }
           }
           
@@ -520,9 +586,20 @@ function Ventas({ businessId, userRole = 'admin' }) {
             font-family: 'Courier New', monospace;
             font-size: 12px;
             line-height: 1.4;
-            max-width: 80mm;
-            margin: 0 auto;
-            padding: 10px;
+            width: ${printerWidthMm}mm;
+            max-width: ${printerWidthMm}mm;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            background: #fff;
+          }
+
+          .receipt {
+            display: block;
+            width: 100%;
+            margin: 0;
+            padding: 2mm;
+            box-sizing: border-box;
           }
           
           .header {
@@ -640,6 +717,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
         </style>
       </head>
       <body>
+        <div class="receipt">
         <div class="header">
           <h1>═══════════════════════════════════</h1>
           <h1>COMPROBANTE DE VENTA</h1>
@@ -729,6 +807,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
             Generado por Stocky - Sistema de Gestión POS<br>
             www.stockypos.app
           </p>
+        </div>
         </div>
         
         <script>
@@ -837,6 +916,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
         total: total,
         items: emailItems,
         businessName: businessData?.name || 'Stocky',
+        businessId,
         issuedAt: selectedSale?.created_at || new Date().toISOString()
       });
 
@@ -859,6 +939,32 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setGeneratingInvoice(false);
     }
   }, [businessId, selectedSale, invoiceCustomerName, invoiceCustomerEmail]);
+
+  const selectedSaleAmountReceived = toNumberOrNull(selectedSale?.amount_received);
+  const selectedSaleChangeAmount = toNumberOrNull(selectedSale?.change_amount);
+  const hasAmountReceivedValue = selectedSale?.amount_received !== null
+    && selectedSale?.amount_received !== undefined;
+  const hasChangeAmountValue = selectedSale?.change_amount !== null
+    && selectedSale?.change_amount !== undefined;
+  const selectedSaleChangeBreakdown = Array.isArray(selectedSale?.change_breakdown)
+    ? selectedSale.change_breakdown
+    : [];
+  const selectedSaleTotal = toNumberOrNull(selectedSale?.total) ?? 0;
+  const changeFromBreakdown = selectedSaleChangeBreakdown.reduce((sum, entry) => {
+    const denomination = Number(entry?.denomination || 0);
+    const count = Number(entry?.count || 0);
+    if (!Number.isFinite(denomination) || !Number.isFinite(count) || count <= 0) return sum;
+    return sum + (denomination * count);
+  }, 0);
+  const changeFromDifference = selectedSaleAmountReceived !== null
+    ? Math.max(selectedSaleAmountReceived - selectedSaleTotal, 0)
+    : null;
+  const resolvedChangeAmount = selectedSaleChangeAmount !== null
+    ? selectedSaleChangeAmount
+    : (changeFromBreakdown > 0 ? changeFromBreakdown : changeFromDifference);
+  const hasChangeBreakdown = changeFromBreakdown > 0;
+  const showCashPaymentDetails = selectedSale?.payment_method === 'cash'
+    && (hasAmountReceivedValue || hasChangeAmountValue || hasChangeBreakdown);
 
   return (
     <AsyncStateWrapper
@@ -1626,7 +1732,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                 </CardHeader>
 
                 <CardContent className="p-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                  <div className={`grid grid-cols-1 sm:grid-cols-3 ${showCashPaymentDetails ? 'lg:grid-cols-5' : ''} gap-3 mb-6`}>
                     <div className="rounded-xl border border-slate-200 p-3">
                       <p className="text-xs text-slate-500 uppercase">Vendedor</p>
                       <p className="font-semibold text-slate-900">{getVendedorName(selectedSale)}</p>
@@ -1639,7 +1745,39 @@ function Ventas({ businessId, userRole = 'admin' }) {
                       <p className="text-xs text-slate-500 uppercase">Total</p>
                       <p className="font-semibold text-slate-900">{formatPrice(selectedSale?.total || 0)}</p>
                     </div>
+                    {showCashPaymentDetails && (
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                        <p className="text-xs text-emerald-700 uppercase">Recibido</p>
+                        <p className="font-semibold text-emerald-900">{formatPrice(selectedSaleAmountReceived)}</p>
+                      </div>
+                    )}
+                    {showCashPaymentDetails && (
+                      <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+                        <p className="text-xs text-blue-700 uppercase">Cambio</p>
+                        <p className="font-semibold text-blue-900">
+                          {resolvedChangeAmount !== null ? formatPrice(resolvedChangeAmount) : 'No registrado'}
+                        </p>
+                      </div>
+                    )}
                   </div>
+
+                  {showCashPaymentDetails && selectedSaleChangeBreakdown.length > 0 && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 mb-6">
+                      <p className="text-xs text-slate-500 uppercase mb-2">Desglose del cambio</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {selectedSaleChangeBreakdown.map((entry, idx) => {
+                          const denomination = Number(entry?.denomination || 0);
+                          const count = Number(entry?.count || 0);
+                          if (!Number.isFinite(denomination) || !Number.isFinite(count) || count <= 0) return null;
+                          return (
+                            <p key={`change-${idx}`} className="text-sm text-slate-700">
+                              {count} x {formatPrice(denomination)}
+                            </p>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {saleDetailsLoading ? (
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-700 text-sm">

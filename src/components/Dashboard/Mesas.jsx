@@ -27,6 +27,7 @@ import SplitBillModal from './SplitBillModal';
 import { closeModalImmediate } from '../../utils/closeModalImmediate';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { normalizeTableRecord } from '../../utils/tableStatus.js';
+import { getThermalPaperWidthMm } from '../../utils/printer.js';
 
 const getPaymentMethodLabel = (method) => {
   if (method === 'cash') return 'Efectivo';
@@ -59,6 +60,74 @@ const mergeOrderItemsPreservingPosition = (previousItems = [], incomingItems = [
   const newItemsFirst = normalizedIncoming.filter((item) => !item?.id || !previousIds.has(item.id));
 
   return [...newItemsFirst, ...preserved];
+};
+
+const COLOMBIAN_DENOMINATIONS = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50];
+
+const parseCopAmount = (value) => {
+  if (value === null || value === undefined) return NaN;
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value) : NaN;
+
+  const raw = String(value).trim().replace(/\s/g, '').replace(/\$/g, '');
+  if (!raw) return NaN;
+
+  // Formato es-CO con miles "." y decimal "," (si llega decimal se redondea a pesos).
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(raw)) {
+    const parsed = Number(raw.replace(/\./g, '').replace(',', '.'));
+    return Number.isFinite(parsed) ? Math.round(parsed) : NaN;
+  }
+
+  // Formato en-US con miles "," y decimal ".".
+  if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(raw)) {
+    const parsed = Number(raw.replace(/,/g, ''));
+    return Number.isFinite(parsed) ? Math.round(parsed) : NaN;
+  }
+
+  // Número simple (admite coma decimal).
+  const simpleParsed = Number(raw.replace(',', '.'));
+  if (Number.isFinite(simpleParsed)) return Math.round(simpleParsed);
+
+  // Último fallback: tomar solo dígitos.
+  const digitsOnly = raw.replace(/[^\d]/g, '');
+  if (!digitsOnly) return NaN;
+  const digitsParsed = Number(digitsOnly);
+  return Number.isFinite(digitsParsed) ? Math.round(digitsParsed) : NaN;
+};
+
+// Calcula cambio usando greedy para minimizar cantidad de billetes/monedas.
+const calcularCambio = (total, pagado) => {
+  const normalizedTotal = Math.round(Number(total) || 0);
+  const normalizedPaid = parseCopAmount(pagado);
+
+  if (normalizedTotal <= 0) {
+    return { isValid: false, reason: 'invalid_total', change: 0, breakdown: [] };
+  }
+
+  if (!Number.isFinite(normalizedPaid) || normalizedPaid <= 0) {
+    return { isValid: false, reason: 'invalid_paid', change: 0, breakdown: [] };
+  }
+
+  if (normalizedPaid < normalizedTotal) {
+    return { isValid: false, reason: 'insufficient', change: 0, breakdown: [] };
+  }
+
+  let remaining = normalizedPaid - normalizedTotal;
+  const breakdown = [];
+
+  for (const denomination of COLOMBIAN_DENOMINATIONS) {
+    const count = Math.floor(remaining / denomination);
+    if (count > 0) {
+      breakdown.push({ denomination, count });
+      remaining -= count * denomination;
+    }
+  }
+
+  return {
+    isValid: true,
+    reason: null,
+    change: normalizedPaid - normalizedTotal,
+    breakdown
+  };
 };
 
 const normalizeTableIdentifier = (value) => String(value ?? '').trim();
@@ -132,6 +201,8 @@ function Mesas({ businessId }) {
   const [showSplitBillModal, setShowSplitBillModal] = useState(false);
   const [isGeneratingSplitSales, setIsGeneratingSplitSales] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [amountReceived, setAmountReceived] = useState('');
+  const [amountReceivedError, setAmountReceivedError] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [clientes, setClientes] = useState([]);
   const [isClosingOrder, setIsClosingOrder] = useState(false);
@@ -217,6 +288,7 @@ function Mesas({ businessId }) {
             opened_at,
             order_items (
               id,
+              product_id,
               quantity,
               price,
               subtotal,
@@ -410,11 +482,8 @@ function Mesas({ businessId }) {
         .select(`
           *,
           order_items!order_items_order_id_fkey (
-            id,
-            quantity,
-            price,
-            subtotal,
-            products (name, category)
+            *,
+            products (name, code, category)
           )
         `)
         .eq('id', orderId)
@@ -955,6 +1024,8 @@ function Mesas({ businessId }) {
   const handlePayAllTogether = () => {
     setShowCloseOrderChoiceModal(false);
     setShowSplitBillModal(false);
+    setAmountReceived(String(Math.round(orderTotal || 0)));
+    setAmountReceivedError('');
     setShowPaymentModal(true);
   };
 
@@ -970,66 +1041,79 @@ function Mesas({ businessId }) {
     setIsGeneratingSplitSales(true);
     setError(null);
 
-    // Prepare snapshot
     const mesaSnapshot = selectedMesa ? { ...selectedMesa } : null;
-
-    // Apply optimistic UI: mark mesa as available and close UI immediately
-    if (mesaSnapshot) {
-      setMesas(prevMesas => prevMesas.map(m => m.id === mesaSnapshot.id ? { ...m, status: 'available', current_order_id: null } : m));
+    if (!mesaSnapshot?.id || !mesaSnapshot?.current_order_id) {
+      setError('❌ No se encontró una orden activa para cerrar.');
+      setIsGeneratingSplitSales(false);
+      setIsClosingOrder(false);
+      return;
     }
-    setShowSplitBillModal(false);
-    setShowCloseOrderChoiceModal(false);
-    setShowPaymentModal(false);
-    setShowOrderDetails(false);
-    setModalOpenIntent(false);
-    setSelectedMesa(null);
-    setOrderItems([]);
-    setPendingQuantityUpdatesSafe({});
 
-    // Prevent realtime reopens while background processes
-    justCompletedSaleRef.current = true;
-    setCanShowOrderModal(false);
+    try {
+      await persistPendingQuantityUpdates(mesaSnapshot.current_order_id);
 
-    (async () => {
-      try {
-        await persistPendingQuantityUpdates(mesaSnapshot.current_order_id);
+      const { totalSold } = await closeOrderAsSplit(businessId, {
+        subAccounts,
+        orderId: mesaSnapshot.current_order_id,
+        tableId: mesaSnapshot.id
+      });
 
-        const { totalSold } = await closeOrderAsSplit(businessId, {
-          subAccounts,
-          orderId: mesaSnapshot.current_order_id,
-          tableId: mesaSnapshot.id
-        });
+      // Cerrar UI solo cuando la venta se confirmó en backend.
+      justCompletedSaleRef.current = true;
+      setCanShowOrderModal(false);
+      setShowSplitBillModal(false);
+      setShowCloseOrderChoiceModal(false);
+      setShowPaymentModal(false);
+      setShowOrderDetails(false);
+      setModalOpenIntent(false);
+      setSelectedMesa(null);
+      setOrderItems([]);
+      setPendingQuantityUpdatesSafe({});
 
-        loadMesas().catch(() => {});
+      loadMesas().catch(() => {});
 
-        setSuccessDetails([
-          { label: 'Total', value: formatPrice(totalSold) },
-          { label: 'Mesa', value: `#${mesaSnapshot.table_number}` },
-          { label: 'Cuentas', value: subAccounts.length }
-        ]);
-        setSuccessTitle('✨ Mesa Cerrada');
-        setAlertType('success');
-        setSuccess(true);
+      setSuccessDetails([
+        { label: 'Total', value: formatPrice(totalSold) },
+        { label: 'Mesa', value: `#${mesaSnapshot.table_number}` },
+        { label: 'Cuentas', value: subAccounts.length }
+      ]);
+      setSuccessTitle('✨ Mesa Cerrada');
+      setAlertType('success');
+      setSuccess(true);
 
-        setTimeout(() => {
-          justCompletedSaleRef.current = false;
-          setCanShowOrderModal(true);
-        }, MODAL_REOPEN_GUARD_MS);
-      } catch (error) {
-        setError(`❌ ${error?.message || 'No se pudo cerrar la orden. Revirtiendo estado.'}`);
-        // Rollback: reload mesas
-        try { await loadMesas(); } catch { /* no-op */ }
-        try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch { /* no-op */ }
-      } finally {
-        setIsGeneratingSplitSales(false);
-        setIsClosingOrder(false);
-      }
-    })();
+      setTimeout(() => {
+        justCompletedSaleRef.current = false;
+        setCanShowOrderModal(true);
+      }, MODAL_REOPEN_GUARD_MS);
+    } catch (error) {
+      setError(`❌ ${error?.message || 'No se pudo cerrar la orden. Revirtiendo estado.'}`);
+      try { await loadMesas(); } catch { /* no-op */ }
+      try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch { /* no-op */ }
+    } finally {
+      setIsGeneratingSplitSales(false);
+      setIsClosingOrder(false);
+    }
   };
 
   const processPaymentAndClose = async () => {
     // Prevenir doble click
     if (isClosingOrder) return;
+
+    const paymentSnapshot = paymentMethod;
+    const amountReceivedSnapshot = amountReceived;
+    const normalizedAmountReceived = parseCopAmount(amountReceivedSnapshot);
+    const cashChangeData = paymentSnapshot === 'cash'
+      ? calcularCambio(orderTotal, amountReceivedSnapshot)
+      : null;
+
+    if (paymentSnapshot === 'cash') {
+      if (!cashChangeData?.isValid) {
+        setError(cashChangeData?.reason === 'insufficient'
+          ? '❌ El monto recibido es menor al total de la cuenta.'
+          : '❌ Ingresa un monto recibido válido.');
+        return;
+      }
+    }
 
     setIsClosingOrder(true);
     setError(null);
@@ -1048,6 +1132,8 @@ function Mesas({ businessId }) {
     setOrderItems([]);
     setPendingQuantityUpdatesSafe({});
     setPaymentMethod('cash');
+    setAmountReceived('');
+    setAmountReceivedError('');
     setSelectedCustomer('');
 
     // Prevent realtime reopens while background processes
@@ -1061,7 +1147,9 @@ function Mesas({ businessId }) {
         const { saleTotal } = await closeOrderSingle(businessId, {
           orderId: mesaSnapshot.current_order_id,
           tableId: mesaSnapshot.id,
-          paymentMethod
+          paymentMethod: paymentSnapshot,
+          amountReceived: paymentSnapshot === 'cash' ? normalizedAmountReceived : null,
+          changeBreakdown: paymentSnapshot === 'cash' ? cashChangeData?.breakdown || [] : []
         });
 
         loadMesas().catch(() => {});
@@ -1069,7 +1157,13 @@ function Mesas({ businessId }) {
         setSuccessDetails([
           { label: 'Total', value: formatPrice(saleTotal) },
           { label: 'Mesa', value: `#${mesaSnapshot.table_number}` },
-          { label: 'Método', value: getPaymentMethodLabel(paymentMethod) }
+          { label: 'Método', value: getPaymentMethodLabel(paymentSnapshot) },
+          ...(paymentSnapshot === 'cash'
+            ? [
+                { label: 'Recibido', value: formatPrice(Number.isFinite(normalizedAmountReceived) ? normalizedAmountReceived : 0) },
+                { label: 'Cambio', value: formatPrice(Math.max((Number.isFinite(normalizedAmountReceived) ? normalizedAmountReceived : 0) - (Number(saleTotal) || 0), 0)) }
+              ]
+            : [])
         ]);
         setSuccessTitle('✨ Mesa Cerrada');
         setAlertType('success');
@@ -1111,6 +1205,7 @@ function Mesas({ businessId }) {
     }
 
     // Crear contenido HTML para impresión
+    const printerWidthMm = getThermalPaperWidthMm();
     const printContent = `
       <!DOCTYPE html>
       <html>
@@ -1120,12 +1215,18 @@ function Mesas({ businessId }) {
         <style>
           @media print {
             @page {
-              size: 80mm auto;
-              margin: 0;
+              size: ${printerWidthMm}mm auto;
+              margin: 2mm;
             }
-            body {
+            html, body {
+              width: ${printerWidthMm}mm !important;
+              height: auto !important;
               margin: 0;
               padding: 0;
+            }
+            .receipt {
+              break-inside: avoid;
+              page-break-inside: avoid;
             }
           }
           
@@ -1133,9 +1234,20 @@ function Mesas({ businessId }) {
             font-family: 'Courier New', monospace;
             font-size: 12px;
             line-height: 1.4;
-            max-width: 80mm;
-            margin: 0 auto;
-            padding: 10px;
+            width: ${printerWidthMm}mm;
+            max-width: ${printerWidthMm}mm;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            background: #fff;
+          }
+
+          .receipt {
+            display: block;
+            width: 100%;
+            margin: 0;
+            padding: 2mm;
+            box-sizing: border-box;
           }
           
           .header {
@@ -1209,6 +1321,7 @@ function Mesas({ businessId }) {
         </style>
       </head>
       <body>
+        <div class="receipt">
         <div class="header">
           <h1>ORDEN DE COCINA</h1>
           <p>Mesa #${selectedMesa.table_number}</p>
@@ -1238,6 +1351,7 @@ function Mesas({ businessId }) {
         <div class="footer">
           <p>*** ORDEN PARA COCINA ***</p>
           <p>Sistema Stocky</p>
+        </div>
         </div>
         
         <script>
@@ -1325,6 +1439,21 @@ function Mesas({ businessId }) {
   const orderTotal = useMemo(() => {
     return orderItems.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
   }, [orderItems]);
+
+  const cambioPago = useMemo(() => {
+    if (paymentMethod !== 'cash') return null;
+    if (amountReceived === '' || amountReceived === null) {
+      return { isValid: false, reason: 'empty', change: 0, breakdown: [] };
+    }
+    return calcularCambio(orderTotal, amountReceived);
+  }, [paymentMethod, orderTotal, amountReceived]);
+
+  const isCashPaymentInvalid = useMemo(() => (
+    paymentMethod === 'cash'
+    && amountReceived !== ''
+    && cambioPago
+    && !cambioPago.isValid
+  ), [paymentMethod, amountReceived, cambioPago]);
 
   // Items que exceden el stock disponible (para mostrar en el modal de pago)
   const insufficientItems = useMemo(() => {
@@ -1426,10 +1555,11 @@ function Mesas({ businessId }) {
             
             {/* Alerta de error - rojo */}
             <SaleErrorAlert 
-              isVisible={success && alertType === 'error'}
-              onClose={() => setSuccess(false)}
-              title={successTitle}
-              details={successDetails}
+              isVisible={!!error}
+              onClose={() => setError(null)}
+              title="❌ Error"
+              message={error || ''}
+              details={[]}
               duration={7000}
             />
           </AnimatePresence>
@@ -1740,15 +1870,6 @@ function Mesas({ businessId }) {
                                       </Button>
                                     </div>
 
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => removeItem(item.id)}
-                                      className="h-9 px-2.5 sm:px-3 hover:bg-red-100 hover:text-red-600 text-xs sm:text-sm"
-                                    >
-                                      <Trash2 className="w-4 h-4 sm:mr-1.5" />
-                                      <span className="hidden sm:inline">Eliminar</span>
-                                    </Button>
                                   </div>
                                 </div>
                               </CardContent>
@@ -1879,90 +2000,168 @@ function Mesas({ businessId }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start sm:items-center justify-center z-[60] p-3 sm:p-4 overflow-y-auto"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-3xl shadow-2xl max-w-lg w-full"
+              className="bg-white rounded-3xl shadow-2xl max-w-6xl w-full my-2 sm:my-4"
             >
               <Card className="border-0">
                 <CardHeader className="border-b border-accent-100 bg-gradient-to-r from-primary-50 to-accent-50">
-                  <CardTitle className="text-2xl font-bold text-primary-900">
+                  <CardTitle className="text-xl sm:text-2xl font-bold text-primary-900">
                     💳 Confirmar Pago
                   </CardTitle>
                 </CardHeader>
 
-                <CardContent className="pt-6 space-y-6">
-                  <div className="bg-accent-50 rounded-2xl p-6 text-center border-2 border-accent-200">
-                    <p className="text-sm text-primary-600 mb-2">Total a pagar</p>
-                    <h3 className="text-4xl font-bold text-primary-900">
-                      {formatPrice(orderTotal)}
-                    </h3>
+                <CardContent className="pt-4 sm:pt-6 space-y-4 sm:space-y-5">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="lg:col-span-1 bg-accent-50 rounded-2xl border-2 border-accent-200 p-4 sm:p-5">
+                      <p className="text-xs uppercase tracking-wide text-primary-600 mb-1">Total a pagar</p>
+                      <h3 className="text-3xl sm:text-4xl font-bold text-primary-900">
+                        {formatPrice(orderTotal)}
+                      </h3>
+                      <div className="mt-4 space-y-1.5">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-primary-600">Cambio a devolver</span>
+                          <span className={`font-bold ${paymentMethod === 'cash' && cambioPago?.isValid ? 'text-green-700' : 'text-primary-900'}`}>
+                            {paymentMethod === 'cash' && cambioPago?.isValid ? formatPrice(cambioPago.change) : formatPrice(0)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="lg:col-span-1 space-y-3">
+                      <div>
+                        <label className="block text-sm font-semibold text-primary-700 mb-1.5">
+                          Método de Pago *
+                        </label>
+                        <select
+                          value={paymentMethod}
+                          onChange={(e) => {
+                            const nextMethod = e.target.value;
+                            setPaymentMethod(nextMethod);
+                            if (nextMethod !== 'cash') {
+                              setAmountReceivedError('');
+                            }
+                          }}
+                          className="w-full h-11 px-3 rounded-xl border-2 border-accent-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                        >
+                          <option value="cash">💵 Efectivo</option>
+                          <option value="card">💳 Tarjeta</option>
+                          <option value="transfer">🏦 Transferencia</option>
+                          <option value="mixed">🔄 Mixto</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-primary-700 mb-1.5">
+                          Cliente (Opcional)
+                        </label>
+                        <select
+                          value={selectedCustomer}
+                          onChange={(e) => setSelectedCustomer(e.target.value)}
+                          className="w-full h-11 px-3 rounded-xl border-2 border-accent-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                        >
+                          <option value="">Venta general</option>
+                          {clientes.map(cliente => (
+                            <option key={cliente.id} value={cliente.id}>
+                              {cliente.full_name} - {cliente.email}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-primary-700 mb-1.5">
+                          Monto recibido
+                        </label>
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          min="0"
+                          step="50"
+                          value={amountReceived}
+                          onChange={(e) => {
+                            const nextValue = e.target.value;
+                            setAmountReceived(nextValue);
+
+                            if (paymentMethod !== 'cash') {
+                              setAmountReceivedError('');
+                              return;
+                            }
+
+                            if (nextValue === '') {
+                              setAmountReceivedError('Ingresa el monto recibido.');
+                              return;
+                            }
+
+                            const validation = calcularCambio(orderTotal, nextValue);
+                            if (!validation.isValid) {
+                              if (validation.reason === 'insufficient') {
+                                setAmountReceivedError('El monto recibido es menor al total.');
+                                return;
+                              }
+                              setAmountReceivedError('Ingresa un monto recibido válido.');
+                              return;
+                            }
+
+                            setAmountReceivedError('');
+                          }}
+                          className={`h-11 border-2 ${amountReceivedError ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : 'border-accent-300 focus:border-primary-500 focus:ring-primary-200'} transition-all`}
+                          placeholder="Ej: 100000"
+                        />
+                        {amountReceivedError && paymentMethod === 'cash' && (
+                          <p className="mt-1.5 text-xs text-red-600">{amountReceivedError}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="lg:col-span-1 rounded-xl border border-accent-200 bg-white p-4 space-y-2">
+                      <p className="text-xs uppercase tracking-wide text-primary-600">Desglose del cambio</p>
+                      {paymentMethod === 'cash' && cambioPago?.isValid && cambioPago.change > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-1">
+                          {cambioPago.breakdown.map(({ denomination, count }) => (
+                            <p key={denomination} className="text-sm text-primary-700">
+                              {count} x {formatPrice(denomination)}
+                            </p>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-primary-600">Sin cambio para devolver.</p>
+                      )}
+                    </div>
                   </div>
 
                   {insufficientItems.length > 0 && (
-                    <div className="p-4 rounded-lg border border-red-200 bg-red-50 flex flex-col gap-3">
-                      <div className="flex items-center gap-3">
-                        <AlertCircle className="w-5 h-5 text-red-600" />
+                    <div className="p-3 rounded-lg border border-red-200 bg-red-50 flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-red-600" />
                         <div>
-                          <p className="text-sm font-semibold text-red-800">⚠️ Hay productos con stock insuficiente</p>
-                          <p className="text-xs text-red-700">Revisa los siguientes productos o crea una compra antes de cerrar la orden.</p>
+                          <p className="text-sm font-semibold text-red-800">Stock insuficiente ({insufficientItems.length})</p>
+                          <p className="text-xs text-red-700">Corrige antes de cerrar la orden.</p>
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                         {insufficientItems.map(it => (
-                          <div key={it.id || `${it.product_id}-${it.quantity}`} className="text-sm text-red-700">
+                          <div key={it.id || `${it.product_id}-${it.quantity}`} className="text-xs text-red-700">
                             <strong className="text-primary-900">{it.product_name}</strong>
-                            <div>Disponibles: {it.available_stock} — Pedido: {it.quantity}</div>
+                            <div>Disp: {it.available_stock} / Ped: {it.quantity}</div>
                           </div>
                         ))}
                       </div>
-                      <div className="flex justify-end" />
                     </div>
                   )}
 
-                  <div>
-                    <label className="block text-sm font-semibold text-primary-700 mb-2">
-                      Método de Pago *
-                    </label>
-                    <select
-                      value={paymentMethod}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="w-full h-12 px-4 rounded-xl border-2 border-accent-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
-                    >
-                      <option value="cash">💵 Efectivo</option>
-                      <option value="card">💳 Tarjeta</option>
-                      <option value="transfer">🏦 Transferencia</option>
-                      <option value="mixed">🔄 Mixto</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-primary-700 mb-2">
-                      Cliente (Opcional)
-                    </label>
-                    <select
-                      value={selectedCustomer}
-                      onChange={(e) => setSelectedCustomer(e.target.value)}
-                      className="w-full h-12 px-4 rounded-xl border-2 border-accent-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
-                    >
-                      <option value="">Venta general</option>
-                      {clientes.map(cliente => (
-                        <option key={cliente.id} value={cliente.id}>
-                          {cliente.full_name} - {cliente.email}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex gap-3 pt-4">
+                  <div className="flex gap-3 pt-1">
                     <Button
                       variant="outline"
                       onClick={() => {
                         setShowPaymentModal(false);
                         setPaymentMethod('cash');
+                        setAmountReceived('');
+                        setAmountReceivedError('');
                         setSelectedCustomer('');
                       }}
                       disabled={isClosingOrder}
@@ -1972,7 +2171,7 @@ function Mesas({ businessId }) {
                     </Button>
                     <Button
                       onClick={processPaymentAndClose}
-                      disabled={isClosingOrder}
+                      disabled={isClosingOrder || (paymentMethod === 'cash' && (amountReceived === '' || isCashPaymentInvalid))}
                       className="flex-1 h-12 gradient-primary text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isClosingOrder ? (
