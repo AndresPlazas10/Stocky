@@ -14,6 +14,51 @@ function buildIdempotencyKey({ action, businessId, orderId, tableId }) {
   return `stocky:${normalizedAction}:${b}:${o}:${t}`;
 }
 
+function normalizeSplitSubAccountsForRpc(subAccounts = []) {
+  if (!Array.isArray(subAccounts)) return [];
+
+  return subAccounts.map((sub, index) => {
+    const normalizedPaymentMethod = typeof sub?.paymentMethod === 'string'
+      ? sub.paymentMethod
+      : (typeof sub?.payment_method === 'string' ? sub.payment_method : 'cash');
+
+    const normalizedItems = Array.isArray(sub?.items)
+      ? sub.items
+          .map((item) => {
+            const productId = item?.product_id || item?.products?.id || null;
+            const quantity = Number(item?.quantity);
+            const unitPrice = Number(item?.unit_price ?? item?.price ?? item?.unitPrice);
+
+            if (!productId) return null;
+            if (!Number.isFinite(quantity) || quantity <= 0) return null;
+            if (!Number.isFinite(unitPrice) || unitPrice < 0) return null;
+
+            return {
+              product_id: productId,
+              quantity,
+              unit_price: unitPrice
+            };
+          })
+          .filter(Boolean)
+      : [];
+
+    return {
+      name: sub?.name || `Cuenta ${index + 1}`,
+      paymentMethod: normalizedPaymentMethod,
+      payment_method: normalizedPaymentMethod,
+      amountReceived: sub?.amountReceived ?? sub?.amount_received ?? null,
+      amount_received: sub?.amountReceived ?? sub?.amount_received ?? null,
+      changeBreakdown: Array.isArray(sub?.changeBreakdown)
+        ? sub.changeBreakdown
+        : (Array.isArray(sub?.change_breakdown) ? sub.change_breakdown : []),
+      change_breakdown: Array.isArray(sub?.changeBreakdown)
+        ? sub.changeBreakdown
+        : (Array.isArray(sub?.change_breakdown) ? sub.change_breakdown : []),
+      items: normalizedItems
+    };
+  });
+}
+
 function isOrderContextError(errorLike) {
   const message = String(errorLike?.message || errorLike || '').toLowerCase();
   if (!message) return false;
@@ -47,25 +92,100 @@ function isFunctionUnavailableError(errorLike, functionName) {
   );
 }
 
-function isIdempotencyLayerError(errorLike) {
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
-  if (!message) return false;
+function getFriendlySaleErrorMessage(errorLike, fallbackMessage) {
+  const rawMessage = String(errorLike?.message || errorLike || '').trim();
+  const normalized = rawMessage.toLowerCase();
 
-  return (
-    message.includes('idempotency')
-  ) || (
-    message.includes('idempotency_requests')
-  ) || (
-    message.includes('permission denied')
-  ) || (
-    message.includes('row-level security')
-  ) || (
-    message.includes('violates row-level security')
-  ) || (
-    message.includes('conflicto de idempotencia')
-  ) || (
-    message.includes('processing for this idempotent key')
-  );
+  if (normalized.includes('idx_sales_prevent_duplicates')) {
+    return 'La venta ya estaba siendo procesada o ya fue registrada. Actualiza y verifica en Ventas.';
+  }
+
+  return rawMessage || fallbackMessage;
+}
+
+function normalizeCashBreakdownEntries(changeBreakdown) {
+  if (!Array.isArray(changeBreakdown)) return [];
+
+  return changeBreakdown
+    .map((entry) => {
+      const denomination = Math.round(Number(entry?.denomination));
+      const count = Math.round(Number(entry?.count));
+
+      if (!Number.isFinite(denomination) || denomination <= 0) return null;
+      if (!Number.isFinite(count) || count <= 0) return null;
+
+      return { denomination, count };
+    })
+    .filter(Boolean);
+}
+
+function computeChangeFromBreakdown(changeBreakdown = []) {
+  return changeBreakdown.reduce((sum, entry) => {
+    const denomination = Number(entry?.denomination || 0);
+    const count = Number(entry?.count || 0);
+    if (!Number.isFinite(denomination) || !Number.isFinite(count) || count <= 0) return sum;
+    return sum + (denomination * count);
+  }, 0);
+}
+
+function buildCashMetadata({ paymentMethod, saleTotal, amountReceived, changeBreakdown }) {
+  if (paymentMethod !== 'cash') {
+    return {
+      amountReceived: null,
+      changeAmount: null,
+      changeBreakdown: []
+    };
+  }
+
+  const normalizedSaleTotal = Number.isFinite(Number(saleTotal))
+    ? Number(saleTotal)
+    : 0;
+  const normalizedAmountReceived = Number.isFinite(Number(amountReceived))
+    ? Math.max(Number(amountReceived), 0)
+    : null;
+  const normalizedChangeBreakdown = normalizeCashBreakdownEntries(changeBreakdown);
+  const breakdownChange = computeChangeFromBreakdown(normalizedChangeBreakdown);
+  const changeFromDifference = normalizedAmountReceived !== null
+    ? Math.max(normalizedAmountReceived - normalizedSaleTotal, 0)
+    : null;
+
+  return {
+    amountReceived: normalizedAmountReceived,
+    changeAmount: breakdownChange > 0 ? breakdownChange : changeFromDifference,
+    changeBreakdown: normalizedChangeBreakdown
+  };
+}
+
+async function persistSaleCashMetadata({
+  businessId,
+  saleId,
+  paymentMethod,
+  saleTotal,
+  amountReceived,
+  changeBreakdown
+}) {
+  if (!saleId || paymentMethod !== 'cash') return;
+
+  const metadata = buildCashMetadata({
+    paymentMethod,
+    saleTotal,
+    amountReceived,
+    changeBreakdown
+  });
+
+  const { error } = await supabase
+    .from('sales')
+    .update({
+      amount_received: metadata.amountReceived,
+      change_amount: metadata.changeAmount,
+      change_breakdown: metadata.changeBreakdown
+    })
+    .eq('id', saleId)
+    .eq('business_id', businessId);
+
+  if (error) {
+    // Best-effort: no bloquear cierre de orden por metadatos de efectivo.
+  }
 }
 
 async function finalizeOrderAndTable({ businessId, orderId, tableId }) {
@@ -131,6 +251,11 @@ async function getSellerName(businessId) {
  */
 export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tableId }) {
   const { user, sellerName } = await getSellerName(businessId);
+  const normalizedSubAccounts = normalizeSplitSubAccountsForRpc(subAccounts);
+  const subAccountsWithItems = normalizedSubAccounts.filter((sub) => Array.isArray(sub.items) && sub.items.length > 0);
+  if (subAccountsWithItems.length === 0) {
+    throw new Error('No hay subcuentas con productos válidos para procesar.');
+  }
   const idempotencyKey = buildIdempotencyKey({
     action: 'close-order-split',
     businessId,
@@ -145,7 +270,7 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     p_business_id: businessId,
     p_user_id: user.id,
     p_seller_name: sellerName,
-    p_sub_accounts: subAccounts,
+    p_sub_accounts: subAccountsWithItems,
     p_order_id: orderId,
     p_table_id: tableId,
     p_idempotency_key: idempotencyKey
@@ -156,20 +281,25 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     atomicError,
     'create_split_sales_complete_idempotent'
   );
-  const retryBaseSplitFn = atomicError && (missingIdempotentSplitFn || isIdempotencyLayerError(atomicError));
+  const retryBaseSplitFn = atomicError && missingIdempotentSplitFn;
   if (retryBaseSplitFn) {
     ({ data: atomicResult, error: atomicError } = await supabase.rpc('create_split_sales_complete', {
       p_business_id: businessId,
       p_user_id: user.id,
       p_seller_name: sellerName,
-      p_sub_accounts: subAccounts,
+      p_sub_accounts: subAccountsWithItems,
       p_order_id: orderId,
       p_table_id: tableId
     }));
   }
 
   if (!atomicError && atomicResult?.[0]?.status === 'success') {
-    return { totalSold: Number(atomicResult[0].total_sold || 0) };
+    const atomicSalesCount = Number(atomicResult[0].sales_count || 0);
+    const atomicTotalSold = Number(atomicResult[0].total_sold || 0);
+    if (!Number.isFinite(atomicTotalSold) || atomicTotalSold <= 0 || atomicSalesCount <= 0) {
+      throw new Error('Cierre dividido inválido: la operación no generó ventas.');
+    }
+    return { totalSold: atomicTotalSold };
   }
 
   // Fallback transitorio: mantener compatibilidad mientras la migración nueva se despliega.
@@ -179,29 +309,30 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
   );
   const shouldFallbackWithoutOrderContext = isOrderContextError(atomicError);
   if (!isMissingAtomicFn && !shouldFallbackWithoutOrderContext) {
-    throw new Error(atomicError?.message || '❌ No se pudo cerrar la orden dividida. Intenta de nuevo.');
+    throw new Error(getFriendlySaleErrorMessage(
+      atomicError,
+      '❌ No se pudo cerrar la orden dividida. Intenta de nuevo.'
+    ));
   }
 
   let totalSold = 0;
-  for (let i = 0; i < subAccounts.length; i++) {
-    const sub = subAccounts[i];
+  for (let i = 0; i < subAccountsWithItems.length; i++) {
+    const sub = subAccountsWithItems[i];
     if (!sub.items || sub.items.length === 0) continue;
 
-    const saleTotal = sub.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+    const saleTotal = sub.items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
     totalSold += saleTotal;
 
     const itemsForRpc = sub.items.map(item => ({
       product_id: item.product_id,
       quantity: item.quantity,
-      unit_price: item.price
+      unit_price: item.unit_price
     }));
 
-    const isLastSale = i === subAccounts.length - 1;
+    const isLastSale = i === subAccountsWithItems.length - 1;
     const closeOrderInsideRpc = isLastSale && !shouldFallbackWithoutOrderContext;
     const subKey = `${idempotencyKey}:sub:${i + 1}`;
-    let result = null;
-    let rpcError = null;
-    ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete_idempotent', {
+    const subIdempotentBaseParams = {
       p_business_id: businessId,
       p_user_id: user.id,
       p_seller_name: sellerName,
@@ -210,32 +341,52 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
       p_order_id: closeOrderInsideRpc ? orderId : null,
       p_table_id: closeOrderInsideRpc ? tableId : null,
       p_idempotency_key: subKey
-    }));
+    };
+    const subBaseParams = {
+      p_business_id: businessId,
+      p_user_id: user.id,
+      p_seller_name: sellerName,
+      p_payment_method: sub.paymentMethod || 'cash',
+      p_items: itemsForRpc,
+      p_order_id: closeOrderInsideRpc ? orderId : null,
+      p_table_id: closeOrderInsideRpc ? tableId : null
+    };
+    let result = null;
+    let rpcError = null;
+    ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete_idempotent', subIdempotentBaseParams));
 
     const missingIdempotentSaleFn = isFunctionUnavailableError(
       rpcError,
       'create_sale_complete_idempotent'
     );
-    const retryBaseSaleFn = rpcError && (missingIdempotentSaleFn || isIdempotencyLayerError(rpcError));
+    const retryBaseSaleFn = rpcError && missingIdempotentSaleFn;
     if (retryBaseSaleFn) {
-      ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete', {
-        p_business_id: businessId,
-        p_user_id: user.id,
-        p_seller_name: sellerName,
-        p_payment_method: sub.paymentMethod || 'cash',
-        p_items: itemsForRpc,
-        p_order_id: closeOrderInsideRpc ? orderId : null,
-        p_table_id: closeOrderInsideRpc ? tableId : null
-      }));
+      ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete', subBaseParams));
     }
 
     if (rpcError || !result?.[0]) {
-      throw new Error(rpcError?.message || `❌ No se pudo registrar la venta ${i + 1}. Intenta de nuevo.`);
+      throw new Error(getFriendlySaleErrorMessage(
+        rpcError,
+        `❌ No se pudo registrar la venta ${i + 1}. Intenta de nuevo.`
+      ));
     }
+
+    await persistSaleCashMetadata({
+      businessId,
+      saleId: result[0].sale_id,
+      paymentMethod: sub.paymentMethod || 'cash',
+      saleTotal,
+      amountReceived: sub.amountReceived ?? sub.amount_received ?? null,
+      changeBreakdown: sub.changeBreakdown ?? sub.change_breakdown ?? []
+    });
   }
 
   if (shouldFallbackWithoutOrderContext) {
     await finalizeOrderAndTable({ businessId, orderId, tableId });
+  }
+
+  if (!Number.isFinite(totalSold) || totalSold <= 0) {
+    throw new Error('No se pudieron generar ventas en el cierre dividido.');
   }
 
   return { totalSold };
@@ -245,10 +396,10 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
  * Cierra la orden en una sola venta, descuenta stock y libera la mesa.
  * OPTIMIZADO: Usa RPC create_sale_complete en una sola transacción.
  * @param {string} businessId
- * @param {{ orderId: string, tableId: string, paymentMethod: string }} params
+ * @param {{ orderId: string, tableId: string, paymentMethod: string, amountReceived?: number|null, changeBreakdown?: Array<{denomination:number,count:number}>|null }} params
  * @returns {Promise<{ saleTotal: number }>}
  */
-export async function closeOrderSingle(businessId, { orderId, tableId, paymentMethod }) {
+export async function closeOrderSingle(businessId, { orderId, tableId, paymentMethod, amountReceived = null, changeBreakdown = null }) {
   const { user, sellerName } = await getSellerName(businessId);
   const idempotencyKey = buildIdempotencyKey({
     action: 'close-order-single',
@@ -281,11 +432,13 @@ export async function closeOrderSingle(businessId, { orderId, tableId, paymentMe
     quantity: item.quantity,
     unit_price: item.price
   }));
-
-  // Llamar wrapper idempotente (con fallback a función base).
-  let result = null;
-  let rpcError = null;
-  ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete_idempotent', {
+  const normalizedAmountReceived = Number.isFinite(Number(amountReceived))
+    ? Number(amountReceived)
+    : null;
+  const normalizedChangeBreakdown = Array.isArray(changeBreakdown)
+    ? changeBreakdown
+    : null;
+  const idempotentBaseParams = {
     p_business_id: businessId,
     p_user_id: user.id,
     p_seller_name: sellerName,
@@ -294,68 +447,81 @@ export async function closeOrderSingle(businessId, { orderId, tableId, paymentMe
     p_order_id: orderId,
     p_table_id: tableId,
     p_idempotency_key: idempotencyKey
-  }));
+  };
+  const baseParams = {
+    p_business_id: businessId,
+    p_user_id: user.id,
+    p_seller_name: sellerName,
+    p_payment_method: paymentMethod || 'cash',
+    p_items: itemsForRpc,
+    p_order_id: orderId,
+    p_table_id: tableId
+  };
+
+  // Llamar wrapper idempotente (con fallback a función base).
+  let result = null;
+  let rpcError = null;
+  ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete_idempotent', idempotentBaseParams));
 
   const missingIdempotentSaleFn = isFunctionUnavailableError(
     rpcError,
     'create_sale_complete_idempotent'
   );
-  const retryBaseSaleFn = rpcError && (missingIdempotentSaleFn || isIdempotencyLayerError(rpcError));
+  const retryBaseSaleFn = rpcError && missingIdempotentSaleFn;
   if (retryBaseSaleFn) {
-    ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete', {
-      p_business_id: businessId,
-      p_user_id: user.id,
-      p_seller_name: sellerName,
-      p_payment_method: paymentMethod || 'cash',
-      p_items: itemsForRpc,
-      p_order_id: orderId,
-      p_table_id: tableId
-    }));
+    ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete', baseParams));
   }
 
+  let resolvedSaleId = result?.[0]?.sale_id || null;
   if (rpcError || !result?.[0]) {
     if (!isOrderContextError(rpcError)) {
-      throw new Error(rpcError?.message || '❌ No se pudo registrar la venta. Intenta de nuevo.');
+      throw new Error(getFriendlySaleErrorMessage(
+        rpcError,
+        '❌ No se pudo registrar la venta. Intenta de nuevo.'
+      ));
     }
 
     const fallbackKey = `${idempotencyKey}:no-order-context`;
     let fallbackResult = null;
     let fallbackError = null;
 
-    ({ data: fallbackResult, error: fallbackError } = await supabase.rpc('create_sale_complete_idempotent', {
-      p_business_id: businessId,
-      p_user_id: user.id,
-      p_seller_name: sellerName,
-      p_payment_method: paymentMethod || 'cash',
-      p_items: itemsForRpc,
+    const fallbackIdempotentBaseParams = {
+      ...idempotentBaseParams,
       p_order_id: null,
       p_table_id: null,
       p_idempotency_key: fallbackKey
-    }));
+    };
+    ({ data: fallbackResult, error: fallbackError } = await supabase.rpc('create_sale_complete_idempotent', fallbackIdempotentBaseParams));
 
     const missingFallbackIdempotentFn = isFunctionUnavailableError(
       fallbackError,
       'create_sale_complete_idempotent'
     );
-    const retryBaseFallbackFn = fallbackError && (missingFallbackIdempotentFn || isIdempotencyLayerError(fallbackError));
+    const retryBaseFallbackFn = fallbackError && missingFallbackIdempotentFn;
     if (retryBaseFallbackFn) {
-      ({ data: fallbackResult, error: fallbackError } = await supabase.rpc('create_sale_complete', {
-        p_business_id: businessId,
-        p_user_id: user.id,
-        p_seller_name: sellerName,
-        p_payment_method: paymentMethod || 'cash',
-        p_items: itemsForRpc,
-        p_order_id: null,
-        p_table_id: null
-      }));
+      const fallbackBaseParams = { ...baseParams, p_order_id: null, p_table_id: null };
+      ({ data: fallbackResult, error: fallbackError } = await supabase.rpc('create_sale_complete', fallbackBaseParams));
     }
 
     if (fallbackError || !fallbackResult?.[0]) {
-      throw new Error(fallbackError?.message || '❌ No se pudo registrar la venta. Intenta de nuevo.');
+      throw new Error(getFriendlySaleErrorMessage(
+        fallbackError,
+        '❌ No se pudo registrar la venta. Intenta de nuevo.'
+      ));
     }
 
+    resolvedSaleId = fallbackResult?.[0]?.sale_id || resolvedSaleId;
     await finalizeOrderAndTable({ businessId, orderId, tableId });
   }
+
+  await persistSaleCashMetadata({
+    businessId,
+    saleId: resolvedSaleId,
+    paymentMethod: paymentMethod || 'cash',
+    saleTotal,
+    amountReceived: normalizedAmountReceived,
+    changeBreakdown: normalizedChangeBreakdown
+  });
 
   return { saleTotal };
 }

@@ -14,6 +14,7 @@ import { X, Plus, Trash2, CheckCircle2, CreditCard, DollarSign } from 'lucide-re
 import { formatPrice } from '../../utils/formatters.js';
 
 const MAX_SUB_ACCOUNTS = 10;
+const COLOMBIAN_DENOMINATIONS = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50];
 
 const PAYMENT_OPTIONS = [
   { value: 'cash', label: '💵 Efectivo', icon: DollarSign },
@@ -21,6 +22,54 @@ const PAYMENT_OPTIONS = [
   { value: 'transfer', label: '🏦 Transferencia', icon: CreditCard },
   { value: 'mixed', label: '🔄 Mixto', icon: DollarSign },
 ];
+
+const parseCopAmount = (value) => {
+  if (value === null || value === undefined) return NaN;
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value) : NaN;
+
+  const raw = String(value).trim().replace(/\s/g, '').replace(/\$/g, '');
+  if (!raw) return NaN;
+
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(raw)) {
+    const parsed = Number(raw.replace(/\./g, '').replace(',', '.'));
+    return Number.isFinite(parsed) ? Math.round(parsed) : NaN;
+  }
+
+  if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(raw)) {
+    const parsed = Number(raw.replace(/,/g, ''));
+    return Number.isFinite(parsed) ? Math.round(parsed) : NaN;
+  }
+
+  const simpleParsed = Number(raw.replace(',', '.'));
+  if (Number.isFinite(simpleParsed)) return Math.round(simpleParsed);
+
+  const digitsOnly = raw.replace(/[^\d]/g, '');
+  if (!digitsOnly) return NaN;
+  const digitsParsed = Number(digitsOnly);
+  return Number.isFinite(digitsParsed) ? Math.round(digitsParsed) : NaN;
+};
+
+const calcularCambio = (total, pagado) => {
+  const normalizedTotal = Math.round(Number(total) || 0);
+  const normalizedPaid = parseCopAmount(pagado);
+
+  if (normalizedTotal <= 0) return { isValid: false, change: 0, breakdown: [] };
+  if (!Number.isFinite(normalizedPaid) || normalizedPaid < normalizedTotal) {
+    return { isValid: false, change: 0, breakdown: [] };
+  }
+
+  let remaining = normalizedPaid - normalizedTotal;
+  const breakdown = [];
+  for (const denomination of COLOMBIAN_DENOMINATIONS) {
+    const count = Math.floor(remaining / denomination);
+    if (count > 0) {
+      breakdown.push({ denomination, count });
+      remaining -= count * denomination;
+    }
+  }
+
+  return { isValid: true, change: normalizedPaid - normalizedTotal, breakdown, paid: normalizedPaid };
+};
 
 /**
  * itemAssignments: { itemId: { accountId: qty } }
@@ -37,8 +86,9 @@ function getInitialAssignments(orderItems, defaultAccountId = 1) {
 
 export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }) {
   const [accounts, setAccounts] = useState([
-    { id: 1, name: 'Cuenta 1', paymentMethod: 'cash' },
+    { id: 1, name: 'Cuenta 1', paymentMethod: 'cash', amountReceived: '' },
   ]);
+  const _motionLintUsage = motion;
   const [itemAssignments, setItemAssignments] = useState(() =>
     getInitialAssignments(orderItems, 1)
   );
@@ -48,7 +98,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel })
     const nextId = Math.max(...accounts.map((a) => a.id), 0) + 1;
     setAccounts((prev) => [
       ...prev,
-      { id: nextId, name: `Cuenta ${nextId}`, paymentMethod: 'cash' },
+      { id: nextId, name: `Cuenta ${nextId}`, paymentMethod: 'cash', amountReceived: '' },
     ]);
   };
 
@@ -78,6 +128,12 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel })
     );
   };
 
+  const updateAccountAmountReceived = (accountId, amountReceived) => {
+    setAccounts((prev) =>
+      prev.map((a) => (a.id === accountId ? { ...a, amountReceived } : a))
+    );
+  };
+
   const setItemQuantityForAccount = (itemId, accountId, qty) => {
     const numQty = Math.max(0, Math.floor(Number(qty)) || 0);
     setItemAssignments((prev) => {
@@ -85,16 +141,6 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel })
       byAccount[accountId] = numQty;
       return { ...prev, [itemId]: byAccount };
     });
-  };
-
-  const assignAllToAccount = (itemId, accountId) => {
-    const item = orderItems.find((i) => i.id === itemId);
-    if (!item) return;
-    const qty = Number(item.quantity) || 1;
-    setItemAssignments((prev) => ({
-      ...prev,
-      [itemId]: { [accountId]: qty },
-    }));
   };
 
   const subAccounts = useMemo(() => {
@@ -113,8 +159,22 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel })
         }
       });
       const total = items.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
-      return { ...acc, items, total };
-    }, [accounts, orderItems, itemAssignments]);
+      const normalizedTotal = Math.round(total);
+      const cashInput = acc.amountReceived === '' ? String(normalizedTotal) : acc.amountReceived;
+      const cashInfo = acc.paymentMethod === 'cash'
+        ? calcularCambio(normalizedTotal, cashInput)
+        : { isValid: true, change: 0, breakdown: [], paid: null };
+
+      return {
+        ...acc,
+        items,
+        total,
+        amountReceivedResolved: acc.paymentMethod === 'cash' && cashInfo.isValid ? cashInfo.paid : null,
+        changeAmount: acc.paymentMethod === 'cash' && cashInfo.isValid ? cashInfo.change : 0,
+        changeBreakdown: acc.paymentMethod === 'cash' && cashInfo.isValid ? cashInfo.breakdown : [],
+        cashInfo
+      };
+    });
   }, [accounts, orderItems, itemAssignments]);
 
   const getAssignedSum = useCallback((itemId) => {
@@ -138,8 +198,16 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel })
     return errors;
   }, [orderItems, getAssignedSum]);
 
+  const hasCashValidationErrors = subAccounts.some((sa) =>
+    sa.paymentMethod === 'cash'
+    && sa.items.length > 0
+    && !sa.cashInfo?.isValid
+  );
+
   const canConfirm =
-    subAccounts.some((sa) => sa.items.length > 0) && validationErrors.length === 0;
+    subAccounts.some((sa) => sa.items.length > 0)
+    && validationErrors.length === 0
+    && !hasCashValidationErrors;
 
   const handleConfirm = () => {
     if (!canConfirm) return;
@@ -150,6 +218,8 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel })
         paymentMethod: sa.paymentMethod,
         items: sa.items,
         total: sa.total,
+        amountReceived: sa.paymentMethod === 'cash' ? sa.amountReceivedResolved : null,
+        changeBreakdown: sa.paymentMethod === 'cash' ? sa.changeBreakdown : [],
       })),
     });
   };
@@ -241,6 +311,29 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel })
                             <span className="text-sm font-bold text-primary-900">
                               {formatPrice(acc.total)}
                             </span>
+                            {acc.paymentMethod === 'cash' && (
+                              <>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step={50}
+                                  value={acc.amountReceived}
+                                  onChange={(e) => updateAccountAmountReceived(acc.id, e.target.value)}
+                                  placeholder="Recibido"
+                                  className="h-8 w-full text-xs border-accent-300"
+                                  aria-label={`Monto recibido ${acc.name}`}
+                                />
+                                {acc.items.length > 0 && (() => {
+                                  const sa = subAccounts.find((s) => s.id === acc.id);
+                                  if (!sa) return null;
+                                  return (
+                                    <span className={`text-[11px] font-semibold ${sa.cashInfo?.isValid ? 'text-green-700' : 'text-red-600'}`}>
+                                      {sa.cashInfo?.isValid ? `Cambio: ${formatPrice(sa.changeAmount)}` : 'Pago insuficiente'}
+                                    </span>
+                                  );
+                                })()}
+                              </>
+                            )}
                           </div>
                         </th>
                       ))}
@@ -342,7 +435,9 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel })
             )}
             {!canConfirm && validationErrors.length === 0 && (
               <p className="text-sm text-amber-700 text-center font-medium">
-                Asigna al menos un producto a alguna sub-cuenta.
+                {hasCashValidationErrors
+                  ? 'Hay sub-cuentas en efectivo con pago insuficiente.'
+                  : 'Asigna al menos un producto a alguna sub-cuenta.'}
               </p>
             )}
           </div>

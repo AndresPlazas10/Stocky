@@ -19,16 +19,20 @@ import {
   AlertTriangle,
   Info,
   Database,
-  Shield
+  Shield,
+  Printer
 } from 'lucide-react';
 import { InvoicingProvider } from '../../context/InvoicingContext';
 import InvoicingSection from '../Settings/InvoicingSection';
+import { getThermalPaperWidthMm, setThermalPaperWidthMm } from '../../utils/printer.js';
 
 function Configuracion({ user, business, onBusinessUpdate }) {
+  const _motionLintUsage = motion;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [editingBusiness, setEditingBusiness] = useState(false);
+  const [printerPaperWidth, setPrinterPaperWidth] = useState(() => getThermalPaperWidthMm());
   
   const [businessData, setBusinessData] = useState({
     name: '',
@@ -110,6 +114,17 @@ function Configuracion({ user, business, onBusinessUpdate }) {
       window.location.href = '/';
     } catch {
       setError('❌ No se pudo cerrar la sesión correctamente');
+    }
+  }, []);
+
+  const handlePrinterWidthChange = useCallback((e) => {
+    const nextWidth = Number(e.target.value);
+    const saved = setThermalPaperWidthMm(nextWidth);
+    if (saved) {
+      setPrinterPaperWidth(nextWidth);
+      setSuccess(`Configuración de impresora guardada: ${nextWidth}mm`);
+    } else {
+      setError('❌ No se pudo guardar la configuración de impresora');
     }
   }, []);
 
@@ -428,7 +443,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
           </div>
 
           <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200">
                 <div className="flex items-center gap-3 mb-2">
                   <Settings className="w-5 h-5 text-blue-600" />
@@ -454,6 +469,24 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                   <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                   Conectado
                 </p>
+              </div>
+
+              <div className="p-4 bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl border border-amber-200">
+                <div className="flex items-center gap-3 mb-2">
+                  <Printer className="w-5 h-5 text-amber-700" />
+                  <span className="text-sm text-amber-800 font-medium">Impresora térmica</span>
+                </div>
+                <div className="pl-8">
+                  <label className="block text-xs text-amber-700 mb-1">Ancho de papel</label>
+                  <select
+                    value={printerPaperWidth}
+                    onChange={handlePrinterWidthChange}
+                    className="w-full max-w-[180px] h-10 px-3 border border-amber-300 rounded-lg bg-white text-amber-900 font-semibold focus:ring-2 focus:ring-amber-300 focus:border-transparent"
+                  >
+                    <option value={58}>58mm</option>
+                    <option value={80}>80mm</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
