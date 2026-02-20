@@ -1,4 +1,5 @@
 const PRINTER_WIDTH_KEY = 'stocky_printer_paper_width_mm';
+const AUTO_PRINT_RECEIPT_KEY = 'stocky_auto_print_receipt_enabled';
 const ALLOWED_WIDTHS = new Set([58, 80]);
 const DEFAULT_WIDTH = 80;
 
@@ -24,3 +25,19 @@ export const setThermalPaperWidthMm = (width) => {
   }
 };
 
+export const isAutoPrintReceiptEnabled = () => {
+  try {
+    return window.localStorage.getItem(AUTO_PRINT_RECEIPT_KEY) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+export const setAutoPrintReceiptEnabled = (enabled) => {
+  try {
+    window.localStorage.setItem(AUTO_PRINT_RECEIPT_KEY, enabled ? 'true' : 'false');
+    return true;
+  } catch {
+    return false;
+  }
+};

@@ -14,7 +14,17 @@
 import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { Rate, Trend, Counter } from 'k6/metrics';
-import { randomItem, randomIntBetween } from 'https://jslib.k6.io/k6-utils/1.2.0/index.js';
+
+function randomIntBetween(min, max) {
+  const low = Math.ceil(Number(min));
+  const high = Math.floor(Number(max));
+  return Math.floor(Math.random() * (high - low + 1)) + low;
+}
+
+function randomItem(items) {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  return items[randomIntBetween(0, items.length - 1)];
+}
 
 // =====================================================
 // MÉTRICAS PERSONALIZADAS
@@ -108,9 +118,9 @@ export function setup() {
   
   console.log('✅ Autenticado:', userId);
   
-  // Obtener lista de productos para simular ventas
-  const productsRes = http.get(
-    `${API_URL}/rest/v1/products?business_id=eq.${__ENV.BUSINESS_ID}&select=id,name,price&limit=50`,
+  // Obtener lista de productos para simular ventas (schema actual: sale_price).
+  let productsRes = http.get(
+    `${API_URL}/rest/v1/products?business_id=eq.${__ENV.BUSINESS_ID}&select=id,name,sale_price&limit=50`,
     {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -118,9 +128,25 @@ export function setup() {
       },
     }
   );
-  
-  const products = productsRes.json();
-  console.log(`📦 Cargados ${products.length} productos para simular ventas`);
+
+  let products = productsRes.json();
+
+  // Compatibilidad con esquemas legacy donde la columna es `price`.
+  if (productsRes.status >= 400) {
+    productsRes = http.get(
+      `${API_URL}/rest/v1/products?business_id=eq.${__ENV.BUSINESS_ID}&select=id,name,price&limit=50`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'apikey': ANON_KEY,
+        },
+      }
+    );
+    products = productsRes.json();
+  }
+
+  const normalizedProducts = Array.isArray(products) ? products : [];
+  console.log(`📦 Cargados ${normalizedProducts.length} productos para simular ventas`);
   
   return {
     apiUrl: API_URL,
@@ -128,7 +154,7 @@ export function setup() {
     token: token,
     userId: userId,
     businessId: __ENV.BUSINESS_ID,
-    products: products || [],
+    products: normalizedProducts,
   };
 }
 
@@ -230,6 +256,13 @@ function testListSales(data, headers) {
 
 function testCreateSale(data, headers) {
   group('Crear Venta', () => {
+    if (!Array.isArray(data.products) || data.products.length === 0) {
+      failureRate.add(1);
+      dbErrors.add(1);
+      console.error('❌ No hay productos disponibles para crear ventas en la prueba.');
+      return;
+    }
+
     // Generar datos de venta realistas
     const numItems = randomIntBetween(1, 5);
     const selectedProducts = [];
@@ -238,13 +271,12 @@ function testCreateSale(data, headers) {
     for (let i = 0; i < numItems; i++) {
       const product = randomItem(data.products);
       const quantity = randomIntBetween(1, 10);
-      const price = parseFloat(product.price) || 10000;
+      const price = parseFloat(product.sale_price ?? product.price) || 10000;
       
       selectedProducts.push({
         product_id: product.id,
         quantity: quantity,
         unit_price: price,
-        subtotal: quantity * price,
       });
       
       total += quantity * price;
@@ -272,17 +304,20 @@ function testCreateSale(data, headers) {
       return;
     }
     
-    const sale = saleResponse.json();
+    const salePayload = saleResponse.json();
+    const sale = Array.isArray(salePayload) ? salePayload[0] : salePayload;
+    const saleId = sale?.id;
     
     check(sale, {
-      'Venta tiene ID': (s) => !!s.id,
+      'Venta tiene ID': (s) => !!s?.id,
       'Total correcto': (s) => s.total === total,
     });
+    if (!saleId) return;
     
     // Paso 2: Crear detalles de venta
     const details = selectedProducts.map(item => ({
       ...item,
-      sale_id: sale.id,
+      sale_id: saleId,
     }));
     
     const detailsResponse = http.post(
@@ -297,7 +332,7 @@ function testCreateSale(data, headers) {
     sleep(0.5);
     
     const verifyResponse = http.get(
-      `${data.apiUrl}/rest/v1/sales?id=eq.${sale.id}`,
+      `${data.apiUrl}/rest/v1/sales?id=eq.${saleId}`,
       { headers }
     );
     
@@ -355,21 +390,23 @@ export function teardown(data) {
 // =====================================================
 
 export function handleSummary(data) {
-  const totalRequests = data.metrics.http_reqs.values.count;
-  const failedRequests = data.metrics.http_req_failed.values.passes;
-  const avgLatency = data.metrics.http_req_duration.values.avg;
-  const p95Latency = data.metrics.http_req_duration.values['p(95)'];
-  const p99Latency = data.metrics.http_req_duration.values['p(99)'];
+  const totalRequests = Number(data?.metrics?.http_reqs?.values?.count || 0);
+  const errorRate = Number(data?.metrics?.http_req_failed?.values?.rate || 0);
+  const failedRequests = Math.round(totalRequests * errorRate);
+  const avgLatency = Number(data?.metrics?.http_req_duration?.values?.avg || 0);
+  const p95Latency = Number(data?.metrics?.http_req_duration?.values?.['p(95)'] || 0);
+  const p99Latency = Number(data?.metrics?.http_req_duration?.values?.['p(99)'] || 0);
+  const throughput = Number(data?.metrics?.http_reqs?.values?.rate || 0);
   
   const summary = {
     '📊 RESUMEN DE PRUEBA': {
       'Total de requests': totalRequests,
       'Requests fallidos': failedRequests,
-      'Tasa de error': `${(failedRequests / totalRequests * 100).toFixed(2)}%`,
+      'Tasa de error': `${(errorRate * 100).toFixed(2)}%`,
       'Latencia promedio': `${avgLatency.toFixed(2)}ms`,
       'Latencia P95': `${p95Latency.toFixed(2)}ms`,
       'Latencia P99': `${p99Latency.toFixed(2)}ms`,
-      'Throughput': `${data.metrics.http_reqs.values.rate.toFixed(2)} req/s`,
+      'Throughput': `${throughput.toFixed(2)} req/s`,
     },
     '🔍 ANÁLISIS': {
       'Errores de base de datos': data.metrics.database_errors ? data.metrics.database_errors.values.count : 0,
@@ -378,8 +415,8 @@ export function handleSummary(data) {
     },
     '✅ UMBRALES': {
       'P95 < 800ms': p95Latency < 800 ? '✓ PASS' : '✗ FAIL',
-      'Errores < 2%': (failedRequests / totalRequests) < 0.02 ? '✓ PASS' : '✗ FAIL',
-      'Throughput > 40': data.metrics.http_reqs.values.rate > 40 ? '✓ PASS' : '✗ FAIL',
+      'Errores < 2%': errorRate < 0.02 ? '✓ PASS' : '✗ FAIL',
+      'Throughput > 40': throughput > 40 ? '✓ PASS' : '✗ FAIL',
     }
   };
   

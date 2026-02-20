@@ -33,6 +33,54 @@ function getFriendlySaleErrorMessage(errorLike) {
   return rawMessage || 'Error al procesar la venta';
 }
 
+function normalizeReference(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const lowered = raw.toLowerCase();
+  if (lowered === 'null' || lowered === 'undefined') return null;
+  return raw;
+}
+
+function normalizeRpcSaleItem(item = {}) {
+  const itemType = String(item?.item_type || '').trim().toLowerCase();
+  const fallbackId = normalizeReference(item?.item_id || item?.id || null);
+
+  const explicitProductId = normalizeReference(item?.product_id);
+  const explicitComboId = normalizeReference(item?.combo_id);
+
+  // Priorizar referencias explícitas; inferir solo cuando no llega ninguna.
+  let productId = explicitProductId;
+  let comboId = explicitComboId;
+
+  if (!productId && !comboId) {
+    if (itemType === 'combo') comboId = fallbackId;
+    if (itemType === 'product') productId = fallbackId;
+  }
+
+  const quantity = Number(item?.quantity);
+  const unitPrice = Number(item?.unit_price ?? item?.price);
+
+  if ((!productId && !comboId) || (productId && comboId)) {
+    throw new Error(
+      `Item inválido en carrito: "${item?.name || 'sin nombre'}" ` +
+      `(product_id=${productId || 'null'}, combo_id=${comboId || 'null'}, item_type=${itemType || 'null'})`
+    );
+  }
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    throw new Error(`Cantidad inválida para "${item?.name || 'item'}"`);
+  }
+  if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+    throw new Error(`Precio inválido para "${item?.name || 'item'}"`);
+  }
+
+  return {
+    product_id: productId,
+    combo_id: comboId,
+    quantity,
+    unit_price: unitPrice
+  };
+}
+
 /**
  * Crea una venta completa en UNA SOLA LLAMADA RPC
  * @param {object} params
@@ -42,7 +90,7 @@ export async function createSaleOptimized({
   businessId,
   cart,
   paymentMethod = 'cash',
-  total,
+  total: _total,
   idempotencyKey = null
 }) {
   try {
@@ -83,41 +131,65 @@ export async function createSaleOptimized({
     const sellerName = isOwner || isAdmin ? 'Administrador' : (employee?.full_name || user.email || 'Vendedor');
 
     // 4. Preparar items en formato esperado por la función RPC
-    const itemsForRpc = cart.map(item => ({
-      product_id: item.product_id,
-      quantity: item.quantity,
-      unit_price: item.unit_price
-    }));
+    const itemsForRpc = cart.map((item) => normalizeRpcSaleItem(item));
 
     const startTime = performance.now();
 
-    // 5. LLAMADA RPC (idempotente por defecto)
+    const hasComboItems = itemsForRpc.some((item) => Boolean(item?.combo_id));
+
+    // 5. LLAMADA RPC
     let data = null;
     let error = null;
-    ({ data, error } = await supabase.rpc('create_sale_complete_idempotent', {
-      p_business_id: businessId,
-      p_user_id: user.id,
-      p_seller_name: sellerName,
-      p_payment_method: paymentMethod,
-      p_items: itemsForRpc,
-      p_idempotency_key: idempotencyKey
-    }));
-
-    const missingIdempotentFn = isFunctionUnavailableError(
-      error,
-      'create_sale_complete_idempotent'
-    );
-    if (error && missingIdempotentFn) {
+    if (hasComboItems) {
       ({ data, error } = await supabase.rpc('create_sale_complete', {
         p_business_id: businessId,
         p_user_id: user.id,
         p_seller_name: sellerName,
         p_payment_method: paymentMethod,
-        p_items: itemsForRpc
+        p_items: itemsForRpc,
+        p_amount_received: null,
+        p_change_breakdown: []
       }));
+
+      const missingBaseFn = isFunctionUnavailableError(error, 'create_sale_complete');
+      if (error && missingBaseFn) {
+        ({ data, error } = await supabase.rpc('create_sale_complete_idempotent', {
+          p_business_id: businessId,
+          p_user_id: user.id,
+          p_seller_name: sellerName,
+          p_payment_method: paymentMethod,
+          p_items: itemsForRpc,
+          p_idempotency_key: idempotencyKey
+        }));
+      }
+    } else {
+      ({ data, error } = await supabase.rpc('create_sale_complete_idempotent', {
+        p_business_id: businessId,
+        p_user_id: user.id,
+        p_seller_name: sellerName,
+        p_payment_method: paymentMethod,
+        p_items: itemsForRpc,
+        p_idempotency_key: idempotencyKey
+      }));
+
+      const missingIdempotentFn = isFunctionUnavailableError(
+        error,
+        'create_sale_complete_idempotent'
+      );
+      if (error && missingIdempotentFn) {
+        ({ data, error } = await supabase.rpc('create_sale_complete', {
+          p_business_id: businessId,
+          p_user_id: user.id,
+          p_seller_name: sellerName,
+          p_payment_method: paymentMethod,
+          p_items: itemsForRpc,
+          p_amount_received: null,
+          p_change_breakdown: []
+        }));
+      }
     }
 
-    const elapsed = performance.now() - startTime;
+    const _elapsed = performance.now() - startTime;
 
     if (error) {
       return { 
