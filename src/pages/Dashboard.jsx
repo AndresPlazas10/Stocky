@@ -4,11 +4,13 @@ import { DashboardLayout } from '../components/layout/DashboardLayout.jsx';
 import PaymentWarningModal from '../components/PaymentWarningModal.jsx';
 import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
 import PricingAnnouncementModal from '../components/PricingAnnouncementModal.jsx';
+import PlatformUpdateModal from '../components/PlatformUpdateModal.jsx';
 import { shouldShowPaymentWarning } from '../config/unpaidBusinesses.js';
 import Home from '../components/Dashboard/Home.jsx';
 import Ventas from '../components/Dashboard/Ventas.jsx';
 import Compras from '../components/Dashboard/Compras.jsx';
 import Inventario from '../components/Dashboard/Inventario.jsx';
+import Combos from '../components/Dashboard/Combos.jsx';
 import Proveedores from '../components/Dashboard/Proveedores.jsx';
 import Empleados from '../components/Dashboard/Empleados.jsx';
 import Facturas from '../components/Dashboard/Facturas.jsx';
@@ -25,7 +27,6 @@ function Dashboard() {
   const [activeSection, setActiveSection] = useState('home');
   const [businessLogo, setBusinessLogo] = useState(null);
   const [showPaymentWarning, setShowPaymentWarning] = useState(false);
-  const [hasUnpaidBusiness, setHasUnpaidBusiness] = useState(false);
   const [isBusinessDisabled, setIsBusinessDisabled] = useState(false);
 
   useEffect(() => {
@@ -166,7 +167,6 @@ function Dashboard() {
 
       // 🚨 VERIFICAR SI HOY ES DÍA DE ADVERTENCIA DE PAGO (para todos los negocios)
       if (shouldShowPaymentWarning()) {
-        setHasUnpaidBusiness(true);
         // Mostrar el modal de advertencia después de 1 segundo
         setTimeout(() => {
           setShowPaymentWarning(true);
@@ -237,6 +237,9 @@ function Dashboard() {
       
       case 'inventario':
         return <Inventario key="inventario" businessId={business?.id} userRole="admin" />;
+
+      case 'combos':
+        return <Combos key="combos" businessId={business?.id} />;
       
       case 'proveedores':
         return <Proveedores key="proveedores" businessId={business?.id} />;
@@ -292,6 +295,8 @@ function Dashboard() {
       />
       {/* Modal de planes y precios (se muestra según fecha: día 1-5 de cada mes) */}
       <PricingAnnouncementModal />
+      {/* Modal de novedades/versionado (se muestra 1 vez por versión y usuario/negocio) */}
+      <PlatformUpdateModal userId={user?.id} businessId={business?.id} />
       
       <DashboardLayout
         userName={business?.owner_name || 'Usuario'}

@@ -1,4 +1,5 @@
 import { supabase } from '../supabase/Client';
+import { buildUtcRangeFromLocalDates } from '../utils/dateRange.js';
 
 const PURCHASE_LIST_COLUMNS = `
   id,
@@ -52,19 +53,16 @@ async function getFilteredPurchasesViaRpc(businessId, filters, pagination) {
   const limit = Number(pagination.limit || 50);
   const offset = Number(pagination.offset || 0);
 
-  const toDateIso = filters.toDate
-    ? (() => {
-        const endDate = new Date(filters.toDate);
-        endDate.setHours(23, 59, 59, 999);
-        return endDate.toISOString();
-      })()
-    : null;
+  const { fromIso: fromDateIso, toIso: toDateIso } = buildUtcRangeFromLocalDates(
+    filters.fromDate,
+    filters.toDate
+  );
 
   const { data, error } = await supabase.rpc('get_purchases_enriched', {
     p_business_id: businessId,
     p_limit: limit,
     p_offset: offset,
-    p_from_date: filters.fromDate || null,
+    p_from_date: fromDateIso,
     p_to_date: toDateIso,
     p_supplier_id: filters.supplierId || null,
     p_user_id: filters.userId || null,
@@ -89,7 +87,7 @@ async function getFilteredPurchasesViaRpc(businessId, filters, pagination) {
 
 async function getFilteredPurchasesLegacy(businessId, filters, pagination) {
   const includeCount = pagination.includeCount !== false;
-  const countMode = pagination.countMode || 'exact';
+  const countMode = pagination.countMode || 'planned';
   const limit = Number(pagination.limit || 50);
   const offset = Number(pagination.offset || 0);
 
@@ -99,12 +97,12 @@ async function getFilteredPurchasesLegacy(businessId, filters, pagination) {
 
   query = query.eq('business_id', businessId).order('created_at', { ascending: false });
 
-  if (filters.fromDate) query = query.gte('created_at', filters.fromDate);
-  if (filters.toDate) {
-    const endDate = new Date(filters.toDate);
-    endDate.setHours(23, 59, 59, 999);
-    query = query.lte('created_at', endDate.toISOString());
-  }
+  const { fromIso: fromDateIso, toIso: toDateIso } = buildUtcRangeFromLocalDates(
+    filters.fromDate,
+    filters.toDate
+  );
+  if (fromDateIso) query = query.gte('created_at', fromDateIso);
+  if (toDateIso) query = query.lte('created_at', toDateIso);
 
   if (filters.supplierId) query = query.eq('supplier_id', filters.supplierId);
   if (filters.userId) query = query.eq('user_id', filters.userId);

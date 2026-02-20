@@ -5,6 +5,7 @@
 
 import { supabase } from '../supabase/Client';
 import { isAdminRole } from '../utils/roles.js';
+import { buildUtcRangeFromLocalDates } from '../utils/dateRange.js';
 
 const SALES_LIST_COLUMNS = `
   id,
@@ -183,22 +184,19 @@ export async function getFilteredSales(businessId, filters = {}, pagination = {}
   const limit = Number(pagination.limit || 50);
   const offset = Number(pagination.offset || 0);
   const includeCount = pagination.includeCount !== false;
-  const countMode = pagination.countMode || 'exact';
+  const countMode = pagination.countMode || 'planned';
 
-  const toDateIso = filters.toDate
-    ? (() => {
-        const endDate = new Date(filters.toDate);
-        endDate.setHours(23, 59, 59, 999);
-        return endDate.toISOString();
-      })()
-    : null;
+  const { fromIso: fromDateIso, toIso: toDateIso } = buildUtcRangeFromLocalDates(
+    filters.fromDate,
+    filters.toDate
+  );
 
   try {
     const { data: rpcRows, error: rpcError } = await supabase.rpc('get_sales_enriched', {
       p_business_id: businessId,
       p_limit: limit,
       p_offset: offset,
-      p_from_date: filters.fromDate || null,
+      p_from_date: fromDateIso,
       p_to_date: toDateIso,
       p_payment_method: filters.paymentMethod || null,
       p_user_id: filters.employeeId || null,
@@ -224,8 +222,8 @@ export async function getFilteredSales(businessId, filters = {}, pagination = {}
         : supabase.from('sales').select(SALES_LIST_COLUMNS);
       query = query.eq('business_id', businessId).order('created_at', { ascending: false });
 
-      if (filters.fromDate) query = query.gte('created_at', filters.fromDate);
-      if (filters.toDate) query = query.lte('created_at', toDateIso);
+      if (fromDateIso) query = query.gte('created_at', fromDateIso);
+      if (toDateIso) query = query.lte('created_at', toDateIso);
       if (filters.paymentMethod) query = query.eq('payment_method', filters.paymentMethod);
       if (filters.employeeId) query = query.eq('user_id', filters.employeeId);
       if (filters.customerId) query = query.eq('customer_id', filters.customerId);
@@ -363,7 +361,8 @@ export async function createSale({
     // 6. Insertar detalles de venta
     const saleDetails = cart.map(item => ({
       sale_id: sale.id,
-      product_id: item.product_id,
+      product_id: item.product_id || null,
+      combo_id: item.combo_id || null,
       quantity: item.quantity,
       unit_price: item.unit_price
     }));
@@ -381,12 +380,16 @@ export async function createSale({
 
     // 7. Reducir stock de productos en BATCH (OPTIMIZADO)
     // CAMBIO: De 10 queries secuenciales a 1 sola llamada RPC
-    const { error: stockError } = await supabase.rpc('update_stock_batch', {
-      product_updates: cart.map(item => ({
+    const stockUpdates = cart
+      .filter((item) => item.product_id)
+      .map((item) => ({
         product_id: item.product_id,
         quantity: item.quantity
-      }))
-    });
+      }));
+
+    const { error: stockError } = stockUpdates.length > 0
+      ? await supabase.rpc('update_stock_batch', { product_updates: stockUpdates })
+      : { error: null };
 
     if (stockError) {
       // Error crítico: revertir venta
@@ -462,12 +465,16 @@ export async function deleteSale(saleId) {
 
     // Restaurar stock en BATCH (OPTIMIZADO)
     if (details && details.length > 0) {
-      const { error: restoreError } = await supabase.rpc('restore_stock_batch', {
-        product_updates: details.map(d => ({
+      const productUpdates = details
+        .filter((d) => d.product_id)
+        .map((d) => ({
           product_id: d.product_id,
           quantity: d.quantity
-        }))
-      });
+        }));
+
+      const { error: restoreError } = productUpdates.length > 0
+        ? await supabase.rpc('restore_stock_batch', { product_updates: productUpdates })
+        : { error: null };
       
       if (restoreError) {
         // Log error pero no fallar (venta ya fue eliminada)

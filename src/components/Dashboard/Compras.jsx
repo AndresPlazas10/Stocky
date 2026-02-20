@@ -7,6 +7,7 @@ import { formatPrice, formatDateOnly } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
+import { SaleUpdateAlert } from '../ui/SaleUpdateAlert';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -42,6 +43,16 @@ const getPaymentMethodLabel = (method) => {
   return method || '-';
 };
 
+const isMissingCreatePurchaseRpcError = (error) => {
+  const code = String(error?.code || '');
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    code === 'PGRST202'
+    || code === '42883'
+    || message.includes('create_purchase_complete')
+  );
+};
+
 function Compras({ businessId }) {
   const [compras, setCompras] = useState([]);
   const [pagePurchases, setPagePurchases] = useState(1);
@@ -74,8 +85,10 @@ function Compras({ businessId }) {
       setLoading(true);
       const lim = Number(pagination.limit ?? limitPurchases);
       const off = Number(pagination.offset ?? ((pagePurchases - 1) * lim));
-      const includeCount = pagination.includeCount !== false;
-      const countMode = pagination.countMode || 'exact';
+      const includeCount = typeof pagination.includeCount === 'boolean'
+        ? pagination.includeCount
+        : off === 0;
+      const countMode = pagination.countMode || 'planned';
       const { data: purchasesData, count, error: purchasesError } = await getFilteredPurchases(businessId, filters, {
         limit: lim,
         offset: off,
@@ -90,6 +103,8 @@ function Compras({ businessId }) {
         setCompras([]);
         if (typeof count === 'number') {
           setTotalCountPurchases(count);
+        } else if (!includeCount) {
+          setTotalCountPurchases(off);
         }
         return;
       }
@@ -102,6 +117,8 @@ function Compras({ businessId }) {
         setCompras(purchasesData);
         if (typeof count === 'number') {
           setTotalCountPurchases(count);
+        } else if (!includeCount) {
+          setTotalCountPurchases(off + purchasesData.length);
         }
         return;
       }
@@ -141,6 +158,8 @@ function Compras({ businessId }) {
       setCompras(purchasesWithEmployees);
       if (typeof count === 'number') {
         setTotalCountPurchases(count);
+      } else if (!includeCount) {
+        setTotalCountPurchases(off + purchasesWithEmployees.length);
       }
     } catch (error) {
       setError(`❌ Error al cargar las compras: ${error?.message || 'Error desconocido'}`);
@@ -390,74 +409,99 @@ function Compras({ businessId }) {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) throw new Error('Tu sesión ha expirado. Inicia sesión nuevamente.');
 
-      // Insertar compra
-      const { data: purchase, error: purchaseError } = await supabase
-        .from('purchases')
-        .insert([{
-          business_id: businessId,
-          user_id: user.id,
-          supplier_id: supplierId,
-          payment_method: paymentMethod,
-          notes: notes || null,
-          total: total,
-          created_at: new Date().toISOString()
-        }])
-        .select()
-        .maybeSingle();
+      const createPurchaseLegacy = async () => {
+        // Insertar compra
+        const { data: purchase, error: purchaseError } = await supabase
+          .from('purchases')
+          .insert([{
+            business_id: businessId,
+            user_id: user.id,
+            supplier_id: supplierId,
+            payment_method: paymentMethod,
+            notes: notes || null,
+            total: total,
+            created_at: new Date().toISOString()
+          }])
+          .select()
+          .maybeSingle();
 
-      if (purchaseError) throw purchaseError;
+        if (purchaseError) throw purchaseError;
 
-      // Insertar detalles
-      const purchaseDetails = cart.map(item => ({
-        purchase_id: purchase.id,
+        // Insertar detalles
+        const purchaseDetails = cart.map(item => ({
+          purchase_id: purchase.id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_cost: item.unit_price,
+          subtotal: item.quantity * item.unit_price
+        }));
+
+        const { error: detailsError } = await supabase
+          .from('purchase_details')
+          .insert(purchaseDetails);
+
+        if (detailsError) {
+          // Intentar rollback manual
+          await supabase.from('purchases').delete().eq('id', purchase.id);
+          throw detailsError;
+        }
+
+        // Actualizar stock y costo de forma consistente para todo el negocio
+        const productIds = [...new Set(cart.map(item => item.product_id))];
+        const { data: freshProducts, error: productsFetchError } = await supabase
+          .from('products')
+          .select('id, stock')
+          .eq('business_id', businessId)
+          .in('id', productIds);
+
+        if (productsFetchError) throw productsFetchError;
+
+        const stockMap = new Map((freshProducts || []).map(product => [product.id, Number(product.stock || 0)]));
+        const purchaseItemMap = new Map(cart.map(item => [item.product_id, item]));
+
+        const updateResults = await Promise.all(
+          productIds.map(productId => {
+            const item = purchaseItemMap.get(productId);
+            const currentStock = stockMap.get(productId) || 0;
+            const newStock = currentStock + Number(item.quantity || 0);
+
+            return supabase
+              .from('products')
+              .update({
+                stock: newStock,
+                purchase_price: Number(item.unit_price || 0)
+              })
+              .eq('id', productId)
+              .eq('business_id', businessId);
+          })
+        );
+
+        const failedUpdate = updateResults.find(result => result.error);
+        if (failedUpdate?.error) throw failedUpdate.error;
+      };
+
+      const purchaseItemsPayload = cart.map((item) => ({
         product_id: item.product_id,
-        quantity: item.quantity,
-        unit_cost: item.unit_price,
-        subtotal: item.quantity * item.unit_price
+        quantity: Number(item.quantity),
+        unit_cost: Number(item.unit_price)
       }));
 
-      const { error: detailsError } = await supabase
-        .from('purchase_details')
-        .insert(purchaseDetails);
+      const { error: rpcError } = await supabase.rpc('create_purchase_complete', {
+        p_business_id: businessId,
+        p_user_id: user.id,
+        p_supplier_id: supplierId,
+        p_payment_method: paymentMethod,
+        p_notes: notes || null,
+        p_items: purchaseItemsPayload
+      });
 
-      if (detailsError) {
-        // Intentar rollback manual
-        await supabase.from('purchases').delete().eq('id', purchase.id);
-        throw detailsError;
+      if (rpcError) {
+        if (isMissingCreatePurchaseRpcError(rpcError)) {
+          await createPurchaseLegacy();
+        } else {
+          throw rpcError;
+        }
       }
-
-      // Actualizar stock y costo de forma consistente para todo el negocio
-      const productIds = [...new Set(cart.map(item => item.product_id))];
-      const { data: freshProducts, error: productsFetchError } = await supabase
-        .from('products')
-        .select('id, stock')
-        .eq('business_id', businessId)
-        .in('id', productIds);
-
-      if (productsFetchError) throw productsFetchError;
-
-      const stockMap = new Map((freshProducts || []).map(product => [product.id, Number(product.stock || 0)]));
-      const purchaseItemMap = new Map(cart.map(item => [item.product_id, item]));
-
-      const updateResults = await Promise.all(
-        productIds.map(productId => {
-          const item = purchaseItemMap.get(productId);
-          const currentStock = stockMap.get(productId) || 0;
-          const newStock = currentStock + Number(item.quantity || 0);
-
-          return supabase
-            .from('products')
-            .update({
-              stock: newStock,
-              purchase_price: Number(item.unit_price || 0)
-            })
-            .eq('id', productId)
-            .eq('business_id', businessId);
-        })
-      );
-
-      const failedUpdate = updateResults.find(result => result.error);
-      if (failedUpdate?.error) throw failedUpdate.error;
 
       setSuccess('✅ Compra registrada exitosamente');
       resetForm();
@@ -670,13 +714,27 @@ function Compras({ businessId }) {
       noResultsTitle="No hay compras para esos filtros"
       noResultsDescription="Ajusta los filtros o registra una nueva compra."
       noResultsAction={
-        <Button
-          type="button"
-          onClick={() => setShowModal(true)}
-          className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
-        >
-          Nueva Compra
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Button
+            type="button"
+            onClick={() => {
+              setSearchTerm('');
+              setCurrentFiltersPurchases({});
+              setPagePurchases(1);
+              loadCompras({}, { limit: limitPurchases, offset: 0, includeCount: false });
+            }}
+            className="bg-white text-gray-700 border-2 border-gray-300 hover:bg-gray-100 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
+          >
+            Limpiar Filtros
+          </Button>
+          <Button
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
+          >
+            Nueva Compra
+          </Button>
+        </div>
       }
       emptyTitle="No hay compras registradas"
       emptyDescription="Crea la primer compra para poder visualizarlas."
@@ -731,6 +789,14 @@ function Compras({ businessId }) {
         duration={5000}
       />
 
+      <SaleUpdateAlert
+        isVisible={isCreatingPurchase}
+        onClose={() => {}}
+        title="Generando compra..."
+        details={[]}
+        duration={600000}
+      />
+
       <SaleSuccessAlert 
         isVisible={!!success}
         onClose={() => setSuccess('')}
@@ -745,12 +811,12 @@ function Compras({ businessId }) {
           onApply={(filters) => {
             setCurrentFiltersPurchases(filters || {});
             setPagePurchases(1);
-            loadCompras(filters || {}, { limit: limitPurchases, offset: 0, includeCount: true, countMode: 'exact' });
+            loadCompras(filters || {}, { limit: limitPurchases, offset: 0, includeCount: false });
           }}
           onClear={() => {
             setCurrentFiltersPurchases({});
             setPagePurchases(1);
-            loadCompras({}, { limit: limitPurchases, offset: 0, includeCount: true, countMode: 'exact' });
+            loadCompras({}, { limit: limitPurchases, offset: 0, includeCount: false });
           }}
         />
 
