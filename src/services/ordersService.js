@@ -131,6 +131,12 @@ function getFriendlySaleErrorMessage(errorLike, fallbackMessage) {
   return rawMessage || fallbackMessage;
 }
 
+function isSalesDuplicateIndexError(errorLike) {
+  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+  if (!message) return false;
+  return message.includes('idx_sales_prevent_duplicates');
+}
+
 function normalizeReference(value) {
   const raw = String(value ?? '').trim();
   if (!raw) return null;
@@ -370,7 +376,8 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     'create_split_sales_complete'
   );
   const shouldFallbackWithoutOrderContext = isOrderContextError(atomicError);
-  if (!isMissingAtomicFn && !shouldFallbackWithoutOrderContext) {
+  const shouldFallbackDueToDuplicateIndex = isSalesDuplicateIndexError(atomicError);
+  if (!isMissingAtomicFn && !shouldFallbackWithoutOrderContext && !shouldFallbackDueToDuplicateIndex) {
     throw new Error(getFriendlySaleErrorMessage(
       atomicError,
       '❌ No se pudo cerrar la orden dividida. Intenta de nuevo.'
