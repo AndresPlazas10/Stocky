@@ -1,6 +1,9 @@
-import { X, Home, ShoppingCart, ShoppingBag, Package, FileText, Users, Truck, BarChart3, Settings, LogOut, ChevronRight } from 'lucide-react';
+import { X, Home, ShoppingCart, ShoppingBag, Package, Layers, Users, Truck, BarChart3, Settings, LogOut, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
+
+// eslint helper: `no-unused-vars` no detecta consistentemente `<motion.* />` en esta config.
+const _motionLintUsage = motion;
 
 /**
  * Drawer lateral swipeable para móvil
@@ -18,6 +21,7 @@ export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userNam
         { id: 'ventas', icon: ShoppingCart, label: 'Ventas', color: 'text-green-600' },
         { id: 'compras', icon: ShoppingBag, label: 'Compras', color: 'text-amber-600' },
         { id: 'inventario', icon: Package, label: 'Inventario', color: 'text-purple-600' },
+        { id: 'combos', icon: Layers, label: 'Combos', color: 'text-pink-600' },
       ]
     },
     {

@@ -1,0 +1,515 @@
+{
+  "root_group": {
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [
+      {
+        "checks": [
+          {
+            "id": "f33782faecbb733b970237be297c48c8",
+            "passes": 9398,
+            "fails": 0,
+            "name": "GET /sales: status 200",
+            "path": "::Listar Ventas::GET /sales: status 200"
+          },
+          {
+            "path": "::Listar Ventas::GET /sales: latencia < 1000ms",
+            "id": "93be04a29170089152db07eecf6b59b0",
+            "passes": 9396,
+            "fails": 2,
+            "name": "GET /sales: latencia < 1000ms"
+          },
+          {
+            "name": "Tiene datos de ventas",
+            "path": "::Listar Ventas::Tiene datos de ventas",
+            "id": "17858bb5f52f4a07cfa16487055044db",
+            "passes": 9396,
+            "fails": 0
+          },
+          {
+            "name": "Ventas del negocio correcto",
+            "path": "::Listar Ventas::Ventas del negocio correcto",
+            "id": "b7c6a1cd44b547713da3ceb4c01fe99d",
+            "passes": 9396,
+            "fails": 0
+          }
+        ],
+        "name": "Listar Ventas",
+        "path": "::Listar Ventas",
+        "id": "c61a1eb900091bb79481c7fe1fcc2fee",
+        "groups": []
+      },
+      {
+        "name": "Crear Venta",
+        "path": "::Crear Venta",
+        "id": "affde722e44bb53ebe79da71e4490aed",
+        "groups": [],
+        "checks": [
+            {
+              "name": "POST /sales: status 201",
+              "path": "::Crear Venta::POST /sales: status 201",
+              "id": "a72da7c1b801e8d0c8862139e8e871ce",
+              "passes": 4716,
+              "fails": 0
+            },
+            {
+              "fails": 1,
+              "name": "POST /sales: latencia < 1000ms",
+              "path": "::Crear Venta::POST /sales: latencia < 1000ms",
+              "id": "60e7d6aa489e19b88ca0e715b5549271",
+              "passes": 4715
+            },
+            {
+              "name": "Venta tiene ID",
+              "path": "::Crear Venta::Venta tiene ID",
+              "id": "e6fde3a57b805ef12a60308468cc2a9e",
+              "passes": 4715,
+              "fails": 0
+            },
+            {
+              "passes": 4715,
+              "fails": 0,
+              "name": "Total correcto",
+              "path": "::Crear Venta::Total correcto",
+              "id": "490320a16e3eb5359ecd0eba9fdd3ebb"
+            },
+            {
+              "name": "POST /sale_details: status 201",
+              "path": "::Crear Venta::POST /sale_details: status 201",
+              "id": "bdc8ba8e3e6d290f485a962e3141d225",
+              "passes": 4715,
+              "fails": 0
+            },
+            {
+              "fails": 639,
+              "name": "POST /sale_details: latencia < 1000ms",
+              "path": "::Crear Venta::POST /sale_details: latencia < 1000ms",
+              "id": "c4fcd49ebfe2cac231fe35c7c4e779b5",
+              "passes": 4076
+            },
+            {
+              "id": "d96290a14aeb1b69c9b216ec4789f2de",
+              "passes": 4715,
+              "fails": 0,
+              "name": "GET /sales/:id: status 200",
+              "path": "::Crear Venta::GET /sales/:id: status 200"
+            },
+            {
+              "passes": 4715,
+              "fails": 0,
+              "name": "GET /sales/:id: latencia < 1000ms",
+              "path": "::Crear Venta::GET /sales/:id: latencia < 1000ms",
+              "id": "ae3314d41f62533464717c24d4c13d8b"
+            },
+            {
+              "name": "Venta encontrada",
+              "path": "::Crear Venta::Venta encontrada",
+              "id": "c4e7a4ded948e82eddff470173eababe",
+              "passes": 4715,
+              "fails": 0
+            }
+          ]
+      },
+      {
+        "groups": [],
+        "checks": [
+            {
+              "name": "GET /sales (con JOIN): status 200",
+              "path": "::Reporte de Ventas::GET /sales (con JOIN): status 200",
+              "id": "4d6eaac19bf95eb96306e7475f197642",
+              "passes": 1596,
+              "fails": 0
+            },
+            {
+              "name": "GET /sales (con JOIN): latencia < 1000ms",
+              "path": "::Reporte de Ventas::GET /sales (con JOIN): latencia < 1000ms",
+              "id": "d759892714463721f115be71a2290f6e",
+              "passes": 1562,
+              "fails": 34
+            },
+            {
+              "name": "Reporte tiene datos",
+              "path": "::Reporte de Ventas::Reporte tiene datos",
+              "id": "cc331b9cbca5fbaf75c5bb0c21da2265",
+              "passes": 1562,
+              "fails": 0
+            },
+            {
+              "id": "359e63b53c898cd8c89d556583fc5855",
+              "passes": 1562,
+              "fails": 0,
+              "name": "Incluye detalles",
+              "path": "::Reporte de Ventas::Incluye detalles"
+            }
+          ],
+        "name": "Reporte de Ventas",
+        "path": "::Reporte de Ventas",
+        "id": "5418aa90d27b6d78ffa75b8b387503c5"
+      }
+    ],
+    "checks": [],
+    "name": ""
+  },
+  "options": {
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)"
+    ],
+    "summaryTimeUnit": "",
+    "noColor": true
+  },
+  "state": {
+    "isStdOutTTY": false,
+    "isStdErrTTY": false,
+    "testRunDurationMs": 1086540.93
+  },
+  "metrics": {
+    "timeout_errors": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 0,
+        "rate": 0
+      },
+      "thresholds": {
+        "count<3": {
+          "ok": true
+        }
+      }
+    },
+    "vus": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "value": 1,
+        "min": 0,
+        "max": 50
+      }
+    },
+    "data_sent": {
+      "contains": "data",
+      "values": {
+        "count": 6763896,
+        "rate": 6225.164476776775
+      },
+      "type": "counter"
+    },
+    "http_req_tls_handshaking": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 469.6,
+        "p(90)": 0,
+        "p(95)": 0,
+        "avg": 0.12212425423593988,
+        "min": 0,
+        "med": 0
+      }
+    },
+    "request_latency_ms": {
+      "values": {
+        "max": 2709.566,
+        "p(90)": 481.4426000000001,
+        "p(95)": 727.1279,
+        "avg": 257.6421664677805,
+        "min": 128.067,
+        "med": 165.268
+      },
+      "type": "trend",
+      "contains": "default"
+    },
+    "iteration_duration": {
+      "contains": "time",
+      "values": {
+        "avg": 2601.531623269524,
+        "min": 1136.263584,
+        "med": 2451.108812,
+        "max": 6523.50875,
+        "p(90)": 4067.7070878,
+        "p(95)": 4295.8508997
+      },
+      "type": "trend"
+    },
+    "database_errors": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 0,
+        "rate": 0
+      },
+      "thresholds": {
+        "count<10": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 727.1066499999996,
+        "avg": 257.6464173892293,
+        "min": 128.067,
+        "med": 165.274,
+        "max": 2709.566,
+        "p(90)": 481.41280000000006
+      },
+      "thresholds": {
+        "p(99)<1500": {
+          "ok": true
+        },
+        "p(50)<300": {
+          "ok": true
+        },
+        "p(95)<800": {
+          "ok": true
+        }
+      }
+    },
+    "rls_policy_errors": {
+      "thresholds": {
+        "count<5": {
+          "ok": true
+        }
+      },
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "rate": 0,
+        "count": 0
+      }
+    },
+    "http_req_receiving": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 1.9820000000000002,
+        "max": 526.14,
+        "p(90)": 21.6388,
+        "p(95)": 23.431949999999997,
+        "avg": 6.802165977249243,
+        "min": 0.015
+      }
+    },
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 0,
+        "avg": 0.11874663908996896,
+        "min": 0,
+        "med": 0,
+        "max": 1035.048,
+        "p(90)": 0
+      }
+    },
+    "group_duration": {
+      "contains": "time",
+      "values": {
+        "p(95)": 1723.118172699999,
+        "avg": 594.9940595971366,
+        "min": 134.970166,
+        "med": 181.0243125,
+        "max": 3920.84325,
+        "p(90)": 1415.4542291
+      },
+      "type": "trend"
+    },
+    "data_received": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 256543916,
+        "rate": 236110.6783156342
+      }
+    },
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 0.001,
+        "max": 4258.509,
+        "p(90)": 0.002,
+        "p(95)": 0.002,
+        "avg": 0.42571231405636495,
+        "min": 0
+      }
+    },
+    "checks": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0.9921705794466128,
+        "passes": 85665,
+        "fails": 676
+      }
+    },
+    "iterations": {
+      "values": {
+        "rate": 14.458728213763656,
+        "count": 15710
+      },
+      "type": "counter",
+      "contains": "default"
+    },
+    "http_req_failed": {
+      "thresholds": {
+        "rate<0.02": {
+          "ok": true
+        }
+      },
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0,
+        "passes": 0,
+        "fails": 25142
+      }
+    },
+    "http_req_waiting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 126.687,
+        "med": 154.959,
+        "max": 2709.238,
+        "p(90)": 476.2373000000001,
+        "p(95)": 721.6154999999994,
+        "avg": 250.6394481345945
+      }
+    },
+    "vus_max": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "value": 50,
+        "min": 50,
+        "max": 50
+      }
+    },
+    "failed_requests": {
+      "thresholds": {
+        "rate<0.05": {
+          "ok": true
+        }
+      },
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0,
+        "passes": 0,
+        "fails": 25140
+      }
+    },
+    "http_reqs": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 25142,
+        "rate": 23.1394872533702
+      },
+      "thresholds": {
+        "rate>40": {
+          "ok": false
+        }
+      }
+    },
+    "http_req_duration{expected_response:true}": {
+      "values": {
+        "avg": 257.6464173892293,
+        "min": 128.067,
+        "med": 165.274,
+        "max": 2709.566,
+        "p(90)": 481.41280000000006,
+        "p(95)": 727.1066499999996
+      },
+      "type": "trend",
+      "contains": "time"
+    },
+    "http_req_sending": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 0.02,
+        "med": 0.181,
+        "max": 53.864,
+        "p(90)": 0.307,
+        "p(95)": 0.354,
+        "avg": 0.20480327738445547
+      }
+    }
+  },
+  "setup_data": {
+    "anonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InduZ2p5cmtxeGJsbmh4bGlha3FqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3MjQ3NDEsImV4cCI6MjA3ODMwMDc0MX0.u8ZcugaNYFnl_j0Acex8GQTFoDcUeRJibiL0aOe7yW0",
+    "apiUrl": "https://wngjyrkqxblnhxliakqj.supabase.co",
+    "businessId": "64f20782-163d-4978-982d-4fd326946262",
+    "products": [
+      {
+        "id": "ac5597fa-62f8-4fb7-b1d1-77b82673dd8a",
+        "name": "K6 Product 2",
+        "sale_price": 1001
+      },
+      {
+        "id": "3bd3b7d3-6b79-4b37-bec1-9419cf17ab61",
+        "name": "K6 Product 8",
+        "sale_price": 1007
+      },
+      {
+        "id": "98cf67c6-7819-40df-be22-9dd99c739332",
+        "name": "K6 Product 3",
+        "sale_price": 1002
+      },
+      {
+        "id": "adb4505d-249c-45ac-9a6e-93d173af1f32",
+        "name": "K6 Product 9",
+        "sale_price": 1008
+      },
+      {
+        "sale_price": 1003,
+        "id": "e896c217-2a69-460a-89bf-5a33d6401abc",
+        "name": "K6 Product 4"
+      },
+      {
+        "id": "df5ca306-7afc-4cfa-8b82-d3b3cd8f7e92",
+        "name": "K6 Product 10",
+        "sale_price": 1009
+      },
+      {
+        "name": "K6 Product 5",
+        "sale_price": 1004,
+        "id": "0445e082-61c3-40a0-9ab8-de28b322d426"
+      },
+      {
+        "id": "a47f5300-f49a-4f26-9ff0-c0877437593d",
+        "name": "K6 Product 12",
+        "sale_price": 1011
+      },
+      {
+        "id": "d8053e15-aed1-4b69-b1f8-505565859018",
+        "name": "K6 Product 6",
+        "sale_price": 1005
+      },
+      {
+        "name": "K6 Product 1",
+        "sale_price": 1000,
+        "id": "0ea13d14-2ac1-4ab3-9524-5b7f411e64fc"
+      },
+      {
+        "id": "be0ce665-e07a-4287-bb2a-e2e04caba1e9",
+        "name": "K6 Product 7",
+        "sale_price": 1006
+      },
+      {
+        "sale_price": 1010,
+        "id": "b2f18f42-86b0-43c7-885f-59ff4e51f68c",
+        "name": "K6 Product 11"
+      }
+    ],
+    "token": "eyJhbGciOiJIUzI1NiIsImtpZCI6IkNxdERhdlhEYk56NXR2THgiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3duZ2p5cmtxeGJsbmh4bGlha3FqLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiI3YmI0MDQ4Ni1jMGJlLTRjNjUtODMxOC0wNzM5MDJiMWMyMmUiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzcxNDcwOTU0LCJpYXQiOjE3NzE0NjczNTQsImVtYWlsIjoidGVzdEBzdG9ja2x5LmNvbSIsInBob25lIjoiIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiZW1haWwiLCJwcm92aWRlcnMiOlsiZW1haWwiXX0sInVzZXJfbWV0YWRhdGEiOnsiZW1haWwiOiJ0ZXN0QHN0b2NrbHkuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiN2JiNDA0ODYtYzBiZS00YzY1LTgzMTgtMDczOTAyYjFjMjJlIn0sInJvbGUiOiJhdXRoZW50aWNhdGVkIiwiYWFsIjoiYWFsMSIsImFtciI6W3sibWV0aG9kIjoicGFzc3dvcmQiLCJ0aW1lc3RhbXAiOjE3NzE0NjczNTR9XSwic2Vzc2lvbl9pZCI6IjY2NGYxOWNkLWYwNTAtNDllMC1iYzM4LWU5MjU5Njc1MjRiOCIsImlzX2Fub255bW91cyI6ZmFsc2V9.Zdj3ltLpBeFFt1f_463HuUfZrA0-X-pADSB4zAJHmKA",
+    "userId": "7bb40486-c0be-4c65-8318-073902b1c22e"
+  }
+}

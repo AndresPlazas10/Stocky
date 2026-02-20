@@ -23,18 +23,20 @@ function normalizeSplitSubAccountsForRpc(subAccounts = []) {
       : (typeof sub?.payment_method === 'string' ? sub.payment_method : 'cash');
 
     const normalizedItems = Array.isArray(sub?.items)
-      ? sub.items
+        ? sub.items
           .map((item) => {
             const productId = item?.product_id || item?.products?.id || null;
+            const comboId = item?.combo_id || item?.combos?.id || null;
             const quantity = Number(item?.quantity);
             const unitPrice = Number(item?.unit_price ?? item?.price ?? item?.unitPrice);
 
-            if (!productId) return null;
+            if ((!productId && !comboId) || (productId && comboId)) return null;
             if (!Number.isFinite(quantity) || quantity <= 0) return null;
             if (!Number.isFinite(unitPrice) || unitPrice < 0) return null;
 
             return {
               product_id: productId,
+              combo_id: comboId,
               quantity,
               unit_price: unitPrice
             };
@@ -92,6 +94,32 @@ function isFunctionUnavailableError(errorLike, functionName) {
   );
 }
 
+async function callCreateSaleCompleteWithFallback({
+  preferBase = false,
+  baseParams,
+  idempotentParams
+}) {
+  let result = null;
+  let rpcError = null;
+
+  if (preferBase) {
+    ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete', baseParams));
+    const missingBaseFn = isFunctionUnavailableError(rpcError, 'create_sale_complete');
+    if (rpcError && missingBaseFn) {
+      ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete_idempotent', idempotentParams));
+    }
+    return { result, rpcError };
+  }
+
+  ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete_idempotent', idempotentParams));
+  const missingIdempotentFn = isFunctionUnavailableError(rpcError, 'create_sale_complete_idempotent');
+  if (rpcError && missingIdempotentFn) {
+    ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete', baseParams));
+  }
+
+  return { result, rpcError };
+}
+
 function getFriendlySaleErrorMessage(errorLike, fallbackMessage) {
   const rawMessage = String(errorLike?.message || errorLike || '').trim();
   const normalized = rawMessage.toLowerCase();
@@ -101,6 +129,14 @@ function getFriendlySaleErrorMessage(errorLike, fallbackMessage) {
   }
 
   return rawMessage || fallbackMessage;
+}
+
+function normalizeReference(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const lowered = raw.toLowerCase();
+  if (lowered === 'null' || lowered === 'undefined') return null;
+  return raw;
 }
 
 function normalizeCashBreakdownEntries(changeBreakdown) {
@@ -247,10 +283,11 @@ async function getSellerName(businessId) {
  * OPTIMIZADO: Usa RPC create_split_sales_complete en una transacción atómica.
  * @param {string} businessId
  * @param {{ subAccounts: Array<{ name: string, paymentMethod: string, items: Array<{ product_id: string, quantity: number, price: number }> }>, orderId: string, tableId: string }} params
- * @returns {Promise<{ totalSold: number }>}
+ * @returns {Promise<{ totalSold: number, saleIds: string[] }>}
  */
 export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tableId }) {
   const { user, sellerName } = await getSellerName(businessId);
+  const operationStartedAt = new Date().toISOString();
   const normalizedSubAccounts = normalizeSplitSubAccountsForRpc(subAccounts);
   const subAccountsWithItems = normalizedSubAccounts.filter((sub) => Array.isArray(sub.items) && sub.items.length > 0);
   if (subAccountsWithItems.length === 0) {
@@ -262,35 +299,42 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     orderId,
     tableId
   });
+  const hasComboItemsInSplit = subAccountsWithItems.some((sub) =>
+    Array.isArray(sub.items) && sub.items.some((item) => Boolean(item?.combo_id))
+  );
 
   // Camino principal: cierre atómico de todas las subcuentas en 1 transacción.
   let atomicResult = null;
   let atomicError = null;
-  ({ data: atomicResult, error: atomicError } = await supabase.rpc('create_split_sales_complete_idempotent', {
-    p_business_id: businessId,
-    p_user_id: user.id,
-    p_seller_name: sellerName,
-    p_sub_accounts: subAccountsWithItems,
-    p_order_id: orderId,
-    p_table_id: tableId,
-    p_idempotency_key: idempotencyKey
-  }));
-
-  // Compatibilidad transitoria: reintentar función base cuando falla capa idempotente.
-  const missingIdempotentSplitFn = isFunctionUnavailableError(
-    atomicError,
-    'create_split_sales_complete_idempotent'
-  );
-  const retryBaseSplitFn = atomicError && missingIdempotentSplitFn;
-  if (retryBaseSplitFn) {
-    ({ data: atomicResult, error: atomicError } = await supabase.rpc('create_split_sales_complete', {
+  if (!hasComboItemsInSplit) {
+    ({ data: atomicResult, error: atomicError } = await supabase.rpc('create_split_sales_complete_idempotent', {
       p_business_id: businessId,
       p_user_id: user.id,
       p_seller_name: sellerName,
       p_sub_accounts: subAccountsWithItems,
       p_order_id: orderId,
-      p_table_id: tableId
+      p_table_id: tableId,
+      p_idempotency_key: idempotencyKey
     }));
+
+    // Compatibilidad transitoria: reintentar función base cuando falla capa idempotente.
+    const missingIdempotentSplitFn = isFunctionUnavailableError(
+      atomicError,
+      'create_split_sales_complete_idempotent'
+    );
+    const retryBaseSplitFn = atomicError && missingIdempotentSplitFn;
+    if (retryBaseSplitFn) {
+      ({ data: atomicResult, error: atomicError } = await supabase.rpc('create_split_sales_complete', {
+        p_business_id: businessId,
+        p_user_id: user.id,
+        p_seller_name: sellerName,
+        p_sub_accounts: subAccountsWithItems,
+        p_order_id: orderId,
+        p_table_id: tableId
+      }));
+    }
+  } else {
+    atomicError = { message: 'split combos bypass atomic rpc' };
   }
 
   if (!atomicError && atomicResult?.[0]?.status === 'success') {
@@ -299,7 +343,25 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     if (!Number.isFinite(atomicTotalSold) || atomicTotalSold <= 0 || atomicSalesCount <= 0) {
       throw new Error('Cierre dividido inválido: la operación no generó ventas.');
     }
-    return { totalSold: atomicTotalSold };
+
+    // Best-effort: recuperar ids de ventas recién creadas para autoimpresión.
+    let atomicSaleIds = [];
+    try {
+      const { data: recentSales } = await supabase
+        .from('sales')
+        .select('id')
+        .eq('business_id', businessId)
+        .eq('user_id', user.id)
+        .gte('created_at', operationStartedAt)
+        .order('created_at', { ascending: false })
+        .limit(atomicSalesCount);
+
+      atomicSaleIds = (recentSales || []).map((sale) => sale.id).filter(Boolean);
+    } catch {
+      // no-op
+    }
+
+    return { totalSold: atomicTotalSold, saleIds: atomicSaleIds };
   }
 
   // Fallback transitorio: mantener compatibilidad mientras la migración nueva se despliega.
@@ -316,6 +378,7 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
   }
 
   let totalSold = 0;
+  const saleIds = [];
   for (let i = 0; i < subAccountsWithItems.length; i++) {
     const sub = subAccountsWithItems[i];
     if (!sub.items || sub.items.length === 0) continue;
@@ -324,7 +387,8 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     totalSold += saleTotal;
 
     const itemsForRpc = sub.items.map(item => ({
-      product_id: item.product_id,
+      product_id: item.product_id || null,
+      combo_id: item.combo_id || null,
       quantity: item.quantity,
       unit_price: item.unit_price
     }));
@@ -349,20 +413,20 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
       p_payment_method: sub.paymentMethod || 'cash',
       p_items: itemsForRpc,
       p_order_id: closeOrderInsideRpc ? orderId : null,
-      p_table_id: closeOrderInsideRpc ? tableId : null
+      p_table_id: closeOrderInsideRpc ? tableId : null,
+      p_amount_received: Number.isFinite(Number(sub.amountReceived ?? sub.amount_received))
+        ? Number(sub.amountReceived ?? sub.amount_received)
+        : null,
+      p_change_breakdown: Array.isArray(sub.changeBreakdown)
+        ? sub.changeBreakdown
+        : (Array.isArray(sub.change_breakdown) ? sub.change_breakdown : [])
     };
-    let result = null;
-    let rpcError = null;
-    ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete_idempotent', subIdempotentBaseParams));
-
-    const missingIdempotentSaleFn = isFunctionUnavailableError(
-      rpcError,
-      'create_sale_complete_idempotent'
-    );
-    const retryBaseSaleFn = rpcError && missingIdempotentSaleFn;
-    if (retryBaseSaleFn) {
-      ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete', subBaseParams));
-    }
+    const preferBaseForSubSale = itemsForRpc.some((item) => Boolean(item?.combo_id));
+    const { result, rpcError } = await callCreateSaleCompleteWithFallback({
+      preferBase: preferBaseForSubSale,
+      baseParams: subBaseParams,
+      idempotentParams: subIdempotentBaseParams
+    });
 
     if (rpcError || !result?.[0]) {
       throw new Error(getFriendlySaleErrorMessage(
@@ -371,9 +435,12 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
       ));
     }
 
+    const createdSaleId = result[0].sale_id || null;
+    if (createdSaleId) saleIds.push(createdSaleId);
+
     await persistSaleCashMetadata({
       businessId,
-      saleId: result[0].sale_id,
+      saleId: createdSaleId,
       paymentMethod: sub.paymentMethod || 'cash',
       saleTotal,
       amountReceived: sub.amountReceived ?? sub.amount_received ?? null,
@@ -389,7 +456,7 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     throw new Error('No se pudieron generar ventas en el cierre dividido.');
   }
 
-  return { totalSold };
+  return { totalSold, saleIds };
 }
 
 /**
@@ -397,7 +464,7 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
  * OPTIMIZADO: Usa RPC create_sale_complete en una sola transacción.
  * @param {string} businessId
  * @param {{ orderId: string, tableId: string, paymentMethod: string, amountReceived?: number|null, changeBreakdown?: Array<{denomination:number,count:number}>|null }} params
- * @returns {Promise<{ saleTotal: number }>}
+ * @returns {Promise<{ saleTotal: number, saleId: string | null }>}
  */
 export async function closeOrderSingle(businessId, { orderId, tableId, paymentMethod, amountReceived = null, changeBreakdown = null }) {
   const { user, sellerName } = await getSellerName(businessId);
@@ -414,6 +481,7 @@ export async function closeOrderSingle(businessId, { orderId, tableId, paymentMe
       *,
       order_items (
         product_id,
+        combo_id,
         quantity,
         price
       )
@@ -427,11 +495,29 @@ export async function closeOrderSingle(businessId, { orderId, tableId, paymentMe
   const saleTotal = orderData.order_items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
   
   // Preparar items para RPC
-  const itemsForRpc = orderData.order_items.map(item => ({
-    product_id: item.product_id,
-    quantity: item.quantity,
-    unit_price: item.price
-  }));
+  const itemsForRpc = orderData.order_items.map((item) => {
+    const productId = normalizeReference(item?.product_id || item?.products?.id || null);
+    const comboId = normalizeReference(item?.combo_id || item?.combos?.id || null);
+    const quantity = Number(item?.quantity);
+    const unitPrice = Number(item?.price ?? item?.unit_price);
+
+    if ((!productId && !comboId) || (productId && comboId)) {
+      throw new Error('❌ La orden tiene items inválidos: cada línea debe referenciar un producto o un combo.');
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error('❌ La orden tiene cantidades inválidas.');
+    }
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      throw new Error('❌ La orden tiene precios inválidos.');
+    }
+
+    return {
+      product_id: productId,
+      combo_id: comboId,
+      quantity,
+      unit_price: unitPrice
+    };
+  });
   const normalizedAmountReceived = Number.isFinite(Number(amountReceived))
     ? Number(amountReceived)
     : null;
@@ -455,22 +541,17 @@ export async function closeOrderSingle(businessId, { orderId, tableId, paymentMe
     p_payment_method: paymentMethod || 'cash',
     p_items: itemsForRpc,
     p_order_id: orderId,
-    p_table_id: tableId
+    p_table_id: tableId,
+    p_amount_received: normalizedAmountReceived,
+    p_change_breakdown: normalizedChangeBreakdown ?? []
   };
+  const preferBaseForSingleClose = itemsForRpc.some((item) => Boolean(item?.combo_id));
 
-  // Llamar wrapper idempotente (con fallback a función base).
-  let result = null;
-  let rpcError = null;
-  ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete_idempotent', idempotentBaseParams));
-
-  const missingIdempotentSaleFn = isFunctionUnavailableError(
-    rpcError,
-    'create_sale_complete_idempotent'
-  );
-  const retryBaseSaleFn = rpcError && missingIdempotentSaleFn;
-  if (retryBaseSaleFn) {
-    ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete', baseParams));
-  }
+  const { result, rpcError } = await callCreateSaleCompleteWithFallback({
+    preferBase: preferBaseForSingleClose,
+    baseParams,
+    idempotentParams: idempotentBaseParams
+  });
 
   let resolvedSaleId = result?.[0]?.sale_id || null;
   if (rpcError || !result?.[0]) {
@@ -491,17 +572,12 @@ export async function closeOrderSingle(businessId, { orderId, tableId, paymentMe
       p_table_id: null,
       p_idempotency_key: fallbackKey
     };
-    ({ data: fallbackResult, error: fallbackError } = await supabase.rpc('create_sale_complete_idempotent', fallbackIdempotentBaseParams));
-
-    const missingFallbackIdempotentFn = isFunctionUnavailableError(
-      fallbackError,
-      'create_sale_complete_idempotent'
-    );
-    const retryBaseFallbackFn = fallbackError && missingFallbackIdempotentFn;
-    if (retryBaseFallbackFn) {
-      const fallbackBaseParams = { ...baseParams, p_order_id: null, p_table_id: null };
-      ({ data: fallbackResult, error: fallbackError } = await supabase.rpc('create_sale_complete', fallbackBaseParams));
-    }
+    const fallbackBaseParams = { ...baseParams, p_order_id: null, p_table_id: null };
+    ({ result: fallbackResult, rpcError: fallbackError } = await callCreateSaleCompleteWithFallback({
+      preferBase: preferBaseForSingleClose,
+      baseParams: fallbackBaseParams,
+      idempotentParams: fallbackIdempotentBaseParams
+    }));
 
     if (fallbackError || !fallbackResult?.[0]) {
       throw new Error(getFriendlySaleErrorMessage(
@@ -523,5 +599,5 @@ export async function closeOrderSingle(businessId, { orderId, tableId, paymentMe
     changeBreakdown: normalizedChangeBreakdown
   });
 
-  return { saleTotal };
+  return { saleTotal, saleId: resolvedSaleId };
 }

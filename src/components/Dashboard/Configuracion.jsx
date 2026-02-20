@@ -24,7 +24,12 @@ import {
 } from 'lucide-react';
 import { InvoicingProvider } from '../../context/InvoicingContext';
 import InvoicingSection from '../Settings/InvoicingSection';
-import { getThermalPaperWidthMm, setThermalPaperWidthMm } from '../../utils/printer.js';
+import {
+  getThermalPaperWidthMm,
+  setThermalPaperWidthMm,
+  isAutoPrintReceiptEnabled,
+  setAutoPrintReceiptEnabled
+} from '../../utils/printer.js';
 
 function Configuracion({ user, business, onBusinessUpdate }) {
   const _motionLintUsage = motion;
@@ -33,6 +38,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
   const [success, setSuccess] = useState('');
   const [editingBusiness, setEditingBusiness] = useState(false);
   const [printerPaperWidth, setPrinterPaperWidth] = useState(() => getThermalPaperWidthMm());
+  const [autoPrintReceipt, setAutoPrintReceipt] = useState(() => isAutoPrintReceiptEnabled());
   
   const [businessData, setBusinessData] = useState({
     name: '',
@@ -125,6 +131,21 @@ function Configuracion({ user, business, onBusinessUpdate }) {
       setSuccess(`Configuración de impresora guardada: ${nextWidth}mm`);
     } else {
       setError('❌ No se pudo guardar la configuración de impresora');
+    }
+  }, []);
+
+  const handleAutoPrintReceiptChange = useCallback((e) => {
+    const nextValue = Boolean(e?.target?.checked);
+    const saved = setAutoPrintReceiptEnabled(nextValue);
+    if (saved) {
+      setAutoPrintReceipt(nextValue);
+      setSuccess(
+        nextValue
+          ? 'Autoimpresión de recibo activada'
+          : 'Autoimpresión de recibo desactivada'
+      );
+    } else {
+      setError('❌ No se pudo guardar la configuración de autoimpresión');
     }
   }, []);
 
@@ -486,6 +507,15 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                     <option value={58}>58mm</option>
                     <option value={80}>80mm</option>
                   </select>
+                  <label className="mt-3 inline-flex items-center gap-2 text-sm text-amber-900 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={autoPrintReceipt}
+                      onChange={handleAutoPrintReceiptChange}
+                      className="h-4 w-4 rounded border-amber-400 text-amber-700 focus:ring-amber-300"
+                    />
+                    Imprimir recibo automáticamente al cerrar venta
+                  </label>
                 </div>
               </div>
             </div>

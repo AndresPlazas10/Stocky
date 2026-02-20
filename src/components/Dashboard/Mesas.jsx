@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client.jsx';
 import { closeOrderAsSplit, closeOrderSingle } from '../../services/ordersService.js';
+import { fetchComboCatalog } from '../../services/combosService.js';
 import { formatPrice, formatDateTimeTicket } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -27,7 +28,8 @@ import SplitBillModal from './SplitBillModal';
 import { closeModalImmediate } from '../../utils/closeModalImmediate';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { normalizeTableRecord } from '../../utils/tableStatus.js';
-import { getThermalPaperWidthMm } from '../../utils/printer.js';
+import { getThermalPaperWidthMm, isAutoPrintReceiptEnabled } from '../../utils/printer.js';
+import { printSaleReceipt } from '../../utils/saleReceiptPrint.js';
 
 const getPaymentMethodLabel = (method) => {
   if (method === 'cash') return 'Efectivo';
@@ -171,6 +173,25 @@ const applyPendingQuantities = (items = [], pendingUpdates = {}) => {
   });
 };
 
+const ORDER_ITEMS_SELECT = `
+  id,
+  order_id,
+  product_id,
+  combo_id,
+  quantity,
+  price,
+  subtotal,
+  products (id, name, code, category),
+  combos (id, nombre, descripcion)
+`;
+
+const ORDER_ITEM_TYPE = {
+  PRODUCT: 'product',
+  COMBO: 'combo'
+};
+
+const getOrderItemName = (item) => item?.products?.name || item?.combos?.nombre || 'Item';
+
 function Mesas({ businessId }) {
   const MODAL_REOPEN_GUARD_MS = 600;
   const [mesas, setMesas] = useState([]);
@@ -191,6 +212,7 @@ function Mesas({ businessId }) {
   const [orderItems, setOrderItems] = useState([]);
   const [pendingQuantityUpdates, setPendingQuantityUpdates] = useState({});
   const [productos, setProductos] = useState([]);
+  const [combos, setCombos] = useState([]);
   const [searchProduct, setSearchProduct] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const [quantityToAdd, setQuantityToAdd] = useState(1);
@@ -289,10 +311,12 @@ function Mesas({ businessId }) {
             order_items (
               id,
               product_id,
+              combo_id,
               quantity,
               price,
               subtotal,
-              products (name, category)
+              products (id, name, category),
+              combos (id, nombre, descripcion)
             )
           )
         `)
@@ -332,6 +356,15 @@ function Mesas({ businessId }) {
     }
   }, [businessId]);
 
+  const loadCombos = useCallback(async () => {
+    try {
+      const data = await fetchComboCatalog(businessId);
+      setCombos(data || []);
+    } catch {
+      setError('No se pudo cargar los combos. Revisa tu conexión e intenta de nuevo.');
+    }
+  }, [businessId]);
+
   const loadClientes = useCallback(async () => {
     // Tabla customers eliminada - no hacer nada
     setClientes([]);
@@ -343,6 +376,7 @@ function Mesas({ businessId }) {
       await Promise.all([
         loadMesas(),
         loadProductos(),
+        loadCombos(),
         loadClientes()
       ]);
     } catch {
@@ -350,7 +384,7 @@ function Mesas({ businessId }) {
     } finally {
       setLoading(false);
     }
-  }, [loadMesas, loadProductos, loadClientes]);
+  }, [loadMesas, loadProductos, loadCombos, loadClientes]);
 
   useEffect(() => {
     if (businessId) {
@@ -443,7 +477,7 @@ function Mesas({ businessId }) {
       if (selectedMesa?.current_order_id === updatedOrder.id) {
         const { data: items } = await supabase
           .from('order_items')
-          .select('*, products(name, code)')
+          .select(ORDER_ITEMS_SELECT)
           .eq('order_id', updatedOrder.id)
           .order('id', { ascending: true });
         
@@ -482,8 +516,7 @@ function Mesas({ businessId }) {
         .select(`
           *,
           order_items!order_items_order_id_fkey (
-            *,
-            products (name, code, category)
+            ${ORDER_ITEMS_SELECT}
           )
         `)
         .eq('id', orderId)
@@ -532,6 +565,14 @@ function Mesas({ businessId }) {
     onInsert: (newItem) => handleOrderItemChange(newItem, 'INSERT'),
     onUpdate: (updatedItem) => handleOrderItemChange(updatedItem, 'UPDATE'),
     onDelete: (deletedItem) => handleOrderItemChange(deletedItem, 'DELETE')
+  });
+
+  useRealtimeSubscription('combos', {
+    filter: { business_id: businessId },
+    enabled: !!businessId,
+    onInsert: () => { loadCombos().catch(() => {}); },
+    onUpdate: () => { loadCombos().catch(() => {}); },
+    onDelete: () => { loadCombos().catch(() => {}); }
   });
 
   const handleCreateTable = useCallback(async (e) => {
@@ -637,8 +678,7 @@ function Mesas({ businessId }) {
         .select(`
           *,
           order_items!order_items_order_id_fkey (
-            *,
-            products (name, code, category)
+            ${ORDER_ITEMS_SELECT}
           )
         `)
         .eq('id', mesa.current_order_id)
@@ -723,7 +763,7 @@ function Mesas({ businessId }) {
 
     const { data: freshItems, error: reloadError } = await supabase
       .from('order_items')
-      .select('*, products(name, code)')
+      .select(ORDER_ITEMS_SELECT)
       .eq('order_id', orderId)
       .order('id', { ascending: true });
 
@@ -763,7 +803,7 @@ function Mesas({ businessId }) {
       // Revertir solo los items si falla
       const { data: freshItems } = await supabase
         .from('order_items')
-        .select('*, products(name, code)')
+        .select(ORDER_ITEMS_SELECT)
         .eq('order_id', selectedMesa.current_order_id)
         .order('id', { ascending: true });
       if (freshItems) {
@@ -816,15 +856,26 @@ function Mesas({ businessId }) {
     }
   }, [selectedMesa, updateOrderTotal, persistPendingQuantityUpdates, setPendingQuantityUpdatesSafe]);
 
-  const addProductToOrder = useCallback(async (producto) => {
+  const addCatalogItemToOrder = useCallback(async (catalogItem) => {
     try {
       if (!selectedMesa?.current_order_id) return;
 
+      const itemType = catalogItem?.item_type || ORDER_ITEM_TYPE.PRODUCT;
+      const isCombo = itemType === ORDER_ITEM_TYPE.COMBO;
+      const itemId = isCombo
+        ? (catalogItem?.combo_id || catalogItem?.id)
+        : (catalogItem?.product_id || catalogItem?.id);
+      const itemName = catalogItem?.name || catalogItem?.nombre || 'Item';
 
-      // Validar que el producto tenga precio
-      const precio = producto.sale_price || producto.price;
-      if (!precio || precio === null || precio === undefined) {
-        setError(`⚠️ El producto "${producto.name}" no tiene un precio válido`);
+      if (!itemId) {
+        setError('⚠️ No se pudo identificar el item seleccionado.');
+        return;
+      }
+
+      // Validar que el item tenga precio
+      const precio = Number(catalogItem?.sale_price ?? catalogItem?.price ?? 0);
+      if (!Number.isFinite(precio) || precio < 0) {
+        setError(`⚠️ El item "${itemName}" no tiene un precio válido`);
         return;
       }
 
@@ -835,13 +886,15 @@ function Mesas({ businessId }) {
         return;
       }
 
-      // Aviso transitorio si la cantidad solicitada supera el stock disponible
-      if (typeof producto.stock === 'number' && qty > producto.stock) {
-        setError(`⚠️ Stock insuficiente para ${producto.name}. Disponibles: ${producto.stock}. Considera crear una compra.`);
+      // Aviso transitorio si la cantidad solicitada supera el stock disponible (solo producto simple)
+      if (!isCombo && typeof catalogItem.stock === 'number' && qty > catalogItem.stock) {
+        setError(`⚠️ Stock insuficiente para ${itemName}. Disponibles: ${catalogItem.stock}. Considera crear una compra.`);
       }
 
-      // Verificar si el producto ya está en la orden
-      const existingItem = orderItems.find(item => item.product_id === producto.id);
+      // Verificar si el item ya está en la orden
+      const existingItem = orderItems.find((item) => (
+        isCombo ? item.combo_id === itemId : item.product_id === itemId
+      ));
 
       if (existingItem) {
         // Incrementar cantidad con la cantidad especificada
@@ -860,7 +913,7 @@ function Mesas({ businessId }) {
         // Recargar el item actualizado para obtener el subtotal correcto
         const { data: updatedItem } = await supabase
           .from('order_items')
-          .select('*, products(name, code)')
+          .select(ORDER_ITEMS_SELECT)
           .eq('id', existingItem.id)
           .maybeSingle();
         
@@ -883,7 +936,8 @@ function Mesas({ businessId }) {
           .from('order_items')
           .insert([{
             order_id: selectedMesa.current_order_id,
-            product_id: producto.id,
+            product_id: isCombo ? null : itemId,
+            combo_id: isCombo ? itemId : null,
             quantity: qty,
             price: parseFloat(precio)
             // subtotal se calcula automáticamente con trigger
@@ -900,14 +954,20 @@ function Mesas({ businessId }) {
           const optimisticItem = {
             id: newItem.id,
             order_id: selectedMesa.current_order_id,
-            product_id: producto.id,
+            product_id: isCombo ? null : itemId,
+            combo_id: isCombo ? itemId : null,
             quantity: qty,
             price: parseFloat(precio),
             subtotal: qty * parseFloat(precio),
-            products: {
-              name: producto.name,
-              code: producto.code
-            }
+            products: isCombo ? null : {
+              id: itemId,
+              name: itemName,
+              code: catalogItem.code
+            },
+            combos: isCombo ? {
+              id: itemId,
+              nombre: itemName
+            } : null
           };
           setOrderItems(prevItems => [optimisticItem, ...prevItems]);
         }
@@ -918,11 +978,11 @@ function Mesas({ businessId }) {
       setSearchProduct('');
       setQuantityToAdd(1); // Resetear cantidad
     } catch {
-      setError('❌ No se pudo agregar el producto. Por favor, intenta de nuevo.');
+      setError('❌ No se pudo agregar el item. Por favor, intenta de nuevo.');
       // Revertir solo los items si falla
       const { data: freshItems } = await supabase
         .from('order_items')
-        .select('*, products(name, code)')
+        .select(ORDER_ITEMS_SELECT)
         .eq('order_id', selectedMesa.current_order_id)
         .order('id', { ascending: true });
       if (freshItems) {
@@ -959,7 +1019,7 @@ function Mesas({ businessId }) {
       setError('❌ No se pudo actualizar la cantidad. Por favor, intenta de nuevo.');
       const { data: freshItems } = await supabase
         .from('order_items')
-        .select('*, products(name, code)')
+        .select(ORDER_ITEMS_SELECT)
         .eq('order_id', selectedMesa.current_order_id)
         .order('id', { ascending: true });
       if (freshItems) {
@@ -1034,8 +1094,50 @@ function Mesas({ businessId }) {
     setShowSplitBillModal(true);
   };
 
+  const tryAutoPrintReceiptBySaleId = useCallback(async (saleId) => {
+    if (!isAutoPrintReceiptEnabled() || !saleId) return;
+
+    try {
+      const [{ data: saleRow }, { data: saleDetails }] = await Promise.all([
+        supabase
+          .from('sales')
+          .select('id, total, payment_method, created_at, seller_name')
+          .eq('id', saleId)
+          .eq('business_id', businessId)
+          .maybeSingle(),
+        supabase
+          .from('sale_details')
+          .select('quantity, unit_price, subtotal, product_id, combo_id, products(name, code), combos(nombre)')
+          .eq('sale_id', saleId)
+      ]);
+
+      if (!saleRow || !Array.isArray(saleDetails) || saleDetails.length === 0) return;
+
+      const printResult = printSaleReceipt({
+        sale: saleRow,
+        saleDetails,
+        sellerName: saleRow.seller_name || 'Empleado'
+      });
+
+      if (!printResult.ok) {
+        setError('⚠️ La venta se cerró, pero no se pudo imprimir el recibo automáticamente.');
+      }
+    } catch {
+      setError('⚠️ La venta se cerró, pero no se pudo imprimir el recibo automáticamente.');
+    }
+  }, [businessId]);
+
   const processSplitPaymentAndClose = async ({ subAccounts }) => {
     if (isClosingOrder) return;
+
+    if (hasInsufficientComboStock) {
+      const firstShortage = insufficientComboComponents[0];
+      setError(
+        `❌ Stock insuficiente para "${firstShortage.product_name}" ` +
+        `(disp: ${firstShortage.available_stock}, req: ${firstShortage.required_quantity}).`
+      );
+      return;
+    }
 
     setIsClosingOrder(true);
     setIsGeneratingSplitSales(true);
@@ -1052,11 +1154,16 @@ function Mesas({ businessId }) {
     try {
       await persistPendingQuantityUpdates(mesaSnapshot.current_order_id);
 
-      const { totalSold } = await closeOrderAsSplit(businessId, {
+      const { totalSold, saleIds = [] } = await closeOrderAsSplit(businessId, {
         subAccounts,
         orderId: mesaSnapshot.current_order_id,
         tableId: mesaSnapshot.id
       });
+
+      for (const saleId of saleIds) {
+        // best-effort: no bloquear cierre si falla la impresión de alguno
+        await tryAutoPrintReceiptBySaleId(saleId);
+      }
 
       // Cerrar UI solo cuando la venta se confirmó en backend.
       justCompletedSaleRef.current = true;
@@ -1098,6 +1205,15 @@ function Mesas({ businessId }) {
   const processPaymentAndClose = async () => {
     // Prevenir doble click
     if (isClosingOrder) return;
+
+    if (hasInsufficientComboStock) {
+      const firstShortage = insufficientComboComponents[0];
+      setError(
+        `❌ Stock insuficiente para "${firstShortage.product_name}" ` +
+        `(disp: ${firstShortage.available_stock}, req: ${firstShortage.required_quantity}).`
+      );
+      return;
+    }
 
     const paymentSnapshot = paymentMethod;
     const amountReceivedSnapshot = amountReceived;
@@ -1144,13 +1260,15 @@ function Mesas({ businessId }) {
       try {
         await persistPendingQuantityUpdates(mesaSnapshot.current_order_id);
 
-        const { saleTotal } = await closeOrderSingle(businessId, {
+        const { saleTotal, saleId } = await closeOrderSingle(businessId, {
           orderId: mesaSnapshot.current_order_id,
           tableId: mesaSnapshot.id,
           paymentMethod: paymentSnapshot,
           amountReceived: paymentSnapshot === 'cash' ? normalizedAmountReceived : null,
           changeBreakdown: paymentSnapshot === 'cash' ? cashChangeData?.breakdown || [] : []
         });
+
+        await tryAutoPrintReceiptBySaleId(saleId);
 
         loadMesas().catch(() => {});
 
@@ -1194,7 +1312,7 @@ function Mesas({ businessId }) {
     // Filtrar solo productos que van a cocina (solo Platos)
     const categoriasParaCocina = ['Platos'];
     const itemsParaCocina = orderItems.filter(item => 
-      categoriasParaCocina.includes(item.products?.category)
+      item.combo_id || categoriasParaCocina.includes(item.products?.category)
     );
 
     // Si no hay nada para cocina, mostrar mensaje
@@ -1338,7 +1456,7 @@ function Mesas({ businessId }) {
         <div class="items">
           ${itemsParaCocina.map(item => `
             <div class="item">
-              <div class="item-name">${item.products?.name || 'Producto'}</div>
+              <div class="item-name">${getOrderItemName(item)}</div>
               <div class="item-qty">x${item.quantity}</div>
             </div>
           `).join('')}
@@ -1427,14 +1545,49 @@ function Mesas({ businessId }) {
     })();
   };
 
-  const filteredProducts = useMemo(() => {
+  const comboById = useMemo(() => {
+    const map = new Map();
+    combos.forEach((combo) => map.set(combo.id, combo));
+    return map;
+  }, [combos]);
+
+  const catalogItems = useMemo(() => {
+    const productItems = productos.map((producto) => ({
+      item_type: ORDER_ITEM_TYPE.PRODUCT,
+      id: producto.id,
+      product_id: producto.id,
+      combo_id: null,
+      name: producto.name,
+      code: producto.code || '',
+      sale_price: Number(producto.sale_price || 0),
+      stock: Number(producto.stock || 0)
+    }));
+
+    const comboItems = combos.map((combo) => ({
+      item_type: ORDER_ITEM_TYPE.COMBO,
+      id: combo.id,
+      product_id: null,
+      combo_id: combo.id,
+      name: combo.nombre,
+      code: `COMBO-${String(combo.id).slice(0, 4).toUpperCase()}`,
+      sale_price: Number(combo.precio_venta || 0),
+      stock: null,
+      combo_items: combo.combo_items || []
+    }));
+
+    return [...comboItems, ...productItems];
+  }, [productos, combos]);
+
+  const filteredCatalog = useMemo(() => {
     if (!searchProduct.trim()) return [];
     const search = searchProduct.toLowerCase();
-    return productos.filter(p =>
-      p.name.toLowerCase().includes(search) ||
-      p.code.toLowerCase().includes(search)
-    ).slice(0, 5);
-  }, [searchProduct, productos]);
+    return catalogItems
+      .filter((item) =>
+        item.name.toLowerCase().includes(search) ||
+        item.code.toLowerCase().includes(search)
+      )
+      .slice(0, 8);
+  }, [searchProduct, catalogItems]);
 
   const orderTotal = useMemo(() => {
     return orderItems.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
@@ -1455,17 +1608,63 @@ function Mesas({ businessId }) {
     && !cambioPago.isValid
   ), [paymentMethod, amountReceived, cambioPago]);
 
-  // Items que exceden el stock disponible (para mostrar en el modal de pago)
+  // Items simples que exceden stock disponible (informativo).
   const insufficientItems = useMemo(() => {
     if (!orderItems || orderItems.length === 0) return [];
     return orderItems
-      .map(item => {
+      .filter((item) => !item.combo_id)
+      .map((item) => {
         const prod = productos.find(p => p.id === item.product_id);
         return prod ? { ...item, available_stock: prod.stock, product_name: prod.name } : null;
       })
       .filter(Boolean)
       .filter(i => typeof i.available_stock === 'number' && i.quantity > i.available_stock);
   }, [orderItems, productos]);
+
+  // Validación crítica: stock interno requerido por combos.
+  const insufficientComboComponents = useMemo(() => {
+    if (!orderItems || orderItems.length === 0) return [];
+
+    const requiredByProduct = new Map();
+
+    orderItems.forEach((item) => {
+      if (!item?.combo_id) return;
+      const combo = comboById.get(item.combo_id);
+      if (!combo) return;
+
+      const comboQty = Number(item.quantity || 0);
+      if (!Number.isFinite(comboQty) || comboQty <= 0) return;
+
+      (combo.combo_items || []).forEach((component) => {
+        const productId = component?.producto_id;
+        if (!productId) return;
+
+        const componentQty = Number(component?.cantidad || 0);
+        if (!Number.isFinite(componentQty) || componentQty <= 0) return;
+
+        const currentRequired = Number(requiredByProduct.get(productId) || 0);
+        requiredByProduct.set(productId, currentRequired + (comboQty * componentQty));
+      });
+    });
+
+    const shortages = [];
+    requiredByProduct.forEach((requiredQty, productId) => {
+      const product = productos.find((p) => p.id === productId);
+      const stock = Number(product?.stock || 0);
+      if (stock >= requiredQty) return;
+
+      shortages.push({
+        product_id: productId,
+        product_name: product?.name || 'Producto',
+        available_stock: stock,
+        required_quantity: requiredQty
+      });
+    });
+
+    return shortages;
+  }, [orderItems, comboById, productos]);
+
+  const hasInsufficientComboStock = insufficientComboComponents.length > 0;
 
   useEffect(() => {
     let errorTimer, successTimer;
@@ -1529,8 +1728,17 @@ function Mesas({ businessId }) {
             {/* Alerta de procesamiento de ventas divididas */}
             <SaleUpdateAlert
               isVisible={isGeneratingSplitSales}
-              onClose={() => setIsGeneratingSplitSales(false)}
-              title="Generando ventas...."
+              onClose={() => {}}
+              title="Generando ventas..."
+              details={[]}
+              duration={600000}
+            />
+
+            {/* Alerta de procesamiento para cierre normal (sin división) */}
+            <SaleUpdateAlert
+              isVisible={isClosingOrder && !isGeneratingSplitSales}
+              onClose={() => {}}
+              title="Generando venta..."
               details={[]}
               duration={600000}
             />
@@ -1760,42 +1968,47 @@ function Mesas({ businessId }) {
                 </CardHeader>
 
                 <CardContent className="pt-6 overflow-y-auto flex-1">
-                  {/* Buscar producto */}
+                  {/* Buscar producto o combo */}
                   <div className="mb-6">
                     <label className="block text-sm font-semibold text-primary-700 mb-3">
                       <Search className="w-4 h-4 inline mr-2" />
-                      Agregar Producto
+                      Agregar Producto o Combo
                     </label>
                     <Input
                       type="text"
-                      placeholder="Buscar por nombre o código..."
+                      placeholder="Buscar por nombre..."
                       value={searchProduct}
                       onChange={(e) => setSearchProduct(e.target.value)}
                       className="h-12 border-accent-300"
                     />
                     
                     <AnimatePresence>
-                      {searchProduct && filteredProducts.length > 0 && (
+                      {searchProduct && filteredCatalog.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
                           className="mt-2 border-2 border-accent-200 rounded-2xl overflow-hidden max-h-60 overflow-y-auto shadow-lg"
                         >
-                          {filteredProducts.map((producto, index) => (
+                          {filteredCatalog.map((catalogItem, index) => (
                             <motion.div
-                              key={producto.id}
+                              key={`${catalogItem.item_type}:${catalogItem.id}`}
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
                               transition={{ delay: index * 0.02 }}
-                              onClick={() => addProductToOrder(producto)}
+                              onClick={() => addCatalogItemToOrder(catalogItem)}
                               className="p-4 cursor-pointer border-b border-accent-100 last:border-0 hover:bg-accent-50 transition-colors flex justify-between items-center"
                             >
-                              <span className="font-semibold text-primary-900">
-                                {producto.name}
-                              </span>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-semibold text-primary-900 truncate">
+                                  {catalogItem.name}
+                                </span>
+                                {catalogItem.item_type === ORDER_ITEM_TYPE.COMBO && (
+                                  <Badge className="bg-blue-100 text-blue-700">Combo</Badge>
+                                )}
+                              </div>
                               <span className="text-lg font-bold text-green-600">
-                                ${producto.sale_price || producto.price}
+                                {formatPrice(catalogItem.sale_price || 0)}
                               </span>
                             </motion.div>
                           ))}
@@ -1806,19 +2019,19 @@ function Mesas({ businessId }) {
 
                   {/* Items de la orden */}
                   <div className="mb-6">
-                    <h3 className="text-lg font-bold text-primary-900 mb-4">Productos en la orden</h3>
+                    <h3 className="text-lg font-bold text-primary-900 mb-4">Items en la orden</h3>
                     {orderItems.length === 0 ? (
                       <div className="text-center py-12">
                         <div className="w-16 h-16 rounded-full bg-accent-100 flex items-center justify-center mx-auto mb-3">
                           <ShoppingCart className="w-8 h-8 text-accent-600" />
                         </div>
-                        <p className="text-accent-600">No hay productos en esta orden</p>
+                        <p className="text-accent-600">No hay items en esta orden</p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                         {orderItems.map((item, index) => (
                           <motion.div
-                            key={item.id || `temp-${item.product_id}-${index}`}
+                            key={item.id || `temp-${item.product_id || item.combo_id}-${index}`}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: index * 0.05 }}
@@ -1829,9 +2042,14 @@ function Mesas({ businessId }) {
                                   <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1 min-w-0">
                                       <h4 className="font-semibold text-primary-900 text-sm sm:text-base leading-tight">
-                                        {item.products?.name}
+                                        {getOrderItemName(item)}
                                       </h4>
                                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                                        {item.combo_id && (
+                                          <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 font-medium">
+                                            Combo
+                                          </span>
+                                        )}
                                         <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium">
                                           {formatPrice(parseFloat(item.price))} por unidad
                                         </span>
@@ -2154,6 +2372,26 @@ function Mesas({ businessId }) {
                     </div>
                   )}
 
+                  {insufficientComboComponents.length > 0 && (
+                    <div className="p-3 rounded-lg border border-red-300 bg-red-50 flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-red-700" />
+                        <div>
+                          <p className="text-sm font-semibold text-red-900">Stock insuficiente en componentes de combos ({insufficientComboComponents.length})</p>
+                          <p className="text-xs text-red-800">No se puede confirmar la venta hasta corregir estas cantidades.</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {insufficientComboComponents.map((item) => (
+                          <div key={item.product_id} className="text-xs text-red-800">
+                            <strong className="text-primary-900">{item.product_name}</strong>
+                            <div>Disp: {item.available_stock} / Req: {item.required_quantity}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex gap-3 pt-1">
                     <Button
                       variant="outline"
@@ -2171,7 +2409,11 @@ function Mesas({ businessId }) {
                     </Button>
                     <Button
                       onClick={processPaymentAndClose}
-                      disabled={isClosingOrder || (paymentMethod === 'cash' && (amountReceived === '' || isCashPaymentInvalid))}
+                      disabled={
+                        isClosingOrder
+                        || hasInsufficientComboStock
+                        || (paymentMethod === 'cash' && (amountReceived === '' || isCashPaymentInvalid))
+                      }
                       className="flex-1 h-12 gradient-primary text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isClosingOrder ? (

@@ -71,6 +71,13 @@ const calcularCambio = (total, pagado) => {
   return { isValid: true, change: normalizedPaid - normalizedTotal, breakdown, paid: normalizedPaid };
 };
 
+const getOrderItemName = (item) => (
+  item?.products?.name
+  || item?.combos?.nombre
+  || item?.combos?.name
+  || 'Item'
+);
+
 /**
  * itemAssignments: { itemId: { accountId: qty } }
  * Suma de qty por item debe ser igual a item.quantity
@@ -368,7 +375,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel })
                         >
                           <td className="p-4 align-top border-r border-accent-200 min-w-[180px] max-w-[260px]">
                             <p className="font-semibold text-primary-900 text-sm break-words">
-                              {item.products?.name || 'Producto'}
+                              {getOrderItemName(item)}
                             </p>
                             <p className="text-xs text-accent-600 mt-0.5">
                               {totalQty} × {formatPrice(item.price)} = {formatPrice(item.subtotal)}

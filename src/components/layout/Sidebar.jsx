@@ -4,8 +4,8 @@ import { AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard,
   Package,
+  Layers,
   ShoppingCart,
-  FileText,
   Users,
   Truck,
   ShoppingBag,
@@ -20,11 +20,15 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// eslint helper: `no-unused-vars` no detecta consistentemente `<motion.* />` en esta config.
+const _motionLintUsage = motion;
+
 const menuItems = [
   { icon: LayoutDashboard, label: 'Inicio', section: 'home' },
   { icon: ShoppingCart, label: 'Ventas', section: 'ventas' },
   { icon: ShoppingBag, label: 'Compras', section: 'compras' },
   { icon: Package, label: 'Inventario', section: 'inventario' },
+  { icon: Layers, label: 'Combos', section: 'combos' },
   { icon: Truck, label: 'Proveedores', section: 'proveedores' },
   { icon: Users, label: 'Empleados', section: 'empleados' },
   { icon: BarChart3, label: 'Reportes', section: 'reportes' },

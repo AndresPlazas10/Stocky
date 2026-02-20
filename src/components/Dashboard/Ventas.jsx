@@ -1,19 +1,22 @@
-import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabase/Client';
 import { getFilteredSales } from '../../services/salesService';
 import { createSaleOptimized, recordSaleCreationTime } from '../../services/salesServiceOptimized';
+import { fetchComboCatalog } from '../../services/combosService.js';
 import SalesFilters from '../Filters/SalesFilters';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
-import { formatPrice, formatDate, formatDateOnly, formatDateTimeTicket } from '../../utils/formatters.js';
+import { formatPrice, formatDate, formatDateOnly } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
-import { getThermalPaperWidthMm } from '../../utils/printer.js';
+import { isAutoPrintReceiptEnabled } from '../../utils/printer.js';
+import { printSaleReceipt } from '../../utils/saleReceiptPrint.js';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
+import { SaleUpdateAlert } from '../ui/SaleUpdateAlert';
 import Pagination from '../Pagination';
 import { 
   ShoppingCart, 
@@ -33,7 +36,6 @@ import {
   Printer,
   Eye
 } from 'lucide-react';
-import ComprobanteDisclaimer from '../Legal/ComprobanteDisclaimer';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 
 const _motionLintUsage = motion;
@@ -70,6 +72,21 @@ const toNumberOrNull = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const SALE_ITEM_TYPE = {
+  PRODUCT: 'product',
+  COMBO: 'combo'
+};
+
+const buildCartItemKey = (itemType, id) => `${itemType}:${id}`;
+
+const getSaleDetailDisplayName = (detail) => (
+  detail?.products?.name
+  || detail?.combos?.nombre
+  || detail?.combos?.name
+  || detail?.product_name
+  || 'Item'
+);
+
 function Ventas({ businessId, userRole = 'admin' }) {
   const [ventas, setVentas] = useState([]);
   const [page, setPage] = useState(1);
@@ -77,6 +94,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [totalCount, setTotalCount] = useState(0);
   const [currentFilters, setCurrentFilters] = useState({});
   const [productos, setProductos] = useState([]);
+  const [combos, setCombos] = useState([]);
   const clientes = [];
   const [loading, setLoading] = useState(true);
   const [showSaleModal, setShowSaleModal] = useState(false);
@@ -118,8 +136,10 @@ function Ventas({ businessId, userRole = 'admin' }) {
     try {
       const lim = Number(pagination.limit ?? limit);
       const off = Number(pagination.offset ?? ((page - 1) * lim));
-      const includeCount = pagination.includeCount !== false;
-      const countMode = pagination.countMode || 'exact';
+      const includeCount = typeof pagination.includeCount === 'boolean'
+        ? pagination.includeCount
+        : off === 0;
+      const countMode = pagination.countMode || 'planned';
       
       // SIEMPRE cargar datos frescos - sin caché
       const { data, count, error: salesError } = await getFilteredSales(businessId, filters, {
@@ -135,6 +155,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setVentas(data || []);
       if (typeof count === 'number') {
         setTotalCount(count);
+      } else if (!includeCount) {
+        setTotalCount(off + (data?.length || 0));
       }
     } catch (err) {
       setVentas([]);
@@ -154,6 +176,11 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
     if (error) throw error;
     setProductos(data || []);
+  }, [businessId]);
+
+  const loadCombos = useCallback(async () => {
+    const data = await fetchComboCatalog(businessId);
+    setCombos(data || []);
   }, [businessId]);
 
   // Verificar si el usuario autenticado es empleado
@@ -201,6 +228,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       await Promise.all([
         loadVentas(),
         loadProductos(),
+        loadCombos(),
         checkIfEmployee()
       ]);
     } catch {
@@ -208,7 +236,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     } finally {
       setLoading(false);
     }
-  }, [loadVentas, loadProductos, checkIfEmployee]);
+  }, [loadVentas, loadProductos, loadCombos, checkIfEmployee]);
 
   useEffect(() => {
     if (businessId) {
@@ -278,49 +306,110 @@ function Ventas({ businessId, userRole = 'admin' }) {
     }
   });
 
+  useRealtimeSubscription('combos', {
+    filter: { business_id: businessId },
+    enabled: !!businessId,
+    onInsert: () => {
+      loadCombos().catch(() => {});
+    },
+    onUpdate: () => {
+      loadCombos().catch(() => {});
+    },
+    onDelete: () => {
+      loadCombos().catch(() => {});
+    }
+  });
+
+  const comboById = useMemo(() => {
+    const map = new Map();
+    combos.forEach((combo) => map.set(combo.id, combo));
+    return map;
+  }, [combos]);
+
+  const catalogItems = useMemo(() => {
+    const productItems = productos.map((producto) => ({
+      item_type: SALE_ITEM_TYPE.PRODUCT,
+      item_id: producto.id,
+      product_id: producto.id,
+      combo_id: null,
+      name: producto.name,
+      code: producto.code || '',
+      sale_price: Number(producto.sale_price || 0),
+      stock: Number(producto.stock || 0),
+      combo_items: []
+    }));
+
+    const comboItems = combos.map((combo) => ({
+      item_type: SALE_ITEM_TYPE.COMBO,
+      item_id: combo.id,
+      product_id: null,
+      combo_id: combo.id,
+      name: combo.nombre,
+      code: `COMBO-${String(combo.id).slice(0, 4).toUpperCase()}`,
+      sale_price: Number(combo.precio_venta || 0),
+      stock: null,
+      combo_items: combo.combo_items || []
+    }));
+
+    return [...comboItems, ...productItems];
+  }, [productos, combos]);
+
   // Memoizar funciones del carrito
-  const addToCart = useCallback((producto) => {
-    setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.product_id === producto.id);
-      
+  const addToCart = useCallback((catalogItem) => {
+    const itemType = catalogItem?.item_type || SALE_ITEM_TYPE.PRODUCT;
+    const itemId = catalogItem?.item_id || catalogItem?.id;
+    if (!itemId) return;
+
+    const itemKey = buildCartItemKey(itemType, itemId);
+
+    setCart((prevCart) => {
+      const existingItem = prevCart.find((item) => item.item_key === itemKey);
+
       if (existingItem) {
-        return prevCart.map(item =>
-          item.product_id === producto.id
+        return prevCart.map((item) => (
+          item.item_key === itemKey
             ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.unit_price }
             : item
-        );
-      } else {
-        return [...prevCart, {
-          product_id: producto.id,
-          name: producto.name,
-          code: producto.code,
-          quantity: 1,
-          unit_price: producto.sale_price,
-          subtotal: producto.sale_price,
-          available_stock: producto.stock
-        }];
+        ));
       }
+
+      const unitPrice = Number(catalogItem.sale_price || 0);
+      const quantity = 1;
+      return [
+        ...prevCart,
+        {
+          item_key: itemKey,
+          item_type: itemType,
+          item_id: itemId,
+          product_id: itemType === SALE_ITEM_TYPE.PRODUCT ? itemId : null,
+          combo_id: itemType === SALE_ITEM_TYPE.COMBO ? itemId : null,
+          name: catalogItem.name,
+          code: catalogItem.code || '',
+          quantity,
+          unit_price: unitPrice,
+          subtotal: quantity * unitPrice,
+          available_stock: itemType === SALE_ITEM_TYPE.PRODUCT ? Number(catalogItem.stock || 0) : null
+        }
+      ];
     });
     setSearchProduct('');
   }, []);
 
-  const removeFromCart = useCallback((productId) => {
-    setCart(prevCart => prevCart.filter(item => item.product_id !== productId));
+  const removeFromCart = useCallback((itemKey) => {
+    setCart((prevCart) => prevCart.filter((item) => item.item_key !== itemKey));
   }, []);
 
-  const updateQuantity = useCallback((productId, newQuantity) => {
+  const updateQuantity = useCallback((itemKey, newQuantity) => {
     if (newQuantity <= 0) {
-      removeFromCart(productId);
+      removeFromCart(itemKey);
       return;
     }
 
-    setCart(prevCart => {
-      return prevCart.map(item =>
-        item.product_id === productId
-          ? { ...item, quantity: newQuantity, subtotal: newQuantity * item.unit_price }
-          : item
-      );
-    });
+    setCart((prevCart) => prevCart.map((item) => (
+      item.item_key === itemKey
+        ? { ...item, quantity: newQuantity, subtotal: newQuantity * item.unit_price }
+        : item
+    )));
   }, [removeFromCart]);
 
   // Stock en vivo por producto para evitar desincronización en carrito
@@ -330,6 +419,47 @@ function Ventas({ businessId, userRole = 'admin' }) {
     return map;
   }, [productos]);
 
+  const comboStockShortages = useMemo(() => {
+    const requiredByProduct = new Map();
+
+    cart.forEach((item) => {
+      if (!item?.combo_id) return;
+
+      const combo = comboById.get(item.combo_id);
+      if (!combo) return;
+
+      const comboQuantity = Number(item.quantity || 0);
+      if (!Number.isFinite(comboQuantity) || comboQuantity <= 0) return;
+
+      (combo.combo_items || []).forEach((component) => {
+        const productId = component?.producto_id;
+        if (!productId) return;
+
+        const componentQty = Number(component?.cantidad || 0);
+        if (!Number.isFinite(componentQty) || componentQty <= 0) return;
+
+        const current = Number(requiredByProduct.get(productId) || 0);
+        requiredByProduct.set(productId, current + (comboQuantity * componentQty));
+      });
+    });
+
+    const shortages = [];
+    requiredByProduct.forEach((requiredQty, productId) => {
+      const stock = Number(stockByProductId.get(productId) || 0);
+      if (stock >= requiredQty) return;
+
+      const product = productos.find((p) => p.id === productId);
+      shortages.push({
+        product_id: productId,
+        product_name: product?.name || 'Producto',
+        available_stock: stock,
+        required_quantity: requiredQty
+      });
+    });
+
+    return shortages;
+  }, [cart, comboById, productos, stockByProductId]);
+
   const total = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.subtotal, 0);
   }, [cart]);
@@ -337,11 +467,13 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const saleIntentSignature = useMemo(() => {
     const normalizedItems = [...cart]
       .map((item) => ({
-        product_id: item.product_id,
+        item_type: item.item_type || SALE_ITEM_TYPE.PRODUCT,
+        product_id: item.product_id || null,
+        combo_id: item.combo_id || null,
         quantity: Number(item.quantity || 0),
         unit_price: Number(item.unit_price || 0)
       }))
-      .sort((a, b) => String(a.product_id).localeCompare(String(b.product_id)));
+      .sort((a, b) => String(a.product_id || a.combo_id || '').localeCompare(String(b.product_id || b.combo_id || '')));
 
     return JSON.stringify({
       businessId,
@@ -372,6 +504,14 @@ function Ventas({ businessId, userRole = 'admin' }) {
       // Verificar sesión antes de procesar
       if (!sessionChecked) {
         throw new Error('⚠️ Verificando sesión...');
+      }
+
+      if (comboStockShortages.length > 0) {
+        const firstShortage = comboStockShortages[0];
+        throw new Error(
+          `Stock insuficiente para "${firstShortage.product_name}". ` +
+          `Disponibles: ${firstShortage.available_stock}. Requeridos: ${firstShortage.required_quantity}.`
+        );
       }
 
       // Calcular total del carrito
@@ -411,6 +551,44 @@ function Ventas({ businessId, userRole = 'admin' }) {
       ]);
       setAlertType('success');
       setSuccess(true);
+
+      // Autoimprimir recibo si el usuario lo tiene activado en configuración.
+      if (isAutoPrintReceiptEnabled()) {
+        try {
+          const [{ data: saleRow }, { data: saleDetails }] = await Promise.all([
+            supabase
+              .from('sales')
+              .select('id, total, payment_method, created_at, seller_name')
+              .eq('id', result.data.id)
+              .maybeSingle(),
+            supabase
+              .from('sale_details')
+              .select('quantity, unit_price, subtotal, product_id, combo_id, products(name, code), combos(nombre)')
+              .eq('sale_id', result.data.id)
+          ]);
+
+          const saleForPrint = saleRow || {
+            id: result.data.id,
+            total: saleTotal,
+            payment_method: paymentMethod,
+            created_at: new Date().toISOString(),
+            seller_name: 'Empleado'
+          };
+
+          const detailsForPrint = Array.isArray(saleDetails) ? saleDetails : [];
+          const printResult = printSaleReceipt({
+            sale: saleForPrint,
+            saleDetails: detailsForPrint,
+            sellerName: saleForPrint.seller_name || getVendedorName(saleForPrint)
+          });
+
+          if (!printResult.ok) {
+            setError('⚠️ La venta se registró, pero no se pudo imprimir el recibo automáticamente.');
+          }
+        } catch {
+          setError('⚠️ La venta se registró, pero no se pudo imprimir el recibo automáticamente.');
+        }
+      }
       
       // Limpiar el carrito y cerrar POS
       setCart([]);
@@ -435,7 +613,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear
     }
-  }, [cart, sessionChecked, businessId, paymentMethod, loadVentas, isSubmitting, currentFilters, limit, page, saleIntentSignature]);
+  }, [cart, sessionChecked, comboStockShortages, businessId, paymentMethod, loadVentas, isSubmitting, currentFilters, limit, page, saleIntentSignature]);
 
   // Funciones de eliminación de venta (solo admin)
   const handleDeleteSale = (saleId) => {
@@ -495,7 +673,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
     const { data, error } = await supabase
       .from('sale_details')
-      .select('quantity, unit_price, subtotal, products(name, code)')
+      .select('quantity, unit_price, subtotal, product_id, combo_id, products(name, code), combos(nombre)')
       .eq('sale_id', saleId);
 
     if (error) throw error;
@@ -540,7 +718,6 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
   // Función para imprimir factura física
   const handlePrintInvoice = useCallback(async (venta) => {
-    // Cargar detalles de la venta
     let saleDetails = [];
     try {
       saleDetails = await fetchSaleDetails(venta.id);
@@ -556,278 +733,13 @@ function Ventas({ businessId, userRole = 'admin' }) {
       return;
     }
 
-    // Crear contenido HTML para impresión
-    const printerWidthMm = getThermalPaperWidthMm();
-    const printContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Comprobante de Pago #${venta.id}</title>
-        <style>
-          @media print {
-            @page {
-              size: ${printerWidthMm}mm auto;
-              margin: 2mm;
-            }
-            html, body {
-              width: ${printerWidthMm}mm !important;
-              height: auto !important;
-              margin: 0;
-              padding: 0;
-            }
-            .receipt {
-              break-inside: avoid;
-              page-break-inside: avoid;
-            }
-          }
-          
-          body {
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.4;
-            width: ${printerWidthMm}mm;
-            max-width: ${printerWidthMm}mm;
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            background: #fff;
-          }
+    const printResult = printSaleReceipt({
+      sale: venta,
+      saleDetails,
+      sellerName: getVendedorName(venta)
+    });
 
-          .receipt {
-            display: block;
-            width: 100%;
-            margin: 0;
-            padding: 2mm;
-            box-sizing: border-box;
-          }
-          
-          .header {
-            text-align: center;
-            border-bottom: 2px dashed #000;
-            padding-bottom: 10px;
-            margin-bottom: 10px;
-          }
-          
-          .header h1 {
-            font-size: 18px;
-            margin: 0 0 5px 0;
-            font-weight: bold;
-          }
-          
-          .header p {
-            margin: 2px 0;
-            font-size: 11px;
-          }
-          
-          .info {
-            margin: 10px 0;
-            font-size: 11px;
-          }
-          
-          .info-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 3px 0;
-          }
-          
-          .separator {
-            border-top: 1px dashed #000;
-            margin: 10px 0;
-          }
-          
-          .items-header {
-            display: flex;
-            justify-content: space-between;
-            font-weight: bold;
-            border-bottom: 1px solid #000;
-            padding: 5px 0;
-            font-size: 11px;
-          }
-          
-          .item {
-            display: flex;
-            justify-content: space-between;
-            margin: 5px 0;
-            font-size: 11px;
-          }
-          
-          .item-name {
-            flex: 1;
-            padding-right: 5px;
-          }
-          
-          .item-qty {
-            width: 40px;
-            text-align: center;
-          }
-          
-          .item-price {
-            width: 70px;
-            text-align: right;
-          }
-          
-          .totals {
-            margin-top: 15px;
-            border-top: 2px solid #000;
-            padding-top: 10px;
-          }
-          
-          .total-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 5px 0;
-            font-size: 12px;
-          }
-          
-          .total-row.final {
-            font-size: 16px;
-            font-weight: bold;
-            margin-top: 8px;
-            padding-top: 8px;
-            border-top: 1px solid #000;
-          }
-          
-          .payment-info {
-            margin: 15px 0;
-            padding: 8px;
-            background: #f5f5f5;
-            border-radius: 5px;
-            text-align: center;
-            font-size: 11px;
-          }
-          
-          .footer {
-            text-align: center;
-            margin-top: 20px;
-            padding-top: 10px;
-            border-top: 2px dashed #000;
-            font-size: 10px;
-          }
-          
-          .legal-notice {
-            margin-top: 15px;
-            padding: 8px;
-            border-top: 1px dashed #000;
-            font-size: 9px;
-            text-align: center;
-            line-height: 1.4;
-            color: #555;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="receipt">
-        <div class="header">
-          <h1>═══════════════════════════════════</h1>
-          <h1>COMPROBANTE DE VENTA</h1>
-          <h1>═══════════════════════════════════</h1>
-          <p style="margin: 10px 0; font-size: 9px; border-top: 1px dashed #000; padding-top: 8px;">
-            Sistema Stocky<br>
-            ${venta.created_at ? formatDateTimeTicket(venta.created_at) : 'Fecha no disponible'}
-          </p>
-        </div>
-        
-        <div class="info">
-          <div class="info-row">
-            <span><strong>Comprobante #:</strong></span>
-            <span>CPV-${String(venta.id).substring(0, 8).toUpperCase()}</span>
-          </div>
-          <div class="info-row">
-            <span><strong>Vendedor:</strong></span>
-            <span>${getVendedorName(venta)}</span>
-          </div>
-          <div class="info-row">
-            <span><strong>Cliente:</strong></span>
-            <span>Venta general</span>
-          </div>
-        </div>
-        
-        <div class="separator"></div>
-        
-        <div class="items-header">
-          <span style="flex: 1;">Producto</span>
-          <span style="width: 40px; text-align: center;">Cant.</span>
-          <span style="width: 70px; text-align: right;">Total</span>
-        </div>
-        
-        ${saleDetails.map(item => `
-          <div class="item">
-            <div class="item-name">${item.products?.name || 'Producto'}</div>
-            <div class="item-qty">x${item.quantity}</div>
-            <div class="item-price">${formatPrice(item.subtotal)}</div>
-          </div>
-        `).join('')}
-        
-        <div class="totals">
-          <div class="total-row final">
-            <span>TOTAL:</span>
-            <span>${formatPrice(venta.total)}</span>
-          </div>
-        </div>
-        
-        <div class="payment-info">
-          <strong>Método de Pago:</strong><br>
-          ${venta.payment_method === 'cash' ? '💵 Efectivo' : 
-            venta.payment_method === 'card' ? '💳 Tarjeta' :
-            venta.payment_method === 'transfer' ? '🏦 Transferencia' :
-            '🔀 Mixto'}
-        </div>
-        
-        <div class="footer">
-          <p>¡Gracias por su compra!</p>
-          <div style="margin: 12px 0; padding: 8px; background: #f9f9f9; border-radius: 4px; border-left: 3px solid #666;">
-            <p style="margin: 0 0 4px 0; font-size: 8px; font-weight: bold; color: #333; text-transform: uppercase; letter-spacing: 0.5px;">
-              💬 Frase del día
-            </p>
-            <p style="margin: 0; font-size: 9px; font-style: italic; color: #555; line-height: 1.4;">
-              "${(() => {
-                const frases = [
-                  'El éxito es la suma de pequeños esfuerzos repetidos día tras día.', 
-                  'La mejor manera de predecir el futuro es crearlo.', 
-                  'El cliente no siempre tiene la razón, pero siempre es el cliente.',
-                  'La calidad nunca es un accidente; siempre es el resultado del esfuerzo.',
-                  'Haz que cada cliente se sienta único y especial.',
-                  'El secreto del cambio es enfocar toda tu energía no en luchar contra lo viejo, sino en construir lo nuevo.',
-                  'Tu actitud determina tu dirección.',
-                  'Los negocios exitosos se construyen con relaciones, no con transacciones.',
-                  'La excelencia no es un acto, es un hábito.',
-                  'Cada día es una nueva oportunidad para mejorar.'
-                ];
-                const hoy = new Date();
-                const inicioDia = new Date(hoy.getFullYear(), 0, 0);
-                const diff = hoy - inicioDia;
-                const unDia = 1000 * 60 * 60 * 24;
-                const diaDelAno = Math.floor(diff / unDia);
-                return frases[diaDelAno % frases.length];
-              })()}"
-            </p>
-          </div>
-          <p style="margin: 10px 0; font-size: 8px; border-top: 1px dashed #000; padding-top: 5px;">
-            Generado por Stocky - Sistema de Gestión POS<br>
-            www.stockypos.app
-          </p>
-        </div>
-        </div>
-        
-        <script>
-          window.onload = function() {
-            window.print();
-            setTimeout(function() {
-              window.close();
-            }, 100);
-          };
-        </script>
-      </body>
-      </html>
-    `;
-
-    // Abrir ventana de impresión
-    const printWindow = window.open('', '_blank', 'width=300,height=600');
-    if (printWindow) {
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-    } else {
+    if (!printResult.ok) {
       setError('No se pudo abrir la ventana de impresión. Verifica los permisos del navegador.');
       setTimeout(() => setError(null), 3000);
     }
@@ -838,16 +750,16 @@ function Ventas({ businessId, userRole = 'admin' }) {
     setSaleToDelete(null);
   };
 
-  // Memoizar productos filtrados
-  const filteredProducts = useMemo(() => {
-    if (!searchProduct.trim()) return productos;
-    
+  // Memoizar catálogo filtrado (productos + combos)
+  const filteredCatalog = useMemo(() => {
+    if (!searchProduct.trim()) return catalogItems;
+
     const search = searchProduct.toLowerCase();
-    return productos.filter(p =>
-      p.name.toLowerCase().includes(search) ||
-      p.code?.toLowerCase().includes(search)
+    return catalogItems.filter((item) =>
+      item.name.toLowerCase().includes(search) ||
+      item.code?.toLowerCase().includes(search)
     );
-  }, [productos, searchProduct]);
+  }, [catalogItems, searchProduct]);
   // Cleanup de timers de mensajes
   useEffect(() => {
     if (success) {
@@ -883,7 +795,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
         .from('sale_details')
         .select(`
           *,
-          products(name)
+          products(name),
+          combos(nombre)
         `)
         .eq('sale_id', selectedSale.id);
 
@@ -896,7 +809,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
       // Preparar items para el email
       const emailItems = saleDetails.map(detail => ({
-        product_name: detail.products?.name || detail.product_name || 'Producto',
+        product_name: getSaleDetailDisplayName(detail),
         quantity: detail.quantity,
         unit_price: detail.unit_price
       }));
@@ -977,13 +890,19 @@ function Ventas({ businessId, userRole = 'admin' }) {
       noResultsTitle="No hay ventas para esos filtros"
       noResultsDescription="Ajusta los filtros o registra una nueva venta."
       noResultsAction={
-        <Button
-          type="button"
-          onClick={() => setShowSaleModal(true)}
-          className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
-        >
-          Nueva Venta
-        </Button>
+        <div className="flex justify-center">
+          <Button
+            type="button"
+            onClick={() => {
+              setCurrentFilters({});
+              setPage(1);
+              loadVentas({}, { limit, offset: 0, includeCount: false });
+            }}
+            className="bg-white text-gray-700 border-2 border-gray-300 hover:bg-gray-100 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
+          >
+            Limpiar Filtros
+          </Button>
+        </div>
       }
       emptyTitle="Aun no hay ventas registradas"
       emptyDescription="Las ventas apareceran aqui en tiempo real cuando registres la primera."
@@ -1040,6 +959,13 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
       {/* Mensajes */}
       <AnimatePresence>
+        <SaleUpdateAlert
+          isVisible={isSubmitting}
+          onClose={() => {}}
+          title="Generando venta..."
+          details={[]}
+          duration={600000}
+        />
         <SaleSuccessAlert 
           isVisible={success && alertType === 'success'}
           onClose={() => setSuccess(false)}
@@ -1062,12 +988,12 @@ function Ventas({ businessId, userRole = 'admin' }) {
           onApply={(filters) => {
             setCurrentFilters(filters || {});
             setPage(1);
-            loadVentas(filters || {}, { limit, offset: 0, includeCount: true, countMode: 'exact' });
+            loadVentas(filters || {}, { limit, offset: 0, includeCount: false });
           }}
           onClear={() => {
             setCurrentFilters({});
             setPage(1);
-            loadVentas({}, { limit, offset: 0, includeCount: true, countMode: 'exact' });
+            loadVentas({}, { limit, offset: 0, includeCount: false });
           }}
         />
       )}
@@ -1121,14 +1047,14 @@ function Ventas({ businessId, userRole = 'admin' }) {
               {/* Contenido del Modal */}
               <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(94vh-80px)]">
                 <div className="grid xl:grid-cols-2 gap-3 sm:gap-6">
-          {/* Panel izquierdo - Productos */}
+          {/* Panel izquierdo - Productos y combos */}
           <Card className="shadow-xl rounded-2xl bg-white border-none">
             <div className="p-4 sm:p-6">
               <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 gradient-primary rounded-lg">
                   <Search className="w-5 h-5 text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-accent-600">Productos</h3>
+                <h3 className="text-xl font-bold text-accent-600">Productos y Combos</h3>
               </div>
               
               <div className="relative mb-6">
@@ -1136,53 +1062,59 @@ function Ventas({ businessId, userRole = 'admin' }) {
                 <Input
                   type="text"
                   className="pl-10 h-12 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
-                  placeholder="Buscar producto por nombre o código..."
+                  placeholder="Buscar producto o combo..."
                   value={searchProduct}
                   onChange={(e) => setSearchProduct(e.target.value)}
                 />
               </div>
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 max-h-[42vh] sm:max-h-[600px] overflow-y-auto pr-1 sm:pr-2 custom-scrollbar">
-                {filteredProducts.length === 0 ? (
+                {filteredCatalog.length === 0 ? (
                   <div className="text-center py-12 text-gray-500 lg:col-span-2">
                     <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                    <p className="font-medium">No hay productos disponibles</p>
+                    <p className="font-medium">No hay items disponibles</p>
                   </div>
                 ) : (
-                  filteredProducts.map(producto => (
+                  filteredCatalog.map((catalogItem) => (
                     <motion.div
-                      key={producto.id}
+                      key={`${catalogItem.item_type}:${catalogItem.item_id}`}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       className="cursor-pointer"
                     >
                       <Card
                         className="h-full hover:shadow-lg transition-all duration-300 rounded-xl border-gray-200 bg-gradient-to-br from-white to-gray-50 overflow-hidden"
-                        onClick={() => addToCart(producto)}
+                        onClick={() => addToCart(catalogItem)}
                       >
                         <div className="p-3 sm:p-4 h-full flex flex-col gap-3">
                           <div className="min-w-0">
-                            <p className="font-bold text-accent-600 text-base sm:text-lg truncate" title={producto.name}>
-                              {producto.name}
+                            <p className="font-bold text-accent-600 text-base sm:text-lg truncate" title={catalogItem.name}>
+                              {catalogItem.name}
                             </p>
-                            <p className="text-sm text-gray-500 mt-1 truncate" title={producto.code}>
-                              Código: {producto.code}
+                            <p className="text-sm text-gray-500 mt-1 truncate" title={catalogItem.code}>
+                              Código: {catalogItem.code || 'N/A'}
                             </p>
-                            <Badge 
-                              className={`mt-2 ${
-                                producto.stock > 10 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : producto.stock > 0 
-                                  ? 'bg-yellow-100 text-yellow-800' 
-                                  : 'bg-red-100 text-red-800'
-                              }`}
-                            >
-                              Stock: {producto.stock}
-                            </Badge>
+                            {catalogItem.item_type === SALE_ITEM_TYPE.COMBO ? (
+                              <Badge className="mt-2 bg-blue-100 text-blue-800">
+                                Combo ({catalogItem.combo_items?.length || 0} productos)
+                              </Badge>
+                            ) : (
+                              <Badge
+                                className={`mt-2 ${
+                                  catalogItem.stock > 10
+                                    ? 'bg-green-100 text-green-800'
+                                    : catalogItem.stock > 0
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}
+                              >
+                                Stock: {catalogItem.stock}
+                              </Badge>
+                            )}
                           </div>
                           <div className="mt-auto flex items-end justify-between gap-3">
                             <p className="text-lg sm:text-xl font-bold text-secondary-600">
-                              {formatPrice(producto.sale_price)}
+                              {formatPrice(catalogItem.sale_price)}
                             </p>
                             <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-accent-100 text-accent-700">
                               <Plus className="w-5 h-5" />
@@ -1260,7 +1192,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                   ) : (
                     cart.map(item => (
                       <motion.div
-                        key={item.product_id}
+                        key={item.item_key}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: 20 }}
@@ -1272,9 +1204,12 @@ function Ventas({ businessId, userRole = 'admin' }) {
                               <div className="flex-1">
                                 <p className="font-bold text-accent-600">{item.name}</p>
                                 <p className="text-xs text-gray-500">{item.code}</p>
+                                {item.item_type === SALE_ITEM_TYPE.COMBO && (
+                                  <Badge className="mt-1 bg-blue-100 text-blue-700">Combo</Badge>
+                                )}
                               </div>
                               <Button
-                                onClick={() => removeFromCart(item.product_id)}
+                                onClick={() => removeFromCart(item.item_key)}
                                 className="h-7 w-7 p-0 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg border-none"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -1283,7 +1218,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                               <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1 w-fit">
                                 <button
-                                  onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
+                                  onClick={() => updateQuantity(item.item_key, item.quantity - 1)}
                                   className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold transition-colors"
                                 >
                                   -
@@ -1291,12 +1226,12 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                 <input
                                   type="number"
                                   value={item.quantity}
-                                  onChange={(e) => updateQuantity(item.product_id, parseInt(e.target.value) || 0)}
+                                  onChange={(e) => updateQuantity(item.item_key, parseInt(e.target.value, 10) || 0)}
                                   min="1"
                                   className="w-12 text-center border-none focus:outline-none focus:ring-0 font-bold text-accent-600"
                                 />
                                 <button
-                                  onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
+                                  onClick={() => updateQuantity(item.item_key, item.quantity + 1)}
                                   className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold transition-colors"
                                 >
                                   +
@@ -1307,6 +1242,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                               </p>
                             </div>
                             {(() => {
+                              if (item.item_type !== SALE_ITEM_TYPE.PRODUCT || !item.product_id) return false;
                               const liveStock = stockByProductId.get(item.product_id);
                               const available = Number.isFinite(liveStock) ? liveStock : item.available_stock;
                               return typeof available === 'number' && item.quantity > available;
@@ -1331,6 +1267,22 @@ function Ventas({ businessId, userRole = 'admin' }) {
                 </div>
               </div>
 
+              {comboStockShortages.length > 0 && (
+                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="w-4 h-4 text-red-600" />
+                    <p className="text-sm font-semibold text-red-800">Stock insuficiente para productos internos de combos</p>
+                  </div>
+                  <div className="space-y-1 text-xs text-red-700">
+                    {comboStockShortages.map((item) => (
+                      <p key={item.product_id}>
+                        {item.product_name}: disponibles {item.available_stock} / requeridos {item.required_quantity}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <Card className="gradient-primary text-white shadow-lg rounded-xl border-none mb-3 sm:mb-4">
                 <div className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1343,7 +1295,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
               <Button
                 onClick={processSale}
-                disabled={cart.length === 0 || isSubmitting}
+                disabled={cart.length === 0 || isSubmitting || comboStockShortages.length > 0}
                 className="w-full h-11 sm:h-14 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold text-sm sm:text-lg rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 sm:gap-3"
               >
                 {isSubmitting ? (
@@ -1636,7 +1588,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                           <tbody>
                             {selectedSale.sale_details.map((detail, index) => (
                               <tr key={index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                                <td className="px-4 py-3 text-gray-800">{detail.products?.name || detail.product_name}</td>
+                                <td className="px-4 py-3 text-gray-800">{getSaleDetailDisplayName(detail)}</td>
                                 <td className="px-4 py-3 text-center text-gray-700">{detail.quantity}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{formatPrice(detail.unit_price)}</td>
                                 <td className="px-4 py-3 text-right font-semibold text-gray-800">
@@ -1806,8 +1758,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
                         <tbody>
                           {selectedSale.sale_details.map((item, idx) => (
                             <tr key={`${selectedSale.id}-${idx}`} className="border-b border-slate-100 last:border-b-0">
-                              <td className="px-4 py-3 text-slate-800">{item.products?.name || 'Producto'}</td>
-                              <td className="px-4 py-3 text-slate-600">{item.products?.code || '-'}</td>
+                              <td className="px-4 py-3 text-slate-800">{getSaleDetailDisplayName(item)}</td>
+                              <td className="px-4 py-3 text-slate-600">{item.products?.code || (item.combo_id ? 'COMBO' : '-')}</td>
                               <td className="px-4 py-3 text-center text-slate-700">{item.quantity}</td>
                               <td className="px-4 py-3 text-right text-slate-700">{formatPrice(item.unit_price)}</td>
                               <td className="px-4 py-3 text-right font-semibold text-slate-900">
@@ -1900,53 +1852,5 @@ function Ventas({ businessId, userRole = 'admin' }) {
     </AsyncStateWrapper>
   );
 }
-
-// =====================================================
-// COMPONENTES MEMOIZADOS PARA OPTIMIZACIÓN
-// =====================================================
-
-// ProductCard memoizado - solo se renderiza si producto cambia
-const ProductCard = memo(({ producto, onAdd }) => {
-  return (
-    <motion.div
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      className="cursor-pointer"
-    >
-      <Card 
-        className="hover:shadow-lg transition-all duration-300 rounded-xl border-gray-200 bg-gradient-to-br from-white to-gray-50"
-        onClick={() => onAdd(producto)}
-      >
-        <div className="p-3 sm:p-4 flex items-center justify-between">
-          <div className="flex-1">
-            <p className="font-bold text-accent-600 text-lg">{producto.name}</p>
-            <p className="text-sm text-gray-500 mt-1">Código: {producto.code}</p>
-            <Badge 
-              className={`mt-2 ${
-                producto.stock > 10 
-                  ? 'bg-green-100 text-green-800' 
-                  : producto.stock > 0 
-                  ? 'bg-yellow-100 text-yellow-800' 
-                  : 'bg-red-100 text-red-800'
-              }`}
-            >
-              Stock: {producto.stock}
-            </Badge>
-          </div>
-          <div className="text-right ml-4">
-            <p className="text-2xl font-bold text-secondary-600">
-              {formatPrice(producto.sale_price)}
-            </p>
-            <Plus className="w-6 h-6 text-accent-600 mt-2 ml-auto" />
-          </div>
-        </div>
-      </Card>
-    </motion.div>
-  );
-}, (prevProps, nextProps) => {
-  // Solo re-render si cambia el ID o el stock
-  return prevProps.producto.id === nextProps.producto.id &&
-         prevProps.producto.stock === nextProps.producto.stock;
-});
 
 export default Ventas;
