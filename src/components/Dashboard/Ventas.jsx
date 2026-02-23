@@ -168,7 +168,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const loadProductos = useCallback(async () => {
     const { data, error } = await supabase
       .from('products')
-      .select('id, code, name, sale_price, stock, category')
+      .select('id, code, name, sale_price, stock, category, manage_stock')
       .eq('business_id', businessId)
       .eq('is_active', true)
       .order('name')
@@ -292,7 +292,11 @@ function Ventas({ businessId, userRole = 'admin' }) {
       // Mantener stock disponible del carrito sincronizado con cambios en tiempo real
       setCart(prevCart => prevCart.map(item =>
         item.product_id === updatedProduct.id
-          ? { ...item, available_stock: updatedProduct.stock }
+          ? {
+              ...item,
+              available_stock: updatedProduct.manage_stock === false ? null : updatedProduct.stock,
+              manage_stock: updatedProduct.manage_stock !== false
+            }
           : item
       ));
     },
@@ -327,7 +331,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
   }, [combos]);
 
   const catalogItems = useMemo(() => {
-    const productItems = productos.map((producto) => ({
+      const productItems = productos.map((producto) => ({
       item_type: SALE_ITEM_TYPE.PRODUCT,
       item_id: producto.id,
       product_id: producto.id,
@@ -336,6 +340,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       code: producto.code || '',
       sale_price: Number(producto.sale_price || 0),
       stock: Number(producto.stock || 0),
+      manage_stock: producto.manage_stock !== false,
       combo_items: []
     }));
 
@@ -388,7 +393,10 @@ function Ventas({ businessId, userRole = 'admin' }) {
           quantity,
           unit_price: unitPrice,
           subtotal: quantity * unitPrice,
-          available_stock: itemType === SALE_ITEM_TYPE.PRODUCT ? Number(catalogItem.stock || 0) : null
+          available_stock: itemType === SALE_ITEM_TYPE.PRODUCT && catalogItem.manage_stock !== false
+            ? Number(catalogItem.stock || 0)
+            : null,
+          manage_stock: itemType === SALE_ITEM_TYPE.PRODUCT ? catalogItem.manage_stock !== false : true
         }
       ];
     });
@@ -419,6 +427,12 @@ function Ventas({ businessId, userRole = 'admin' }) {
     return map;
   }, [productos]);
 
+  const manageStockByProductId = useMemo(() => {
+    const map = new Map();
+    productos.forEach((producto) => map.set(producto.id, producto.manage_stock !== false));
+    return map;
+  }, [productos]);
+
   const comboStockShortages = useMemo(() => {
     const requiredByProduct = new Map();
 
@@ -445,6 +459,9 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
     const shortages = [];
     requiredByProduct.forEach((requiredQty, productId) => {
+      const shouldManageStock = manageStockByProductId.get(productId) !== false;
+      if (!shouldManageStock) return;
+
       const stock = Number(stockByProductId.get(productId) || 0);
       if (stock >= requiredQty) return;
 
@@ -458,7 +475,25 @@ function Ventas({ businessId, userRole = 'admin' }) {
     });
 
     return shortages;
-  }, [cart, comboById, productos, stockByProductId]);
+  }, [cart, comboById, productos, stockByProductId, manageStockByProductId]);
+
+  const simpleStockShortages = useMemo(() => {
+    return cart
+      .filter((item) => item.item_type === SALE_ITEM_TYPE.PRODUCT && item.product_id && item.manage_stock !== false)
+      .map((item) => {
+        const liveStock = stockByProductId.get(item.product_id);
+        const availableStock = Number.isFinite(liveStock) ? Number(liveStock) : Number(item.available_stock || 0);
+        if (availableStock >= Number(item.quantity || 0)) return null;
+
+        return {
+          product_id: item.product_id,
+          product_name: item.name || 'Producto',
+          available_stock: availableStock,
+          required_quantity: Number(item.quantity || 0)
+        };
+      })
+      .filter(Boolean);
+  }, [cart, stockByProductId]);
 
   const total = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.subtotal, 0);
@@ -508,6 +543,14 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
       if (comboStockShortages.length > 0) {
         const firstShortage = comboStockShortages[0];
+        throw new Error(
+          `Stock insuficiente para "${firstShortage.product_name}". ` +
+          `Disponibles: ${firstShortage.available_stock}. Requeridos: ${firstShortage.required_quantity}.`
+        );
+      }
+
+      if (simpleStockShortages.length > 0) {
+        const firstShortage = simpleStockShortages[0];
         throw new Error(
           `Stock insuficiente para "${firstShortage.product_name}". ` +
           `Disponibles: ${firstShortage.available_stock}. Requeridos: ${firstShortage.required_quantity}.`
@@ -613,7 +656,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear
     }
-  }, [cart, sessionChecked, comboStockShortages, businessId, paymentMethod, loadVentas, isSubmitting, currentFilters, limit, page, saleIntentSignature]);
+  }, [cart, sessionChecked, comboStockShortages, simpleStockShortages, businessId, paymentMethod, loadVentas, isSubmitting, currentFilters, limit, page, saleIntentSignature]);
 
   // Funciones de eliminación de venta (solo admin)
   const handleDeleteSale = (saleId) => {
@@ -1098,6 +1141,10 @@ function Ventas({ businessId, userRole = 'admin' }) {
                               <Badge className="mt-2 bg-blue-100 text-blue-800">
                                 Combo ({catalogItem.combo_items?.length || 0} productos)
                               </Badge>
+                            ) : catalogItem.manage_stock === false ? (
+                              <Badge className="mt-2 bg-slate-100 text-slate-700">
+                                Sin control de stock
+                              </Badge>
                             ) : (
                               <Badge
                                 className={`mt-2 ${
@@ -1243,6 +1290,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                             </div>
                             {(() => {
                               if (item.item_type !== SALE_ITEM_TYPE.PRODUCT || !item.product_id) return false;
+                              if (item.manage_stock === false) return false;
                               const liveStock = stockByProductId.get(item.product_id);
                               const available = Number.isFinite(liveStock) ? liveStock : item.available_stock;
                               return typeof available === 'number' && item.quantity > available;
@@ -1283,6 +1331,22 @@ function Ventas({ businessId, userRole = 'admin' }) {
                 </div>
               )}
 
+              {simpleStockShortages.length > 0 && (
+                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="w-4 h-4 text-red-600" />
+                    <p className="text-sm font-semibold text-red-800">Stock insuficiente en productos</p>
+                  </div>
+                  <div className="space-y-1 text-xs text-red-700">
+                    {simpleStockShortages.map((item) => (
+                      <p key={`simple-shortage-${item.product_id}`}>
+                        {item.product_name}: disponibles {item.available_stock} / requeridos {item.required_quantity}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <Card className="gradient-primary text-white shadow-lg rounded-xl border-none mb-3 sm:mb-4">
                 <div className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1295,7 +1359,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
               <Button
                 onClick={processSale}
-                disabled={cart.length === 0 || isSubmitting || comboStockShortages.length > 0}
+                disabled={cart.length === 0 || isSubmitting || comboStockShortages.length > 0 || simpleStockShortages.length > 0}
                 className="w-full h-11 sm:h-14 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold text-sm sm:text-lg rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 sm:gap-3"
               >
                 {isSubmitting ? (

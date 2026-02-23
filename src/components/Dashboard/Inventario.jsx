@@ -55,7 +55,8 @@ function Inventario({ businessId, userRole = 'admin' }) {
     min_stock: '',
     unit: 'unit',
     supplier_id: '',
-    is_active: true
+    is_active: true,
+    manage_stock: true
   });
   const [generatedCode, setGeneratedCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -185,10 +186,20 @@ function Inventario({ businessId, userRole = 'admin' }) {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    setFormData(prev => {
+      const nextValue = type === 'checkbox' ? checked : value;
+      const nextState = {
+        ...prev,
+        [name]: nextValue
+      };
+
+      if (name === 'manage_stock' && !checked) {
+        nextState.stock = '';
+        nextState.min_stock = '';
+      }
+
+      return nextState;
+    });
   };
 
   const handleSubmit = useCallback(async (e) => {
@@ -235,12 +246,13 @@ function Inventario({ businessId, userRole = 'admin' }) {
         category: formData.category.trim(),
         purchase_price: parseFloat(formData.purchase_price) || 0,
         sale_price: parseFloat(formData.sale_price),
-        stock: parseInt(formData.stock) || 0,
-        min_stock: parseInt(formData.min_stock) || 5,
+        stock: formData.manage_stock ? (parseInt(formData.stock) || 0) : 0,
+        min_stock: formData.manage_stock ? (parseInt(formData.min_stock) || 5) : 0,
         unit: formData.unit || 'unit',
         supplier_id: formData.supplier_id || null,
         business_id: businessId,
-        is_active: true
+        is_active: true,
+        manage_stock: formData.manage_stock !== false
       };
 
       // Camino principal: generación de código atómica en DB
@@ -255,7 +267,8 @@ function Inventario({ businessId, userRole = 'admin' }) {
         p_min_stock: productData.min_stock,
         p_unit: productData.unit,
         p_supplier_id: productData.supplier_id,
-        p_is_active: productData.is_active
+        p_is_active: productData.is_active,
+        p_manage_stock: productData.manage_stock
       }));
       
       if (insertError) {
@@ -296,7 +309,9 @@ function Inventario({ businessId, userRole = 'admin' }) {
             stock: '',
             min_stock: '',
             unit: 'unit',
-            supplier_id: ''
+            supplier_id: '',
+            is_active: true,
+            manage_stock: true
           });
           setGeneratedCode('');
           setSuccess('✅ Producto creado exitosamente');
@@ -324,7 +339,9 @@ function Inventario({ businessId, userRole = 'admin' }) {
         stock: '',
         min_stock: '',
         unit: 'unit',
-        supplier_id: ''
+        supplier_id: '',
+        is_active: true,
+        manage_stock: true
       });
       setGeneratedCode('');
       setSuccess('✅ Producto creado exitosamente');
@@ -353,10 +370,11 @@ function Inventario({ businessId, userRole = 'admin' }) {
         purchase_price: parseFloat(formData.purchase_price) || 0,
         sale_price: parseFloat(formData.sale_price),
         // No se actualiza el stock al editar (se maneja con compras/ventas)
-        min_stock: parseInt(formData.min_stock) || 5,
+        min_stock: formData.manage_stock ? (parseInt(formData.min_stock) || 5) : 0,
         unit: formData.unit || 'unit',
         supplier_id: formData.supplier_id || null,
-        is_active: formData.is_active
+        is_active: formData.is_active,
+        manage_stock: formData.manage_stock !== false
       };
 
       const { error: updateError } = await supabase
@@ -381,7 +399,9 @@ function Inventario({ businessId, userRole = 'admin' }) {
         stock: '',
         min_stock: '',
         unit: 'unit',
-        supplier_id: ''
+        supplier_id: '',
+        is_active: true,
+        manage_stock: true
       });
       setGeneratedCode('');
       setSuccess('✅ Producto actualizado exitosamente');
@@ -402,7 +422,8 @@ function Inventario({ businessId, userRole = 'admin' }) {
       min_stock: producto.min_stock.toString(),
       unit: producto.unit,
       supplier_id: producto.supplier_id || '',
-      is_active: producto.is_active
+      is_active: producto.is_active,
+      manage_stock: producto.manage_stock !== false
     });
     setGeneratedCode(producto.code);
     setShowEditModal(true);
@@ -560,7 +581,8 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       min_stock: '',
                       unit: 'unit',
                       supplier_id: '',
-                      is_active: true
+                      is_active: true,
+                      manage_stock: true
                     });
                     setGeneratedCode('');
                   } else {
@@ -623,7 +645,8 @@ function Inventario({ businessId, userRole = 'admin' }) {
                 min_stock: '',
                 unit: 'unit',
                 supplier_id: '',
-                is_active: true
+                is_active: true,
+                manage_stock: true
               });
               setGeneratedCode('');
             }}
@@ -656,7 +679,8 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       min_stock: '',
                       unit: 'unit',
                       supplier_id: '',
-                      is_active: true
+                      is_active: true,
+                      manage_stock: true
                     });
                     setGeneratedCode('');
                   }}
@@ -761,10 +785,23 @@ function Inventario({ businessId, userRole = 'admin' }) {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-3">
+                    <label className="flex items-center justify-between p-3 border border-gray-200 rounded-xl bg-gray-50">
+                      <span className="text-sm font-medium text-gray-800">¿Este producto lleva control de stock?</span>
+                      <input
+                        name="manage_stock"
+                        type="checkbox"
+                        checked={formData.manage_stock !== false}
+                        onChange={handleChange}
+                        className="h-4 w-4 rounded border-gray-300 text-[#edb886] focus:ring-[#edb886]"
+                      />
+                    </label>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       <Package className="w-4 h-4" />
-                      Stock inicial *
+                      Stock inicial {formData.manage_stock !== false ? '*' : '(deshabilitado)'}
                     </label>
                     <Input
                       name="stock"
@@ -773,8 +810,9 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       placeholder="0" 
                       value={formData.stock}
                       onChange={handleChange}
-                      required
-                      className="h-11 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
+                      required={formData.manage_stock !== false}
+                      disabled={formData.manage_stock === false}
+                      className="h-11 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886] disabled:bg-gray-100 disabled:text-gray-400"
                     />
                   </div>
 
@@ -790,9 +828,14 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       placeholder="0" 
                       value={formData.min_stock}
                       onChange={handleChange}
-                      className="h-11 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
+                      disabled={formData.manage_stock === false}
+                      className="h-11 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886] disabled:bg-gray-100 disabled:text-gray-400"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Alerta cuando el stock baje de este nivel</p>
+                    {formData.manage_stock !== false ? (
+                      <p className="text-xs text-gray-500 mt-1">Alerta cuando el stock baje de este nivel</p>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-1">No aplica cuando no se controla inventario</p>
+                    )}
                   </div>
 
                   <div>
@@ -847,7 +890,8 @@ function Inventario({ businessId, userRole = 'admin' }) {
                         min_stock: '',
                         unit: 'unit',
                         supplier_id: '',
-                        is_active: true
+                        is_active: true,
+                        manage_stock: true
                       });
                       setGeneratedCode('');
                     }}
@@ -906,7 +950,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                   transition={{ duration: 0.3, delay: index * 0.02 }}
                 >
                   <Card className={`shadow-lg rounded-2xl bg-white border-2 hover:shadow-xl transition-all duration-300 ${
-                    producto.stock <= producto.min_stock 
+                    (producto.manage_stock !== false && producto.stock <= producto.min_stock)
                       ? 'border-red-300 bg-red-50/30' 
                       : 'border-accent-100 hover:border-primary-300'
                   }`}>
@@ -1001,11 +1045,19 @@ function Inventario({ businessId, userRole = 'admin' }) {
                             <span className="text-xs text-accent-500 uppercase tracking-wide">Stock</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Badge className={getStockBadgeClass(producto.stock, producto.min_stock)}>
-                              {producto.stock} {producto.unit}
-                            </Badge>
-                            {producto.stock <= producto.min_stock && (
-                              <AlertTriangle className="w-4 h-4 text-red-500 animate-pulse" />
+                            {producto.manage_stock === false ? (
+                              <Badge className="bg-slate-100 text-slate-700 border border-slate-200">
+                                Sin control de stock
+                              </Badge>
+                            ) : (
+                              <>
+                                <Badge className={getStockBadgeClass(producto.stock, producto.min_stock)}>
+                                  {producto.stock} {producto.unit}
+                                </Badge>
+                                {producto.stock <= producto.min_stock && (
+                                  <AlertTriangle className="w-4 h-4 text-red-500 animate-pulse" />
+                                )}
+                              </>
                             )}
                           </div>
                         </div>
@@ -1017,7 +1069,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                             <span className="text-xs text-accent-500 uppercase tracking-wide">Mínimo</span>
                           </div>
                           <p className="text-sm font-medium text-gray-700">
-                            {producto.min_stock} {producto.unit}
+                            {producto.manage_stock === false ? 'No aplica' : `${producto.min_stock} ${producto.unit}`}
                           </p>
                         </div>
                       </div>
@@ -1315,15 +1367,34 @@ function Inventario({ businessId, userRole = 'admin' }) {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-3">
+                    <label className="flex items-center justify-between p-3 border border-gray-200 rounded-xl bg-gray-50">
+                      <span className="text-sm font-medium text-gray-800">¿Este producto lleva control de stock?</span>
+                      <input
+                        name="manage_stock"
+                        type="checkbox"
+                        checked={formData.manage_stock !== false}
+                        onChange={handleChange}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </label>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       <Package className="w-4 h-4" />
                       Stock actual
                     </label>
                     <div className="h-11 px-4 rounded-xl border border-gray-300 bg-gray-100 flex items-center">
-                      <span className="text-gray-500">{formData.stock}</span>
+                      <span className="text-gray-500">
+                        {formData.manage_stock === false ? 'Sin control de stock' : formData.stock}
+                      </span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">El stock se modifica con compras/ventas</p>
+                    {formData.manage_stock !== false ? (
+                      <p className="text-xs text-gray-500 mt-1">El stock se modifica con compras/ventas</p>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-1">No se valida ni descuenta inventario al vender</p>
+                    )}
                   </div>
 
                   <div>
@@ -1338,7 +1409,8 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       placeholder="0" 
                       value={formData.min_stock}
                       onChange={handleChange}
-                      className="h-11 rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      disabled={formData.manage_stock === false}
+                      className="h-11 rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400"
                     />
                   </div>
 

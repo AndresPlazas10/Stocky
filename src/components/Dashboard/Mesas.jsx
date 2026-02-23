@@ -338,7 +338,7 @@ function Mesas({ businessId }) {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, code, name, sale_price, stock, category')
+        .select('id, code, name, sale_price, stock, category, manage_stock')
         .eq('business_id', businessId)
         .eq('is_active', true)
         .order('name')
@@ -887,7 +887,12 @@ function Mesas({ businessId }) {
       }
 
       // Aviso transitorio si la cantidad solicitada supera el stock disponible (solo producto simple)
-      if (!isCombo && typeof catalogItem.stock === 'number' && qty > catalogItem.stock) {
+      if (
+        !isCombo
+        && catalogItem.manage_stock !== false
+        && typeof catalogItem.stock === 'number'
+        && qty > catalogItem.stock
+      ) {
         setError(`⚠️ Stock insuficiente para ${itemName}. Disponibles: ${catalogItem.stock}. Considera crear una compra.`);
       }
 
@@ -1130,6 +1135,15 @@ function Mesas({ businessId }) {
   const processSplitPaymentAndClose = async ({ subAccounts }) => {
     if (isClosingOrder) return;
 
+    if (insufficientItems.length > 0) {
+      const firstShortage = insufficientItems[0];
+      setError(
+        `❌ Stock insuficiente para "${firstShortage.product_name}" ` +
+        `(disp: ${firstShortage.available_stock}, req: ${firstShortage.quantity}).`
+      );
+      return;
+    }
+
     if (hasInsufficientComboStock) {
       const firstShortage = insufficientComboComponents[0];
       setError(
@@ -1205,6 +1219,15 @@ function Mesas({ businessId }) {
   const processPaymentAndClose = async () => {
     // Prevenir doble click
     if (isClosingOrder) return;
+
+    if (insufficientItems.length > 0) {
+      const firstShortage = insufficientItems[0];
+      setError(
+        `❌ Stock insuficiente para "${firstShortage.product_name}" ` +
+        `(disp: ${firstShortage.available_stock}, req: ${firstShortage.quantity}).`
+      );
+      return;
+    }
 
     if (hasInsufficientComboStock) {
       const firstShortage = insufficientComboComponents[0];
@@ -1560,7 +1583,8 @@ function Mesas({ businessId }) {
       name: producto.name,
       code: producto.code || '',
       sale_price: Number(producto.sale_price || 0),
-      stock: Number(producto.stock || 0)
+      stock: Number(producto.stock || 0),
+      manage_stock: producto.manage_stock !== false
     }));
 
     const comboItems = combos.map((combo) => ({
@@ -1615,6 +1639,7 @@ function Mesas({ businessId }) {
       .filter((item) => !item.combo_id)
       .map((item) => {
         const prod = productos.find(p => p.id === item.product_id);
+        if (!prod || prod.manage_stock === false) return null;
         return prod ? { ...item, available_stock: prod.stock, product_name: prod.name } : null;
       })
       .filter(Boolean)
@@ -1650,6 +1675,7 @@ function Mesas({ businessId }) {
     const shortages = [];
     requiredByProduct.forEach((requiredQty, productId) => {
       const product = productos.find((p) => p.id === productId);
+      if (product?.manage_stock === false) return;
       const stock = Number(product?.stock || 0);
       if (stock >= requiredQty) return;
 
@@ -2411,6 +2437,7 @@ function Mesas({ businessId }) {
                       onClick={processPaymentAndClose}
                       disabled={
                         isClosingOrder
+                        || insufficientItems.length > 0
                         || hasInsufficientComboStock
                         || (paymentMethod === 'cash' && (amountReceived === '' || isCashPaymentInvalid))
                       }

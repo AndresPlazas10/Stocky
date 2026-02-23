@@ -31,7 +31,7 @@ export function useProducts(businessId, options = {}) {
 
       let query = supabase
         .from('products')
-        .select('id, code, name, category, purchase_price, sale_price, stock, min_stock, unit, supplier_id, is_active')
+        .select('id, code, name, category, purchase_price, sale_price, stock, min_stock, unit, supplier_id, is_active, manage_stock')
         .eq('business_id', businessId);
 
       if (activeOnly && !includeInactive) {

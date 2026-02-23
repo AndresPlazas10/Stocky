@@ -419,10 +419,10 @@ export async function getAvailableProducts(businessId) {
   try {
     const { data, error } = await supabase
       .from('products')
-      .select('id, code, name, sale_price, stock, category, is_active')
+      .select('id, code, name, sale_price, stock, category, is_active, manage_stock')
       .eq('business_id', businessId)
       .eq('is_active', true)
-      .gt('stock', 0)
+      .or('manage_stock.eq.false,stock.gt.0')
       .order('name');
 
     if (error) throw error;
