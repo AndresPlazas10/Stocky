@@ -2,6 +2,7 @@ import { AnimatePresence } from 'framer-motion';
 import { motion } from 'framer-motion';
 import { AlertTriangle, X, CreditCard, Calendar, Phone, Mail } from 'lucide-react';
 import { Button } from './ui/button';
+import paymentQr from '../assets/QR.jpeg';
 
 /**
  * Modal de advertencia para negocios con pagos pendientes
@@ -17,13 +18,13 @@ function PaymentWarningModal({ isOpen, onClose, businessName = 'su negocio' }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[9999] p-2 sm:p-4"
         >
           <motion.div
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header con advertencia */}
@@ -56,7 +57,7 @@ function PaymentWarningModal({ isOpen, onClose, businessName = 'su negocio' }) {
             </div>
 
             {/* Contenido */}
-            <div className="p-5">
+            <div className="flex-1 min-h-0 overflow-y-auto p-5">
               <div className="bg-orange-50 border-l-4 border-orange-500 p-3 rounded-lg mb-3">
                 <div className="flex items-start gap-2">
                   <CreditCard className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
@@ -84,24 +85,33 @@ function PaymentWarningModal({ isOpen, onClose, businessName = 'su negocio' }) {
                     <CreditCard className="w-5 h-5 text-green-700" />
                     <h5 className="font-bold text-green-900 text-sm">Método de Pago</h5>
                   </div>
-                  <div className="space-y-1.5 text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-900">• Valor:</span>
-                      <span className="text-gray-800 font-bold">$50.000 COP</span>
+                  <div className="grid md:grid-cols-[1fr_auto] gap-3 items-start">
+                    <div className="space-y-1.5 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-gray-900">• Valor:</span>
+                        <span className="text-gray-800 font-bold">$50.000 COP</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-gray-900">• Medio:</span>
+                        <span className="text-gray-800">Pago con QR</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-900">• Nu (Bre-B):</span>
-                      <span className="text-gray-800 font-mono font-bold">@APM331</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-900">• Titular:</span>
-                      <span className="text-gray-800">Andres Felipe</span>
-                    </div>
-                    <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
-                      <p className="text-xs text-yellow-900 leading-snug">
-                        <strong>⚠️ Importante:</strong> Por favor, realice el envío a través de <strong>Bre-B</strong> a la llave <strong>@APM331</strong> y remita una fotografía del comprobante de pago por nuestro canal de WhatsApp, indicando el nombre de su negocio para poder identificarlo correctamente en nuestro sistema.
+                    <div className="bg-white border border-green-300 rounded-lg p-2.5">
+                      <p className="text-xs text-gray-700 font-medium text-center mb-2">
+                        Escanea el QR desde tu app de banco preferida para pagar.
                       </p>
+                      <img
+                        src={paymentQr}
+                        alt="QR de pago de Stocky"
+                        className="w-full max-w-[210px] md:max-w-[230px] mx-auto rounded-md border border-gray-200"
+                        loading="lazy"
+                      />
                     </div>
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
+                    <p className="text-xs text-yellow-900 leading-snug">
+                      <strong>⚠️ Importante:</strong> Realiza el pago usando el QR y remite una fotografía del comprobante por nuestro canal de WhatsApp 318-824-6925, indicando el nombre de tu negocio para poder identificarlo correctamente en el sistema.
+                    </p>
                   </div>
                 </div>
               </div>
