@@ -34,7 +34,7 @@ import {
   Trash2
 } from 'lucide-react';
 
-const MOBILE_PRODUCTS_COLUMNS = 'id, name, category, purchase_price, sale_price, stock, min_stock, supplier_id, unit, is_active, created_at';
+const MOBILE_PRODUCTS_COLUMNS = 'id, name, category, purchase_price, sale_price, stock, min_stock, supplier_id, unit, is_active, manage_stock, created_at';
 
 function InventarioMobile({ businessId }) {
   const [productos, setProductos] = useState([]);
@@ -147,7 +147,7 @@ function InventarioMobile({ businessId }) {
   // Calcular estadísticas
   const totalProductos = productos.length;
   const valorInventario = productos.reduce((sum, p) => sum + (p.stock * p.purchase_price), 0);
-  const productosBajoStock = productos.filter(p => p.stock <= (p.min_stock || 5)).length;
+  const productosBajoStock = productos.filter(p => p.manage_stock !== false && p.stock <= (p.min_stock || 5)).length;
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -215,6 +215,7 @@ function InventarioMobile({ businessId }) {
             key: 'stock',
             label: 'Stock',
             format: (val, item) => {
+              if (item.manage_stock === false) return 'Sin control';
               const isLow = val <= (item.min_stock || 5);
               return `${val} ${isLow ? '⚠️' : ''}`;
             }

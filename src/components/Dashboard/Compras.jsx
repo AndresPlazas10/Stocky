@@ -31,7 +31,7 @@ import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 
 const _motionLintUsage = motion;
 
-const PRODUCT_LIST_COLUMNS = 'id, name, purchase_price, supplier_id, stock, is_active';
+const PRODUCT_LIST_COLUMNS = 'id, name, purchase_price, supplier_id, stock, manage_stock, is_active';
 const SUPPLIER_LIST_COLUMNS = 'id, business_name, contact_name';
 
 const getPaymentMethodLabel = (method) => {
@@ -450,20 +450,30 @@ function Compras({ businessId }) {
         const productIds = [...new Set(cart.map(item => item.product_id))];
         const { data: freshProducts, error: productsFetchError } = await supabase
           .from('products')
-          .select('id, stock')
+          .select('id, stock, manage_stock')
           .eq('business_id', businessId)
           .in('id', productIds);
 
         if (productsFetchError) throw productsFetchError;
 
-        const stockMap = new Map((freshProducts || []).map(product => [product.id, Number(product.stock || 0)]));
+        const stockMap = new Map((freshProducts || []).map((product) => [
+          product.id,
+          {
+            stock: Number(product.stock || 0),
+            manage_stock: product.manage_stock !== false
+          }
+        ]));
         const purchaseItemMap = new Map(cart.map(item => [item.product_id, item]));
 
         const updateResults = await Promise.all(
           productIds.map(productId => {
             const item = purchaseItemMap.get(productId);
-            const currentStock = stockMap.get(productId) || 0;
-            const newStock = currentStock + Number(item.quantity || 0);
+            const productState = stockMap.get(productId) || { stock: 0, manage_stock: true };
+            const currentStock = Number(productState.stock || 0);
+            const shouldManageStock = productState.manage_stock !== false;
+            const newStock = shouldManageStock
+              ? currentStock + Number(item.quantity || 0)
+              : currentStock;
 
             return supabase
               .from('products')
@@ -596,12 +606,18 @@ function Compras({ businessId }) {
       if (productIds.length > 0) {
         const { data: productsBefore, error: productsBeforeError } = await supabase
           .from('products')
-          .select('id, stock')
+          .select('id, stock, manage_stock')
           .eq('business_id', businessId)
           .in('id', productIds);
 
         if (productsBeforeError) throw new Error('Error al consultar stock previo: ' + productsBeforeError.message);
-        stockBeforeMap = new Map((productsBefore || []).map((p) => [p.id, Number(p.stock || 0)]));
+        stockBeforeMap = new Map((productsBefore || []).map((p) => [
+          p.id,
+          {
+            stock: Number(p.stock || 0),
+            manage_stock: p.manage_stock !== false
+          }
+        ]));
       }
 
       // Eliminar detalles de compra (si existe trigger, aquí se revertirá automáticamente).
@@ -626,22 +642,32 @@ function Compras({ businessId }) {
       if (productIds.length > 0) {
         const { data: productsAfter, error: productsAfterError } = await supabase
           .from('products')
-          .select('id, stock')
+          .select('id, stock, manage_stock')
           .eq('business_id', businessId)
           .in('id', productIds);
 
         if (productsAfterError) throw new Error('Error al consultar stock posterior: ' + productsAfterError.message);
 
-        const stockAfterMap = new Map((productsAfter || []).map((p) => [p.id, Number(p.stock || 0)]));
-        const noStockChanged = groupedDetails.every((item) => {
+        const stockAfterMap = new Map((productsAfter || []).map((p) => [
+          p.id,
+          {
+            stock: Number(p.stock || 0),
+            manage_stock: p.manage_stock !== false
+          }
+        ]));
+        const managedDetails = groupedDetails.filter((item) => {
           const before = stockBeforeMap.get(item.product_id);
-          const after = stockAfterMap.get(item.product_id);
+          return before?.manage_stock !== false;
+        });
+        const noStockChanged = managedDetails.every((item) => {
+          const before = stockBeforeMap.get(item.product_id)?.stock;
+          const after = stockAfterMap.get(item.product_id)?.stock;
           return Number.isFinite(before) && Number.isFinite(after) && before === after;
         });
 
         if (noStockChanged) {
-          const fallbackUpdates = groupedDetails.map((item) => {
-            const currentStock = stockAfterMap.get(item.product_id);
+          const fallbackUpdates = managedDetails.map((item) => {
+            const currentStock = stockAfterMap.get(item.product_id)?.stock;
             if (!Number.isFinite(currentStock)) {
               return Promise.resolve({ error: new Error(`Stock no disponible para ${item.product_id}`) });
             }

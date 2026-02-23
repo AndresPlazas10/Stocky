@@ -92,7 +92,7 @@ function Reportes({ businessId }) {
           .lte('created_at', end),
         supabase
           .from('products')
-          .select('stock, min_stock')
+          .select('stock, min_stock, manage_stock')
           .eq('business_id', businessId)
           .eq('is_active', true),
         supabase
@@ -130,7 +130,7 @@ function Reportes({ businessId }) {
       const totalCompras = compras?.reduce((sum, c) => sum + (c.total || 0), 0) || 0;
       const cantidadCompras = compras?.length || 0;
       const productosStock = productos?.length || 0;
-      const productosLowStock = productos?.filter(p => p.stock <= p.min_stock).length || 0;
+      const productosLowStock = productos?.filter(p => p.manage_stock !== false && p.stock <= p.min_stock).length || 0;
 
       const paymentMethods = {};
       ventas?.forEach(v => {
