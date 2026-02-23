@@ -15,12 +15,12 @@ function BusinessDisabledModal({ businessName = 'su negocio', onSignOut }) {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[99999] p-4"
+      className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[99999] p-2 sm:p-4"
     >
       <motion.div
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col"
       >
         {/* Header bloqueado */}
         <div className="bg-gradient-to-r from-red-700 to-red-900 p-5 text-white relative overflow-hidden">
@@ -43,7 +43,7 @@ function BusinessDisabledModal({ businessName = 'su negocio', onSignOut }) {
         </div>
 
         {/* Contenido */}
-        <div className="p-4 md:p-5">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-5">
           <div className="bg-red-50 border-l-4 border-red-600 p-3 rounded-lg mb-3">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -71,18 +71,10 @@ function BusinessDisabledModal({ businessName = 'su negocio', onSignOut }) {
                   <span className="font-semibold text-gray-900">• Valor:</span>
                   <span className="text-gray-800 font-bold">$50.000 COP</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-gray-900">• Nu (Bre-B):</span>
-                  <span className="text-gray-800 font-mono font-bold">0091676591</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-gray-900">• Titular:</span>
-                  <span className="text-gray-800">StockyPos</span>
-                </div>
               </div>
               <div className="bg-white border border-green-300 rounded-lg p-2.5">
                 <p className="text-xs text-gray-700 font-medium text-center mb-2">
-                  Escanea el QR para pagar.
+                  Escanea el QR desde tu app de banco preferida para pagar.
                 </p>
                 <img
                   src={paymentQr}
@@ -94,7 +86,7 @@ function BusinessDisabledModal({ businessName = 'su negocio', onSignOut }) {
             </div>
             <div className="bg-yellow-50 border border-yellow-300 rounded p-2 mt-2">
               <p className="text-xs text-yellow-900 font-medium leading-snug">
-                  <strong>⚠️ Importante:</strong> Por favor, realice el envío a través de <strong>Bre-B</strong> a la llave <strong>0091676591</strong> y remita una fotografía del comprobante de pago por nuestro canal de WhatsApp, indicando el nombre de su negocio para poder identificarlo correctamente en nuestro sistema.
+                  <strong>⚠️ Importante:</strong> Por favor, realice el envío a través de <strong>Bre-B</strong> al medio de pago indicado y remita una fotografía del comprobante de pago por nuestro canal de WhatsApp 318-824-6925, indicando el nombre de su negocio para poder identificarlo correctamente en nuestro sistema.
               </p>
             </div>
           </div>

@@ -9,20 +9,28 @@
  * DÍAS DEL MES en los que se muestra el modal de advertencia de pago
  */
 export const PAYMENT_WARNING_DAYS = [
-  // Desactivado - Fecha de cobro por definir
+  1, 2, 3, 4, 5
 ];
 
 /**
  * FECHA DE INICIO del sistema de advertencias
  * El modal NO se mostrará antes de esta fecha
  */
-const START_DATE = new Date('2099-12-31'); // Desactivado temporalmente
+const START_DATE = new Date('2026-01-01');
+
+// Flag temporal para previsualizar el modal fuera de la ventana real.
+// Debe permanecer en false en producción.
+const FORCE_SHOW_PAYMENT_WARNING = false;
 
 /**
  * Verifica si hoy es un día de advertencia de pago
  * @returns {boolean} - true si hoy se debe mostrar la advertencia
  */
 export const shouldShowPaymentWarning = () => {
+  if (FORCE_SHOW_PAYMENT_WARNING) {
+    return true;
+  }
+
   if (PAYMENT_WARNING_DAYS.length === 0) {
     return false; // Si no hay días configurados, no mostrar
   }
