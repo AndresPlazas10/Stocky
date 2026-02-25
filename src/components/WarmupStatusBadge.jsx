@@ -4,6 +4,7 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus.js';
 
 function resolveBadgePresentation(status, isOnline) {
   const phase = status?.phase || DASHBOARD_WARMUP_PHASE.IDLE;
+  const reason = String(status?.reason || '').trim().toLowerCase();
 
   if (phase === DASHBOARD_WARMUP_PHASE.RUNNING) {
     return {
@@ -34,10 +35,28 @@ function resolveBadgePresentation(status, isOnline) {
     };
   }
 
+  if (!isOnline || reason === 'offline') {
+    return {
+      label: 'Sin internet (Modo offline)',
+      className: 'bg-red-100 text-red-800 border-red-200',
+      Icon: AlertCircle,
+      spinning: false
+    };
+  }
+
+  if (reason === 'local_sync_disabled') {
+    return {
+      label: 'Con internet',
+      className: 'bg-green-100 text-green-800 border-green-200',
+      Icon: CheckCircle2,
+      spinning: false
+    };
+  }
+
   return {
-    label: 'Offline pendiente',
-    className: 'bg-gray-100 text-gray-700 border-gray-200',
-    Icon: AlertCircle,
+    label: 'Con internet',
+    className: 'bg-green-100 text-green-800 border-green-200',
+    Icon: CheckCircle2,
     spinning: false
   };
 }
