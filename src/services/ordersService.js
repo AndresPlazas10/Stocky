@@ -33,8 +33,7 @@ async function enqueueOrderCloseOutbox({
 
 function canQueueLocalOrderSales() {
   const hasAnyOrderCloseWritePath = Boolean(
-    LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
-    || LOCAL_SYNC_CONFIG.localWrites?.orders
+    LOCAL_SYNC_CONFIG.localWrites?.orders
     || LOCAL_SYNC_CONFIG.localWrites?.tables
     || LOCAL_SYNC_CONFIG.localWrites?.sales
   );

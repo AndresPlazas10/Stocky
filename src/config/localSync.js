@@ -9,11 +9,8 @@ function parseNumberEnv(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-const localSyncEnabled = parseBooleanEnv(import.meta.env.VITE_LOCAL_SYNC_ENABLED, true);
-const localWritesDefaultEnabled = localSyncEnabled;
-
 export const LOCAL_SYNC_CONFIG = {
-  enabled: localSyncEnabled,
+  enabled: parseBooleanEnv(import.meta.env.VITE_LOCAL_SYNC_ENABLED, false),
   devtoolsEnabled: parseBooleanEnv(import.meta.env.VITE_LOCAL_SYNC_DEVTOOLS, false),
   preferPGlite: parseBooleanEnv(import.meta.env.VITE_LOCAL_SYNC_PREFER_PGLITE, true),
   electricPullEnabled: parseBooleanEnv(import.meta.env.VITE_ELECTRIC_PULL_ENABLED, false),
@@ -27,30 +24,30 @@ export const LOCAL_SYNC_CONFIG = {
   localReadCacheTtlMs: parseNumberEnv(import.meta.env.VITE_LOCAL_SYNC_READ_CACHE_TTL_MS, 30000),
   localWrites: {
     allLocalFirst: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_FIRST_ALL, false),
-    sales: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_WRITE_SALES, localWritesDefaultEnabled),
-    salesLocalFirst: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_FIRST_SALES, localWritesDefaultEnabled),
-    purchases: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_WRITE_PURCHASES, localWritesDefaultEnabled),
-    purchasesLocalFirst: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_FIRST_PURCHASES, localWritesDefaultEnabled),
-    orders: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_WRITE_ORDERS, localWritesDefaultEnabled),
-    ordersLocalFirst: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_FIRST_ORDERS, localWritesDefaultEnabled),
-    tables: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_WRITE_TABLES, localWritesDefaultEnabled),
-    tablesLocalFirst: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_FIRST_TABLES, localWritesDefaultEnabled),
-    products: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_WRITE_PRODUCTS, localWritesDefaultEnabled),
-    productsLocalFirst: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_FIRST_PRODUCTS, localWritesDefaultEnabled),
-    suppliers: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_WRITE_SUPPLIERS, localWritesDefaultEnabled),
-    suppliersLocalFirst: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_FIRST_SUPPLIERS, localWritesDefaultEnabled),
-    invoices: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_WRITE_INVOICES, localWritesDefaultEnabled),
-    invoicesLocalFirst: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_FIRST_INVOICES, localWritesDefaultEnabled)
+    sales: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_WRITE_SALES, false),
+    salesLocalFirst: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_FIRST_SALES, false),
+    purchases: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_WRITE_PURCHASES, false),
+    purchasesLocalFirst: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_FIRST_PURCHASES, false),
+    orders: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_WRITE_ORDERS, false),
+    ordersLocalFirst: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_FIRST_ORDERS, false),
+    tables: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_WRITE_TABLES, false),
+    tablesLocalFirst: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_FIRST_TABLES, false),
+    products: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_WRITE_PRODUCTS, false),
+    productsLocalFirst: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_FIRST_PRODUCTS, false),
+    suppliers: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_WRITE_SUPPLIERS, false),
+    suppliersLocalFirst: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_FIRST_SUPPLIERS, false),
+    invoices: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_WRITE_INVOICES, false),
+    invoicesLocalFirst: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_FIRST_INVOICES, false)
   },
   localReads: {
     // Si local-sync está activo y una flag específica no existe en el entorno,
     // habilitamos lectura local por defecto para evitar UI vacía en offline.
-    products: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_READ_PRODUCTS, localSyncEnabled),
-    sales: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_READ_SALES, localSyncEnabled),
-    purchases: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_READ_PURCHASES, localSyncEnabled),
-    orders: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_READ_ORDERS, localSyncEnabled),
-    inventory: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_READ_INVENTORY, localSyncEnabled),
-    invoices: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_READ_INVOICES, localSyncEnabled)
+    products: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_READ_PRODUCTS, parseBooleanEnv(import.meta.env.VITE_LOCAL_SYNC_ENABLED, false)),
+    sales: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_READ_SALES, parseBooleanEnv(import.meta.env.VITE_LOCAL_SYNC_ENABLED, false)),
+    purchases: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_READ_PURCHASES, parseBooleanEnv(import.meta.env.VITE_LOCAL_SYNC_ENABLED, false)),
+    orders: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_READ_ORDERS, parseBooleanEnv(import.meta.env.VITE_LOCAL_SYNC_ENABLED, false)),
+    inventory: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_READ_INVENTORY, parseBooleanEnv(import.meta.env.VITE_LOCAL_SYNC_ENABLED, false)),
+    invoices: parseBooleanEnv(import.meta.env.VITE_FF_LOCAL_READ_INVOICES, parseBooleanEnv(import.meta.env.VITE_LOCAL_SYNC_ENABLED, false))
   }
 };
 

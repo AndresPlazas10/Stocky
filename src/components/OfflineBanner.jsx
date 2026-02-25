@@ -15,14 +15,10 @@ export default function OfflineBanner() {
   const canWriteOffline = Boolean(
     LOCAL_SYNC_CONFIG.enabled
     && (
-      LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
-      || LOCAL_SYNC_CONFIG.localWrites?.sales
+      LOCAL_SYNC_CONFIG.localWrites?.sales
       || LOCAL_SYNC_CONFIG.localWrites?.purchases
-      || LOCAL_SYNC_CONFIG.localWrites?.orders
-      || LOCAL_SYNC_CONFIG.localWrites?.tables
       || LOCAL_SYNC_CONFIG.localWrites?.products
       || LOCAL_SYNC_CONFIG.localWrites?.suppliers
-      || LOCAL_SYNC_CONFIG.localWrites?.invoices
     )
   );
 
