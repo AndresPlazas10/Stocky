@@ -15,7 +15,8 @@ function canQueueLocalOrders() {
     LOCAL_SYNC_CONFIG.enabled
     && LOCAL_SYNC_CONFIG.shadowWritesEnabled
     && (
-      LOCAL_SYNC_CONFIG.localWrites?.orders
+      LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
+      || LOCAL_SYNC_CONFIG.localWrites?.orders
       || LOCAL_SYNC_CONFIG.localWrites?.tables
     )
   );
