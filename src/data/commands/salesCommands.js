@@ -57,10 +57,7 @@ function canQueueLocalSales() {
   return Boolean(
     LOCAL_SYNC_CONFIG.enabled
     && LOCAL_SYNC_CONFIG.shadowWritesEnabled
-    && (
-      LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
-      || LOCAL_SYNC_CONFIG.localWrites?.sales
-    )
+    && LOCAL_SYNC_CONFIG.localWrites?.sales
   );
 }
 
