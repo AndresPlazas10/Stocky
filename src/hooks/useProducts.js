@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/supabase/Client';
+import { readAdapter } from '../data/adapters/localAdapter.js';
 
 /**
  * Hook para gestionar productos de un negocio
@@ -29,22 +29,33 @@ export function useProducts(businessId, options = {}) {
       setLoading(true);
       setError(null);
 
-      let query = supabase
-        .from('products')
-        .select('id, code, name, category, purchase_price, sale_price, stock, min_stock, unit, supplier_id, is_active, manage_stock')
-        .eq('business_id', businessId);
-
-      if (activeOnly && !includeInactive) {
-        query = query.eq('is_active', true);
-      }
-
-      query = query.order(orderBy, { ascending: orderDirection === 'asc' });
-
-      const { data, error: fetchError } = await query;
-
+      const { data, error: fetchError } = await readAdapter.getProductsWithSupplierByBusiness(businessId);
       if (fetchError) throw fetchError;
-      
-      setProducts(data || []);
+
+      const rawProducts = Array.isArray(data) ? data : [];
+      const filteredProducts = activeOnly && !includeInactive
+        ? rawProducts.filter((product) => product?.is_active === true)
+        : rawProducts;
+
+      const sortedProducts = [...filteredProducts].sort((a, b) => {
+        const aValue = a?.[orderBy];
+        const bValue = b?.[orderBy];
+        const multiplier = orderDirection === 'asc' ? 1 : -1;
+
+        if (aValue === null || aValue === undefined) return 1 * multiplier;
+        if (bValue === null || bValue === undefined) return -1 * multiplier;
+
+        if (typeof aValue === 'number' && typeof bValue === 'number') {
+          return (aValue - bValue) * multiplier;
+        }
+
+        return String(aValue).localeCompare(String(bValue), 'es', {
+          numeric: true,
+          sensitivity: 'base'
+        }) * multiplier;
+      });
+
+      setProducts(sortedProducts);
     } catch (err) {
       setError(err.message);
       setProducts([]);

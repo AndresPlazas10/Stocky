@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { supabase } from '../../supabase/Client';
+import { getSalesSellersByBusiness } from '../../data/queries/authQueries.js';
 import { Calendar, User, Filter, X, Receipt } from 'lucide-react';
 
 const SalesFilters = React.memo(function SalesFilters({ businessId, onApply, onClear }) {
@@ -13,36 +13,11 @@ const SalesFilters = React.memo(function SalesFilters({ businessId, onApply, onC
   useEffect(() => {
     let mounted = true;
     async function loadSellers() {
-      // Obtener usuario actual (administrador)
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // Cargar empleados - solo campos necesarios
-      const { data: employeesData } = await supabase
-        .from('employees')
-        .select('user_id, full_name')
-        .eq('business_id', businessId)
-        .eq('is_active', true)
-        .order('full_name')
-        .limit(100);
-      
       if (!mounted) return;
-      
-      const allSellers = [...(employeesData || [])];
-      
-      // Agregar administrador al inicio de la lista si hay usuario autenticado
-      // y no está ya en la lista de empleados
-      if (user?.id) {
-        const isAlreadyInList = allSellers.some(seller => seller.user_id === user.id);
-        if (!isAlreadyInList) {
-          allSellers.unshift({
-            user_id: user.id,
-            full_name: 'Administrador',
-            is_admin: true
-          });
-        }
-      }
-      
-      setSellers(allSellers);
+
+      const allSellers = await getSalesSellersByBusiness(businessId);
+      if (!mounted) return;
+      setSellers(allSellers || []);
     }
     if (businessId) loadSellers();
     return () => { mounted = false; };

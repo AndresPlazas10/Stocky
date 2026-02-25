@@ -3,8 +3,11 @@
  * Centraliza la lógica que antes estaba en Mesas.jsx para facilitar tests y futura unificación con salesService.
  */
 
-import { supabase } from '../supabase/Client.jsx';
+import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { isAdminRole } from '../utils/roles.js';
+import { enqueueOutboxMutation } from '../sync/outboxShadow.js';
+import LOCAL_SYNC_CONFIG from '../config/localSync.js';
+import { runOutboxTick } from '../sync/syncBootstrap.js';
 
 function buildIdempotencyKey({ action, businessId, orderId, tableId }) {
   const normalizedAction = String(action || '').trim().toLowerCase();
@@ -12,6 +15,64 @@ function buildIdempotencyKey({ action, businessId, orderId, tableId }) {
   const o = String(orderId || '').trim();
   const t = String(tableId || '').trim();
   return `stocky:${normalizedAction}:${b}:${o}:${t}`;
+}
+
+async function enqueueOrderCloseOutbox({
+  businessId,
+  mutationType,
+  mutationId,
+  payload
+}) {
+  await enqueueOutboxMutation({
+    businessId,
+    mutationType,
+    mutationId,
+    payload
+  });
+}
+
+function canQueueLocalOrderSales() {
+  const hasAnyOrderCloseWritePath = Boolean(
+    LOCAL_SYNC_CONFIG.localWrites?.orders
+    || LOCAL_SYNC_CONFIG.localWrites?.tables
+    || LOCAL_SYNC_CONFIG.localWrites?.sales
+  );
+
+  return Boolean(
+    LOCAL_SYNC_CONFIG.enabled
+    && LOCAL_SYNC_CONFIG.shadowWritesEnabled
+    && hasAnyOrderCloseWritePath
+  );
+}
+
+function shouldForceOrderSalesLocalFirst() {
+  return Boolean(canQueueLocalOrderSales());
+}
+
+function isConnectivityError(errorLike) {
+  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+  return (
+    message.includes('failed to fetch')
+    || message.includes('networkerror')
+    || message.includes('network request failed')
+    || message.includes('fetch failed')
+    || message.includes('load failed')
+    || message.includes('network')
+  );
+}
+
+function buildOfflineCloseUnavailableMessage() {
+  return 'Sin internet: el cierre offline de mesas no está habilitado en esta configuración.';
+}
+
+async function triggerBackgroundOutboxSync() {
+  if (typeof navigator !== 'undefined' && navigator.onLine) {
+    runOutboxTick().catch(() => {});
+  }
+}
+
+function buildLocalSaleId(mutationId) {
+  return `local:${mutationId}`;
 }
 
 function normalizeSplitSubAccountsForRpc(subAccounts = []) {
@@ -61,6 +122,164 @@ function normalizeSplitSubAccountsForRpc(subAccounts = []) {
   });
 }
 
+function normalizeOrderItemsForSale(orderItems = []) {
+  const source = Array.isArray(orderItems) ? orderItems : [];
+  return source.map((item = {}) => {
+    const productId = normalizeReference(item?.product_id || item?.products?.id || null);
+    const comboId = normalizeReference(item?.combo_id || item?.combos?.id || null);
+    const quantity = Number(item?.quantity);
+    const unitPrice = Number(item?.price ?? item?.unit_price);
+
+    if ((!productId && !comboId) || (productId && comboId)) {
+      throw new Error('❌ La orden tiene items inválidos: cada línea debe referenciar un producto o un combo.');
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error('❌ La orden tiene cantidades inválidas.');
+    }
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      throw new Error('❌ La orden tiene precios inválidos.');
+    }
+
+    return {
+      product_id: productId,
+      combo_id: comboId,
+      quantity,
+      unit_price: unitPrice
+    };
+  });
+}
+
+async function enqueueSaleCreateForOrderClose({
+  businessId,
+  mutationId,
+  paymentMethod = 'cash',
+  items = [],
+  orderId = null,
+  tableId = null,
+  amountReceived = null,
+  changeBreakdown = [],
+  sellerName = 'Administrador',
+  userId = null
+}) {
+  const total = items.reduce(
+    (sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)),
+    0
+  );
+  const queued = await enqueueOutboxMutation({
+    businessId,
+    mutationType: 'sale.create',
+    mutationId,
+    payload: {
+      local_write: true,
+      payment_method: paymentMethod || 'cash',
+      items_count: items.length,
+      items,
+      total,
+      order_id: orderId,
+      table_id: tableId,
+      amount_received: Number.isFinite(Number(amountReceived)) ? Number(amountReceived) : null,
+      change_breakdown: Array.isArray(changeBreakdown) ? changeBreakdown : [],
+      seller_name: sellerName || 'Administrador',
+      user_id: userId || null,
+      idempotency_key: mutationId,
+      created_at: new Date().toISOString()
+    }
+  });
+
+  if (!queued) {
+    throw new Error('No se pudo guardar el cierre de mesa localmente.');
+  }
+
+  return {
+    total,
+    localSaleId: buildLocalSaleId(mutationId)
+  };
+}
+
+async function enqueueLocalSingleClose({
+  businessId,
+  orderId,
+  tableId,
+  paymentMethod,
+  amountReceived = null,
+  changeBreakdown = [],
+  itemsForRpc
+}) {
+  const mutationId = buildIdempotencyKey({
+    action: 'close-order-single',
+    businessId,
+    orderId,
+    tableId
+  });
+
+  const queuedSale = await enqueueSaleCreateForOrderClose({
+    businessId,
+    mutationId,
+    paymentMethod,
+    items: itemsForRpc,
+    orderId,
+    tableId,
+    amountReceived,
+    changeBreakdown,
+    userId: null
+  });
+
+  await triggerBackgroundOutboxSync();
+
+  return {
+    saleTotal: queuedSale.total,
+    saleId: queuedSale.localSaleId,
+    localOnly: true,
+    pendingSync: true
+  };
+}
+
+async function enqueueLocalSplitClose({
+  businessId,
+  orderId,
+  tableId,
+  subAccountsWithItems = []
+}) {
+  const parentMutationId = buildIdempotencyKey({
+    action: 'close-order-split',
+    businessId,
+    orderId,
+    tableId
+  });
+  let totalSold = 0;
+  const localSaleIds = [];
+
+  for (let index = 0; index < subAccountsWithItems.length; index += 1) {
+    const sub = subAccountsWithItems[index];
+    const mutationId = `${parentMutationId}:sub:${index + 1}`;
+    const isLast = index === subAccountsWithItems.length - 1;
+
+    const queuedSale = await enqueueSaleCreateForOrderClose({
+      businessId,
+      mutationId,
+      paymentMethod: sub.paymentMethod || 'cash',
+      items: Array.isArray(sub.items) ? sub.items : [],
+      orderId: isLast ? orderId : null,
+      tableId: isLast ? tableId : null,
+      amountReceived: sub.amountReceived ?? sub.amount_received ?? null,
+      changeBreakdown: sub.changeBreakdown ?? sub.change_breakdown ?? [],
+      userId: null
+    });
+
+    totalSold += Number(queuedSale.total || 0);
+    localSaleIds.push(queuedSale.localSaleId);
+  }
+
+  await triggerBackgroundOutboxSync();
+
+  return {
+    totalSold,
+    saleIds: localSaleIds,
+    localOnly: true,
+    pendingSync: true
+  };
+}
+
 function isOrderContextError(errorLike) {
   const message = String(errorLike?.message || errorLike || '').toLowerCase();
   if (!message) return false;
@@ -103,18 +322,18 @@ async function callCreateSaleCompleteWithFallback({
   let rpcError = null;
 
   if (preferBase) {
-    ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete', baseParams));
+    ({ data: result, error: rpcError } = await supabaseAdapter.createSaleCompleteRpc(baseParams));
     const missingBaseFn = isFunctionUnavailableError(rpcError, 'create_sale_complete');
     if (rpcError && missingBaseFn) {
-      ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete_idempotent', idempotentParams));
+      ({ data: result, error: rpcError } = await supabaseAdapter.createSaleCompleteIdempotentRpc(idempotentParams));
     }
     return { result, rpcError };
   }
 
-  ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete_idempotent', idempotentParams));
+  ({ data: result, error: rpcError } = await supabaseAdapter.createSaleCompleteIdempotentRpc(idempotentParams));
   const missingIdempotentFn = isFunctionUnavailableError(rpcError, 'create_sale_complete_idempotent');
   if (rpcError && missingIdempotentFn) {
-    ({ data: result, error: rpcError } = await supabase.rpc('create_sale_complete', baseParams));
+    ({ data: result, error: rpcError } = await supabaseAdapter.createSaleCompleteRpc(baseParams));
   }
 
   return { result, rpcError };
@@ -123,12 +342,25 @@ async function callCreateSaleCompleteWithFallback({
 function getFriendlySaleErrorMessage(errorLike, fallbackMessage) {
   const rawMessage = String(errorLike?.message || errorLike || '').trim();
   const normalized = rawMessage.toLowerCase();
+  const code = String(errorLike?.code || '').trim();
+  const status = String(errorLike?.status || errorLike?.statusCode || '').trim();
+  const hint = String(errorLike?.hint || '').trim();
+  const details = String(errorLike?.details || '').trim();
 
   if (normalized.includes('idx_sales_prevent_duplicates')) {
     return 'La venta ya estaba siendo procesada o ya fue registrada. Actualiza y verifica en Ventas.';
   }
 
-  return rawMessage || fallbackMessage;
+  const baseMessage = rawMessage || fallbackMessage;
+  const diagnosticParts = [
+    code ? `code=${code}` : null,
+    status ? `status=${status}` : null,
+    hint ? `hint=${hint}` : null,
+    details ? `details=${details}` : null
+  ].filter(Boolean);
+
+  if (diagnosticParts.length === 0) return baseMessage;
+  return `${baseMessage} [diag: ${diagnosticParts.join(' | ')}]`;
 }
 
 function isSalesDuplicateIndexError(errorLike) {
@@ -215,15 +447,15 @@ async function persistSaleCashMetadata({
     changeBreakdown
   });
 
-  const { error } = await supabase
-    .from('sales')
-    .update({
+  const { error } = await supabaseAdapter.updateSaleCashMetadataByBusinessAndId({
+    businessId,
+    saleId,
+    payload: {
       amount_received: metadata.amountReceived,
       change_amount: metadata.changeAmount,
       change_breakdown: metadata.changeBreakdown
-    })
-    .eq('id', saleId)
-    .eq('business_id', businessId);
+    }
+  });
 
   if (error) {
     // Best-effort: no bloquear cierre de orden por metadatos de efectivo.
@@ -232,11 +464,11 @@ async function persistSaleCashMetadata({
 
 async function finalizeOrderAndTable({ businessId, orderId, tableId }) {
   if (orderId) {
-    const { error: orderCloseError } = await supabase
-      .from('orders')
-      .update({ status: 'closed', closed_at: new Date().toISOString() })
-      .eq('id', orderId)
-      .eq('business_id', businessId);
+    const { error: orderCloseError } = await supabaseAdapter.updateOrderByBusinessAndId({
+      businessId,
+      orderId,
+      payload: { status: 'closed', closed_at: new Date().toISOString() }
+    });
 
     if (orderCloseError) {
       throw new Error(orderCloseError.message || '❌ No se pudo cerrar la orden.');
@@ -244,11 +476,11 @@ async function finalizeOrderAndTable({ businessId, orderId, tableId }) {
   }
 
   if (tableId) {
-    const { error: tableReleaseError } = await supabase
-      .from('tables')
-      .update({ current_order_id: null, status: 'available' })
-      .eq('id', tableId)
-      .eq('business_id', businessId);
+    const { error: tableReleaseError } = await supabaseAdapter.updateTableByBusinessAndId({
+      businessId,
+      tableId,
+      payload: { current_order_id: null, status: 'available' }
+    });
 
     if (tableReleaseError) {
       throw new Error(tableReleaseError.message || '❌ No se pudo liberar la mesa.');
@@ -257,21 +489,12 @@ async function finalizeOrderAndTable({ businessId, orderId, tableId }) {
 }
 
 async function getSellerName(businessId) {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await supabaseAdapter.getCurrentUser();
   if (!user) throw new Error('❌ No se pudo obtener información del usuario');
 
   const [{ data: employee }, { data: business }] = await Promise.all([
-    supabase
-      .from('employees')
-      .select('full_name, role')
-      .eq('user_id', user.id)
-      .eq('business_id', businessId)
-      .maybeSingle(),
-    supabase
-      .from('businesses')
-      .select('created_by')
-      .eq('id', businessId)
-      .maybeSingle()
+    supabaseAdapter.getEmployeeByUserAndBusiness(user.id, businessId, 'full_name, role'),
+    supabaseAdapter.getBusinessById(businessId, 'created_by')
   ]);
 
   const isOwner = user.id && business?.created_by && String(user.id).trim() === String(business.created_by).trim();
@@ -292,13 +515,53 @@ async function getSellerName(businessId) {
  * @returns {Promise<{ totalSold: number, saleIds: string[] }>}
  */
 export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tableId }) {
-  const { user, sellerName } = await getSellerName(businessId);
-  const operationStartedAt = new Date().toISOString();
   const normalizedSubAccounts = normalizeSplitSubAccountsForRpc(subAccounts);
   const subAccountsWithItems = normalizedSubAccounts.filter((sub) => Array.isArray(sub.items) && sub.items.length > 0);
   if (subAccountsWithItems.length === 0) {
     throw new Error('No hay subcuentas con productos válidos para procesar.');
   }
+  const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
+
+  if (shouldForceOrderSalesLocalFirst()) {
+    return enqueueLocalSplitClose({
+      businessId,
+      orderId,
+      tableId,
+      subAccountsWithItems
+    });
+  }
+
+  if (offlineMode && canQueueLocalOrderSales()) {
+    return enqueueLocalSplitClose({
+      businessId,
+      orderId,
+      tableId,
+      subAccountsWithItems
+    });
+  }
+  if (offlineMode && !canQueueLocalOrderSales()) {
+    throw new Error(buildOfflineCloseUnavailableMessage());
+  }
+
+  let user = null;
+  let sellerName = 'Administrador';
+  try {
+    ({ user, sellerName } = await getSellerName(businessId));
+  } catch (error) {
+    if (isConnectivityError(error)) {
+      if (canQueueLocalOrderSales()) {
+        return enqueueLocalSplitClose({
+          businessId,
+          orderId,
+          tableId,
+          subAccountsWithItems
+        });
+      }
+      throw new Error(buildOfflineCloseUnavailableMessage());
+    }
+    throw error;
+  }
+  const operationStartedAt = new Date().toISOString();
   const idempotencyKey = buildIdempotencyKey({
     action: 'close-order-split',
     businessId,
@@ -313,7 +576,7 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
   let atomicResult = null;
   let atomicError = null;
   if (!hasComboItemsInSplit) {
-    ({ data: atomicResult, error: atomicError } = await supabase.rpc('create_split_sales_complete_idempotent', {
+    ({ data: atomicResult, error: atomicError } = await supabaseAdapter.createSplitSalesCompleteIdempotentRpc({
       p_business_id: businessId,
       p_user_id: user.id,
       p_seller_name: sellerName,
@@ -330,7 +593,7 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     );
     const retryBaseSplitFn = atomicError && missingIdempotentSplitFn;
     if (retryBaseSplitFn) {
-      ({ data: atomicResult, error: atomicError } = await supabase.rpc('create_split_sales_complete', {
+      ({ data: atomicResult, error: atomicError } = await supabaseAdapter.createSplitSalesCompleteRpc({
         p_business_id: businessId,
         p_user_id: user.id,
         p_seller_name: sellerName,
@@ -343,6 +606,15 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     atomicError = { message: 'split combos bypass atomic rpc' };
   }
 
+  if (atomicError && canQueueLocalOrderSales() && isConnectivityError(atomicError)) {
+    return enqueueLocalSplitClose({
+      businessId,
+      orderId,
+      tableId,
+      subAccountsWithItems
+    });
+  }
+
   if (!atomicError && atomicResult?.[0]?.status === 'success') {
     const atomicSalesCount = Number(atomicResult[0].sales_count || 0);
     const atomicTotalSold = Number(atomicResult[0].total_sold || 0);
@@ -353,19 +625,31 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     // Best-effort: recuperar ids de ventas recién creadas para autoimpresión.
     let atomicSaleIds = [];
     try {
-      const { data: recentSales } = await supabase
-        .from('sales')
-        .select('id')
-        .eq('business_id', businessId)
-        .eq('user_id', user.id)
-        .gte('created_at', operationStartedAt)
-        .order('created_at', { ascending: false })
-        .limit(atomicSalesCount);
+      const { data: recentSales } = await supabaseAdapter.getRecentSalesByBusinessAndUserSince({
+        businessId,
+        userId: user.id,
+        start: operationStartedAt,
+        limit: atomicSalesCount,
+        selectSql: 'id'
+      });
 
       atomicSaleIds = (recentSales || []).map((sale) => sale.id).filter(Boolean);
     } catch {
       // no-op
     }
+
+    await enqueueOrderCloseOutbox({
+      businessId,
+      mutationType: 'order.close.split',
+      mutationId: `${idempotencyKey}:atomic`,
+      payload: {
+        order_id: orderId,
+        table_id: tableId,
+        sales_count: atomicSalesCount,
+        total_sold: atomicTotalSold,
+        sale_ids: atomicSaleIds
+      }
+    });
 
     return { totalSold: atomicTotalSold, saleIds: atomicSaleIds };
   }
@@ -463,6 +747,19 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     throw new Error('No se pudieron generar ventas en el cierre dividido.');
   }
 
+  await enqueueOrderCloseOutbox({
+    businessId,
+    mutationType: 'order.close.split',
+    mutationId: `${idempotencyKey}:fallback`,
+    payload: {
+      order_id: orderId,
+      table_id: tableId,
+      sales_count: saleIds.length,
+      total_sold: totalSold,
+      sale_ids: saleIds
+    }
+  });
+
   return { totalSold, saleIds };
 }
 
@@ -470,60 +767,30 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
  * Cierra la orden en una sola venta, descuenta stock y libera la mesa.
  * OPTIMIZADO: Usa RPC create_sale_complete en una sola transacción.
  * @param {string} businessId
- * @param {{ orderId: string, tableId: string, paymentMethod: string, amountReceived?: number|null, changeBreakdown?: Array<{denomination:number,count:number}>|null }} params
+ * @param {{ orderId: string, tableId: string, paymentMethod: string, amountReceived?: number|null, changeBreakdown?: Array<{denomination:number,count:number}>|null, orderItems?: Array<object>|null }} params
  * @returns {Promise<{ saleTotal: number, saleId: string | null }>}
  */
-export async function closeOrderSingle(businessId, { orderId, tableId, paymentMethod, amountReceived = null, changeBreakdown = null }) {
-  const { user, sellerName } = await getSellerName(businessId);
+export async function closeOrderSingle(
+  businessId,
+  {
+    orderId,
+    tableId,
+    paymentMethod,
+    amountReceived = null,
+    changeBreakdown = null,
+    orderItems = null
+  }
+) {
+  const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
+  if (offlineMode && !canQueueLocalOrderSales()) {
+    throw new Error(buildOfflineCloseUnavailableMessage());
+  }
+
   const idempotencyKey = buildIdempotencyKey({
     action: 'close-order-single',
     businessId,
     orderId,
     tableId
-  });
-
-  const { data: orderData, error: orderFetchError } = await supabase
-    .from('orders')
-    .select(`
-      *,
-      order_items (
-        product_id,
-        combo_id,
-        quantity,
-        price
-      )
-    `)
-    .eq('id', orderId)
-    .maybeSingle();
-
-  if (orderFetchError || !orderData) throw new Error('❌ No se pudo cargar la orden.');
-  if (!orderData.order_items?.length) throw new Error('❌ No hay productos en la orden para cerrar.');
-
-  const saleTotal = orderData.order_items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-  
-  // Preparar items para RPC
-  const itemsForRpc = orderData.order_items.map((item) => {
-    const productId = normalizeReference(item?.product_id || item?.products?.id || null);
-    const comboId = normalizeReference(item?.combo_id || item?.combos?.id || null);
-    const quantity = Number(item?.quantity);
-    const unitPrice = Number(item?.price ?? item?.unit_price);
-
-    if ((!productId && !comboId) || (productId && comboId)) {
-      throw new Error('❌ La orden tiene items inválidos: cada línea debe referenciar un producto o un combo.');
-    }
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      throw new Error('❌ La orden tiene cantidades inválidas.');
-    }
-    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-      throw new Error('❌ La orden tiene precios inválidos.');
-    }
-
-    return {
-      product_id: productId,
-      combo_id: comboId,
-      quantity,
-      unit_price: unitPrice
-    };
   });
   const normalizedAmountReceived = Number.isFinite(Number(amountReceived))
     ? Number(amountReceived)
@@ -531,6 +798,84 @@ export async function closeOrderSingle(businessId, { orderId, tableId, paymentMe
   const normalizedChangeBreakdown = Array.isArray(changeBreakdown)
     ? changeBreakdown
     : null;
+
+  let itemsForRpc = [];
+  if (Array.isArray(orderItems) && orderItems.length > 0) {
+    itemsForRpc = normalizeOrderItemsForSale(orderItems);
+  } else {
+    if (offlineMode) {
+      throw new Error('Sin internet: no se pudieron recuperar los productos de la orden para cerrar la mesa.');
+    }
+    try {
+      const { data: orderData, error: orderFetchError } = await supabaseAdapter.getOrderWithItemsById(
+        orderId,
+        'product_id, combo_id, quantity, price'
+      );
+
+      if (orderFetchError || !orderData) throw new Error('❌ No se pudo cargar la orden.');
+      itemsForRpc = normalizeOrderItemsForSale(orderData.order_items || []);
+    } catch (error) {
+      if (isConnectivityError(error)) {
+        throw new Error('Sin internet: no se pudieron recuperar los productos de la orden para cerrar la mesa.');
+      }
+      throw error;
+    }
+  }
+
+  if (itemsForRpc.length === 0) {
+    throw new Error('❌ No hay productos en la orden para cerrar.');
+  }
+
+  const saleTotal = itemsForRpc.reduce(
+    (sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)),
+    0
+  );
+
+  if (shouldForceOrderSalesLocalFirst()) {
+    return enqueueLocalSingleClose({
+      businessId,
+      orderId,
+      tableId,
+      paymentMethod,
+      amountReceived: normalizedAmountReceived,
+      changeBreakdown: normalizedChangeBreakdown ?? [],
+      itemsForRpc
+    });
+  }
+
+  if (offlineMode && canQueueLocalOrderSales()) {
+    return enqueueLocalSingleClose({
+      businessId,
+      orderId,
+      tableId,
+      paymentMethod,
+      amountReceived: normalizedAmountReceived,
+      changeBreakdown: normalizedChangeBreakdown ?? [],
+      itemsForRpc
+    });
+  }
+
+  let user = null;
+  let sellerName = 'Administrador';
+  try {
+    ({ user, sellerName } = await getSellerName(businessId));
+  } catch (error) {
+    if (isConnectivityError(error)) {
+      if (canQueueLocalOrderSales()) {
+        return enqueueLocalSingleClose({
+          businessId,
+          orderId,
+          tableId,
+          paymentMethod,
+          amountReceived: normalizedAmountReceived,
+          changeBreakdown: normalizedChangeBreakdown ?? [],
+          itemsForRpc
+        });
+      }
+      throw new Error(buildOfflineCloseUnavailableMessage());
+    }
+    throw error;
+  }
   const idempotentBaseParams = {
     p_business_id: businessId,
     p_user_id: user.id,
@@ -562,6 +907,18 @@ export async function closeOrderSingle(businessId, { orderId, tableId, paymentMe
 
   let resolvedSaleId = result?.[0]?.sale_id || null;
   if (rpcError || !result?.[0]) {
+    if (canQueueLocalOrderSales() && isConnectivityError(rpcError)) {
+      return enqueueLocalSingleClose({
+        businessId,
+        orderId,
+        tableId,
+        paymentMethod,
+        amountReceived: normalizedAmountReceived,
+        changeBreakdown: normalizedChangeBreakdown ?? [],
+        itemsForRpc
+      });
+    }
+
     if (!isOrderContextError(rpcError)) {
       throw new Error(getFriendlySaleErrorMessage(
         rpcError,
@@ -587,6 +944,18 @@ export async function closeOrderSingle(businessId, { orderId, tableId, paymentMe
     }));
 
     if (fallbackError || !fallbackResult?.[0]) {
+      if (canQueueLocalOrderSales() && isConnectivityError(fallbackError)) {
+        return enqueueLocalSingleClose({
+          businessId,
+          orderId,
+          tableId,
+          paymentMethod,
+          amountReceived: normalizedAmountReceived,
+          changeBreakdown: normalizedChangeBreakdown ?? [],
+          itemsForRpc
+        });
+      }
+
       throw new Error(getFriendlySaleErrorMessage(
         fallbackError,
         '❌ No se pudo registrar la venta. Intenta de nuevo.'
@@ -604,6 +973,20 @@ export async function closeOrderSingle(businessId, { orderId, tableId, paymentMe
     saleTotal,
     amountReceived: normalizedAmountReceived,
     changeBreakdown: normalizedChangeBreakdown
+  });
+
+  await enqueueOrderCloseOutbox({
+    businessId,
+    mutationType: 'order.close.single',
+    mutationId: idempotencyKey,
+    payload: {
+      order_id: orderId,
+      table_id: tableId,
+      sale_id: resolvedSaleId,
+      total_sold: saleTotal,
+      payment_method: paymentMethod || 'cash',
+      amount_received: normalizedAmountReceived
+    }
   });
 
   return { saleTotal, saleId: resolvedSaleId };

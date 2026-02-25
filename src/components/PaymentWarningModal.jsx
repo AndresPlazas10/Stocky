@@ -4,6 +4,8 @@ import { AlertTriangle, X, CreditCard, Calendar, Phone, Mail } from 'lucide-reac
 import { Button } from './ui/button';
 import paymentQr from '../assets/QR.jpeg';
 
+const _motionLintUsage = motion;
+
 /**
  * Modal de advertencia para negocios con pagos pendientes
  * @param {boolean} isOpen - Si el modal está abierto

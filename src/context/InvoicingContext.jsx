@@ -80,7 +80,7 @@ export function InvoicingProvider({ children, _businessId }) {
   }, [loadInvoicingStatus])
 
   // ⚠️ DEPRECATED: Ya no permite crear solicitudes
-  const createRequest = useCallback(async (data = {}) => {
+  const createRequest = useCallback(async (_data = {}) => {
     return { 
       success: false, 
       error: 'La facturación electrónica a través de Stocky ya no está disponible. Los negocios deben facturar directamente en Siigo.' 

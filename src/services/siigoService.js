@@ -7,7 +7,7 @@
 // Este servicio está deprecado. Todas las funciones retornan estado deshabilitado.
 // Los negocios facturan directamente en Siigo (incluido en su plan).
 
-import { supabase } from '../supabase/Client'
+import { readAdapter } from '../data/adapters/localAdapter.js'
 
 // ============================================
 // CONSTANTES
@@ -208,7 +208,7 @@ export const siigoService = {
    * @param {Object} options - Opciones de filtrado
    * @returns {Promise<Array>} Siempre retorna array vacío
    */
-  async getInvoiceHistory(businessId, options = {}) {
+  async getInvoiceHistory(_businessId, _options = {}) {
     return []
   },
 
@@ -235,17 +235,10 @@ export const siigoService = {
    */
   async getCities(searchTerm = '') {
     try {
-      let query = supabase
-        .from('dane_cities')
-        .select('city_code, city_name, department_name')
-        .order('city_name')
-        .limit(50)
-
-      if (searchTerm) {
-        query = query.ilike('city_name', `%${searchTerm}%`)
-      }
-
-      const { data, error } = await query
+      const { data, error } = await readAdapter.getDaneCities({
+        searchTerm,
+        limit: 50
+      })
 
       if (error) throw error
 

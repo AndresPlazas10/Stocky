@@ -1,4 +1,4 @@
-import { supabase } from '../supabase/Client.jsx';
+import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 
 const BUSINESS_COLUMNS = `
   id,
@@ -30,7 +30,7 @@ export async function setBusiness(businessData) {
     }
 
     // Obtener el usuario actual autenticado
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabaseAdapter.getCurrentUser();
     
     if (userError) throw userError;
     
@@ -40,11 +40,10 @@ export async function setBusiness(businessData) {
 
     // Validar si ya existe un negocio con el mismo email
     if (businessData.email) {
-      const { data: existingEmail, error: emailError } = await supabase
-        .from('businesses')
-        .select('id, email')
-        .eq('email', businessData.email)
-        .single();
+      const { data: existingEmail, error: emailError } = await supabaseAdapter.getBusinessByEmail(
+        businessData.email,
+        'id, email'
+      );
 
       if (emailError && emailError.code !== 'PGRST116') { // PGRST116 = no se encontraron filas
         throw emailError;
@@ -56,24 +55,19 @@ export async function setBusiness(businessData) {
     }
 
     // Insertar el negocio en la tabla businesses
-    const { data, error } = await supabase
-      .from('businesses')
-      .insert([
-        {
-          name: businessData.name,
-          address: businessData.address || null,
-          phone: businessData.phone || null,
-          email: businessData.email || null,
-          created_by: user.id,
-        }
-      ])
-      .select();
+    const { data, error } = await supabaseAdapter.insertBusiness({
+      name: businessData.name,
+      address: businessData.address || null,
+      phone: businessData.phone || null,
+      email: businessData.email || null,
+      created_by: user.id
+    });
 
     if (error) throw error;
 
     return {
       success: true,
-      data: data[0],
+      data,
       message: 'Negocio creado exitosamente'
     };
 
@@ -92,16 +86,12 @@ export async function setBusiness(businessData) {
  */
 export async function getBusinesses() {
   try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabaseAdapter.getCurrentUser();
     
     if (userError) throw userError;
     if (!user) throw new Error('❌ Usuario no autenticado');
 
-    const { data, error } = await supabase
-      .from('businesses')
-      .select(BUSINESS_COLUMNS)
-      .eq('created_by', user.id)
-      .order('created_at', { ascending: false });
+    const { data, error } = await supabaseAdapter.getBusinessesByOwnerId(user.id, BUSINESS_COLUMNS);
 
     if (error) throw error;
 
@@ -131,11 +121,7 @@ export async function getBusinessById(businessId) {
       throw new Error('❌ El ID del negocio es requerido');
     }
 
-    const { data, error } = await supabase
-      .from('businesses')
-      .select(BUSINESS_COLUMNS)
-      .eq('id', businessId)
-      .single();
+    const { data, error } = await supabaseAdapter.getBusinessById(businessId, BUSINESS_COLUMNS);
 
     if (error) throw error;
 
@@ -166,17 +152,13 @@ export async function updateBusiness(businessId, updates) {
       throw new Error('❌ El ID del negocio es requerido');
     }
 
-    const { data, error } = await supabase
-      .from('businesses')
-      .update(updates)
-      .eq('id', businessId)
-      .select();
+    const { data, error } = await supabaseAdapter.updateBusinessById(businessId, updates);
 
     if (error) throw error;
 
     return {
       success: true,
-      data: data[0],
+      data,
       message: 'Negocio actualizado exitosamente'
     };
 
@@ -200,10 +182,7 @@ export async function deleteBusiness(businessId) {
       throw new Error('❌ El ID del negocio es requerido');
     }
 
-    const { error } = await supabase
-      .from('businesses')
-      .delete()
-      .eq('id', businessId);
+    const { error } = await supabaseAdapter.deleteBusinessById(businessId);
 
     if (error) throw error;
 

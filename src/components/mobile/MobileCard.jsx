@@ -1,6 +1,8 @@
 import { ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+const _motionLintUsage = motion;
+
 /**
  * Card optimizada para móvil
  * - Padding generoso para touch targets (16px min)

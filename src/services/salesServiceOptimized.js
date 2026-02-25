@@ -3,7 +3,7 @@
  * Usa RPC para crear venta en una sola transacción (~100ms en lugar de 1000ms)
  */
 
-import { supabase } from '../supabase/Client';
+import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { isAdminRole } from '../utils/roles.js';
 
 function isFunctionUnavailableError(errorLike, functionName) {
@@ -103,7 +103,7 @@ export async function createSaleOptimized({
     }
 
     // 2. Obtener usuario actual
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabaseAdapter.getCurrentUser();
     if (userError || !user) {
       return { 
         success: false, 
@@ -113,17 +113,8 @@ export async function createSaleOptimized({
 
     // 3. Obtener nombre del empleado y role + created_by del negocio para detectar admin/owner
     const [{ data: employee }, { data: business }] = await Promise.all([
-      supabase
-        .from('employees')
-        .select('full_name, role')
-        .eq('user_id', user.id)
-        .eq('business_id', businessId)
-        .maybeSingle(),
-      supabase
-        .from('businesses')
-        .select('created_by')
-        .eq('id', businessId)
-        .maybeSingle()
+      supabaseAdapter.getEmployeeByUserAndBusiness(user.id, businessId, 'full_name, role'),
+      supabaseAdapter.getBusinessById(businessId, 'created_by')
     ]);
 
     const isOwner = user.id && business?.created_by && String(user.id).trim() === String(business.created_by).trim();
@@ -141,7 +132,7 @@ export async function createSaleOptimized({
     let data = null;
     let error = null;
     if (hasComboItems) {
-      ({ data, error } = await supabase.rpc('create_sale_complete', {
+      ({ data, error } = await supabaseAdapter.createSaleCompleteRpc({
         p_business_id: businessId,
         p_user_id: user.id,
         p_seller_name: sellerName,
@@ -153,22 +144,26 @@ export async function createSaleOptimized({
 
       const missingBaseFn = isFunctionUnavailableError(error, 'create_sale_complete');
       if (error && missingBaseFn) {
-        ({ data, error } = await supabase.rpc('create_sale_complete_idempotent', {
+        ({ data, error } = await supabaseAdapter.createSaleCompleteIdempotentRpc({
           p_business_id: businessId,
           p_user_id: user.id,
           p_seller_name: sellerName,
           p_payment_method: paymentMethod,
           p_items: itemsForRpc,
+          p_amount_received: null,
+          p_change_breakdown: [],
           p_idempotency_key: idempotencyKey
         }));
       }
     } else {
-      ({ data, error } = await supabase.rpc('create_sale_complete_idempotent', {
+      ({ data, error } = await supabaseAdapter.createSaleCompleteIdempotentRpc({
         p_business_id: businessId,
         p_user_id: user.id,
         p_seller_name: sellerName,
         p_payment_method: paymentMethod,
         p_items: itemsForRpc,
+        p_amount_received: null,
+        p_change_breakdown: [],
         p_idempotency_key: idempotencyKey
       }));
 
@@ -177,7 +172,7 @@ export async function createSaleOptimized({
         'create_sale_complete_idempotent'
       );
       if (error && missingIdempotentFn) {
-        ({ data, error } = await supabase.rpc('create_sale_complete', {
+        ({ data, error } = await supabaseAdapter.createSaleCompleteRpc({
           p_business_id: businessId,
           p_user_id: user.id,
           p_seller_name: sellerName,

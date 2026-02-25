@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
-import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice } from '../../utils/formatters.js';
+import { getReportsSnapshot } from '../../data/queries/reportsQueries.js';
 import {
   TrendingUp,
   TrendingDown,
@@ -19,6 +19,9 @@ import {
   PieChart
 } from 'lucide-react';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
+import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
+
+const _motionLintUsage = motion;
 
 function Reportes({ businessId }) {
   const [loading, setLoading] = useState(true);
@@ -70,60 +73,18 @@ function Reportes({ businessId }) {
       setError('');
       const { start, end } = getDateRange();
 
-      const [
-        { data: ventas, error: ventasError },
-        { data: compras, error: comprasError },
-        { data: productos, error: productosError },
-        { count: totalProveedores, error: proveedoresError },
-        { count: totalFacturas, error: facturasError },
-        { data: saleDetails, error: saleDetailsError }
-      ] = await Promise.all([
-        supabase
-          .from('sales')
-          .select('total, payment_method')
-          .eq('business_id', businessId)
-          .gte('created_at', start)
-          .lte('created_at', end),
-        supabase
-          .from('purchases')
-          .select('total')
-          .eq('business_id', businessId)
-          .gte('created_at', start)
-          .lte('created_at', end),
-        supabase
-          .from('products')
-          .select('stock, min_stock, manage_stock')
-          .eq('business_id', businessId)
-          .eq('is_active', true),
-        supabase
-          .from('suppliers')
-          .select('id', { count: 'exact', head: true })
-          .eq('business_id', businessId),
-        supabase
-          .from('invoices')
-          .select('id', { count: 'exact', head: true })
-          .eq('business_id', businessId)
-          .gte('created_at', start)
-          .lte('created_at', end),
-        supabase
-          .from('sale_details')
-          .select(`
-            quantity,
-            unit_price,
-            products!inner(name, purchase_price),
-            sales!inner(business_id, created_at)
-          `)
-          .eq('sales.business_id', businessId)
-          .gte('sales.created_at', start)
-          .lte('sales.created_at', end)
-      ]);
-
-      if (ventasError) throw ventasError;
-      if (comprasError) throw comprasError;
-      if (productosError) throw productosError;
-      if (proveedoresError) throw proveedoresError;
-      if (facturasError) throw facturasError;
-      if (saleDetailsError) throw saleDetailsError;
+      const {
+        ventas,
+        compras,
+        productos,
+        totalProveedores,
+        totalFacturas,
+        saleDetails
+      } = await getReportsSnapshot({
+        businessId,
+        start,
+        end
+      });
 
       const totalVentas = ventas?.reduce((sum, v) => sum + (v.total || 0), 0) || 0;
       const cantidadVentas = ventas?.length || 0;
@@ -182,12 +143,35 @@ function Reportes({ businessId }) {
         gananciaBruta
       });
 
+      saveOfflineSnapshot(`reportes.snapshot:${businessId}:${selectedPeriod}`, {
+        metrics: {
+          totalVentas,
+          cantidadVentas,
+          totalCompras,
+          cantidadCompras,
+          productosStock,
+          productosLowStock,
+          totalProveedores: totalProveedores || 0,
+          totalFacturas: totalFacturas || 0,
+          gananciaBruta
+        },
+        topProductos: topProducts,
+        ventasPorMetodo: Object.entries(paymentMethods).map(([method, total]) => ({ method, total }))
+      });
+
     } catch {
-      setError('❌ Error al cargar los reportes');
+      if (isOfflineMode()) {
+        const cached = readOfflineSnapshot(`reportes.snapshot:${businessId}:${selectedPeriod}`, null);
+        if (cached?.metrics) setMetrics(cached.metrics);
+        if (Array.isArray(cached?.topProductos)) setTopProductos(cached.topProductos);
+        if (Array.isArray(cached?.ventasPorMetodo)) setVentasPorMetodo(cached.ventasPorMetodo);
+      } else {
+        setError('❌ Error al cargar los reportes');
+      }
     } finally {
       setLoading(false);
     }
-  }, [businessId, getDateRange]);
+  }, [businessId, getDateRange, selectedPeriod]);
 
   useEffect(() => {
     if (businessId) {

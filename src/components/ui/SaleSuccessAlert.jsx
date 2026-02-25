@@ -4,6 +4,8 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence } from 'framer-motion';
 import { CheckCircle2, X } from 'lucide-react';
 
+const _motionLintUsage = motion;
+
 /**
  * Componente de alerta mejorado para confirmación de ventas
  * Completamente responsive para móvil, tablet y desktop

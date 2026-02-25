@@ -1,7 +1,21 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabase/Client';
+import {
+  getAuthenticatedUser,
+  getBusinessByEmail,
+  getOwnedBusinessByUserId,
+  getCurrentSession,
+  isBusinessUsernameTaken
+} from '../data/queries/authQueries.js';
+import {
+  createBusinessRecord,
+  createEmployeeRecord,
+  normalizeUsernameToEmail,
+  signInWithUsernamePassword,
+  signOutSession,
+  signUpBusinessOwner
+} from '../data/commands/authCommands.js';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,6 +24,8 @@ import { SaleErrorAlert } from '@/components/ui/SaleErrorAlert';
 import { SaleSuccessAlert } from '@/components/ui/SaleSuccessAlert';
 
 import { Store, Building2, MapPin, Phone, User, Lock, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
+
+const _motionLintUsage = motion;
 
 function Register() {
   const navigate = useNavigate();
@@ -77,35 +93,27 @@ function Register() {
         throw new Error('❌ El usuario debe tener entre 3-20 caracteres (solo letras, números y guiones bajos)');
       }
 
-      const { data: existingUsername } = await supabase
-        .from('businesses')
-        .select('id')
-        .eq('username', cleanUsername)
-        .maybeSingle();
-
-      if (existingUsername) {
+      const usernameTaken = await isBusinessUsernameTaken(cleanUsername);
+      if (usernameTaken) {
         throw new Error('❌ Este nombre de usuario ya está en uso');
       }
 
-      const cleanEmail = `${cleanUsername}@stockly-app.com`;
+      const { email: cleanEmail } = normalizeUsernameToEmail(cleanUsername);
 
       // Crear usuario en Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: cleanEmail,
-        password: password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
-          data: {
-            username: cleanUsername,
-            business_name: name.trim()
-          }
-        }
-      });
-
-      if (authError) {
+      let authData = null;
+      try {
+        const signUpResult = await signUpBusinessOwner({
+          username: cleanUsername,
+          password,
+          businessName: name.trim(),
+          emailRedirectTo: `${window.location.origin}/dashboard`
+        });
+        authData = signUpResult?.authData || null;
+      } catch (authError) {
         // Mensajes de error mejorados
-        const errorMsg = authError.message || '';
-        
+        const errorMsg = authError?.message || '';
+
         if (errorMsg.includes('already registered') || errorMsg === 'User already registered') {
           throw new Error('❌ Ya existe una cuenta con este nombre de usuario. Intenta con otro nombre.');
         }
@@ -115,45 +123,60 @@ function Register() {
         if (errorMsg.includes('email')) {
           throw new Error('❌ El formato del correo es inválido');
         }
-        throw new Error(`❌ Error al crear la cuenta: ${errorMsg}`);
+        throw new Error(`❌ Error al crear la cuenta: ${errorMsg || 'Error desconocido'}`);
       }
       
       if (!authData.user) throw new Error('❌ Error al crear la cuenta');
 
       if (!authData.session) {
-        await supabase.auth.signOut();
+        await signOutSession();
         throw new Error('⚠️ Supabase requiere confirmación de email. Ve a Dashboard → Authentication → Providers → Email y desactiva "Confirm email"');
       }
 
+      // Garantizar sesión REAL activa antes de insertar en businesses (evita RLS por rol anon).
+      let activeUserId = authData?.session?.user?.id || null;
+      if (!activeUserId) {
+        try {
+          await signInWithUsernamePassword({ username: cleanUsername, password });
+        } catch {
+          // noop: se valida justo después
+        }
+      }
+
+      const [activeSession, activeUser] = await Promise.all([
+        getCurrentSession(),
+        getAuthenticatedUser()
+      ]);
+      activeUserId = activeUser?.id || activeSession?.user?.id || activeUserId;
+
+      if (!activeUserId || !activeSession?.access_token) {
+        throw new Error('❌ No hay sesión activa para crear el negocio. Inicia sesión nuevamente e intenta otra vez.');
+      }
+
       // Crear negocio
-      const { data: businessData, error: businessError } = await supabase
-        .from('businesses')
-        .insert([{
+      let businessData = null;
+      try {
+        businessData = await createBusinessRecord({
           name: name.trim(),
           nit: formData.nit.trim() || null,
           address: address.trim() || null,
           phone: phone.trim() || null,
           email: cleanEmail,
           username: cleanUsername,
-          created_by: authData.user.id
-        }])
-        .select()
-        .single();
-
-      if (businessError) {
-        await supabase.auth.signOut().catch(() => {});
-        throw new Error(`❌ Error al crear el negocio: ${businessError.message || 'Verifica las políticas RLS en Supabase'}`);
+          created_by: activeUserId
+        });
+      } catch (businessError) {
+        await signOutSession().catch(() => {});
+        throw new Error(`❌ Error al crear el negocio: ${businessError?.message || 'Verifica las políticas RLS en Supabase'}`);
       }
 
       // Crear registro de empleado
-      await supabase
-        .from('employees')
-        .insert([{
-          user_id: authData.user.id,
-          business_id: businessData.id,
-          role: 'owner',
-          full_name: name.trim() + ' (Propietario)'
-        }]);
+      await createEmployeeRecord({
+        user_id: activeUserId,
+        business_id: businessData.id,
+        role: 'owner',
+        full_name: name.trim() + ' (Propietario)'
+      });
 
       sessionStorage.setItem('justCreatedBusiness', businessData.id);
       sessionStorage.setItem('businessCreatedAt', Date.now().toString());
@@ -177,13 +200,15 @@ function Register() {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getCurrentSession();
       if (session) {
-        const { data: business } = await supabase
-          .from('businesses')
-          .select('id')
-          .or(`created_by.eq.${session.user.id},email.eq.${session.user.email}`)
-          .maybeSingle();
+        const [ownedBusiness, emailBusiness] = await Promise.all([
+          getOwnedBusinessByUserId(session.user.id, 'id'),
+          session.user.email
+            ? getBusinessByEmail(session.user.email, 'id')
+            : Promise.resolve(null)
+        ]);
+        const business = ownedBusiness || emailBusiness || null;
         
         if (business) {
           window.location.href = '/dashboard';

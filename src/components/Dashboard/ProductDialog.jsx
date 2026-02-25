@@ -15,6 +15,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+const _motionLintUsage = motion;
+
 export function ProductDialog({
   open,
   onClose,

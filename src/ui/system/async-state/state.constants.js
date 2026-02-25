@@ -20,7 +20,9 @@ export function resolveAsyncState({
   syncingRealtime = false,
   actionProcessing = false
 } = {}) {
-  if (offline) return ASYNC_STATES.OFFLINE_MODE;
+  // No bloquear la UI completa en offline cuando no hay datos.
+  // En ese caso preferimos mostrar estados de error/empty/no-results.
+  if (offline && hasData) return ASYNC_STATES.OFFLINE_MODE;
   if (error && !hasData) return ASYNC_STATES.ERROR_STATE;
   if (loading && !hasData) return ASYNC_STATES.LOADING_INITIAL;
   if (loading && hasData) return ASYNC_STATES.LOADING_BACKGROUND;

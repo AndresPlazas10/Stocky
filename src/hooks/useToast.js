@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 /**
  * Hook para gestionar mensajes de toast/notificaciones
@@ -17,32 +17,32 @@ export function useToast(duration = 4000) {
     }
   }, [message, duration]);
 
-  const showSuccess = (text) => {
+  const showSuccess = useCallback((text) => {
     setMessage({ type: 'success', text });
-  };
+  }, []);
 
-  const showError = (text) => {
+  const showError = useCallback((text) => {
     setMessage({ type: 'error', text });
-  };
+  }, []);
 
-  const showWarning = (text) => {
+  const showWarning = useCallback((text) => {
     setMessage({ type: 'warning', text });
-  };
+  }, []);
 
-  const showInfo = (text) => {
+  const showInfo = useCallback((text) => {
     setMessage({ type: 'info', text });
-  };
+  }, []);
 
-  const clear = () => {
+  const clear = useCallback(() => {
     setMessage({ type: null, text: '' });
-  };
+  }, []);
 
-  return { 
-    message, 
-    showSuccess, 
-    showError, 
-    showWarning, 
-    showInfo, 
-    clear 
-  };
+  return useMemo(() => ({
+    message,
+    showSuccess,
+    showError,
+    showWarning,
+    showInfo,
+    clear
+  }), [message, showSuccess, showError, showWarning, showInfo, clear]);
 }

@@ -1,7 +1,5 @@
 import { useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '../supabase/Client';
-
-const IS_DEV = import.meta.env.DEV;
+import { readAdapter } from '../data/adapters/localAdapter.js';
 
 /**
  * Hook optimizado para suscribirse a cambios en tiempo real de Supabase
@@ -44,28 +42,22 @@ export function useRealtimeSubscription(table, options = {}) {
     const parsedFilter = JSON.parse(filterKey || '{}');
     const businessId = parsedFilter?.business_id || 'global';
     const channelName = `realtime:${table}:${businessId}`;
-    const channel = supabase.channel(channelName);
 
     // Construir filtro para Supabase
     const filterString = Object.keys(parsedFilter).length > 0
       ? Object.entries(parsedFilter).map(([key, value]) => `${key}=eq.${value}`).join(',')
       : undefined;
 
-    // Suscripción a cambios de Postgres
-    channel.on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table,
-        filter: filterString
-      },
-      (payload) => {
+    const channel = readAdapter.subscribeToPostgresChanges({
+      channelName,
+      table,
+      filter: filterString,
+      callback: (payload) => {
         // Validación para DELETE sin datos
         if (payload.eventType === 'DELETE' && !payload.old) {
           return;
         }
-        
+
         switch (payload.eventType) {
           case 'INSERT':
             handleInsert(payload);
@@ -78,12 +70,10 @@ export function useRealtimeSubscription(table, options = {}) {
             break;
         }
       }
-    );
-
-    channel.subscribe();
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      readAdapter.removeRealtimeChannel(channel);
     };
   }, [table, enabled, filterKey, handleInsert, handleUpdate, handleDelete]);
 }
@@ -102,7 +92,6 @@ export function useRealtimeSubscriptions(subscriptions = [], enabled = true) {
       const { table, filter = {}, onInsert, onUpdate, onDelete } = sub;
       
       const channelName = `realtime:${table}:${index}:${Date.now()}`;
-      const channel = supabase.channel(channelName);
 
       let filterString = '';
       if (Object.keys(filter).length > 0) {
@@ -111,15 +100,11 @@ export function useRealtimeSubscriptions(subscriptions = [], enabled = true) {
           .join(',');
       }
 
-      channel.on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: table,
-          filter: filterString || undefined
-        },
-        (payload) => {
+      const channel = readAdapter.subscribeToPostgresChanges({
+        channelName,
+        table,
+        filter: filterString || undefined,
+        callback: (payload) => {
           switch (payload.eventType) {
             case 'INSERT':
               if (onInsert) onInsert(payload.new);
@@ -132,14 +117,12 @@ export function useRealtimeSubscriptions(subscriptions = [], enabled = true) {
               break;
           }
         }
-      );
-
-      channel.subscribe();
+      });
       channels.push(channel);
     });
 
     return () => {
-      channels.forEach(channel => supabase.removeChannel(channel));
+      channels.forEach((channel) => readAdapter.removeRealtimeChannel(channel));
     };
   }, [subscriptions, enabled]);
 }

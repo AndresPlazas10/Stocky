@@ -1,9 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
-import { supabase } from '../../supabase/Client';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
+import { getSuppliersForManagement } from '../../data/queries/suppliersQueries.js';
+import {
+  deleteSupplierById,
+  saveSupplierWithTaxFallback
+} from '../../data/commands/suppliersCommands.js';
 
 import { 
   Trash2, 
@@ -19,16 +23,9 @@ import {
   Package,
   AlertTriangle
 } from 'lucide-react';
+import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
 
-const BASE_SUPPLIER_COLUMNS = 'id, business_id, business_name, contact_name, email, phone, address, notes, created_at';
-const isMissingColumnError = (err, columnName) => {
-  const text = `${err?.message || ''} ${err?.details || ''} ${err?.hint || ''}`.toLowerCase();
-  return (
-    err?.code === '42703' ||
-    err?.code === 'PGRST204' ||
-    (text.includes('column') && text.includes(columnName.toLowerCase()))
-  );
-};
+const _motionLintUsage = motion;
 
 function Proveedores({ businessId }) {
   const [proveedores, setProveedores] = useState([]);
@@ -57,44 +54,41 @@ function Proveedores({ businessId }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadProveedores = useCallback(async () => {
+    const offline = isOfflineMode();
+    const offlineSnapshotKey = `proveedores.list:${businessId}`;
+    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
+
+    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+      setProveedores(offlineSnapshot);
+    }
+
     try {
       setLoading(true);
-      const candidates = supplierTaxColumn === 'nit' ? ['nit', 'tax_id'] : ['tax_id', 'nit'];
-      let data = null;
-      let lastError = null;
-      let resolvedColumn = supplierTaxColumn;
+      const { suppliers, taxColumn } = await getSuppliersForManagement({
+        businessId,
+        preferredTaxColumn: supplierTaxColumn
+      });
 
-      for (const column of candidates) {
-        const result = await supabase
-          .from('suppliers')
-          .select(`${BASE_SUPPLIER_COLUMNS}, ${column}`)
-          .eq('business_id', businessId)
-          .order('created_at', { ascending: false });
+      if (taxColumn !== supplierTaxColumn) setSupplierTaxColumn(taxColumn);
+      const normalizedSuppliers = Array.isArray(suppliers) ? suppliers : [];
+      const hasLocalData = normalizedSuppliers.length > 0;
 
-        if (!result.error) {
-          data = result.data;
-          resolvedColumn = column;
-          lastError = null;
-          break;
-        }
-
-        lastError = result.error;
-        if (!isMissingColumnError(result.error, column)) {
-          break;
-        }
+      if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+        setProveedores(offlineSnapshot);
+        return;
       }
 
-      if (lastError) throw lastError;
-      if (resolvedColumn !== supplierTaxColumn) {
-        setSupplierTaxColumn(resolvedColumn);
+      setProveedores(normalizedSuppliers);
+      if (!offline || hasLocalData) {
+        saveOfflineSnapshot(offlineSnapshotKey, normalizedSuppliers);
       }
-
-      setProveedores((data || []).map((supplier) => ({
-        ...supplier,
-        nit: supplier.nit ?? supplier.tax_id ?? null
-      })));
     } catch (error) {
-      setError(`❌ Error al cargar los proveedores: ${error?.message || 'Error desconocido'}`);
+      if (offline) {
+        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
+        setProveedores(Array.isArray(cached) ? cached : []);
+      } else {
+        setError(`❌ Error al cargar los proveedores: ${error?.message || 'Error desconocido'}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -130,78 +124,38 @@ function Proveedores({ businessId }) {
         phone: formData.phone || null,
         address: formData.address || null,
         notes: formData.notes || null,
-        [supplierTaxColumn]: formData.nit || null
+        nit: formData.nit || null
       };
-      const fallbackTaxColumn = supplierTaxColumn === 'nit' ? 'tax_id' : 'nit';
 
-      if (editingSupplier) {
-        // Actualizar proveedor existente
-        let { error } = await supabase
-          .from('suppliers')
-          .update(supplierPayload)
-          .eq('id', editingSupplier.id)
-          .select()
-          .maybeSingle();
-
-        if (error && isMissingColumnError(error, supplierTaxColumn)) {
-          const retryPayload = { ...supplierPayload };
-          delete retryPayload[supplierTaxColumn];
-          retryPayload[fallbackTaxColumn] = formData.nit || null;
-
-          const retry = await supabase
-            .from('suppliers')
-            .update(retryPayload)
-            .eq('id', editingSupplier.id)
-            .select()
-            .maybeSingle();
-
-          error = retry.error;
-          if (!retry.error) {
-            setSupplierTaxColumn(fallbackTaxColumn);
-          }
-        }
-
-        if (error) throw error;
-      } else {
-        // Crear nuevo proveedor
-        let { error } = await supabase
-          .from('suppliers')
-          .insert({
-            business_id: businessId,
-            ...supplierPayload,
-            created_at: new Date().toISOString()
-          })
-          .select()
-          .maybeSingle();
-
-        if (error && isMissingColumnError(error, supplierTaxColumn)) {
-          const retryPayload = { ...supplierPayload };
-          delete retryPayload[supplierTaxColumn];
-          retryPayload[fallbackTaxColumn] = formData.nit || null;
-
-          const retry = await supabase
-            .from('suppliers')
-            .insert({
-              business_id: businessId,
-              ...retryPayload,
-              created_at: new Date().toISOString()
-            })
-            .select()
-            .maybeSingle();
-
-          error = retry.error;
-          if (!retry.error) {
-            setSupplierTaxColumn(fallbackTaxColumn);
-          }
-        }
-
-        if (error) throw error;
-      }
+      const result = await saveSupplierWithTaxFallback({
+        businessId,
+        formData: supplierPayload,
+        supplierId: editingSupplier?.id || null,
+        preferredTaxColumn: supplierTaxColumn
+      });
+      const { taxColumn } = result;
+      if (taxColumn !== supplierTaxColumn) setSupplierTaxColumn(taxColumn);
 
       // Código de éxito
-      setSuccess(editingSupplier ? 'Proveedor actualizado exitosamente' : 'Proveedor creado exitosamente');
+      setSuccess(
+        result?.localOnly
+          ? (editingSupplier ? 'Proveedor actualizado localmente (pendiente sync)' : 'Proveedor creado localmente (pendiente sync)')
+          : (editingSupplier ? 'Proveedor actualizado exitosamente' : 'Proveedor creado exitosamente')
+      );
       resetForm();
-      await loadProveedores();
+      if (result?.localOnly) {
+        setProveedores((prev) => {
+          const nextSupplier = result?.supplier || null;
+          if (!nextSupplier) return prev;
+
+          if (editingSupplier?.id) {
+            return prev.map((item) => (item.id === editingSupplier.id ? { ...item, ...nextSupplier } : item));
+          }
+          return [nextSupplier, ...prev];
+        });
+      } else {
+        await loadProveedores();
+      }
       setShowModal(false);
       
     } catch (error) {
@@ -235,13 +189,18 @@ function Proveedores({ businessId }) {
     if (!supplierToDelete) return;
 
     try {
-      const { error } = await supabase
-        .from('suppliers')
-        .delete()
-        .eq('id', supplierToDelete);
-
-      if (error) {
-        if (error.code === '23503') {
+      try {
+        const result = await deleteSupplierById({
+          supplierId: supplierToDelete,
+          businessId
+        });
+        if (result?.localOnly) {
+          setProveedores((prev) => prev.filter((item) => item.id !== supplierToDelete));
+        } else {
+          loadProveedores();
+        }
+      } catch (error) {
+        if (error?.code === '23503') {
           setError('❌ No se puede eliminar este proveedor porque tiene compras asociadas');
           setShowDeleteModal(false);
           setSupplierToDelete(null);
@@ -251,7 +210,6 @@ function Proveedores({ businessId }) {
       }
 
       setSuccess('✅ Proveedor eliminado exitosamente');
-      loadProveedores();
       setShowDeleteModal(false);
       setSupplierToDelete(null);
     } catch {
@@ -259,7 +217,7 @@ function Proveedores({ businessId }) {
       setShowDeleteModal(false);
       setSupplierToDelete(null);
     }
-  }, [supplierToDelete, loadProveedores]);
+  }, [supplierToDelete, businessId, loadProveedores]);
 
   const cancelDelete = useCallback(() => {
     setShowDeleteModal(false);

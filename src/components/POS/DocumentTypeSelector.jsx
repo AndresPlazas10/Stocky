@@ -20,6 +20,8 @@ import {
   Zap
 } from 'lucide-react'
 
+const _motionLintUsage = motion;
+
 export const DOCUMENT_TYPES = {
   RECEIPT: 'receipt',           // Comprobante de venta (sin validez fiscal)
   ELECTRONIC_INVOICE: 'invoice' // Factura electrónica DIAN
@@ -178,11 +180,11 @@ export default function DocumentTypeSelector({
 // Componente de tarjeta
 // ============================================
 function DocumentTypeCard({ 
-  type,
+  _type,
   selected, 
   disabled, 
   onClick, 
-  icon: Icon,
+  icon: _Icon,
   title, 
   description,
   badge,
@@ -221,7 +223,7 @@ function DocumentTypeCard({
       {/* Icono y título */}
       <div className="flex items-start gap-3 mb-3">
         <div className={`p-2 rounded-lg ${selected ? 'bg-accent-100' : 'bg-gray-100'}`}>
-          <Icon className={`w-5 h-5 ${selected ? 'text-accent-600' : 'text-gray-600'}`} />
+          <_Icon className={`w-5 h-5 ${selected ? 'text-accent-600' : 'text-gray-600'}`} />
         </div>
         <div className="flex-1">
           <h4 className={`font-semibold ${selected ? 'text-accent-700' : 'text-gray-800'}`}>
@@ -277,7 +279,7 @@ function CompactOption({ _type, label, description, icon: _Icon, selected, disab
       }`}
     >
       <div className={`p-2 rounded-lg ${selected ? 'bg-accent-100' : 'bg-gray-100'}`}>
-        <Icon className={`w-4 h-4 ${selected ? 'text-accent-600' : 'text-gray-600'}`} />
+        <_Icon className={`w-4 h-4 ${selected ? 'text-accent-600' : 'text-gray-600'}`} />
       </div>
       <div className="flex-1">
         <p className={`text-sm font-medium ${selected ? 'text-accent-700' : 'text-gray-800'}`}>

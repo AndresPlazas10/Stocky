@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 
 import { cn } from '@/lib/utils';
 
+const _motionLintUsage = motion;
+
 export function ModernCard({ 
   children, 
   className,

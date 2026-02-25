@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { supabase } from '../supabase/Client.jsx';
+import {
+  getAuthenticatedUser,
+  getBusinessById,
+  getEmployeeByUserId
+} from '../data/queries/authQueries.js';
+import { signOutGlobalSession } from '../data/commands/authCommands.js';
 import PaymentWarningModal from '../components/PaymentWarningModal.jsx';
 import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
 import PlatformUpdateModal from '../components/PlatformUpdateModal.jsx';
@@ -8,6 +13,9 @@ import { shouldShowPaymentWarning } from '../config/unpaidBusinesses.js';
 import Ventas from '../components/Dashboard/Ventas.jsx';
 import Inventario from '../components/Dashboard/Inventario.jsx';
 import Mesas from '../components/Dashboard/Mesas.jsx';
+import { warmupDashboardData } from '../services/dashboardWarmupService.js';
+import { useWarmupStatus } from '../hooks/useWarmupStatus.js';
+import { WarmupStatusBadge } from '../components/WarmupStatusBadge.jsx';
 import { 
   Home, 
   ShoppingCart, 
@@ -33,15 +41,40 @@ function EmployeeDashboard() {
   const [showPaymentWarning, setShowPaymentWarning] = useState(false);
   const [isBusinessDisabled, setIsBusinessDisabled] = useState(false);
   const [authUserId, setAuthUserId] = useState(null);
+  const warmupStatus = useWarmupStatus(business?.id);
 
   useEffect(() => {
     checkEmployeeAuth();
   }, []);
 
+  useEffect(() => {
+    if (!business?.id) return;
+    warmupDashboardData(business.id).catch(() => {});
+  }, [business?.id]);
+
+  useEffect(() => {
+    if (!business?.id || typeof window === 'undefined') return undefined;
+
+    const handleOnline = () => {
+      warmupDashboardData(business.id, { force: true }).catch(() => {});
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [business?.id]);
+
   const checkEmployeeAuth = async () => {
     try {
       // Verificar autenticación
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      let user = null;
+      let userError = null;
+      try {
+        user = await getAuthenticatedUser();
+      } catch (error) {
+        userError = error;
+      }
       
       
       if (userError || !user) {
@@ -51,11 +84,13 @@ function EmployeeDashboard() {
       setAuthUserId(user.id);
 
       // Buscar el empleado directamente en la tabla employees
-      const { data: employeeData, error: employeeError } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      let employeeData = null;
+      let employeeError = null;
+      try {
+        employeeData = await getEmployeeByUserId(user.id, '*');
+      } catch (error) {
+        employeeError = error;
+      }
 
       if (employeeError) {
         // Error al verificar empleado
@@ -78,11 +113,13 @@ function EmployeeDashboard() {
       }
 
       // Obtener el negocio
-      const { data: businessData, error: businessError } = await supabase
-        .from('businesses')
-        .select('*')
-        .eq('id', employeeData.business_id)
-        .maybeSingle();
+      let businessData = null;
+      let businessError = null;
+      try {
+        businessData = await getBusinessById(employeeData.business_id, '*');
+      } catch (error) {
+        businessError = error;
+      }
 
       if (businessError || !businessData) {
         // Error al cargar negocio
@@ -130,11 +167,7 @@ function EmployeeDashboard() {
       sessionStorage.clear();
       
       // Cerrar sesión en Supabase con scope global
-      const { error } = await supabase.auth.signOut({ scope: 'global' });
-      
-      if (error) {
-        // Error al cerrar sesión
-      }
+      await signOutGlobalSession();
       
       // Redirigir siempre, incluso si hay error
       window.location.href = '/';
@@ -365,7 +398,10 @@ function EmployeeDashboard() {
             >
               <Menu className="w-6 h-6 text-gray-600" />
             </button>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-800">Panel de Empleado</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl md:text-2xl font-bold text-gray-800">Panel de Empleado</h1>
+              <WarmupStatusBadge status={warmupStatus} />
+            </div>
           </div>
           
           <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">

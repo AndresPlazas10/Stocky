@@ -2,8 +2,10 @@ import { motion } from 'framer-motion';
 
 import { Package, FileText, Inbox } from 'lucide-react';
 
+const _motionLintUsage = motion;
+
 export const EmptyState = ({
-  icon: Icon = Inbox,
+  icon: _Icon = Inbox,
   title = 'No hay datos',
   message = 'No se encontraron elementos para mostrar',
   action,
@@ -16,7 +18,7 @@ export const EmptyState = ({
       className="flex flex-col items-center justify-center py-12 px-4 text-center"
     >
       <div className="w-20 h-20 rounded-full bg-accent-100 flex items-center justify-center mb-4">
-        <Icon className="w-10 h-10 text-accent-600" />
+        <_Icon className="w-10 h-10 text-accent-600" />
       </div>
       <h3 className="text-xl font-semibold text-primary-900 mb-2">{title}</h3>
       <p className="text-primary-600 mb-6 max-w-sm">{message}</p>

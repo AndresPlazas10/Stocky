@@ -1,6 +1,8 @@
 import { Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+const _motionLintUsage = motion;
+
 /**
  * Floating Action Button (FAB) para móvil
  * - Botón flotante en esquina inferior derecha
@@ -10,7 +12,7 @@ import { motion } from 'framer-motion';
  */
 export function FloatingActionButton({ 
   onClick, 
-  icon: Icon = Plus, 
+  icon: _Icon = Plus, 
   label = "Añadir",
   show = true,
   variant = "primary" // primary | secondary | accent
@@ -46,7 +48,7 @@ export function FloatingActionButton({
       `}
       aria-label={label}
     >
-      <Icon size={24} strokeWidth={2.5} />
+      <_Icon size={24} strokeWidth={2.5} />
     </motion.button>
   );
 }

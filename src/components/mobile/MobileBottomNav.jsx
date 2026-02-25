@@ -1,6 +1,8 @@
 import { Home, ShoppingCart, Package, FileText, Users, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+const _motionLintUsage = motion;
+
 /**
  * Bottom Navigation para móvil
  * Sigue las guías de Material Design para navegación inferior

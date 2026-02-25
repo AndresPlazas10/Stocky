@@ -4,6 +4,8 @@ import { AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
 
+const _motionLintUsage = motion;
+
 export function ModernModal({ 
   isOpen, 
   onClose, 

@@ -1,10 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createClient } from '@supabase/supabase-js';
-import { supabase } from '../../supabase/Client.jsx';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
+import {
+  getBusinessUsernameById,
+  getEmployeesForManagement,
+  isEmployeeUsernameTaken
+} from '../../data/queries/employeesQueries.js';
+import {
+  createEmployeeWithRpc,
+  deleteEmployeeWithRpcFallback
+} from '../../data/commands/employeesCommands.js';
 import { 
   Trash2, 
   Users, 
@@ -18,8 +25,12 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-const EMPLOYEE_LIST_COLUMNS = 'id, business_id, user_id, full_name, username, role, is_active, created_at';
 const _motionLintUsage = motion;
+
+function isOwnerRole(role) {
+  const normalized = String(role || '').trim().toLowerCase();
+  return normalized === 'owner' || normalized === 'propietario';
+}
 
 function Empleados({ businessId }) {
   const [empleados, setEmpleados] = useState([]);
@@ -43,41 +54,14 @@ function Empleados({ businessId }) {
     role: 'employee'
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const isolatedAuthClient = useMemo(() => (
-    createClient(
-      import.meta.env.VITE_SUPABASE_URL,
-      import.meta.env.VITE_SUPABASE_ANON_KEY,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false
-        }
-      }
-    )
-  ), []);
 
   const loadEmpleados = useCallback(async () => {
     try {
       setLoading(true);
-      
-      // ✅ CORREGIDO: Cargar solo empleados (ya no existe employee_invitations)
-      const { data: employees, error: empError } = await supabase
-        .from('employees')
-        .select(EMPLOYEE_LIST_COLUMNS)
-        .eq('business_id', businessId)
-        .order('created_at', { ascending: false });
 
-      if (empError) throw empError;
-
-      // Todos los empleados son activos (ya no hay estado pendiente)
-      const employeesWithStatus = (employees || []).map(emp => ({
-        ...emp,
-        is_active: emp.is_active !== false, // Asegurar que is_active sea booleano
-        status: emp.is_active !== false ? 'active' : 'inactive'
-      }));
-      
-      setEmpleados(employeesWithStatus);
+      const employees = await getEmployeesForManagement(businessId);
+      // Ocultar propietario en la UI de empleados.
+      setEmpleados((employees || []).filter((employee) => !isOwnerRole(employee?.role)));
     } catch {
       // Error al cargar empleados
       setError('❌ Error al cargar la lista de empleados');
@@ -151,116 +135,27 @@ function Empleados({ businessId }) {
       }
 
       // Verificar username duplicado
-      const { data: existingEmployee } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('business_id', businessId)
-        .eq('username', cleanUsername)
-        .maybeSingle();
-
-      if (existingEmployee) {
+      const usernameTaken = await isEmployeeUsernameTaken({
+        businessId,
+        username: cleanUsername
+      });
+      if (usernameTaken) {
         throw new Error('❌ Ya existe un empleado con este nombre de usuario');
       }
 
       // Verificar que no sea el username del negocio
-      const { data: businessData } = await supabase
-        .from('businesses')
-        .select('username')
-        .eq('id', businessId)
-        .maybeSingle();
-
-      if (businessData && businessData.username === cleanUsername) {
+      const businessUsername = await getBusinessUsernameById(businessId);
+      if (businessUsername && businessUsername === cleanUsername) {
         throw new Error('No puedes usar el nombre de usuario del negocio');
       }
 
-      const cleanEmail = `${cleanUsername}@stockly-app.com`;
-
-      // 💾 GUARDAR SESIÓN DEL ADMIN ANTES DE CREAR EL EMPLEADO
-      const { data: { session: adminSession } } = await supabase.auth.getSession();
-      
-      if (!adminSession) {
-        throw new Error('No hay sesión activa de administrador');
-      }
-
-      // Crear cuenta Auth para el empleado en cliente aislado
-      // para no reemplazar la sesión activa del administrador.
-      const { data: authData, error: authError } = await isolatedAuthClient.auth.signUp({
-        email: cleanEmail,
+      await createEmployeeWithRpc({
+        businessId,
+        fullName: formData.full_name.trim(),
+        username: cleanUsername,
         password: cleanPassword,
-        options: {
-          data: {
-            full_name: formData.full_name.trim(),
-            role: fixedRole
-          }
-        }
+        role: fixedRole
       });
-
-      if (authError) {
-        // Mensajes de error mejorados
-        const errorMsg = authError.message || '';
-        
-        if (errorMsg.includes('already registered') || errorMsg === 'User already registered') {
-          throw new Error('❌ Ya existe un empleado con este nombre de usuario');
-        }
-        if (errorMsg.includes('password')) {
-          throw new Error('❌ La contraseña debe tener al menos 6 caracteres');
-        }
-        if (errorMsg.includes('email')) {
-          throw new Error('❌ El formato del correo es inválido');
-        }
-        throw new Error(`❌ Error al crear la cuenta: ${errorMsg}`);
-      }
-
-      if (!authData.user) throw new Error('❌ Error al crear la cuenta del empleado');
-      if (!authData.session) throw new Error('❌ La confirmación de email debe estar desactivada en Supabase');
-
-      // Crear empleado usando función SECURITY DEFINER (bypasea RLS)
-      // Pasamos adminSession.user.id como p_admin_user_id porque la sesión ya cambió
-      const { data: employeeId, error: createEmployeeError } = await supabase
-        .rpc('create_employee', {
-          p_business_id: businessId,
-          p_user_id: authData.user.id,
-          p_role: fixedRole,
-          p_full_name: formData.full_name.trim(),
-          p_email: cleanEmail,
-          p_username: cleanUsername,
-          p_access_code: null,
-          p_is_active: true,
-          p_admin_user_id: adminSession.user.id  // ⚡ Pasar el ID del admin explícitamente
-        });
-
-      if (createEmployeeError) {
-        // Errores mejorados de la base de datos
-        const errorMsg = createEmployeeError.message || '';
-        
-        // Error 23505: Violación de constraint único
-        if (errorMsg.includes('23505') || errorMsg.includes('duplicate key')) {
-          if (errorMsg.includes('username')) {
-            throw new Error('❌ Ya existe un empleado con este nombre de usuario');
-          }
-          if (errorMsg.includes('email')) {
-            throw new Error('❌ Ya existe un empleado con este correo');
-          }
-          throw new Error('❌ Este empleado ya existe en tu negocio');
-        }
-        
-        // Error de permisos
-        if (errorMsg.includes('permission denied') || errorMsg.includes('42501')) {
-          throw new Error('❌ No tienes permisos para crear empleados. Contacta al administrador');
-        }
-        
-        // Función no existe
-        if (errorMsg.includes('function') && errorMsg.includes('does not exist')) {
-          throw new Error('❌ Error de configuración. Ejecuta las migraciones de hardening de empleados en Supabase');
-        }
-        
-        // Error genérico
-        throw new Error(`❌ Error al crear el registro: ${errorMsg}`);
-      }
-      
-      if (!employeeId) {
-        throw new Error('No se pudo crear el empleado (función retornó null)');
-      }
 
       // Código de éxito
       setGeneratedCode({
@@ -280,7 +175,7 @@ function Empleados({ businessId }) {
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear
     }
-  }, [businessId, formData, loadEmpleados, isSubmitting, isolatedAuthClient]);
+  }, [businessId, formData, loadEmpleados, isSubmitting]);
 
   const handleDelete = useCallback((empleado) => {
     setEmployeeToDelete(empleado);
@@ -291,35 +186,10 @@ function Empleados({ businessId }) {
     if (!employeeToDelete) return;
 
     try {
-      // ✅ CORREGIDO: Solo manejar empleados activos (ya no hay invitaciones pendientes)
-      
-      // Camino principal: función segura versionada para eliminar empleado.
-      let empError = null;
-      const { error: deleteEmployeeError } = await supabase.rpc('delete_employee', {
-        p_employee_id: employeeToDelete.id
+      await deleteEmployeeWithRpcFallback({
+        employeeId: employeeToDelete.id,
+        businessId
       });
-
-      if (deleteEmployeeError) {
-        const missingDeleteEmployeeFn = deleteEmployeeError?.message?.includes('delete_employee')
-          && deleteEmployeeError?.message?.includes('does not exist');
-
-        if (missingDeleteEmployeeFn) {
-          // Fallback temporal en entornos aún sin migración.
-          const { error } = await supabase
-            .from('employees')
-            .delete()
-            .eq('id', employeeToDelete.id)
-            .eq('business_id', businessId);
-          empError = error;
-        } else {
-          empError = deleteEmployeeError;
-        }
-      }
-
-      if (empError) {
-        // Error al eliminar empleado
-        throw new Error('Error al eliminar el empleado');
-      }
 
       setSuccess('✅ Empleado eliminado exitosamente');
 

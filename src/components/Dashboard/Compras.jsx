@@ -1,8 +1,23 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '../../supabase/Client.jsx';
 import PurchaseFilters from '../Filters/PurchaseFilters';
 import { getFilteredPurchases } from '../../services/purchasesService';
+import {
+  createPurchaseWithRpcFallback,
+  deletePurchaseWithStockFallback
+} from '../../data/commands/purchasesCommands.js';
+import {
+  getEmployeeRoleByBusinessAndUser,
+  getEmployeesByBusiness,
+  getProductsForPurchase,
+  getPurchaseDetailsWithProductByPurchaseId,
+  getSupplierById,
+  getSuppliersForBusiness
+} from '../../data/queries/purchasesQueries.js';
+import {
+  getAuthenticatedUser,
+  getBusinessOwnerById
+} from '../../data/queries/authQueries.js';
 import { formatPrice, formatDateOnly } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
@@ -28,11 +43,9 @@ import {
   Search
 } from 'lucide-react';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
+import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
 
 const _motionLintUsage = motion;
-
-const PRODUCT_LIST_COLUMNS = 'id, name, purchase_price, supplier_id, stock, manage_stock, is_active';
-const SUPPLIER_LIST_COLUMNS = 'id, business_name, contact_name';
 
 const getPaymentMethodLabel = (method) => {
   const value = String(method || '').toLowerCase();
@@ -43,15 +56,27 @@ const getPaymentMethodLabel = (method) => {
   return method || '-';
 };
 
-const isMissingCreatePurchaseRpcError = (error) => {
-  const code = String(error?.code || '');
-  const message = String(error?.message || '').toLowerCase();
+const isConnectivityError = (errorLike) => {
+  const message = String(errorLike?.message || errorLike || '').toLowerCase();
   return (
-    code === 'PGRST202'
-    || code === '42883'
-    || message.includes('create_purchase_complete')
+    message.includes('failed to fetch')
+    || message.includes('networkerror')
+    || message.includes('network request failed')
+    || message.includes('fetch failed')
+    || message.includes('load failed')
+    || message.includes('network')
+    || message.includes('sin conexión')
+    || message.includes('sin conexion')
   );
 };
+
+const formatLoadError = (resourceLabel, errorLike) => {
+  if (isConnectivityError(errorLike)) {
+    return `⚠️ Sin conexión. No se pudieron cargar ${resourceLabel}. Verifica tu internet y reintenta.`;
+  }
+  return `❌ Error al cargar ${resourceLabel}: ${errorLike?.message || 'Error desconocido'}`;
+};
+
 
 function Compras({ businessId }) {
   const [compras, setCompras] = useState([]);
@@ -81,6 +106,15 @@ function Compras({ businessId }) {
   const [isAdmin, setIsAdmin] = useState(false);
 
   const loadCompras = useCallback(async (filters = currentFiltersPurchases, pagination = {}) => {
+    const offline = isOfflineMode();
+    const offlineSnapshotKey = `compras.list:${businessId}`;
+    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
+
+    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+      setCompras(offlineSnapshot);
+      setTotalCountPurchases(offlineSnapshot.length);
+    }
+
     try {
       setLoading(true);
       const lim = Number(pagination.limit ?? limitPurchases);
@@ -100,6 +134,11 @@ function Compras({ businessId }) {
       }
 
       if (!purchasesData || purchasesData.length === 0) {
+        if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+          setCompras(offlineSnapshot);
+          setTotalCountPurchases(offlineSnapshot.length);
+          return;
+        }
         setCompras([]);
         if (typeof count === 'number') {
           setTotalCountPurchases(count);
@@ -115,6 +154,9 @@ function Compras({ businessId }) {
 
       if (alreadyEnriched) {
         setCompras(purchasesData);
+        if (!offline || purchasesData.length > 0) {
+          saveOfflineSnapshot(offlineSnapshotKey, purchasesData);
+        }
         if (typeof count === 'number') {
           setTotalCountPurchases(count);
         } else if (!includeCount) {
@@ -124,15 +166,11 @@ function Compras({ businessId }) {
       }
 
       // Obtener business y datos relacionados
-      const [businessResult, employeesResult, suppliersResult] = await Promise.all([
-        supabase.from('businesses').select('created_by').eq('id', businessId).maybeSingle(),
-        supabase.from('employees').select('user_id, full_name, role').eq('business_id', businessId),
-        supabase.from('suppliers').select(SUPPLIER_LIST_COLUMNS).eq('business_id', businessId)
+      const [business, employeesData, suppliersData] = await Promise.all([
+        getBusinessOwnerById(businessId),
+        getEmployeesByBusiness(businessId),
+        getSuppliersForBusiness(businessId)
       ]);
-
-      const business = businessResult.data;
-      const employeesData = employeesResult.data || [];
-      const suppliersData = suppliersResult.data || [];
 
       const employeeMap = new Map();
       employeesData.forEach(emp => employeeMap.set(emp.user_id, { full_name: emp.full_name || 'Usuario', role: emp.role }));
@@ -156,46 +194,91 @@ function Compras({ businessId }) {
       });
 
       setCompras(purchasesWithEmployees);
+      if (!offline || purchasesWithEmployees.length > 0) {
+        saveOfflineSnapshot(offlineSnapshotKey, purchasesWithEmployees);
+      }
       if (typeof count === 'number') {
         setTotalCountPurchases(count);
       } else if (!includeCount) {
         setTotalCountPurchases(off + purchasesWithEmployees.length);
       }
     } catch (error) {
-      setError(`❌ Error al cargar las compras: ${error?.message || 'Error desconocido'}`);
+      if (offline) {
+        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
+        const safe = Array.isArray(cached) ? cached : [];
+        setCompras(safe);
+        setTotalCountPurchases(safe.length);
+      } else {
+        setError(formatLoadError('las compras', error));
+      }
     } finally {
       setLoading(false);
     }
   }, [businessId, pagePurchases, limitPurchases, currentFiltersPurchases]);
 
   const loadProductos = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(PRODUCT_LIST_COLUMNS)
-        .eq('business_id', businessId)
-        .eq('is_active', true);
+    const offline = isOfflineMode();
+    const offlineSnapshotKey = `compras.productos:${businessId}`;
+    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
 
-      if (error) throw error;
-      setProductos(data || []);
+    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+      setProductos(offlineSnapshot);
+    }
+
+    try {
+      const data = await getProductsForPurchase(businessId);
+      const normalizedData = Array.isArray(data) ? data : [];
+      const hasLocalData = normalizedData.length > 0;
+
+      if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+        setProductos(offlineSnapshot);
+        return;
+      }
+
+      setProductos(normalizedData);
+      if (!offline || hasLocalData) {
+        saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
+      }
     } catch {
-      // Error silencioso
+      if (offline) {
+        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
+        setProductos(Array.isArray(cached) ? cached : []);
+      }
     }
   }, [businessId]);
 
   const loadProveedores = useCallback(async () => {
+    const offline = isOfflineMode();
+    const offlineSnapshotKey = `compras.proveedores:${businessId}`;
+    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
+
+    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+      setProveedores(offlineSnapshot);
+    }
+
     try {
       setLoadingSuppliers(true);
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select(SUPPLIER_LIST_COLUMNS)
-        .eq('business_id', businessId);
+      const data = await getSuppliersForBusiness(businessId);
+      const normalizedData = Array.isArray(data) ? data : [];
+      const hasLocalData = normalizedData.length > 0;
 
-      if (error) throw error;
-      setProveedores(data || []);
+      if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+        setProveedores(offlineSnapshot);
+        return;
+      }
+
+      setProveedores(normalizedData);
+      if (!offline || hasLocalData) {
+        saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
+      }
     } catch (error) {
-      setProveedores([]);
-      setError(`❌ Error al cargar proveedores: ${error?.message || 'Error desconocido'}`);
+      if (offline) {
+        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
+        setProveedores(Array.isArray(cached) ? cached : []);
+      } else {
+        setProveedores([]);
+        setError(formatLoadError('proveedores', error));
+      }
     } finally {
       setLoadingSuppliers(false);
     }
@@ -205,25 +288,19 @@ function Compras({ businessId }) {
   useEffect(() => {
     const checkAdminRole = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await getAuthenticatedUser();
         if (!user || !businessId) return;
 
-        const [businessResult, employeeResult] = await Promise.all([
-          supabase
-            .from('businesses')
-            .select('created_by')
-            .eq('id', businessId)
-            .maybeSingle(),
-          supabase
-            .from('employees')
-            .select('role')
-            .eq('business_id', businessId)
-            .eq('user_id', user.id)
-            .maybeSingle()
+        const [business, employeeRole] = await Promise.all([
+          getBusinessOwnerById(businessId),
+          getEmployeeRoleByBusinessAndUser({
+            businessId,
+            userId: user.id
+          })
         ]);
 
-        const isOwner = user.id === businessResult.data?.created_by;
-        const isAdminRole = employeeResult.data?.role === 'admin';
+        const isOwner = user.id === business?.created_by;
+        const isAdminRole = employeeRole === 'admin';
         
         setIsAdmin(isOwner || isAdminRole);
       } catch {
@@ -256,26 +333,11 @@ function Compras({ businessId }) {
     enabled: !!businessId,
     onInsert: async (newPurchase) => {
       // Cargar datos del proveedor, business y empleados
-      const [supplierResult, businessResult, employeesResult] = await Promise.all([
-        supabase
-          .from('suppliers')
-          .select('business_name, contact_name')
-          .eq('id', newPurchase.supplier_id)
-          .single(),
-        supabase
-          .from('businesses')
-          .select('created_by')
-          .eq('id', businessId)
-          .single(),
-        supabase
-          .from('employees')
-          .select('user_id, full_name, role')
-          .eq('business_id', businessId)
+      const [supplier, business, employeesData] = await Promise.all([
+        getSupplierById(newPurchase.supplier_id),
+        getBusinessOwnerById(businessId),
+        getEmployeesByBusiness(businessId)
       ]);
-
-      const { data: supplier } = supplierResult;
-      const { data: business } = businessResult;
-      const { data: employeesData } = employeesResult;
 
       // Crear mapa de empleados
       const employeeMap = new Map();
@@ -346,6 +408,11 @@ function Compras({ businessId }) {
   }, [success, error]);
 
   const addToCart = useCallback((producto) => {
+    if (producto?.manage_stock === false) {
+      setError('❌ Este producto no maneja stock y no puede registrarse en compras.');
+      return;
+    }
+
     setCart(prevCart => {
       const existing = prevCart.find(item => item.product_id === producto.id);
       
@@ -361,7 +428,8 @@ function Compras({ businessId }) {
         product_id: producto.id,
         product_name: producto.name,
         quantity: 1,
-        unit_price: producto.purchase_price || 0
+        unit_price: producto.purchase_price || 0,
+        manage_stock: producto.manage_stock !== false
       }];
     });
   }, []);
@@ -404,120 +472,36 @@ function Compras({ businessId }) {
     try {
       if (!supplierId) throw new Error('Selecciona un proveedor');
       if (cart.length === 0) throw new Error('Agrega al menos un producto a la compra');
+      if (cart.some((item) => item?.manage_stock === false)) {
+        throw new Error('Hay productos sin control de stock en el carrito. Retíralos para continuar.');
+      }
       if (!total || total <= 0) throw new Error('El total de la compra debe ser mayor a 0');
 
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) throw new Error('Tu sesión ha expirado. Inicia sesión nuevamente.');
+      const user = await getAuthenticatedUser();
+      if (!user) throw new Error('Tu sesión ha expirado. Inicia sesión nuevamente.');
 
-      const createPurchaseLegacy = async () => {
-        // Insertar compra
-        const { data: purchase, error: purchaseError } = await supabase
-          .from('purchases')
-          .insert([{
-            business_id: businessId,
-            user_id: user.id,
-            supplier_id: supplierId,
-            payment_method: paymentMethod,
-            notes: notes || null,
-            total: total,
-            created_at: new Date().toISOString()
-          }])
-          .select()
-          .maybeSingle();
-
-        if (purchaseError) throw purchaseError;
-
-        // Insertar detalles
-        const purchaseDetails = cart.map(item => ({
-          purchase_id: purchase.id,
-          product_id: item.product_id,
-          quantity: item.quantity,
-          unit_cost: item.unit_price,
-          subtotal: item.quantity * item.unit_price
-        }));
-
-        const { error: detailsError } = await supabase
-          .from('purchase_details')
-          .insert(purchaseDetails);
-
-        if (detailsError) {
-          // Intentar rollback manual
-          await supabase.from('purchases').delete().eq('id', purchase.id);
-          throw detailsError;
-        }
-
-        // Actualizar stock y costo de forma consistente para todo el negocio
-        const productIds = [...new Set(cart.map(item => item.product_id))];
-        const { data: freshProducts, error: productsFetchError } = await supabase
-          .from('products')
-          .select('id, stock, manage_stock')
-          .eq('business_id', businessId)
-          .in('id', productIds);
-
-        if (productsFetchError) throw productsFetchError;
-
-        const stockMap = new Map((freshProducts || []).map((product) => [
-          product.id,
-          {
-            stock: Number(product.stock || 0),
-            manage_stock: product.manage_stock !== false
-          }
-        ]));
-        const purchaseItemMap = new Map(cart.map(item => [item.product_id, item]));
-
-        const updateResults = await Promise.all(
-          productIds.map(productId => {
-            const item = purchaseItemMap.get(productId);
-            const productState = stockMap.get(productId) || { stock: 0, manage_stock: true };
-            const currentStock = Number(productState.stock || 0);
-            const shouldManageStock = productState.manage_stock !== false;
-            const newStock = shouldManageStock
-              ? currentStock + Number(item.quantity || 0)
-              : currentStock;
-
-            return supabase
-              .from('products')
-              .update({
-                stock: newStock,
-                purchase_price: Number(item.unit_price || 0)
-              })
-              .eq('id', productId)
-              .eq('business_id', businessId);
-          })
-        );
-
-        const failedUpdate = updateResults.find(result => result.error);
-        if (failedUpdate?.error) throw failedUpdate.error;
-      };
-
-      const purchaseItemsPayload = cart.map((item) => ({
-        product_id: item.product_id,
-        quantity: Number(item.quantity),
-        unit_cost: Number(item.unit_price)
-      }));
-
-      const { error: rpcError } = await supabase.rpc('create_purchase_complete', {
-        p_business_id: businessId,
-        p_user_id: user.id,
-        p_supplier_id: supplierId,
-        p_payment_method: paymentMethod,
-        p_notes: notes || null,
-        p_items: purchaseItemsPayload
+      const result = await createPurchaseWithRpcFallback({
+        businessId,
+        userId: user.id,
+        supplierId,
+        paymentMethod,
+        notes,
+        total,
+        cart
       });
 
-      if (rpcError) {
-        if (isMissingCreatePurchaseRpcError(rpcError)) {
-          await createPurchaseLegacy();
-        } else {
-          throw rpcError;
-        }
-      }
-
-      setSuccess('✅ Compra registrada exitosamente');
+      setSuccess(
+        result?.localOnly
+          ? '✅ Compra guardada localmente. Se sincronizará al reconectar.'
+          : '✅ Compra registrada exitosamente'
+      );
       resetForm();
       setShowModal(false);
-      loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (pagePurchases - 1) * limitPurchases });
-      loadProductos();
+
+      if (!result?.localOnly) {
+        loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (pagePurchases - 1) * limitPurchases });
+        loadProductos();
+      }
       
     } catch (err) {
       setError('❌ Error al registrar la compra: ' + err.message);
@@ -549,15 +533,7 @@ function Compras({ businessId }) {
   const viewDetails = useCallback(async (purchase) => {
     setSelectedPurchase(purchase);
     try {
-      const { data, error } = await supabase
-        .from('purchase_details')
-        .select(`
-          *,
-          product:products(name, code, purchase_price)
-        `)
-        .eq('purchase_id', purchase.id);
-
-      if (error) throw error;
+      const data = await getPurchaseDetailsWithProductByPurchaseId(purchase.id);
       setSelectedPurchase({ ...purchase, details: data });
       setShowDetailsModal(true);
     } catch {
@@ -579,113 +555,10 @@ function Compras({ businessId }) {
     setSuccess('');
     
     try {
-      // Obtener detalles y stock previo para validar si el trigger de DELETE existe.
-      const { data: purchaseDetails, error: detailsFetchError } = await supabase
-        .from('purchase_details')
-        .select('product_id, quantity')
-        .eq('purchase_id', purchaseToDelete);
-
-      if (detailsFetchError) throw new Error('Error al consultar detalles: ' + detailsFetchError.message);
-
-      const groupedDetailsMap = new Map();
-      (purchaseDetails || []).forEach((detail) => {
-        const productId = detail.product_id;
-        const quantity = Number(detail.quantity || 0);
-        if (!productId || quantity <= 0) return;
-        groupedDetailsMap.set(productId, (groupedDetailsMap.get(productId) || 0) + quantity);
+      const { appliedManualFallback } = await deletePurchaseWithStockFallback({
+        purchaseId: purchaseToDelete,
+        businessId
       });
-
-      const groupedDetails = Array.from(groupedDetailsMap.entries()).map(([product_id, quantity]) => ({
-        product_id,
-        quantity
-      }));
-
-      const productIds = groupedDetails.map((item) => item.product_id);
-      let stockBeforeMap = new Map();
-
-      if (productIds.length > 0) {
-        const { data: productsBefore, error: productsBeforeError } = await supabase
-          .from('products')
-          .select('id, stock, manage_stock')
-          .eq('business_id', businessId)
-          .in('id', productIds);
-
-        if (productsBeforeError) throw new Error('Error al consultar stock previo: ' + productsBeforeError.message);
-        stockBeforeMap = new Map((productsBefore || []).map((p) => [
-          p.id,
-          {
-            stock: Number(p.stock || 0),
-            manage_stock: p.manage_stock !== false
-          }
-        ]));
-      }
-
-      // Eliminar detalles de compra (si existe trigger, aquí se revertirá automáticamente).
-      const { error: deleteDetailsError } = await supabase
-        .from('purchase_details')
-        .delete()
-        .eq('purchase_id', purchaseToDelete);
-
-      if (deleteDetailsError) throw new Error('Error al eliminar detalles: ' + deleteDetailsError.message);
-
-      // Eliminar la compra
-      const { error: deleteError } = await supabase
-        .from('purchases')
-        .delete()
-        .eq('id', purchaseToDelete);
-
-      if (deleteError) throw new Error('Error al eliminar compra: ' + deleteError.message);
-
-      let appliedManualFallback = false;
-
-      // Fallback: si el stock no cambió, ajustar manualmente (ambientes sin trigger DELETE).
-      if (productIds.length > 0) {
-        const { data: productsAfter, error: productsAfterError } = await supabase
-          .from('products')
-          .select('id, stock, manage_stock')
-          .eq('business_id', businessId)
-          .in('id', productIds);
-
-        if (productsAfterError) throw new Error('Error al consultar stock posterior: ' + productsAfterError.message);
-
-        const stockAfterMap = new Map((productsAfter || []).map((p) => [
-          p.id,
-          {
-            stock: Number(p.stock || 0),
-            manage_stock: p.manage_stock !== false
-          }
-        ]));
-        const managedDetails = groupedDetails.filter((item) => {
-          const before = stockBeforeMap.get(item.product_id);
-          return before?.manage_stock !== false;
-        });
-        const noStockChanged = managedDetails.every((item) => {
-          const before = stockBeforeMap.get(item.product_id)?.stock;
-          const after = stockAfterMap.get(item.product_id)?.stock;
-          return Number.isFinite(before) && Number.isFinite(after) && before === after;
-        });
-
-        if (noStockChanged) {
-          const fallbackUpdates = managedDetails.map((item) => {
-            const currentStock = stockAfterMap.get(item.product_id)?.stock;
-            if (!Number.isFinite(currentStock)) {
-              return Promise.resolve({ error: new Error(`Stock no disponible para ${item.product_id}`) });
-            }
-
-            return supabase
-              .from('products')
-              .update({ stock: currentStock - item.quantity })
-              .eq('id', item.product_id)
-              .eq('business_id', businessId);
-          });
-
-          const fallbackResults = await Promise.all(fallbackUpdates);
-          const fallbackError = fallbackResults.find((result) => result.error)?.error;
-          if (fallbackError) throw new Error('Error al ajustar stock manualmente: ' + fallbackError.message);
-
-          appliedManualFallback = true;
-        }
-      }
 
       setSuccess(
         appliedManualFallback
@@ -1094,10 +967,15 @@ function Compras({ businessId }) {
                       {!supplierId ? 'Primero selecciona un proveedor...' : 'Seleccionar producto...'}
                     </option>
                     {productos
-                      .filter(producto => !supplierId || producto.supplier_id === supplierId)
+                      .filter(producto => (!supplierId || producto.supplier_id === supplierId))
                       .map(producto => (
-                        <option key={producto.id} value={producto.id}>
+                        <option
+                          key={producto.id}
+                          value={producto.id}
+                          disabled={producto.manage_stock === false}
+                        >
                           {producto.name} - {formatPrice(producto.purchase_price)}
+                          {producto.manage_stock === false ? ' (Sin control de stock)' : ''}
                         </option>
                       ))
                     }

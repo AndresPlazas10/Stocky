@@ -31,13 +31,16 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test": "node --test \"testing/**/*.test.js\"",
     "preview": "vite preview",
     "clean": "rm -rf dist node_modules",
     "reinstall": "npm run clean && npm install",
     "analyze": "vite build --mode analyze",
-    "check": "npm run lint && npm run build"
+    "check": "npm run lint && npm run build",
+    "predeploy": "npm run lint && npm run test && npm run build"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.3.15",
     "@emailjs/browser": "^4.4.1",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.15",

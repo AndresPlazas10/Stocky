@@ -1,6 +1,4 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { supabase } from '../../supabase/Client';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatDate } from '../../utils/formatters.js';
 import { AnimatePresence } from 'framer-motion';
@@ -8,6 +6,21 @@ import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { XCircle, AlertTriangle, Trash2 } from 'lucide-react';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
+import {
+  cancelInvoiceAndRestoreStock,
+  createInvoiceWithItemsAndStock,
+  deleteInvoiceCascade,
+  markInvoiceAsSent
+} from '../../data/commands/invoicesCommands.js';
+import {
+  getBusinessContextByUserId,
+  getInvoiceItemsByInvoiceId,
+  getInvoiceWithItemsById,
+  getInvoicesWithItemsByBusiness,
+  getProductsForInvoicesByBusiness,
+  getProductsStockByIds
+} from '../../data/queries/invoicesQueries.js';
+import { getAuthenticatedUser } from '../../data/queries/authQueries.js';
 
 const INVOICE_LIST_COLUMNS = `
   id,
@@ -29,9 +42,17 @@ const INVOICE_LIST_COLUMNS = `
   cancelled_at
 `;
 
+const INVOICE_ITEM_LIST_COLUMNS = `
+  id,
+  product_name,
+  quantity,
+  unit_price,
+  total
+`;
+
 const PRODUCT_INVOICE_COLUMNS = 'id, code, name, sale_price, stock, business_id, is_active';
 
-export default function Facturas({ userRole = 'admin' }) {
+export default function Facturas({ userRole = 'admin', businessId: businessIdProp = null }) {
   const [facturas, setFacturas] = useState([]);
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -67,81 +88,69 @@ export default function Facturas({ userRole = 'admin' }) {
   const [searchTerm, setSearchTerm] = useState('');
 
   const loadFacturas = useCallback(async (businessId) => {
-    const { data, error } = await supabase
-      .from('invoices')
-      .select(`
-        ${INVOICE_LIST_COLUMNS},
-        invoice_items (
-          id,
-          product_name,
-          quantity,
-          unit_price,
-          total
-        )
-      `)
-      .eq('business_id', businessId)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    setFacturas(data || []);
+    setFacturas(await getInvoicesWithItemsByBusiness({
+      businessId,
+      invoiceColumns: INVOICE_LIST_COLUMNS,
+      invoiceItemsColumns: INVOICE_ITEM_LIST_COLUMNS
+    }));
   }, []);
+
+  const resolveBusinessContext = useCallback(async () => {
+    if (businessIdProp) {
+      return {
+        userId: null,
+        businessId: businessIdProp,
+        employeeId: null
+      };
+    }
+
+    const user = await getAuthenticatedUser();
+
+    if (!user) {
+      const sessionError = new Error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+      sessionError.code = 'SESSION_EXPIRED';
+      throw sessionError;
+    }
+
+    const { businessId, employeeId } = await getBusinessContextByUserId(user.id);
+    if (!businessId) {
+      throw new Error('No se encontró información del negocio');
+    }
+
+    return {
+      userId: user.id,
+      businessId,
+      employeeId
+    };
+  }, [businessIdProp]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError || !user) {
-        setError('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 2000);
-        return;
-      }
-
-      let businessId = null;
-      let employeeId = null;
-
-      // Obtener business_id desde employees (tabla users no existe)
-      const { data: employee } = await supabase
-        .from('employees')
-        .select('id, business_id')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (employee) {
-        businessId = employee.business_id;
-        employeeId = employee.id;
-      }
-
-      if (!businessId) {
-        throw new Error('No se encontró información del negocio');
-      }
+      const { businessId } = await resolveBusinessContext();
 
       // Cargar facturas
-      const [, { data: productsData, error: productsError }] = await Promise.all([
+      const [, productsData] = await Promise.all([
         loadFacturas(businessId),
-        supabase
-          .from('products')
-          .select(PRODUCT_INVOICE_COLUMNS)
-          .eq('business_id', businessId)
-          .eq('is_active', true)
-          .order('name')
+        getProductsForInvoicesByBusiness(businessId, PRODUCT_INVOICE_COLUMNS)
       ]);
 
-      if (productsError) throw productsError;
-      setProductos(productsData || []);
+      setProductos(productsData);
 
       // Tabla customers eliminada - no cargar clientes
       setClientes([]);
 
     } catch (error) {
+      if (error?.code === 'SESSION_EXPIRED') {
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      }
       setError(error.message);
     } finally {
       setLoading(false);
     }
-  }, [loadFacturas]);
+  }, [loadFacturas, resolveBusinessContext]);
 
   useEffect(() => {
     loadData();
@@ -262,39 +271,11 @@ export default function Facturas({ userRole = 'admin' }) {
         throw new Error('El total de la factura debe ser mayor a 0');
       }
 
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError || !user) {
-        throw new Error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-      }
-
-      let businessId = null;
-      let employeeId = null;
-
-      const { data: employee } = await supabase
-        .from('employees')
-        .select('id, business_id')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (employee) {
-        businessId = employee.business_id;
-        employeeId = employee.id;
-      }
-
-      if (!businessId) {
-        throw new Error('No se encontró información del negocio');
-      }
+      const { businessId, employeeId } = await resolveBusinessContext();
 
       // Verificar stock disponible en una sola consulta
       const productIds = [...new Set(items.map(item => item.product_id).filter(Boolean))];
-      const { data: stockProducts, error: stockError } = await supabase
-        .from('products')
-        .select('id, stock, name')
-        .in('id', productIds);
-
-      if (stockError) throw new Error('Error al verificar stock de productos: ' + stockError.message);
+      const stockProducts = await getProductsStockByIds(productIds);
 
       const stockById = new Map((stockProducts || []).map((p) => [p.id, p]));
       for (const item of items) {
@@ -312,77 +293,26 @@ export default function Facturas({ userRole = 'admin' }) {
         customer_id_number: null
       };
 
-      // Generar número de factura
-      const { data: invoiceNumber, error: numberError } = await supabase
-        .rpc('generate_invoice_number', { p_business_id: businessId });
-
-      if (numberError) {
-        throw new Error('Error al generar número de factura: ' + numberError.message);
-      }
-
-      // Crear factura
-      const { data: invoice, error: invoiceError } = await supabase
-        .from('invoices')
-        .insert({
-          business_id: businessId,
-          employee_id: employeeId,
-          invoice_number: invoiceNumber,
-          ...customerData,
-          payment_method: paymentMethod,
-          subtotal: totalFactura,
-          tax: 0,
-          total: totalFactura,
-          notes,
-          status: 'pending',
-          issued_at: new Date().toISOString(),
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .maybeSingle();
-
-      if (invoiceError) throw new Error('Error al crear factura: ' + invoiceError.message);
-
-      // Crear items de factura
-      const invoiceItems = items.map(item => ({
-        invoice_id: invoice.id,
-        product_id: item.product_id,
-        product_name: item.product_name,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        total: item.total,
-        created_at: new Date().toISOString()
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('invoice_items')
-        .insert(invoiceItems);
-
-      if (itemsError) {
-        // Rollback: Eliminar factura si falla crear items
-        await supabase.from('invoices').delete().eq('id', invoice.id);
-        throw new Error('Error al crear items de factura: ' + itemsError.message);
-      }
-
-      // Reducir stock de productos en batch (una sola llamada)
-      const productUpdates = items.map(item => ({
-        product_id: item.product_id,
-        quantity: Number(item.quantity) || 0
-      })).filter(p => p.quantity > 0);
-      if (productUpdates.length > 0) {
-        const { error: stockError } = await supabase.rpc('update_stock_batch', {
-          product_updates: productUpdates
-        });
-        if (stockError) {
-          await supabase.from('invoices').delete().eq('id', invoice.id);
-          throw new Error('Error al actualizar inventario. No se creó la factura.');
-        }
-      }
+      const {
+        invoice,
+        invoiceNumber,
+        invoiceItems,
+        localOnly
+      } = await createInvoiceWithItemsAndStock({
+        businessId,
+        employeeId,
+        paymentMethod,
+        total: totalFactura,
+        notes,
+        items
+      });
 
       // Enviar factura por email si está habilitado
-      let emailSent = false;
       let successMessage = `✅ Factura ${invoiceNumber} creada exitosamente`;
 
-      if (sendEmailOnCreate && customerData.customer_email) {
+      if (localOnly) {
+        successMessage = `✅ Factura ${invoiceNumber} guardada localmente (pendiente sincronización)`;
+      } else if (sendEmailOnCreate && customerData.customer_email) {
         try {
           const emailResult = await sendInvoiceEmail({
             email: customerData.customer_email,
@@ -394,14 +324,10 @@ export default function Facturas({ userRole = 'admin' }) {
           });
           
           if (!emailResult.demo) {
-            await supabase
-              .from('invoices')
-              .update({ 
-                status: 'sent',
-                sent_at: new Date().toISOString()
-              })
-              .eq('id', invoice.id);
-            emailSent = true;
+            await markInvoiceAsSent({
+              invoiceId: invoice.id,
+              businessId
+            });
             successMessage = `✅ Factura ${invoiceNumber} creada y enviada a ${customerData.customer_email}`;
           } else {
             successMessage = `✅ Factura ${invoiceNumber} creada. ⚠️ Email NO enviado (configura EmailJS en Configuración)`;
@@ -417,12 +343,22 @@ export default function Facturas({ userRole = 'admin' }) {
       setTimeout(() => setSuccess(''), 8000);
       setShowForm(false);
       resetForm();
-      await loadFacturas(businessId);
+      if (localOnly) {
+        setFacturas((prev) => [
+          {
+            ...(invoice || {}),
+            invoice_items: invoiceItems || []
+          },
+          ...prev
+        ]);
+      } else {
+        await loadFacturas(businessId);
+      }
       
     } catch (error) {
       
       // Si es error de sesión, redirigir
-      if (error.message.includes('sesión ha expirado')) {
+      if (error?.code === 'SESSION_EXPIRED' || String(error?.message || '').includes('sesión ha expirado')) {
         setTimeout(() => {
           window.location.href = '/login';
         }, 2000);
@@ -446,25 +382,12 @@ export default function Facturas({ userRole = 'admin' }) {
   const handleSendToClient = async (facturaId) => {
     setLoading(true);
     setError('');
+    let shouldReloadAfterSend = true;
     
     try {
       // Obtener los datos completos de la factura
-      const { data: factura, error: facturaError } = await supabase
-        .from('invoices')
-        .select(`
-          *,
-          invoice_items (
-            id,
-            product_name,
-            quantity,
-            unit_price,
-            total
-          )
-        `)
-        .eq('id', facturaId)
-        .maybeSingle();
-
-      if (facturaError) throw new Error('Error al obtener factura: ' + facturaError.message);
+      const factura = await getInvoiceWithItemsById(facturaId, INVOICE_ITEM_LIST_COLUMNS);
+      if (!factura) throw new Error('Factura no encontrada');
 
       // Validar que la factura tenga email del cliente
       if (!factura.customer_email) {
@@ -486,17 +409,20 @@ export default function Facturas({ userRole = 'admin' }) {
         });
         
         // Actualizar estado de la factura a 'sent'
-        const { error: updateError } = await supabase
-          .from('invoices')
-          .update({ 
-            status: 'sent',
-            sent_at: new Date().toISOString()
-          })
-          .eq('id', facturaId);
+        const sentResult = await markInvoiceAsSent({
+          invoiceId: facturaId,
+          businessId: factura.business_id
+        });
 
-        if (updateError) throw updateError;
-
-        if (emailResult.demo) {
+        if (sentResult?.localOnly) {
+          shouldReloadAfterSend = false;
+          setFacturas((prev) => prev.map((item) => (
+            item.id === facturaId
+              ? { ...item, status: 'sent', sent_at: new Date().toISOString() }
+              : item
+          )));
+          setSuccess(`✅ Factura ${factura.invoice_number} marcada como enviada localmente (pendiente sincronización)`);
+        } else if (emailResult.demo) {
           setSuccess(`✅ Factura ${factura.invoice_number} marcada como enviada. ⚠️ Email NO enviado (modo demo - configura EmailJS)`);
         } else {
           setSuccess(`✅ Factura ${factura.invoice_number} enviada exitosamente a ${factura.customer_email}`);
@@ -509,31 +435,18 @@ export default function Facturas({ userRole = 'admin' }) {
       setTimeout(() => setSuccess(''), 8000);
       
       // Recargar facturas
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const { businessId } = await resolveBusinessContext();
       
-      if (userError || !user) {
-        setError('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 2000);
-        return;
-      }
-
-      // Obtener business_id desde employees (tabla users no existe)
-      const { data: employee } = await supabase
-        .from('employees')
-        .select('business_id')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
-      
-      let businessId = employee?.business_id;
-      
-      if (businessId) {
+      if (businessId && shouldReloadAfterSend) {
         await loadFacturas(businessId);
       }
 
     } catch (error) {
+      if (error?.code === 'SESSION_EXPIRED' || String(error?.message || '').includes('sesión ha expirado')) {
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      }
       // Error al enviar factura
       setError(error.message || 'Error desconocido al enviar factura');
       setTimeout(() => setError(''), 8000);
@@ -554,68 +467,33 @@ export default function Facturas({ userRole = 'admin' }) {
     setError('');
     
     try {
+      const { businessId } = await resolveBusinessContext();
+
       // Primero obtener los items de la factura antes de cancelarla
-      const { data: invoiceItems, error: itemsError } = await supabase
-        .from('invoice_items')
-        .select('product_id, quantity, product_name')
-        .eq('invoice_id', invoiceToCancel);
+      const invoiceItems = await getInvoiceItemsByInvoiceId(invoiceToCancel);
+      const { restoreError, localOnly } = await cancelInvoiceAndRestoreStock({
+        invoiceId: invoiceToCancel,
+        businessId,
+        invoiceItems
+      });
 
-      if (itemsError) throw new Error('Error al obtener items de la factura: ' + itemsError.message);
-
-      // Cancelar la factura (el trigger restaurará el stock automáticamente)
-      const { error: cancelError } = await supabase
-        .from('invoices')
-        .update({ 
-          status: 'cancelled',
-          cancelled_at: new Date().toISOString()
-        })
-        .eq('id', invoiceToCancel);
-
-      if (cancelError) throw new Error('Error al cancelar factura: ' + cancelError.message);
-
-      // Restaurar stock en batch si el trigger no lo hizo automáticamente
-      if (invoiceItems && invoiceItems.length > 0) {
-        try {
-          const { error: restoreError } = await supabase.rpc('restore_stock_batch', {
-            product_updates: invoiceItems.map(item => ({
-              product_id: item.product_id,
-              quantity: Number(item.quantity || 0)
-            }))
-          });
-          
-          if (restoreError) {
-          }
-        } catch (restoreErr) {
-          // Advertencia al restaurar stock
-          // No fallar la cancelación por esto
-        }
-      }
-
-      setSuccess(`✅ Factura cancelada y stock restaurado`);
+      setSuccess(
+        localOnly
+          ? '✅ Factura cancelada localmente (pendiente sync)'
+          : restoreError
+          ? '✅ Factura cancelada (⚠️ revisar restauración automática de stock)'
+          : '✅ Factura cancelada y stock restaurado'
+      );
       setTimeout(() => setSuccess(''), 5000);
       
       // Obtener business_id del usuario actual
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError || !user) {
-        setError('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 2000);
-        return;
-      }
-
-      // Obtener business_id desde employees (tabla users no existe)
-      const { data: employee } = await supabase
-        .from('employees')
-        .select('business_id')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
-      
-      let businessId = employee?.business_id;
-      
-      if (businessId) {
+      if (localOnly) {
+        setFacturas((prev) => prev.map((item) => (
+          item.id === invoiceToCancel
+            ? { ...item, status: 'cancelled', cancelled_at: new Date().toISOString() }
+            : item
+        )));
+      } else if (businessId) {
         await loadFacturas(businessId);
       }
 
@@ -623,6 +501,11 @@ export default function Facturas({ userRole = 'admin' }) {
       setInvoiceToCancel(null);
 
     } catch (error) {
+      if (error?.code === 'SESSION_EXPIRED' || String(error?.message || '').includes('sesión ha expirado')) {
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      }
       // Error al cancelar factura
       setError(error.message || 'Error desconocido al cancelar factura');
       setTimeout(() => setError(''), 8000);
@@ -646,48 +529,22 @@ export default function Facturas({ userRole = 'admin' }) {
     setError('');
     
     try {
-      // Eliminar items de factura primero (cascade debería hacerlo automático)
-      const { error: itemsError } = await supabase
-        .from('invoice_items')
-        .delete()
-        .eq('invoice_id', invoiceToDelete);
+      const { businessId } = await resolveBusinessContext();
+      const deleteResult = await deleteInvoiceCascade({
+        invoiceId: invoiceToDelete,
+        businessId
+      });
 
-      if (itemsError) throw new Error('Error al eliminar items: ' + itemsError.message);
-
-      // Eliminar la factura
-      const { error: deleteError } = await supabase
-        .from('invoices')
-        .delete()
-        .eq('id', invoiceToDelete);
-
-      if (deleteError) throw new Error('Error al eliminar factura: ' + deleteError.message);
-
-      setSuccess('✅ Factura eliminada exitosamente');
+      setSuccess(
+        deleteResult?.localOnly
+          ? '✅ Factura eliminada localmente (pendiente sync)'
+          : '✅ Factura eliminada exitosamente'
+      );
       setTimeout(() => setSuccess(''), 4000);
 
-      // Recargar facturas
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // Obtener business_id desde employees
-      const { data: employee } = await supabase
-        .from('employees')
-        .select('business_id')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
-      
-      let businessId = employee?.business_id;
-      
-      if (!businessId) {
-        const { data: employee } = await supabase
-          .from('employees')
-          .select('business_id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        businessId = employee?.business_id;
-      }
-      
-      if (businessId) {
+      if (deleteResult?.localOnly) {
+        setFacturas((prev) => prev.filter((item) => item.id !== invoiceToDelete));
+      } else if (businessId) {
         await loadFacturas(businessId);
       }
 
@@ -695,6 +552,11 @@ export default function Facturas({ userRole = 'admin' }) {
       setInvoiceToDelete(null);
 
     } catch (error) {
+      if (error?.code === 'SESSION_EXPIRED' || String(error?.message || '').includes('sesión ha expirado')) {
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      }
       // Error al eliminar factura
       setError(error.message || 'Error desconocido al eliminar factura');
       setTimeout(() => setError(''), 8000);

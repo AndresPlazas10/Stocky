@@ -9,7 +9,7 @@ import { motion } from 'framer-motion';
 
 import { useState } from 'react'
 
-import { 
+import {
   X, 
   FileText, 
   CheckCircle,
@@ -22,14 +22,16 @@ import {
   Shield,
   Clock
 } from 'lucide-react'
-import { supabase } from '../../supabase/Client'
+import { createInvoicingRequest } from '../../data/commands/settingsCommands.js'
+
+const _motionLintUsage = motion;
 
 export default function InvoicingActivationFlow({ 
   businessId, 
   businessName, 
   businessNit,
   onClose, 
-  onComplete 
+  _onComplete 
 }) {
   const [requestSent, setRequestSent] = useState(false)
   const [sending, setSending] = useState(false)
@@ -76,15 +78,17 @@ export default function InvoicingActivationFlow({
     
     try {
       // Guardar solicitud en la base de datos
-      const { error: dbError } = await supabase
-        .from('invoicing_requests')
-        .insert({
-          business_id: businessId,
-          status: 'pending',
-          nit_provided: businessNit || null,
-          contact_method: contactMethod,
-          message: message || null,
-        })
+      let dbError = null;
+      try {
+        await createInvoicingRequest({
+          businessId,
+          nitProvided: businessNit || null,
+          contactMethod,
+          message: message || null
+        });
+      } catch (error) {
+        dbError = error;
+      }
 
       if (dbError) {
         // Si ya existe una solicitud pendiente

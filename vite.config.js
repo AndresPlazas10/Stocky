@@ -20,6 +20,9 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['lucide-react', 'react', 'react-dom', 'react-router-dom'],
+    // PGlite usa import.meta.url para cargar pglite.data; si Vite lo prebundlea
+    // puede romper la ruta del bundle y caer en "Invalid FS bundle size".
+    exclude: ['@electric-sql/pglite'],
     esbuildOptions: {
       target: 'es2020',
     },
@@ -29,6 +32,26 @@ export default defineConfig({
     sourcemap: false,
     minify: 'terser',
     target: 'es2020',
+    rollupOptions: {
+      onwarn(warning, warn) {
+        const message = String(warning?.message || '')
+        const id = String(warning?.id || '')
+        const code = String(warning?.code || '')
+
+        // Known upstream browser-build noise from @electric-sql/pglite:
+        // - Dynamic NodeFS path in a browser target
+        // - internal eval emitted by wasm runtime bundle
+        if (
+          id.includes('@electric-sql/pglite/dist/fs/nodefs.js')
+          || (code === 'EVAL' && id.includes('@electric-sql/pglite/dist/index.js'))
+          || (id.includes('@electric-sql/pglite/dist/fs/nodefs.js') && message.includes('__vite-browser-external'))
+        ) {
+          return
+        }
+
+        warn(warning)
+      },
+    },
     terserOptions: {
       compress: {
         drop_console: true,

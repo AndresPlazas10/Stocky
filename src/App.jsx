@@ -3,8 +3,10 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { Loader2, AlertCircle, X } from 'lucide-react';
-import OfflineBanner from './components/OfflineBanner';
+import LOCAL_SYNC_CONFIG from './config/localSync.js';
 import PricingAnnouncementModal from './components/PricingAnnouncementModal';
+import { registerLocalSyncDevtools } from './sync/devtools.js';
+import { bootstrapLocalSync, runOutboxTick, stopLocalSync } from './sync/syncBootstrap.js';
 import { isBraveBrowser } from './utils/braveDetection';
 
 // Lazy loading de páginas para optimizar carga inicial
@@ -43,6 +45,48 @@ function App() {
     detectBrave();
   }, []);
 
+  useEffect(() => {
+    registerLocalSyncDevtools();
+  }, []);
+
+  useEffect(() => {
+    if (!LOCAL_SYNC_CONFIG.enabled) return undefined;
+
+    let mounted = true;
+    bootstrapLocalSync().catch(() => {});
+
+    return () => {
+      if (!mounted) return;
+      mounted = false;
+      stopLocalSync().catch(() => {});
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!LOCAL_SYNC_CONFIG.enabled || typeof window === 'undefined') return undefined;
+
+    const flushOutbox = () => {
+      runOutboxTick().catch(() => {});
+    };
+
+    const handleOnline = () => {
+      flushOutbox();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      flushOutbox();
+    };
+
+    window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   return (
     <>
       {/* Advertencia para Brave */}
@@ -66,9 +110,6 @@ function App() {
           </div>
         </div>
       )}
-      {/* Banner de estado de conexión */}
-      <OfflineBanner />
-      
       {/* Modal de novedades eliminado */}
       
       {/* Modal de precios y planes (se muestra solo en Dashboard) */}

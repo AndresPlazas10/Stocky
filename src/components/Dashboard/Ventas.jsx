@@ -1,9 +1,22 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '../../supabase/Client';
 import { getFilteredSales } from '../../services/salesService';
-import { createSaleOptimized, recordSaleCreationTime } from '../../services/salesServiceOptimized';
+import { recordSaleCreationTime } from '../../services/salesServiceOptimized';
 import { fetchComboCatalog } from '../../services/combosService.js';
+import { createSaleWithOutbox, deleteSaleWithDetails } from '../../data/commands/salesCommands.js';
+import {
+  getBusinessNameById,
+  getProductsForSale,
+  getSaleCashMetadataBySaleId,
+  getSaleDetailsBySaleId,
+  getSaleForPrintById
+} from '../../data/queries/salesQueries.js';
+import {
+  getAuthenticatedUser,
+  isEmployeeInBusiness,
+  getEmployeeRoleInBusiness
+} from '../../data/queries/authQueries.js';
+import { isAdminRole } from '../../utils/roles.js';
 import SalesFilters from '../Filters/SalesFilters';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatDate, formatDateOnly } from '../../utils/formatters.js';
@@ -37,6 +50,7 @@ import {
   Eye
 } from 'lucide-react';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
+import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
 
 const _motionLintUsage = motion;
 
@@ -64,6 +78,45 @@ const getPaymentMethodLabel = (method) => {
   if (method === 'transfer') return 'Transferencia';
   if (method === 'mixed') return 'Mixto';
   return method || '-';
+};
+
+const isConnectivityError = (errorLike) => {
+  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+  return (
+    message.includes('failed to fetch')
+    || message.includes('networkerror')
+    || message.includes('network request failed')
+    || message.includes('fetch failed')
+    || message.includes('load failed')
+    || message.includes('network')
+    || message.includes('sin conexión')
+    || message.includes('sin conexion')
+  );
+};
+
+const formatLoadError = (resourceLabel, errorLike) => {
+  if (isConnectivityError(errorLike)) {
+    return `⚠️ Sin conexión. No se pudieron cargar ${resourceLabel}. Verifica tu internet y reintenta.`;
+  }
+  return `❌ Error al cargar ${resourceLabel}: ${errorLike?.message || 'Error desconocido'}`;
+};
+
+const buildDiagnosticAlertMessage = (errorLike, fallback = 'Error desconocido') => {
+  const message = String(errorLike?.message || errorLike || fallback).trim() || fallback;
+  const code = String(errorLike?.code || '').trim();
+  const status = String(errorLike?.status || errorLike?.statusCode || '').trim();
+  const hint = String(errorLike?.hint || '').trim();
+  const details = String(errorLike?.details || '').trim();
+
+  const diagnosticParts = [
+    code ? `code=${code}` : null,
+    status ? `status=${status}` : null,
+    hint ? `hint=${hint}` : null,
+    details ? `details=${details}` : null
+  ].filter(Boolean);
+
+  if (diagnosticParts.length === 0) return `❌ ${message}`;
+  return `❌ ${message} [diag: ${diagnosticParts.join(' | ')}]`;
 };
 
 const toNumberOrNull = (value) => {
@@ -133,6 +186,15 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
   // Funciones de carga memoizadas SIN cache para evitar problemas de actualización
   const loadVentas = useCallback(async (filters = currentFilters, pagination = {}) => {
+    const offline = isOfflineMode();
+    const offlineSnapshotKey = `ventas.list:${businessId}`;
+    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
+
+    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+      setVentas(offlineSnapshot);
+      setTotalCount(offlineSnapshot.length);
+    }
+
     try {
       const lim = Number(pagination.limit ?? limit);
       const off = Number(pagination.offset ?? ((page - 1) * lim));
@@ -152,55 +214,121 @@ function Ventas({ businessId, userRole = 'admin' }) {
         throw new Error(salesError);
       }
       
-      setVentas(data || []);
+      const normalizedData = Array.isArray(data) ? data : [];
+      const hasLocalData = normalizedData.length > 0;
+
+      if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+        setVentas(offlineSnapshot);
+        setTotalCount(offlineSnapshot.length);
+        return;
+      }
+
+      setVentas(normalizedData);
+      if (!offline || hasLocalData) {
+        saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
+      }
       if (typeof count === 'number') {
         setTotalCount(count);
       } else if (!includeCount) {
-        setTotalCount(off + (data?.length || 0));
+        setTotalCount(off + normalizedData.length);
       }
     } catch (err) {
-      setVentas([]);
-      setTotalCount(0);
-      setError(`❌ Error al cargar las ventas: ${err?.message || 'Error desconocido'}`);
+      if (offline) {
+        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
+        const safe = Array.isArray(cached) ? cached : [];
+        setVentas(safe);
+        setTotalCount(safe.length);
+      } else {
+        setVentas([]);
+        setTotalCount(0);
+        setError(formatLoadError('las ventas', err));
+      }
     }
   }, [businessId, page, limit, currentFilters]);
 
   const loadProductos = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('products')
-      .select('id, code, name, sale_price, stock, category, manage_stock')
-      .eq('business_id', businessId)
-      .eq('is_active', true)
-      .order('name')
-      .limit(200);
+    const offline = isOfflineMode();
+    const offlineSnapshotKey = `ventas.productos:${businessId}`;
+    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
 
-    if (error) throw error;
-    setProductos(data || []);
+    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+      setProductos(offlineSnapshot);
+    }
+
+    try {
+      const data = await getProductsForSale(businessId);
+      const normalizedData = Array.isArray(data) ? data : [];
+      const hasLocalData = normalizedData.length > 0;
+      if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+        setProductos(offlineSnapshot);
+        return;
+      }
+
+      setProductos(normalizedData);
+      if (!offline || hasLocalData) {
+        saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
+      }
+    } catch {
+      if (offline) {
+        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
+        setProductos(Array.isArray(cached) ? cached : []);
+      } else {
+        throw new Error('No se pudo cargar productos para ventas');
+      }
+    }
   }, [businessId]);
 
   const loadCombos = useCallback(async () => {
-    const data = await fetchComboCatalog(businessId);
-    setCombos(data || []);
+    const offline = isOfflineMode();
+    const offlineSnapshotKey = `ventas.combos:${businessId}`;
+    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
+
+    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+      setCombos(offlineSnapshot);
+    }
+
+    try {
+      const data = await fetchComboCatalog(businessId);
+      const normalizedData = Array.isArray(data) ? data : [];
+      const hasLocalData = normalizedData.length > 0;
+
+      if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+        setCombos(offlineSnapshot);
+        return;
+      }
+
+      setCombos(normalizedData);
+      if (!offline || hasLocalData) {
+        saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
+      }
+    } catch {
+      if (offline) {
+        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
+        setCombos(Array.isArray(cached) ? cached : []);
+      } else {
+        throw new Error('No se pudo cargar combos para ventas');
+      }
+    }
   }, [businessId]);
 
   // Verificar si el usuario autenticado es empleado
   const checkIfEmployee = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthenticatedUser();
       if (!user) {
         setIsEmployee(false);
         return;
       }
 
-      const { data } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('business_id', businessId)
-        .maybeSingle();
+      const employeeRole = await getEmployeeRoleInBusiness({ userId: user.id, businessId });
+      if (employeeRole) {
+        // owner/admin/propietario/administrador deben conservar permisos de gestión.
+        setIsEmployee(!isAdminRole(employeeRole));
+        return;
+      }
 
-      // Si existe en employees, es empleado (NO puede eliminar ventas)
-      setIsEmployee(!!data);
+      // Fallback: si existe en employees pero sin rol resoluble, tratar como empleado restringido.
+      setIsEmployee(await isEmployeeInBusiness({ userId: user.id, businessId }));
     } catch {
       // Si hay error, asumimos que NO es empleado (es admin)
       setIsEmployee(false);
@@ -210,20 +338,32 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
       
       // Verificar sesión ANTES de cargar datos
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user?.id) {
-        setError('⚠️ Tu sesión ha expirado. Redirigiendo al login...');
-        setLoading(false);
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 2000);
-        return;
+      let user = null;
+      let authError = null;
+      try {
+        user = await getAuthenticatedUser();
+      } catch (error) {
+        authError = error;
       }
       
-      setSessionChecked(true);
+      if (authError || !user?.id) {
+        if (offlineMode) {
+          setSessionChecked(true);
+          setError('⚠️ Sin internet (modo offline). Algunas acciones pueden requerir reconexión.');
+        } else {
+          setError('⚠️ Tu sesión ha expirado. Redirigiendo al login...');
+          setLoading(false);
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 2000);
+          return;
+        }
+      } else {
+        setSessionChecked(true);
+      }
       
       await Promise.all([
         loadVentas(),
@@ -567,7 +707,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
         saleIntentKeyRef.current = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`);
       }
       
-      const result = await createSaleOptimized({
+      const result = await createSaleWithOutbox({
         businessId,
         cart,
         paymentMethod,
@@ -590,24 +730,20 @@ function Ventas({ businessId, userRole = 'admin' }) {
         { label: 'Total', value: formatPrice(saleTotal) },
         { label: 'Método', value: getPaymentMethodLabel(paymentMethod) },
         { label: 'Tiempo', value: `${elapsedMs.toFixed(0)}ms` },
-        { label: 'Artículos', value: cart.length }
+        { label: 'Artículos', value: cart.length },
+        ...(result?.localOnly
+          ? [{ label: 'Sync', value: 'Guardada localmente (pendiente)' }]
+          : [])
       ]);
       setAlertType('success');
       setSuccess(true);
 
       // Autoimprimir recibo si el usuario lo tiene activado en configuración.
-      if (isAutoPrintReceiptEnabled()) {
+      if (!result?.localOnly && isAutoPrintReceiptEnabled()) {
         try {
-          const [{ data: saleRow }, { data: saleDetails }] = await Promise.all([
-            supabase
-              .from('sales')
-              .select('id, total, payment_method, created_at, seller_name')
-              .eq('id', result.data.id)
-              .maybeSingle(),
-            supabase
-              .from('sale_details')
-              .select('quantity, unit_price, subtotal, product_id, combo_id, products(name, code), combos(nombre)')
-              .eq('sale_id', result.data.id)
+          const [saleRow, saleDetails] = await Promise.all([
+            getSaleForPrintById(result.data.id),
+            getSaleDetailsBySaleId(result.data.id)
           ]);
 
           const saleForPrint = saleRow || {
@@ -642,17 +778,19 @@ function Ventas({ businessId, userRole = 'admin' }) {
       saleIntentSignatureRef.current = '';
 
       // Recargar ventas inmediatamente
-      await loadVentas(currentFilters, { limit, offset: (page - 1) * limit, includeCount: false });
+      if (!result?.localOnly) {
+        await loadVentas(currentFilters, { limit, offset: (page - 1) * limit, includeCount: false });
+      }
       
     } catch (error) {
       
       // Si es error de sesión, redirigir a login
-      if (error.message.includes('sesión ha expirado')) {
+      if (String(error?.message || '').includes('sesión ha expirado') && (typeof navigator === 'undefined' || navigator.onLine)) {
         setTimeout(() => {
           window.location.href = '/login';
         }, 2000);
       }
-      setError('❌ ' + (error.message || 'No se pudo procesar la venta. Por favor, intenta de nuevo.'));
+      setError(buildDiagnosticAlertMessage(error, 'No se pudo procesar la venta. Por favor, intenta de nuevo.'));
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear
     }
@@ -671,21 +809,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     setError(null);
     
     try {
-      // Eliminar detalles de venta primero
-      const { error: detailsError } = await supabase
-        .from('sale_details')
-        .delete()
-        .eq('sale_id', saleToDelete);
-
-      if (detailsError) throw new Error('Error al eliminar detalles: ' + detailsError.message);
-
-      // Eliminar la venta
-      const { error: deleteError } = await supabase
-        .from('sales')
-        .delete()
-        .eq('id', saleToDelete);
-
-      if (deleteError) throw new Error('Error al eliminar venta: ' + deleteError.message);
+      await deleteSaleWithDetails(saleToDelete, businessId);
 
       setSuccessTitle('🗑️ Venta Eliminada');
       setSuccessDetails([
@@ -713,14 +837,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
   const fetchSaleDetails = useCallback(async (saleId) => {
     if (!saleId) return [];
-
-    const { data, error } = await supabase
-      .from('sale_details')
-      .select('quantity, unit_price, subtotal, product_id, combo_id, products(name, code), combos(nombre)')
-      .eq('sale_id', saleId);
-
-    if (error) throw error;
-    return data || [];
+    return getSaleDetailsBySaleId(saleId);
   }, []);
 
   const openSaleDetailsModal = useCallback(async (venta) => {
@@ -733,12 +850,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
       const details = await fetchSaleDetails(venta.id);
       let saleInfo = {};
       try {
-        const { data: infoData, error: infoError } = await supabase
-          .from('sales')
-          .select('amount_received, change_amount, change_breakdown')
-          .eq('id', venta.id)
-          .maybeSingle();
-        if (!infoError && infoData) {
+        const infoData = await getSaleCashMetadataBySaleId(venta.id);
+        if (infoData) {
           saleInfo = infoData;
         }
       } catch {
@@ -834,16 +947,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setError(null);
 
       // Obtener detalles de la venta
-      const { data: saleDetails, error: detailsError } = await supabase
-        .from('sale_details')
-        .select(`
-          *,
-          products(name),
-          combos(nombre)
-        `)
-        .eq('sale_id', selectedSale.id);
-
-      if (detailsError) throw detailsError;
+      const saleDetails = await fetchSaleDetails(selectedSale.id);
 
       const total = selectedSale.total;
 
@@ -858,11 +962,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       }));
 
       // Obtener nombre del negocio
-      const { data: businessData } = await supabase
-        .from('businesses')
-        .select('name')
-        .eq('id', businessId)
-        .single();
+      const businessName = await getBusinessNameById(businessId);
 
       // Enviar comprobante por email
       const emailResult = await sendInvoiceEmail({
@@ -871,7 +971,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
         customerName: invoiceCustomerName,
         total: total,
         items: emailItems,
-        businessName: businessData?.name || 'Stocky',
+        businessName: businessName || 'Stocky',
         businessId,
         issuedAt: selectedSale?.created_at || new Date().toISOString()
       });
@@ -894,7 +994,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     } finally {
       setGeneratingInvoice(false);
     }
-  }, [businessId, selectedSale, invoiceCustomerName, invoiceCustomerEmail]);
+  }, [businessId, selectedSale, invoiceCustomerName, invoiceCustomerEmail, fetchSaleDetails]);
 
   const selectedSaleAmountReceived = toNumberOrNull(selectedSale?.amount_received);
   const selectedSaleChangeAmount = toNumberOrNull(selectedSale?.change_amount);
@@ -921,11 +1021,12 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const hasChangeBreakdown = changeFromBreakdown > 0;
   const showCashPaymentDetails = selectedSale?.payment_method === 'cash'
     && (hasAmountReceivedValue || hasChangeAmountValue || hasChangeBreakdown);
+  const shouldBlockWithError = Boolean(ventas.length === 0 && error && !isConnectivityError(error));
 
   return (
     <AsyncStateWrapper
       loading={loading}
-      error={ventas.length === 0 ? error : null}
+      error={shouldBlockWithError ? error : null}
       dataCount={ventas.length}
       onRetry={loadData}
       skeletonType="ventas"
