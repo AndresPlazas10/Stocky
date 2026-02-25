@@ -1,4 +1,5 @@
-import { supabase } from '../supabase/Client.jsx';
+import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
+import { readAdapter } from '../data/adapters/localAdapter.js';
 
 export const COMBO_STATUS = {
   ACTIVE: 'active',
@@ -76,38 +77,10 @@ function normalizeComboPayload(payload = {}) {
 export async function fetchCombos(businessId, { onlyActive = false } = {}) {
   if (!businessId) return [];
 
-  let query = supabase
-    .from('combos')
-    .select(`
-      id,
-      business_id,
-      nombre,
-      precio_venta,
-      descripcion,
-      estado,
-      created_at,
-      combo_items (
-        id,
-        producto_id,
-        cantidad,
-        products (
-          id,
-          name,
-          code,
-          stock,
-          is_active,
-          category
-        )
-      )
-    `)
-    .eq('business_id', businessId)
-    .order('nombre', { ascending: true });
-
-  if (onlyActive) {
-    query = query.eq('estado', COMBO_STATUS.ACTIVE);
-  }
-
-  const { data, error } = await query;
+  const { data, error } = await readAdapter.getCombosByBusinessWithItems({
+    businessId,
+    onlyActive
+  });
   if (error) {
     throw new Error(error.message || 'No se pudieron cargar los combos');
   }
@@ -130,19 +103,13 @@ export async function createCombo(businessId, payload) {
 
   const normalized = normalizeComboPayload(payload);
 
-  const { data: createdCombo, error: comboError } = await supabase
-    .from('combos')
-    .insert([
-      {
-        business_id: businessId,
-        nombre: normalized.nombre,
-        precio_venta: normalized.precio_venta,
-        descripcion: normalized.descripcion,
-        estado: normalized.estado
-      }
-    ])
-    .select('id')
-    .maybeSingle();
+  const { data: createdCombo, error: comboError } = await supabaseAdapter.insertCombo({
+    business_id: businessId,
+    nombre: normalized.nombre,
+    precio_venta: normalized.precio_venta,
+    descripcion: normalized.descripcion,
+    estado: normalized.estado
+  });
 
   if (comboError || !createdCombo?.id) {
     throw new Error(comboError?.message || 'No se pudo crear el combo');
@@ -154,11 +121,14 @@ export async function createCombo(businessId, payload) {
     cantidad: item.cantidad
   }));
 
-  const { error: itemsError } = await supabase.from('combo_items').insert(rows);
+  const { error: itemsError } = await supabaseAdapter.insertComboItems(rows);
 
   if (itemsError) {
     // Best effort rollback para evitar combos huérfanos.
-    await supabase.from('combos').delete().eq('id', createdCombo.id);
+    await supabaseAdapter.deleteComboByBusinessAndId({
+      comboId: createdCombo.id,
+      businessId
+    });
     throw new Error(itemsError.message || 'No se pudieron guardar los productos del combo');
   }
 
@@ -171,26 +141,23 @@ export async function updateCombo(comboId, businessId, payload) {
 
   const normalized = normalizeComboPayload(payload);
 
-  const { error: comboError } = await supabase
-    .from('combos')
-    .update({
+  const { error: comboError } = await supabaseAdapter.updateComboByBusinessAndId({
+    comboId,
+    businessId,
+    payload: {
       nombre: normalized.nombre,
       precio_venta: normalized.precio_venta,
       descripcion: normalized.descripcion,
       estado: normalized.estado,
       updated_at: new Date().toISOString()
-    })
-    .eq('id', comboId)
-    .eq('business_id', businessId);
+    }
+  });
 
   if (comboError) {
     throw new Error(comboError.message || 'No se pudo actualizar el combo');
   }
 
-  const { error: deleteItemsError } = await supabase
-    .from('combo_items')
-    .delete()
-    .eq('combo_id', comboId);
+  const { error: deleteItemsError } = await supabaseAdapter.deleteComboItemsByComboId(comboId);
 
   if (deleteItemsError) {
     throw new Error(deleteItemsError.message || 'No se pudieron actualizar los productos del combo');
@@ -202,7 +169,7 @@ export async function updateCombo(comboId, businessId, payload) {
     cantidad: item.cantidad
   }));
 
-  const { error: insertItemsError } = await supabase.from('combo_items').insert(rows);
+  const { error: insertItemsError } = await supabaseAdapter.insertComboItems(rows);
   if (insertItemsError) {
     throw new Error(insertItemsError.message || 'No se pudieron guardar los productos del combo');
   }
@@ -214,14 +181,14 @@ export async function setComboStatus(comboId, businessId, status) {
 
   const normalizedStatus = normalizeComboStatus(status);
 
-  const { error } = await supabase
-    .from('combos')
-    .update({
+  const { error } = await supabaseAdapter.updateComboByBusinessAndId({
+    comboId,
+    businessId,
+    payload: {
       estado: normalizedStatus,
       updated_at: new Date().toISOString()
-    })
-    .eq('id', comboId)
-    .eq('business_id', businessId);
+    }
+  });
 
   if (error) {
     throw new Error(error.message || 'No se pudo actualizar el estado del combo');
@@ -232,13 +199,11 @@ export async function deleteCombo(comboId, businessId) {
   if (!comboId) throw new Error('comboId es obligatorio');
   if (!businessId) throw new Error('businessId es obligatorio');
 
-  const { data, error } = await supabase
-    .from('combos')
-    .delete()
-    .eq('id', comboId)
-    .eq('business_id', businessId)
-    .select('id')
-    .maybeSingle();
+  const { data, error } = await supabaseAdapter.deleteComboByBusinessAndId({
+    comboId,
+    businessId,
+    selectSql: 'id'
+  });
 
   if (error) {
     if (error.code === '23503') {

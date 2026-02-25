@@ -7,6 +7,8 @@ import { motion } from 'framer-motion';
 import { Shield, FileText, AlertTriangle, CheckCircle2, Info, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+const _motionLintUsage = motion;
+
 export default function TermsAndConditions() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -317,19 +319,11 @@ function Section({ number, title, icon: _Icon, color, children, highlighted = fa
     purple: 'from-purple-500 to-pink-500',
   };
 
-  const bgColorClasses = {
-    green: 'bg-green-50 border-green-200',
-    blue: 'bg-blue-50 border-blue-200',
-    red: 'bg-red-50 border-red-200',
-    amber: 'bg-amber-50 border-amber-200',
-    purple: 'bg-purple-50 border-purple-200',
-  };
-
   return (
     <div className={highlighted ? 'border-2 border-red-300 rounded-xl p-4 bg-red-50/30' : ''}>
       <div className="flex items-start gap-4 mb-4">
         <div className={`p-3 bg-gradient-to-br ${colorClasses[color]} rounded-xl shrink-0`}>
-          <Icon className="w-6 h-6 text-white" />
+          <_Icon className="w-6 h-6 text-white" />
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2">

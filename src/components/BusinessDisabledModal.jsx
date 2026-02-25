@@ -4,6 +4,8 @@ import { Lock, AlertTriangle, CreditCard } from 'lucide-react';
 import { Button } from './ui/button';
 import paymentQr from '../assets/QR.jpeg';
 
+const _motionLintUsage = motion;
+
 /**
  * Modal bloqueante para negocios deshabilitados por falta de pago
  * Este modal NO se puede cerrar, el usuario debe realizar el pago

@@ -1,4 +1,4 @@
-import { supabase } from '../supabase/Client.jsx';
+import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 
 const BUSINESS_COLUMNS = `
   id,
@@ -20,17 +20,16 @@ const BUSINESS_COLUMNS = `
 export async function getCurrentBusiness() {
   try {
     // Obtener el usuario autenticado
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabaseAdapter.getCurrentUser();
     
     if (userError) throw userError;
     if (!user) throw new Error('❌ Usuario no autenticado');
 
     // Buscar el negocio por email del usuario
-    const { data: business, error: businessError } = await supabase
-      .from('businesses')
-      .select(BUSINESS_COLUMNS)
-      .eq('email', user.email)
-      .single();
+    const { data: business, error: businessError } = await supabaseAdapter.getBusinessByEmail(
+      user.email,
+      BUSINESS_COLUMNS
+    );
 
     if (businessError) throw businessError;
 
@@ -55,16 +54,15 @@ export async function getCurrentBusiness() {
  */
 export async function getAllBusinesses() {
   try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabaseAdapter.getCurrentUser();
     
     if (userError) throw userError;
     if (!user) throw new Error('❌ Usuario no autenticado');
 
-    const { data: businesses, error: businessError } = await supabase
-      .from('businesses')
-      .select(BUSINESS_COLUMNS)
-      .eq('created_by', user.id)
-      .order('created_at', { ascending: false });
+    const { data: businesses, error: businessError } = await supabaseAdapter.getBusinessesByOwnerId(
+      user.id,
+      BUSINESS_COLUMNS
+    );
 
     if (businessError) throw businessError;
 

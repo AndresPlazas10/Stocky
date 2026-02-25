@@ -3,9 +3,12 @@
  * Centraliza toda la lógica de ventas con manejo robusto de errores
  */
 
-import { supabase } from '../supabase/Client';
+import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { isAdminRole } from '../utils/roles.js';
 import { buildUtcRangeFromLocalDates } from '../utils/dateRange.js';
+import LOCAL_SYNC_CONFIG from '../config/localSync.js';
+import { getLocalDbClient } from '../localdb/client.js';
+import { logger } from '../utils/logger.js';
 
 const SALES_LIST_COLUMNS = `
   id,
@@ -21,13 +24,118 @@ const SALES_LIST_COLUMNS = `
   total,
   created_at
 `;
+const SALES_LIST_MINIMAL_COLUMNS = `
+  id,
+  business_id,
+  user_id,
+  seller_name,
+  payment_method,
+  customer_id,
+  notes,
+  total,
+  created_at
+`;
 
 const SALES_RPC_NOT_AVAILABLE = 'SALES_RPC_NOT_AVAILABLE';
+let salesRpcDisabled = false;
+
+function buildSalesListCacheKey({ businessId, filters = {}, pagination = {} }) {
+  return [
+    'sales',
+    'list',
+    businessId,
+    JSON.stringify({
+      fromDate: filters?.fromDate || null,
+      toDate: filters?.toDate || null,
+      paymentMethod: filters?.paymentMethod || null,
+      employeeId: filters?.employeeId || null,
+      customerId: filters?.customerId || null,
+      minAmount: filters?.minAmount ?? null,
+      maxAmount: filters?.maxAmount ?? null,
+      limit: Number(pagination?.limit || 50),
+      offset: Number(pagination?.offset || 0),
+      includeCount: pagination?.includeCount !== false,
+      countMode: pagination?.countMode || 'planned'
+    })
+  ].join(':');
+}
+
+async function readCachedSalesList(cacheKey) {
+  if (!LOCAL_SYNC_CONFIG.enabled || !LOCAL_SYNC_CONFIG.localReads?.sales) return null;
+  try {
+    const db = getLocalDbClient();
+    await db.init();
+    const exact = await db.getCacheEntry(cacheKey);
+    if (exact) return exact;
+
+    const keyParts = String(cacheKey || '').split(':');
+    const businessId = keyParts[2] || '';
+    if (businessId) {
+      const fallbackByBusiness = await db.getLatestCacheEntryByPrefix(`sales:list:${businessId}:`);
+      if (fallbackByBusiness) return fallbackByBusiness;
+    }
+    return null;
+  } catch (error) {
+    logger.warn('[sales-service] cache read failed', {
+      cacheKey,
+      error: error?.message || String(error)
+    });
+    return null;
+  }
+}
+
+async function writeCachedSalesList(cacheKey, payload) {
+  if (!LOCAL_SYNC_CONFIG.enabled || !LOCAL_SYNC_CONFIG.localReads?.sales) return;
+  try {
+    const db = getLocalDbClient();
+    await db.init();
+    await db.setCacheEntry(cacheKey, payload);
+  } catch (error) {
+    logger.warn('[sales-service] cache write failed', {
+      cacheKey,
+      error: error?.message || String(error)
+    });
+  }
+}
+
+function isConnectivityError(errorLike) {
+  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+  return (
+    message.includes('failed to fetch')
+    || message.includes('networkerror')
+    || message.includes('network request failed')
+    || message.includes('fetch failed')
+    || message.includes('load failed')
+    || message.includes('network')
+  );
+}
 
 function isMissingSalesRpcError(error) {
   const code = String(error?.code || '');
   const message = String(error?.message || '').toLowerCase();
   return code === 'PGRST202' || code === '42883' || message.includes('get_sales_enriched');
+}
+
+function isRpcBadRequestError(errorLike) {
+  const status = Number(errorLike?.status || errorLike?.statusCode || 0);
+  const code = String(errorLike?.code || '').toUpperCase();
+  return status === 400 || code === 'PGRST100' || code === 'PGRST116' || code === 'PGRST301';
+}
+
+function isMissingColumnError(errorLike) {
+  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+  return message.includes('column') && message.includes('does not exist');
+}
+
+function normalizeOptionalText(value) {
+  const normalized = String(value || '').trim();
+  return normalized || null;
+}
+
+function normalizeOptionalAmount(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function mapRpcSalesRows(rows = [], includeCount = true) {
@@ -75,7 +183,7 @@ function mapRpcSalesRows(rows = [], includeCount = true) {
  */
 export async function getCurrentUser() {
   try {
-    const { data: { user }, error } = await supabase.auth.getUser();
+    const { data: { user }, error } = await supabaseAdapter.getCurrentUser();
     
     if (error) {
       // Error obteniendo usuario
@@ -105,26 +213,18 @@ export async function getSales(businessId) {
     if (userError) throw new Error(userError);
 
     // 2. Obtener ventas
-    const { data: sales, error: salesError } = await supabase
-      .from('sales')
-      .select(SALES_LIST_COLUMNS)
-      .eq('business_id', businessId)
-      .order('created_at', { ascending: false })
-      .limit(50);
+    const { data: sales, error: salesError } = await supabaseAdapter.getRecentSalesByBusiness({
+      businessId,
+      selectSql: SALES_LIST_COLUMNS,
+      limit: 50
+    });
 
     if (salesError) throw salesError;
 
     // 3-4. Obtener info adicional en paralelo
     const [{ data: business }, { data: employees }] = await Promise.all([
-      supabase
-        .from('businesses')
-        .select('created_by, name')
-        .eq('id', businessId)
-        .maybeSingle(),
-      supabase
-        .from('employees')
-        .select('user_id, full_name, role')
-        .eq('business_id', businessId)
+      supabaseAdapter.getBusinessById(businessId, 'created_by, name'),
+      supabaseAdapter.getEmployeesByBusinessWithSelect(businessId, 'user_id, full_name, role')
     ]);
 
     // 5. Crear mapa de empleados
@@ -180,6 +280,12 @@ export async function getSales(businessId) {
  */
 export async function getFilteredSales(businessId, filters = {}, pagination = {}) {
   if (!businessId) return { data: [], count: 0, error: null };
+  const cacheKey = buildSalesListCacheKey({
+    businessId,
+    filters,
+    pagination
+  });
+  const offlineRuntime = typeof navigator !== 'undefined' && navigator.onLine === false;
 
   const limit = Number(pagination.limit || 50);
   const offset = Number(pagination.offset || 0);
@@ -190,66 +296,105 @@ export async function getFilteredSales(businessId, filters = {}, pagination = {}
     filters.fromDate,
     filters.toDate
   );
+  const normalizedPaymentMethod = normalizeOptionalText(filters.paymentMethod);
+  const normalizedEmployeeId = normalizeOptionalText(filters.employeeId);
+  const normalizedCustomerId = normalizeOptionalText(filters.customerId);
+  const normalizedMinAmount = normalizeOptionalAmount(filters.minAmount);
+  const normalizedMaxAmount = normalizeOptionalAmount(filters.maxAmount);
+
+  if (offlineRuntime) {
+    const cached = await readCachedSalesList(cacheKey);
+    if (cached && Array.isArray(cached?.data)) {
+      return {
+        data: cached.data,
+        count: Number.isFinite(Number(cached?.count)) ? Number(cached.count) : 0,
+        error: null
+      };
+    }
+    return { data: [], count: 0, error: null };
+  }
 
   try {
-    const { data: rpcRows, error: rpcError } = await supabase.rpc('get_sales_enriched', {
-      p_business_id: businessId,
-      p_limit: limit,
-      p_offset: offset,
-      p_from_date: fromDateIso,
-      p_to_date: toDateIso,
-      p_payment_method: filters.paymentMethod || null,
-      p_user_id: filters.employeeId || null,
-      p_customer_id: filters.customerId || null,
-      p_min_amount: filters.minAmount ?? null,
-      p_max_amount: filters.maxAmount ?? null,
-      p_include_count: includeCount
-    });
+    if (!salesRpcDisabled) {
+      const { data: rpcRows, error: rpcError } = await supabaseAdapter.getSalesEnrichedRpc({
+        p_business_id: businessId,
+        p_limit: limit,
+        p_offset: offset,
+        p_from_date: fromDateIso,
+        p_to_date: toDateIso,
+        p_payment_method: normalizedPaymentMethod,
+        p_user_id: normalizedEmployeeId,
+        p_customer_id: normalizedCustomerId,
+        p_min_amount: normalizedMinAmount,
+        p_max_amount: normalizedMaxAmount,
+        p_include_count: includeCount
+      });
 
-    if (rpcError) {
-      if (isMissingSalesRpcError(rpcError)) {
-        throw new Error(SALES_RPC_NOT_AVAILABLE);
+      if (rpcError) {
+        if (isMissingSalesRpcError(rpcError) || isRpcBadRequestError(rpcError)) {
+          salesRpcDisabled = true;
+          logger.warn('[sales-service] disabling get_sales_enriched RPC fallback after remote error', {
+            code: rpcError?.code || null,
+            status: rpcError?.status || rpcError?.statusCode || null,
+            message: rpcError?.message || String(rpcError)
+          });
+          throw new Error(SALES_RPC_NOT_AVAILABLE);
+        }
+        throw rpcError;
       }
-      throw rpcError;
+
+      const mapped = mapRpcSalesRows(rpcRows || [], includeCount);
+      await writeCachedSalesList(cacheKey, mapped);
+      return { ...mapped, error: null };
     }
 
-    const mapped = mapRpcSalesRows(rpcRows || [], includeCount);
-    return { ...mapped, error: null };
+    throw new Error(SALES_RPC_NOT_AVAILABLE);
   } catch (rpcErr) {
     try {
-      let query = includeCount
-        ? supabase.from('sales').select(SALES_LIST_COLUMNS, { count: countMode })
-        : supabase.from('sales').select(SALES_LIST_COLUMNS);
-      query = query.eq('business_id', businessId).order('created_at', { ascending: false });
+      const queryParams = {
+        businessId,
+        fromDateIso,
+        toDateIso,
+        paymentMethod: normalizedPaymentMethod,
+        employeeId: normalizedEmployeeId,
+        customerId: normalizedCustomerId,
+        minAmount: normalizedMinAmount,
+        maxAmount: normalizedMaxAmount,
+        limit,
+        offset,
+        includeCount,
+        countMode
+      };
 
-      if (fromDateIso) query = query.gte('created_at', fromDateIso);
-      if (toDateIso) query = query.lte('created_at', toDateIso);
-      if (filters.paymentMethod) query = query.eq('payment_method', filters.paymentMethod);
-      if (filters.employeeId) query = query.eq('user_id', filters.employeeId);
-      if (filters.customerId) query = query.eq('customer_id', filters.customerId);
-      if (filters.minAmount) query = query.gte('total', filters.minAmount);
-      if (filters.maxAmount) query = query.lte('total', filters.maxAmount);
-
-      query = query.range(offset, offset + limit - 1);
-
-      const { data: sales, error, count } = await query;
-      if (error) throw error;
+      let sales = null;
+      let count = null;
+      {
+        const primary = await supabaseAdapter.getFilteredSalesLegacy({
+          ...queryParams,
+          selectSql: SALES_LIST_COLUMNS
+        });
+        if (primary.error) {
+          if (!isMissingColumnError(primary.error)) throw primary.error;
+          const fallback = await supabaseAdapter.getFilteredSalesLegacy({
+            ...queryParams,
+            selectSql: SALES_LIST_MINIMAL_COLUMNS
+          });
+          if (fallback.error) throw fallback.error;
+          sales = fallback.data;
+          count = fallback.count;
+        } else {
+          sales = primary.data;
+          count = primary.count;
+        }
+      }
 
       if (!sales || sales.length === 0) {
         return { data: [], count: includeCount ? (count || 0) : null, error: null };
       }
 
       const [{ data: employees }, { data: business }] = await Promise.all([
-        supabase
-          .from('employees')
-          .select('user_id, full_name, role')
-          .eq('business_id', businessId)
-          .limit(100),
-        supabase
-          .from('businesses')
-          .select('created_by')
-          .eq('id', businessId)
-          .maybeSingle()
+        supabaseAdapter.getEmployeesByBusinessWithSelect(businessId, 'user_id, full_name, role'),
+        supabaseAdapter.getBusinessById(businessId, 'created_by')
       ]);
 
       const employeeMap = new Map();
@@ -281,8 +426,20 @@ export async function getFilteredSales(businessId, filters = {}, pagination = {}
         };
       });
 
-      return { data: enriched, count: includeCount ? (count || 0) : null, error: null };
+      const legacyResult = { data: enriched, count: includeCount ? (count || 0) : null };
+      await writeCachedSalesList(cacheKey, legacyResult);
+      return { ...legacyResult, error: null };
     } catch (legacyError) {
+      if (isConnectivityError(legacyError) || isConnectivityError(rpcErr)) {
+        const cached = await readCachedSalesList(cacheKey);
+        if (cached && Array.isArray(cached?.data)) {
+          return {
+            data: cached.data,
+            count: Number.isFinite(Number(cached?.count)) ? Number(cached.count) : 0,
+            error: null
+          };
+        }
+      }
       const normalizedError = legacyError?.message || rpcErr?.message || 'Error al obtener ventas';
       return { data: [], count: 0, error: normalizedError };
     }
@@ -314,17 +471,8 @@ export async function createSale({
 
     // 3. Obtener info del empleado (incluye role) y created_by del negocio
     const [{ data: employee }, { data: business }] = await Promise.all([
-      supabase
-        .from('employees')
-        .select('id, full_name, role')
-        .eq('user_id', user.id)
-        .eq('business_id', businessId)
-        .maybeSingle(),
-      supabase
-        .from('businesses')
-        .select('created_by')
-        .eq('id', businessId)
-        .maybeSingle()
+      supabaseAdapter.getEmployeeByUserAndBusiness(user.id, businessId, 'id, full_name, role'),
+      supabaseAdapter.getBusinessById(businessId, 'created_by')
     ]);
 
     // 4. Preparar datos de venta
@@ -347,11 +495,7 @@ export async function createSale({
     // Creando venta
 
     // 5. Insertar venta
-    const { data: sale, error: saleError } = await supabase
-      .from('sales')
-      .insert([saleData])
-      .select()
-      .single();
+    const { data: sale, error: saleError } = await supabaseAdapter.insertSale(saleData);
 
     if (saleError) {
       // Error insertando venta
@@ -367,14 +511,12 @@ export async function createSale({
       unit_price: item.unit_price
     }));
 
-    const { error: detailsError } = await supabase
-      .from('sale_details')
-      .insert(saleDetails);
+    const { error: detailsError } = await supabaseAdapter.insertSaleDetails(saleDetails);
 
     if (detailsError) {
       // Error insertando detalles
       // Intentar revertir la venta
-      await supabase.from('sales').delete().eq('id', sale.id);
+      await supabaseAdapter.deleteSaleById(sale.id);
       return { success: false, error: detailsError.message };
     }
 
@@ -388,12 +530,12 @@ export async function createSale({
       }));
 
     const { error: stockError } = stockUpdates.length > 0
-      ? await supabase.rpc('update_stock_batch', { product_updates: stockUpdates })
+      ? await supabaseAdapter.updateStockBatch(stockUpdates)
       : { error: null };
 
     if (stockError) {
       // Error crítico: revertir venta
-      await supabase.from('sales').delete().eq('id', sale.id);
+      await supabaseAdapter.deleteSaleById(sale.id);
       return { 
         success: false, 
         error: `Error al actualizar inventario: ${stockError.message}` 
@@ -417,13 +559,7 @@ export async function createSale({
  */
 export async function getAvailableProducts(businessId) {
   try {
-    const { data, error } = await supabase
-      .from('products')
-      .select('id, code, name, sale_price, stock, category, is_active, manage_stock')
-      .eq('business_id', businessId)
-      .eq('is_active', true)
-      .or('manage_stock.eq.false,stock.gt.0')
-      .order('name');
+    const { data, error } = await supabaseAdapter.getAvailableProductsForSaleByBusiness(businessId);
 
     if (error) throw error;
     return data || [];
@@ -447,16 +583,13 @@ export async function deleteSale(saleId) {
     }
 
     // Primero obtener los detalles para restaurar stock
-    const { data: details } = await supabase
-      .from('sale_details')
-      .select('product_id, quantity')
-      .eq('sale_id', saleId);
+    const { data: details } = await supabaseAdapter.getSaleDetailsBySaleIdWithSelect(
+      saleId,
+      'product_id, quantity'
+    );
 
     // Eliminar la venta (cascade eliminará los detalles)
-    const { error: deleteError } = await supabase
-      .from('sales')
-      .delete()
-      .eq('id', saleId);
+    const { error: deleteError } = await supabaseAdapter.deleteSaleById(saleId);
 
     if (deleteError) {
       // Error eliminando venta
@@ -473,7 +606,7 @@ export async function deleteSale(saleId) {
         }));
 
       const { error: restoreError } = productUpdates.length > 0
-        ? await supabase.rpc('restore_stock_batch', { product_updates: productUpdates })
+        ? await supabaseAdapter.restoreStockBatch(productUpdates)
         : { error: null };
       
       if (restoreError) {

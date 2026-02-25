@@ -6,7 +6,8 @@
 // =====================================================
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/supabase/Client';
+import { readAdapter } from '../data/adapters/localAdapter.js';
+import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 
 // =====================================================
 // useAuth - Gestión centralizada de autenticación
@@ -18,19 +19,33 @@ export function useAuth() {
   const [session, setSession] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     // Obtener sesión inicial
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    supabaseAdapter.getCurrentSession()
+      .then(({ data, error }) => {
+        if (!isMounted) return;
+        if (error) {
+          setLoading(false);
+          return;
+        }
+
+        const currentSession = data?.session ?? null;
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setLoading(false);
+      });
 
     // Escuchar cambios de autenticación
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    } = supabaseAdapter.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
 
       if (_event === 'SIGNED_OUT') {
         localStorage.clear();
@@ -43,11 +58,14 @@ export function useAuth() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut({ scope: 'global' });
+    await supabaseAdapter.signOutGlobal();
     localStorage.clear();
     sessionStorage.clear();
   }, []);
@@ -79,8 +97,9 @@ export function useBusinessAccess(businessId) {
     async function verifyAccess() {
       try {
         const {
-          data: { user },
-        } = await supabase.auth.getUser();
+          data: authData,
+        } = await readAdapter.getCurrentUser();
+        const user = authData?.user || null;
 
         if (!user) {
           setHasAccess(false);
@@ -89,28 +108,25 @@ export function useBusinessAccess(businessId) {
         }
 
         // Opción 1: Usar RPC function (más rápido)
-        const { data: canAccess } = await supabase.rpc('check_business_access', {
-          p_business_id: businessId,
-          p_user_id: user.id,
+        const { data: canAccess } = await supabaseAdapter.checkBusinessAccessRpc({
+          businessId,
+          userId: user.id
         });
 
         if (canAccess) {
           // Determinar rol
-          const { data: business } = await supabase
-            .from('businesses')
-            .select('created_by')
-            .eq('id', businessId)
-            .maybeSingle();
+          const { data: business } = await readAdapter.getBusinessById(
+            businessId,
+            'created_by'
+          );
 
           if (business?.created_by === user.id) {
             setRole('owner');
           } else {
-            const { data: employee } = await supabase
-              .from('employees')
-              .select('role')
-              .eq('business_id', businessId)
-              .eq('user_id', user.id)
-              .maybeSingle();
+            const { data: employee } = await readAdapter.getEmployeeRoleByBusinessAndUser(
+              businessId,
+              user.id
+            );
 
             setRole(employee?.role || 'employee');
           }
@@ -266,23 +282,18 @@ export function usePagination(
         setLoading(true);
         setError(null);
 
-        let query = supabase
-          .from(tableName)
-          .select('*', { count: 'exact' })
-          .order(orderBy.column, { ascending: orderBy.ascending })
-          .range(
-            pageNumber * pageSize,
-            (pageNumber + 1) * pageSize - 1
-          );
+        const from = pageNumber * pageSize;
+        const to = (pageNumber + 1) * pageSize - 1;
 
-        // Aplicar filtros
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value !== null && value !== undefined) {
-            query = query.eq(key, value);
-          }
+        const { data: pageData, error: queryError, count } = await supabaseAdapter.getPaginatedTableRows({
+          tableName,
+          selectSql: '*',
+          filters,
+          orderBy,
+          from,
+          to,
+          countMode: 'exact'
         });
-
-        const { data: pageData, error: queryError, count } = await query;
 
         if (queryError) throw queryError;
 
@@ -355,37 +366,29 @@ export function useRealtime(tableName, filters = {}, onUpdate) {
 
   useEffect(() => {
     // Construir filtro para realtime
-    let filterString = '';
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) {
-        filterString += `${key}=eq.${value}`;
-      }
-    });
+    const filterString = Object.entries(filters || {})
+      .filter(([, value]) => value !== null && value !== undefined && value !== '')
+      .map(([key, value]) => `${key}=eq.${value}`)
+      .join(',');
 
     // Crear canal único
     const channelName = `${tableName}-${filterString || 'all'}`;
 
-    channelRef.current = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: tableName,
-          filter: filterString || undefined,
-        },
-        (payload) => {
-          if (onUpdate) {
-            onUpdate(payload);
-          }
+    channelRef.current = readAdapter.subscribeToPostgresChanges({
+      channelName,
+      event: '*',
+      table: tableName,
+      filter: filterString || undefined,
+      callback: (payload) => {
+        if (onUpdate) {
+          onUpdate(payload);
         }
-      )
-      .subscribe();
+      }
+    });
 
     return () => {
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+        readAdapter.removeRealtimeChannel(channelRef.current);
       }
     };
   }, [tableName, JSON.stringify(filters), onUpdate]);
@@ -460,9 +463,14 @@ export function useLocalStorage(key, initialValue) {
 export function useLowStockAlert(businessId, threshold = 10) {
   const { data, loading, error, refetch } = useSupabaseQuery(
     async () => {
-      return supabase.rpc('get_low_stock_products', {
-        p_business_id: businessId,
-        p_threshold: threshold,
+      if (!businessId) {
+        return { data: [], error: null };
+      }
+
+      return readAdapter.getLowStockProductsByBusiness({
+        businessId,
+        threshold,
+        limit: 100
       });
     },
     [businessId, threshold]

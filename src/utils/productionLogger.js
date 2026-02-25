@@ -1,58 +1,22 @@
-/**
- * Sistema de logging para producción
- * Reemplaza console.log/error/warn con logging condicional basado en entorno
- */
-
-const IS_PRODUCTION = import.meta.env.PROD;
-const IS_DEVELOPMENT = import.meta.env.DEV;
+import baseLogger from './logger.js';
 
 /**
- * Logger que solo funciona en desarrollo
+ * Compat layer para código legado que importe productionLogger.
+ * Toda la salida queda centralizada y controlada por src/utils/logger.js.
  */
 export const logger = {
-  log: (...args) => {
-    if (IS_DEVELOPMENT) {
-      console.log(...args);
-    }
-  },
-  
-  error: (message, error) => {
-    if (IS_DEVELOPMENT) {
-      console.error(message, error);
-    }
-    // En producción, podrías enviar a un servicio como Sentry
-    if (IS_PRODUCTION && error) {
-      // TODO: Integrar con servicio de monitoreo
-    }
-  },
-  
-  warn: (...args) => {
-    if (IS_DEVELOPMENT) {
-      console.warn(...args);
-    }
-  },
-  
-  info: (...args) => {
-    if (IS_DEVELOPMENT) {
-      console.info(...args);
-    }
-  }
+  log: (...args) => baseLogger.success(...args),
+  error: (...args) => baseLogger.error(...args),
+  warn: (...args) => baseLogger.warn(...args),
+  info: (...args) => baseLogger.info(...args)
 };
 
 /**
- * Manejador de errores silencioso para producción
- * @param {Error} error - Error a manejar
- * @param {string} context - Contexto donde ocurrió el error
+ * Manejador de errores silencioso para producción.
+ * En dev conserva trazabilidad usando el logger central.
  */
 export const handleError = (error, context = '') => {
-  if (IS_DEVELOPMENT) {
-    console.error('Error:', context, error);
-  }
-  
-  // En producción, registrar sin exponer detalles al usuario
-  if (IS_PRODUCTION) {
-    // TODO: Enviar a servicio de monitoreo (Sentry, LogRocket, etc.)
-  }
+  logger.error('[production-logger] error', { context, error });
 };
 
 export default logger;

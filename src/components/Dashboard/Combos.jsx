@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Layers, Plus, X, Edit, Package, Save, Trash2, AlertCircle } from 'lucide-react';
-import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice } from '../../utils/formatters.js';
+import { getProductsForCombos } from '../../data/queries/combosQueries.js';
 import {
   COMBO_STATUS,
   createCombo,
@@ -68,19 +68,7 @@ export default function Combos({ businessId }) {
   const loadProductos = useCallback(async () => {
     if (!businessId) return [];
 
-    const { data, error: productsError } = await supabase
-      .from('products')
-      .select('id, name, code, stock, sale_price, is_active')
-      .eq('business_id', businessId)
-      .eq('is_active', true)
-      .order('name', { ascending: true })
-      .limit(500);
-
-    if (productsError) {
-      throw new Error(productsError.message || 'No se pudieron cargar los productos');
-    }
-
-    return data || [];
+    return getProductsForCombos(businessId);
   }, [businessId]);
 
   const loadData = useCallback(async () => {

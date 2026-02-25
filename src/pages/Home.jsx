@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from 'framer-motion';
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../supabase/Client.jsx";
+import { signOutSession } from "../data/commands/authCommands.js";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,6 +28,8 @@ import {
   Shield,
 } from "lucide-react";
 
+const _motionLintUsage = motion;
+
 function Home() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -36,7 +38,7 @@ function Home() {
   useEffect(() => {
     const signOut = async () => {
       try {
-        await supabase.auth.signOut();
+        await signOutSession();
       } catch {
         // Error silencioso
       }

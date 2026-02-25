@@ -6,11 +6,21 @@
 import { WifiOff, RefreshCw } from 'lucide-react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useState, useEffect } from 'react';
+import LOCAL_SYNC_CONFIG from '../config/localSync.js';
 
 export default function OfflineBanner() {
   const isOnline = useOnlineStatus();
   const [showBanner, setShowBanner] = useState(false);
   const [wasOffline, setWasOffline] = useState(false);
+  const canWriteOffline = Boolean(
+    LOCAL_SYNC_CONFIG.enabled
+    && (
+      LOCAL_SYNC_CONFIG.localWrites?.sales
+      || LOCAL_SYNC_CONFIG.localWrites?.purchases
+      || LOCAL_SYNC_CONFIG.localWrites?.products
+      || LOCAL_SYNC_CONFIG.localWrites?.suppliers
+    )
+  );
 
   useEffect(() => {
     if (!isOnline) {
@@ -64,7 +74,9 @@ export default function OfflineBanner() {
                     ⚠️ Sin conexión a Internet
                   </p>
                   <p className="text-xs sm:text-sm opacity-90">
-                    No puedes crear ventas ni sincronizar datos. Verifica tu conexión WiFi o datos móviles.
+                    {canWriteOffline
+                      ? 'Puedes seguir operando localmente. La sincronización se reanudará al reconectar.'
+                      : 'No puedes crear registros ni sincronizar datos. Verifica tu conexión WiFi o datos móviles.'}
                   </p>
                 </div>
               </>

@@ -20,6 +20,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useNotifications } from '../../hooks/useNotifications.js';
+import { WarmupStatusBadge } from '../WarmupStatusBadge.jsx';
+
+const _motionLintUsage = motion;
 
 // Avatares predefinidos
 const predefinedAvatars = [
@@ -35,7 +38,14 @@ const predefinedAvatars = [
   { id: 10, emoji: '👨‍🎤', name: 'Músico', gradient: 'from-yellow-500 to-yellow-600' },
 ];
 
-export const Navbar = React.memo(function Navbar({ userName = "Admin", userEmail = "admin@stockly.com", userRole = "Administrador", businessId, onSignOut }) {
+export const Navbar = React.memo(function Navbar({
+  userName = "Admin",
+  userEmail = "admin@stockly.com",
+  userRole = "Administrador",
+  businessId,
+  onSignOut,
+  warmupStatus = null
+}) {
   const [selectedAvatar, setSelectedAvatar] = useState(() => {
     const saved = localStorage.getItem('userAvatar');
     return saved ? JSON.parse(saved) : predefinedAvatars[0];
@@ -75,7 +85,10 @@ export const Navbar = React.memo(function Navbar({ userName = "Admin", userEmail
         </div>
 
         {/* Right Section */}
-        <div className="flex items-center gap-2 sm:gap-4">{/* Notifications */}
+        <div className="flex items-center gap-2 sm:gap-4">
+          <WarmupStatusBadge status={warmupStatus} />
+
+          {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="relative p-2 rounded-2xl hover:bg-accent/10 transition-colors group">

@@ -3,8 +3,7 @@ import emailjs from '@emailjs/browser';
 import { 
   validateEmail, 
   shouldSendEmail, 
-  logEmailAttempt,
-  normalizeEmail 
+  logEmailAttempt
 } from './emailValidation';
 
 /**

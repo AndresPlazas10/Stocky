@@ -16,6 +16,7 @@ export function AsyncStateWrapper({
   syncingRealtime = false,
   actionProcessing = false,
   offlineMode,
+  showOfflineState = false,
   onRetry,
   skeletonType = 'table',
   emptyTitle,
@@ -29,7 +30,7 @@ export function AsyncStateWrapper({
 }) {
   const isOnline = useOnlineStatus();
   const hasData = dataCount > 0;
-  const offline = offlineMode ?? !isOnline;
+  const offline = showOfflineState ? (offlineMode ?? !isOnline) : false;
 
   const state = resolveAsyncState({
     loading,

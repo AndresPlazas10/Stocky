@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion';
 
+const _motionLintUsage = motion;
+
 /**
  * Input optimizado para móvil
  * - Altura mínima 44px (touch-friendly)

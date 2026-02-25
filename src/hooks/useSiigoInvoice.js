@@ -7,7 +7,7 @@
 // Este hook está deprecado. Todas las funciones retornan estado deshabilitado.
 
 import { useState, useCallback } from 'react'
-import { ID_TYPES, PAYMENT_METHODS, TAX_RATES } from '../services/siigoService'
+import { siigoService, ID_TYPES, PAYMENT_METHODS, TAX_RATES } from '../services/siigoService'
 
 /**
  * ⚠️ DEPRECATED - Hook para facturación (ya no genera facturas electrónicas)
@@ -16,10 +16,10 @@ import { ID_TYPES, PAYMENT_METHODS, TAX_RATES } from '../services/siigoService'
  */
 export function useSiigoInvoice(_businessId) {
   // Estados
-  const [loading, setLoading] = useState(false)
+  const [_loading, _setLoading] = useState(false)
   const [error, setError] = useState('La facturación electrónica a través de Stocky ya no está disponible')
-  const [lastInvoice, setLastInvoice] = useState(null)
-  const [canInvoice, setCanInvoice] = useState(false)
+  const [_lastInvoice, setLastInvoice] = useState(null)
+  const [_canInvoice, _setCanInvoice] = useState(false)
 
   /**
    * ⚠️ DEPRECATED - Siempre retorna false
@@ -93,8 +93,8 @@ export function useSiigoInvoice(_businessId) {
  * @returns {Object} Estado vacío
  */
 export function useSiigoHistory(_businessId) {
-  const [invoices, setInvoices] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [_invoices, setInvoices] = useState([])
+  const [_loading, _setLoading] = useState(false)
   const [stats, setStats] = useState({
     total_invoices: 0,
     successful_invoices: 0,
@@ -105,7 +105,7 @@ export function useSiigoHistory(_businessId) {
   /**
    * ⚠️ DEPRECATED - Ya no carga historial
    */
-  const loadHistory = useCallback(async (options = {}) => {
+  const loadHistory = useCallback(async (_options = {}) => {
     setInvoices([])
   }, [])
 
@@ -144,19 +144,7 @@ export function useDaneCities() {
   const searchCities = useCallback(async (term) => {
     setLoading(true)
     try {
-      // Nota: dane_cities no está deprecada, se mantiene funcional
-      const { supabase } = await import('../supabase/Client')
-      let query = supabase
-        .from('dane_cities')
-        .select('city_code, city_name, department_name')
-        .order('city_name')
-        .limit(50)
-
-      if (term) {
-        query = query.ilike('city_name', `%${term}%`)
-      }
-
-      const { data } = await query
+      const data = await siigoService.getCities(term || '')
       setCities(data || [])
     } catch {
       setCities([])

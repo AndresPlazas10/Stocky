@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
-import { supabase } from '../../supabase/Client';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
+import {
+  updateBusinessProfile
+} from '../../data/commands/businessCommands.js';
+import { signOutSession } from '../../data/commands/authCommands.js';
 import {
   Settings,
   User,
@@ -81,20 +84,16 @@ function Configuracion({ user, business, onBusinessUpdate }) {
       setError('');
       setSuccess('');
 
-      const { data, error: updateError } = await supabase
-        .from('businesses')
-        .update({
+      const data = await updateBusinessProfile({
+        businessId: business.id,
+        payload: {
           name: businessData.name,
           nit: businessData.nit || null,
           email: businessData.email,
           phone: businessData.phone,
           address: businessData.address
-        })
-        .eq('id', business.id)
-        .select()
-        .maybeSingle();
-
-      if (updateError) throw updateError;
+        }
+      });
 
       setSuccess('Información actualizada correctamente');
       setEditingBusiness(false);
@@ -115,8 +114,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
 
   const handleLogout = useCallback(async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      await signOutSession();
       window.location.href = '/';
     } catch {
       setError('❌ No se pudo cerrar la sesión correctamente');

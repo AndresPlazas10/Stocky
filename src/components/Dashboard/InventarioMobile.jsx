@@ -12,9 +12,19 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice } from '../../utils/formatters.js';
 import { useViewport } from '../../hooks/useViewport';
+import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
+import {
+  createProductWithFallback,
+  deleteProductById,
+  setProductActiveStatus,
+  updateProductById
+} from '../../data/commands/inventoryCommands.js';
+import {
+  getInventoryProductsByBusiness,
+  getSuppliersByBusiness
+} from '../../data/queries/inventoryQueries.js';
 import {
   MobileTable,
   FloatingActionButton,
@@ -29,12 +39,9 @@ import {
   Plus,
   DollarSign,
   AlertTriangle,
-  TrendingUp,
   Edit,
   Trash2
 } from 'lucide-react';
-
-const MOBILE_PRODUCTS_COLUMNS = 'id, name, category, purchase_price, sale_price, stock, min_stock, supplier_id, unit, is_active, manage_stock, created_at';
 
 function InventarioMobile({ businessId }) {
   const [productos, setProductos] = useState([]);
@@ -55,27 +62,50 @@ function InventarioMobile({ businessId }) {
   });
 
   const loadProductos = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('products')
-      .select(MOBILE_PRODUCTS_COLUMNS)
-      .eq('business_id', businessId)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
+    const offline = isOfflineMode();
+    const offlineSnapshotKey = `inventario.productos:${businessId}`;
+    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
 
-    if (!error && data) {
-      setProductos(data);
+    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+      setProductos(offlineSnapshot.filter((item) => item?.is_active !== false));
+    }
+
+    const data = await getInventoryProductsByBusiness(businessId);
+    const normalizedData = Array.isArray(data) ? data : [];
+    const hasLocalData = normalizedData.length > 0;
+
+    if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+      setProductos(offlineSnapshot.filter((item) => item?.is_active !== false));
+      return;
+    }
+
+    setProductos(normalizedData.filter((item) => item?.is_active !== false));
+    if (!offline || hasLocalData) {
+      saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
     }
   }, [businessId]);
 
   const loadProveedores = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('suppliers')
-      .select('id, name')
-      .eq('business_id', businessId)
-      .eq('is_active', true);
+    const offline = isOfflineMode();
+    const offlineSnapshotKey = `inventario.proveedores:${businessId}`;
+    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
 
-    if (!error && data) {
-      setProveedores(data);
+    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+      setProveedores(offlineSnapshot);
+    }
+
+    const data = await getSuppliersByBusiness(businessId);
+    const normalizedData = Array.isArray(data) ? data : [];
+    const hasLocalData = normalizedData.length > 0;
+
+    if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+      setProveedores(offlineSnapshot);
+      return;
+    }
+
+    setProveedores(normalizedData);
+    if (!offline || hasLocalData) {
+      saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
     }
   }, [businessId]);
 
@@ -101,8 +131,64 @@ function InventarioMobile({ businessId }) {
 
   const handleSave = async () => {
     try {
-      // Lógica de guardado aquí
-      await loadProductos();
+      const name = String(formData.name || '').trim();
+      const purchasePrice = Number(formData.purchase_price);
+      const salePrice = Number(formData.sale_price);
+      const stock = Number(formData.stock || 0);
+      const minStock = Number(formData.min_stock || 0);
+
+      if (!name || !Number.isFinite(purchasePrice) || !Number.isFinite(salePrice)) {
+        return;
+      }
+
+      const payload = {
+        name,
+        category: String(formData.category || '').trim() || null,
+        purchase_price: purchasePrice,
+        sale_price: salePrice,
+        stock: Number.isFinite(stock) ? stock : 0,
+        min_stock: Number.isFinite(minStock) ? minStock : 0,
+        unit: 'unit',
+        supplier_id: formData.supplier_id || null,
+        is_active: true,
+        manage_stock: true
+      };
+
+      if (editingProduct?.id) {
+        const updateResult = await updateProductById({
+          productId: editingProduct.id,
+          businessId,
+          payload
+        });
+        if (updateResult?.__localOnly) {
+          setProductos((prev) => {
+            const next = prev.map((item) => (
+              item.id === editingProduct.id
+                ? { ...item, ...payload }
+                : item
+            ));
+            saveOfflineSnapshot(`inventario.productos:${businessId}`, next);
+            return next;
+          });
+        } else {
+          await loadProductos();
+        }
+      } else {
+        const createResult = await createProductWithFallback({
+          business_id: businessId,
+          ...payload
+        });
+        if (createResult?.localOnly && createResult?.createdProduct) {
+          setProductos((prev) => {
+            const next = [createResult.createdProduct, ...prev];
+            saveOfflineSnapshot(`inventario.productos:${businessId}`, next);
+            return next;
+          });
+        } else {
+          await loadProductos();
+        }
+      }
+
       setShowAddModal(false);
       resetForm();
     } catch {
@@ -126,7 +212,40 @@ function InventarioMobile({ businessId }) {
 
   const handleDelete = async (product) => {
     if (window.confirm(`¿Eliminar ${product.name}?`)) {
-      // Lógica de eliminación
+      try {
+        const deleteResult = await deleteProductById({
+          productId: product.id,
+          businessId
+        });
+        if (deleteResult?.localOnly) {
+          setProductos((prev) => {
+            const next = prev.filter((item) => item.id !== product.id);
+            saveOfflineSnapshot(`inventario.productos:${businessId}`, next);
+            return next;
+          });
+          return;
+        }
+      } catch (error) {
+        if (error?.code === '23503') {
+          const statusResult = await setProductActiveStatus({
+            productId: product.id,
+            isActive: false,
+            businessId
+          });
+          if (statusResult?.__localOnly) {
+            setProductos((prev) => {
+              const next = prev.map((item) => (
+                item.id === product.id
+                  ? { ...item, is_active: false }
+                  : item
+              ));
+              saveOfflineSnapshot(`inventario.productos:${businessId}`, next);
+              return next;
+            });
+            return;
+          }
+        }
+      }
       await loadProductos();
     }
   };
@@ -351,7 +470,10 @@ function InventarioMobile({ businessId }) {
             onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
             options={[
               { value: '', label: 'Seleccionar proveedor...' },
-              ...proveedores.map(p => ({ value: p.id, label: p.name }))
+              ...proveedores.map((p) => ({
+                value: p.id,
+                label: p.business_name || p.contact_name || 'Proveedor'
+              }))
             ]}
           />
         </div>
