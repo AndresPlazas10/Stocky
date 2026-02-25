@@ -12,10 +12,7 @@ function canQueueLocalPurchases() {
   return Boolean(
     LOCAL_SYNC_CONFIG.enabled
     && LOCAL_SYNC_CONFIG.shadowWritesEnabled
-    && (
-      LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
-      || LOCAL_SYNC_CONFIG.localWrites?.purchases
-    )
+    && LOCAL_SYNC_CONFIG.localWrites?.purchases
   );
 }
 
