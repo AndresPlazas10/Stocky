@@ -48,7 +48,6 @@ async function userCanAccessBusiness(userId, businessId) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'OPTIONS,POST');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -91,7 +90,7 @@ export default async function handler(req, res) {
 
     const { data: tableRow, error: tableError } = await admin
       .from('tables')
-      .select('id,business_id,status,opened_at,closed_at,updated_at,version')
+      .select('id,business_id,current_order_id,status,opened_at,closed_at,updated_at,version')
       .eq('id', table_id)
       .maybeSingle();
 
@@ -108,22 +107,64 @@ export default async function handler(req, res) {
     }
 
     const nowIso = new Date().toISOString();
-    const nextStatus = normalizedAction === 'open' ? 'occupied' : 'available';
+    let nextOrderId = tableRow.current_order_id;
 
-    if (tableRow.status === nextStatus) {
-      res.status(200).json({ ok: true, data: tableRow });
-      return;
+    if (normalizedAction === 'open') {
+      if (!nextOrderId) {
+        const { data: createdOrder, error: createOrderError } = await admin
+          .from('orders')
+          .insert([{
+            business_id: tableRow.business_id,
+            table_id,
+            user_id: user.id,
+            status: 'open',
+            total: 0,
+            opened_at: nowIso
+          }])
+          .select('id')
+          .single();
+
+        if (createOrderError) throw createOrderError;
+        nextOrderId = createdOrder?.id || null;
+      } else {
+        const { error: reopenOrderError } = await admin
+          .from('orders')
+          .update({
+            status: 'open',
+            table_id,
+            business_id: tableRow.business_id,
+            opened_at: nowIso,
+            closed_at: null
+          })
+          .eq('id', nextOrderId)
+          .eq('business_id', tableRow.business_id);
+        if (reopenOrderError) throw reopenOrderError;
+      }
+    } else if (nextOrderId) {
+      const { error: closeOrderError } = await admin
+        .from('orders')
+        .update({
+          status: 'closed',
+          closed_at: nowIso
+        })
+        .eq('id', nextOrderId)
+        .eq('business_id', tableRow.business_id);
+      if (closeOrderError) throw closeOrderError;
+      nextOrderId = null;
     }
 
     const updatePayload = normalizedAction === 'open'
       ? {
+          current_order_id: nextOrderId,
           status: 'occupied',
           opened_by: user.id,
           opened_at: nowIso,
+          closed_at: null,
           updated_at: nowIso,
           version: (tableRow.version || 0) + 1,
         }
       : {
+          current_order_id: null,
           status: 'available',
           closed_by: user.id,
           closed_at: nowIso,
@@ -136,7 +177,7 @@ export default async function handler(req, res) {
       .update(updatePayload)
       .eq('id', table_id)
       .eq('business_id', tableRow.business_id)
-      .select('id,business_id,status,opened_at,closed_at,updated_at,version')
+      .select('id,business_id,current_order_id,status,opened_at,closed_at,updated_at,version')
       .single();
 
     if (updateError) throw updateError;

@@ -6,6 +6,8 @@ import { Navbar } from './Navbar';
 import { MobileHeader, MobileDrawer } from '../mobile';
 import { useViewport } from '../../hooks/useViewport';
 
+const _motionLintUsage = motion;
+
 export function DashboardLayout({ 
   children, 
   userName, 
@@ -17,7 +19,8 @@ export function DashboardLayout({
   onLogoChange,
   onSignOut,
   activeSection,
-  onSectionChange
+  onSectionChange,
+  warmupStatus
 }) {
   const { isMobile } = useViewport();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -32,6 +35,7 @@ export function DashboardLayout({
           onMenuClick={() => setDrawerOpen(true)}
           showSearch={false}
           showNotifications={false}
+          warmupStatus={warmupStatus}
         />
 
         {/* Drawer lateral */}
@@ -81,6 +85,7 @@ export function DashboardLayout({
           userRole={userRole}
           businessId={businessId}
           onSignOut={onSignOut}
+          warmupStatus={warmupStatus}
         />
 
         {/* Page Content */}

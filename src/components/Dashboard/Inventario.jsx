@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '../../supabase/Client.jsx';
 import { formatPrice } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
@@ -27,6 +26,24 @@ import {
   Edit
 } from 'lucide-react';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
+import {
+  createProductWithFallback,
+  deleteProductById,
+  setProductActiveStatus,
+  updateProductById
+} from '../../data/commands/inventoryCommands.js';
+import {
+  getInventoryProductsByBusiness,
+  getSupplierById,
+  getSuppliersByBusiness
+} from '../../data/queries/inventoryQueries.js';
+import {
+  getAuthenticatedUser,
+  isEmployeeInBusiness,
+  getEmployeeRoleInBusiness
+} from '../../data/queries/authQueries.js';
+import { isAdminRole } from '../../utils/roles.js';
+import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
 
 const _motionLintUsage = motion;
 
@@ -60,63 +77,107 @@ function Inventario({ businessId, userRole = 'admin' }) {
   });
   const [generatedCode, setGeneratedCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const hasAdminPrivileges = isAdminRole(userRole);
+
+  const syncProductosSnapshot = useCallback((nextProductos) => {
+    saveOfflineSnapshot(`inventario.productos:${businessId}`, nextProductos);
+  }, [businessId]);
+
+  const setProductosWithSnapshot = useCallback((updater) => {
+    setProductos((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      const normalized = Array.isArray(next) ? next : [];
+      syncProductosSnapshot(normalized);
+      return normalized;
+    });
+  }, [syncProductosSnapshot]);
 
   // Memoizar funciones de carga
   const loadProductos = useCallback(async () => {
+    const offline = isOfflineMode();
+    const offlineSnapshotKey = `inventario.productos:${businessId}`;
+    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
+
+    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+      setProductos(offlineSnapshot);
+    }
+
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          supplier:suppliers(id, business_name, contact_name)
-        `)
-        .eq('business_id', businessId)
-        .order('created_at', { ascending: false });
+      const data = await getInventoryProductsByBusiness(businessId);
+      const normalizedData = Array.isArray(data) ? data : [];
+      const hasLocalData = normalizedData.length > 0;
 
-      if (error) throw error;
-      
-      setProductos(data || []);
+      if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+        setProductos(offlineSnapshot);
+        return;
+      }
+
+      setProductos(normalizedData);
+      if (!offline || hasLocalData) {
+        saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
+      }
     } catch {
-      setError('❌ Error al cargar el inventario');
+      if (offline) {
+        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
+        setProductos(Array.isArray(cached) ? cached : []);
+      } else {
+        setError('❌ Error al cargar el inventario');
+      }
     } finally {
       setLoading(false);
     }
   }, [businessId]);
 
   const loadProveedores = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('id, business_name, contact_name')
-        .eq('business_id', businessId)
-        .order('business_name', { ascending: true });
+    const offline = isOfflineMode();
+    const offlineSnapshotKey = `inventario.proveedores:${businessId}`;
+    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
 
-      if (error) throw error;
-      setProveedores(data || []);
+    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+      setProveedores(offlineSnapshot);
+    }
+
+    try {
+      const data = await getSuppliersByBusiness(businessId);
+      const normalizedData = Array.isArray(data) ? data : [];
+      const hasLocalData = normalizedData.length > 0;
+
+      if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+        setProveedores(offlineSnapshot);
+        return;
+      }
+
+      setProveedores(normalizedData);
+      if (!offline || hasLocalData) {
+        saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
+      }
     } catch {
-      // Error silencioso
+      if (offline) {
+        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
+        setProveedores(Array.isArray(cached) ? cached : []);
+      }
     }
   }, [businessId]);
 
   // Verificar si el usuario autenticado es empleado
   const checkIfEmployee = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthenticatedUser();
       if (!user) {
         setIsEmployee(false);
         return;
       }
 
-      const { data } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('business_id', businessId)
-        .maybeSingle();
+      const employeeRole = await getEmployeeRoleInBusiness({ userId: user.id, businessId });
+      if (employeeRole) {
+        // owner/admin/propietario/administrador deben conservar permisos de gestión.
+        setIsEmployee(!isAdminRole(employeeRole));
+        return;
+      }
 
-      // Si existe en employees, es empleado (NO puede editar/eliminar)
-      setIsEmployee(!!data);
+      // Fallback: si existe en employees pero sin rol resoluble, tratar como empleado restringido.
+      setIsEmployee(await isEmployeeInBusiness({ userId: user.id, businessId }));
     } catch {
       // Si hay error, asumimos que NO es empleado (es admin)
       setIsEmployee(false);
@@ -156,16 +217,12 @@ function Inventario({ businessId, userRole = 'admin' }) {
       // Cargar supplier data
       let productWithSupplier = newProduct;
       if (newProduct.supplier_id) {
-        const { data: supplier } = await supabase
-          .from('suppliers')
-          .select('id, business_name, contact_name')
-          .eq('id', newProduct.supplier_id)
-          .single();
+        const supplier = await getSupplierById(newProduct.supplier_id);
         productWithSupplier = { ...newProduct, supplier };
       }
       
       // Verificar si el producto ya existe antes de agregarlo
-      setProductos(prev => {
+      setProductosWithSnapshot(prev => {
         const exists = prev.some(p => p.id === newProduct.id);
         if (exists) {
           return prev;
@@ -177,10 +234,10 @@ function Inventario({ businessId, userRole = 'admin' }) {
       setTimeout(() => setSuccess(null), 3000);
     },
     onUpdate: (updatedProduct) => {
-      setProductos(prev => prev.map(p => p.id === updatedProduct.id ? { ...p, ...updatedProduct } : p));
+      setProductosWithSnapshot(prev => prev.map(p => p.id === updatedProduct.id ? { ...p, ...updatedProduct } : p));
     },
     onDelete: (deletedProduct) => {
-      setProductos(prev => prev.filter(p => p.id !== deletedProduct.id));
+      setProductosWithSnapshot(prev => prev.filter(p => p.id !== deletedProduct.id));
     }
   });
 
@@ -255,81 +312,23 @@ function Inventario({ businessId, userRole = 'admin' }) {
         manage_stock: formData.manage_stock !== false
       };
 
-      // Camino principal: generación de código atómica en DB
-      let insertError = null;
-      ({ error: insertError } = await supabase.rpc('create_product_with_generated_code', {
-        p_business_id: productData.business_id,
-        p_name: productData.name,
-        p_category: productData.category,
-        p_purchase_price: productData.purchase_price,
-        p_sale_price: productData.sale_price,
-        p_stock: productData.stock,
-        p_min_stock: productData.min_stock,
-        p_unit: productData.unit,
-        p_supplier_id: productData.supplier_id,
-        p_is_active: productData.is_active,
-        p_manage_stock: productData.manage_stock
-      }));
-      
-      if (insertError) {
-        const insertMessage = String(insertError?.message || '');
-        const insertMessageLower = insertMessage.toLowerCase();
-        const missingAtomicCreateFn = insertMessageLower.includes('create_product_with_generated_code')
-          && (
-            insertMessageLower.includes('does not exist')
-            || insertMessageLower.includes('could not find the function')
-            || insertMessageLower.includes('schema cache')
-          );
+      const result = await createProductWithFallback(productData);
 
-        // Compatibilidad transitoria: entorno aún sin la migración nueva.
-        if (missingAtomicCreateFn) {
-          const fallbackCode = `PRD-${Date.now().toString().slice(-6)}`;
-          const { error: retryError } = await supabase
-            .from('products')
-            .insert([{
-              ...productData,
-              code: fallbackCode,
-              created_at: new Date().toISOString()
-            }])
-            .select()
-            .maybeSingle();
-          
-          if (retryError) {
-            throw new Error(`Error al crear producto: ${retryError.message || 'Código duplicado'}`);
-          }
-          
-          // Éxito con retry
-          await loadProductos();
-          setShowForm(false);
-          setFormData({
-            name: '',
-            category: '',
-            purchase_price: '',
-            sale_price: '',
-            stock: '',
-            min_stock: '',
-            unit: 'unit',
-            supplier_id: '',
-            is_active: true,
-            manage_stock: true
+      if (result?.localOnly && result?.createdProduct) {
+        setProductosWithSnapshot((prev) => {
+          const next = [result.createdProduct, ...prev];
+          const seen = new Set();
+          return next.filter((item) => {
+            const key = String(item?.id || '');
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
           });
-          setGeneratedCode('');
-          setSuccess('✅ Producto creado exitosamente');
-          setTimeout(() => setSuccess(null), 3000);
-          return;
-        } else if (insertError.code === '42501') {
-          // Error de permisos RLS
-          throw new Error('No tienes permisos para crear productos. Contacta al administrador.');
-        } else if (insertError.code === '23503') {
-          // FK constraint
-          throw new Error('Proveedor no válido. Selecciona uno existente.');
-        } else {
-          throw new Error(`Error al crear producto: ${insertError.message || 'Error desconocido'}`);
-        }
+        });
+      } else {
+        await loadProductos();
       }
-      
-      // Código de éxito
-      await loadProductos();
+
       setShowForm(false);
       setFormData({
         name: '',
@@ -344,7 +343,11 @@ function Inventario({ businessId, userRole = 'admin' }) {
         manage_stock: true
       });
       setGeneratedCode('');
-      setSuccess('✅ Producto creado exitosamente');
+      setSuccess(
+        result?.localOnly
+          ? '✅ Producto guardado localmente (pendiente sync)'
+          : '✅ Producto creado exitosamente'
+      );
       
       // Auto-limpiar mensaje de éxito después de 3 segundos
       setTimeout(() => setSuccess(null), 3000);
@@ -377,18 +380,22 @@ function Inventario({ businessId, userRole = 'admin' }) {
         manage_stock: formData.manage_stock !== false
       };
 
-      const { error: updateError } = await supabase
-        .from('products')
-        .update(productData)
-        .eq('id', editingProduct.id)
-        .select()
-        .maybeSingle();
-      
-      if (updateError) {
-        throw new Error(`Error al actualizar producto: ${updateError.message}`);
+      const updateResult = await updateProductById({
+        productId: editingProduct.id,
+        businessId,
+        payload: productData
+      });
+
+      if (updateResult?.__localOnly) {
+        setProductosWithSnapshot((prev) => prev.map((item) => (
+          item.id === editingProduct.id
+            ? { ...item, ...productData }
+            : item
+        )));
+      } else {
+        await loadProductos();
       }
 
-      await loadProductos();
       setShowEditModal(false);
       setEditingProduct(null);
       setFormData({
@@ -404,12 +411,16 @@ function Inventario({ businessId, userRole = 'admin' }) {
         manage_stock: true
       });
       setGeneratedCode('');
-      setSuccess('✅ Producto actualizado exitosamente');
+      setSuccess(
+        updateResult?.__localOnly
+          ? '✅ Producto actualizado localmente (pendiente sync)'
+          : '✅ Producto actualizado exitosamente'
+      );
       setTimeout(() => setSuccess(null), 3000);
     } finally {
       setIsSubmitting(false);
     }
-  }, [editingProduct, formData, loadProductos]);
+  }, [editingProduct, formData, loadProductos, businessId, setProductosWithSnapshot]);
 
   const handleEdit = useCallback((producto) => {
     setEditingProduct(producto);
@@ -436,47 +447,68 @@ function Inventario({ businessId, userRole = 'admin' }) {
 
   const confirmDelete = useCallback(async () => {
     if (!productToDelete) return;
+    if (!hasAdminPrivileges || isEmployee) {
+      setError('❌ No tienes permisos para eliminar productos');
+      setShowDeleteModal(false);
+      setProductToDelete(null);
+      return;
+    }
 
     try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productToDelete);
-
-      if (error) {
-        if (error.code === '23503') {
-          setShowDeleteModal(false);
-          setShowDeactivateModal(true);
-          return;
-        }
-        throw error;
-      }
+      const deleteResult = await deleteProductById({
+        productId: productToDelete,
+        businessId
+      });
 
       setError(null);
       setShowDeleteModal(false);
       setProductToDelete(null);
-      setSuccess('✅ Producto eliminado exitosamente');
-      await loadProductos();
-    } catch {
+      setSuccess(
+        deleteResult?.localOnly
+          ? '✅ Producto eliminado localmente (pendiente sync)'
+          : '✅ Producto eliminado exitosamente'
+      );
+      if (deleteResult?.localOnly) {
+        setProductosWithSnapshot((prev) => prev.filter((item) => item.id !== productToDelete));
+      } else {
+        await loadProductos();
+      }
+    } catch (error) {
+      if (error?.code === '23503') {
+        setShowDeleteModal(false);
+        setShowDeactivateModal(true);
+        return;
+      }
       setError('❌ Error al eliminar el producto');
       setShowDeleteModal(false);
       setProductToDelete(null);
     }
-  }, [productToDelete, loadProductos]);
+  }, [productToDelete, loadProductos, businessId, setProductosWithSnapshot, hasAdminPrivileges, isEmployee]);
 
   const confirmDeactivate = useCallback(async () => {
     if (!productToDelete) return;
 
     try {
-      const { error: deactivateError } = await supabase
-        .from('products')
-        .update({ is_active: false })
-        .eq('id', productToDelete);
+      const statusResult = await setProductActiveStatus({
+        productId: productToDelete,
+        isActive: false,
+        businessId
+      });
       
-      if (deactivateError) throw deactivateError;
-      
-      setSuccess('✅ Producto desactivado exitosamente');
-      await loadProductos();
+      setSuccess(
+        statusResult?.__localOnly
+          ? '✅ Producto desactivado localmente (pendiente sync)'
+          : '✅ Producto desactivado exitosamente'
+      );
+      if (statusResult?.__localOnly) {
+        setProductosWithSnapshot((prev) => prev.map((item) => (
+          item.id === productToDelete
+            ? { ...item, is_active: false }
+            : item
+        )));
+      } else {
+        await loadProductos();
+      }
       setShowDeactivateModal(false);
       setProductToDelete(null);
     } catch {
@@ -484,7 +516,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
       setShowDeactivateModal(false);
       setProductToDelete(null);
     }
-  }, [productToDelete, loadProductos]);
+  }, [productToDelete, loadProductos, businessId, setProductosWithSnapshot]);
 
   const cancelDelete = useCallback(() => {
     setShowDeleteModal(false);
@@ -494,19 +526,30 @@ function Inventario({ businessId, userRole = 'admin' }) {
 
   const toggleActive = useCallback(async (productId, currentStatus) => {
     try {
-      const { error } = await supabase
-        .from('products')
-        .update({ is_active: !currentStatus })
-        .eq('id', productId);
+      const statusResult = await setProductActiveStatus({
+        productId,
+        isActive: !currentStatus,
+        businessId
+      });
 
-      if (error) throw error;
-
-      setSuccess(`✅ Producto ${!currentStatus ? 'activado' : 'desactivado'} exitosamente`);
-      await loadProductos();
+      setSuccess(
+        statusResult?.__localOnly
+          ? `✅ Producto ${!currentStatus ? 'activado' : 'desactivado'} localmente (pendiente sync)`
+          : `✅ Producto ${!currentStatus ? 'activado' : 'desactivado'} exitosamente`
+      );
+      if (statusResult?.__localOnly) {
+        setProductosWithSnapshot((prev) => prev.map((item) => (
+          item.id === productId
+            ? { ...item, is_active: !currentStatus }
+            : item
+        )));
+      } else {
+        await loadProductos();
+      }
     } catch {
       setError('❌ Error al actualizar el estado del producto');
     }
-  }, [loadProductos]);
+  }, [loadProductos, businessId, setProductosWithSnapshot]);
 
   // Helper para clases de badge de stock (memoizado)
   const getStockBadgeClass = useCallback((stock, minStock) => {
@@ -534,7 +577,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
       skeletonType="inventario"
       emptyTitle="No hay productos en inventario"
       emptyDescription="Crea el primer producto para habilitar ventas y compras."
-      emptyAction={userRole === 'admin' ? (
+      emptyAction={hasAdminPrivileges ? (
         <Button
           type="button"
           onClick={() => setShowForm(true)}
@@ -563,11 +606,11 @@ function Inventario({ businessId, userRole = 'admin' }) {
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold">Inventario</h1>
                 <p className="text-white/80 mt-1 text-sm sm:text-base">
-                  {userRole === 'admin' ? 'Gestión de productos y stock' : 'Consulta de productos y stock'}
+                  {hasAdminPrivileges ? 'Gestión de productos y stock' : 'Consulta de productos y stock'}
                 </p>
               </div>
             </div>
-            {userRole === 'admin' && (
+            {hasAdminPrivileges && (
               <Button
                 onClick={() => {
                   if (showForm) {
@@ -627,7 +670,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
 
       {/* Modal Formulario Agregar Producto */}
       <AnimatePresence>
-        {showForm && userRole === 'admin' && (
+        {showForm && hasAdminPrivileges && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -980,7 +1023,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                         
                         {/* Estado */}
                         <div className="shrink-0">
-                          {userRole === 'admin' ? (
+                          {hasAdminPrivileges ? (
                             <Button
                               onClick={() => toggleActive(producto.id, producto.is_active)}
                               className={`h-9 px-3 rounded-xl font-medium text-xs transition-all duration-300 ${
@@ -1075,7 +1118,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       </div>
 
                       {/* Acciones */}
-                      {userRole === 'admin' && !isEmployee && (
+                      {hasAdminPrivileges && !isEmployee && (
                         <div className="pt-4 border-t border-accent-200 space-y-2">
                           <Button
                             onClick={() => handleEdit(producto)}

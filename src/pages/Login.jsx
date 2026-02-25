@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabase/Client.jsx';
+import { getOwnedBusinessByUserId } from '../data/queries/authQueries.js';
+import { signInWithUsernamePassword } from '../data/commands/authCommands.js';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { SaleErrorAlert } from '@/components/ui/SaleErrorAlert';
 
 import { Store, User, Lock, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+
+const _motionLintUsage = motion;
 
 function Login() {
   const navigate = useNavigate();
@@ -41,29 +44,15 @@ function Login() {
       }
 
       // Generar el email basado en el username (igual que en el registro)
-      const cleanUsername = username.trim().toLowerCase();
-      const emailToUse = `${cleanUsername}@stockly-app.com`;
-
-      // Intentando login
-
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: emailToUse,
-        password: password
+      const { user } = await signInWithUsernamePassword({
+        username,
+        password
       });
-
-      if (signInError) {
-        // Error de login
-        throw new Error('❌ Usuario o contraseña incorrectos');
-      }
 
       // Login exitoso
 
       // Verificar si es propietario de un negocio
-      const { data: business } = await supabase
-        .from('businesses')
-        .select('id')
-        .eq('created_by', data.user.id)
-        .maybeSingle();
+      const business = await getOwnedBusinessByUserId(user?.id, 'id');
 
       // Redireccionar según el rol (SPA, sin recargar)
       if (business) {

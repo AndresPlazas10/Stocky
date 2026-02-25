@@ -1,5 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../supabase/Client.jsx';
+import { readAdapter } from '../data/adapters/localAdapter.js';
+
+function getTimeAgo(date) {
+  const now = new Date();
+  const diffInMs = now - date;
+  const diffInMinutes = Math.floor(diffInMs / 60000);
+  const diffInHours = Math.floor(diffInMs / 3600000);
+  const diffInDays = Math.floor(diffInMs / 86400000);
+
+  if (diffInMinutes < 1) return 'Justo ahora';
+  if (diffInMinutes < 60) return `Hace ${diffInMinutes} min`;
+  if (diffInHours < 24) return `Hace ${diffInHours} hora${diffInHours > 1 ? 's' : ''}`;
+  return `Hace ${diffInDays} día${diffInDays > 1 ? 's' : ''}`;
+}
 
 export function useNotifications(businessId) {
   const [notifications, setNotifications] = useState([]);
@@ -10,14 +23,11 @@ export function useNotifications(businessId) {
       const allNotifications = [];
 
       // 1. Stock bajo - Productos con stock menor a 10
-      const { data: lowStockProducts } = await supabase
-        .from('products')
-        .select('id, name, stock')
-        .eq('business_id', businessId)
-        .eq('is_active', true)
-        .lt('stock', 10)
-        .order('stock', { ascending: true })
-        .limit(5);
+      const { data: lowStockProducts } = await readAdapter.getLowStockProductsByBusiness({
+        businessId,
+        threshold: 10,
+        limit: 5
+      });
 
       if (lowStockProducts) {
         lowStockProducts.forEach(product => {
@@ -36,14 +46,14 @@ export function useNotifications(businessId) {
       // 2. Ventas recientes - Últimas 3 ventas de hoy
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      const startIso = today.toISOString();
 
-      const { data: recentSales } = await supabase
-        .from('sales')
-        .select('id, total, created_at')
-        .eq('business_id', businessId)
-        .gte('created_at', today.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(3);
+      const { data: recentSales } = await readAdapter.getRecentSalesByBusinessSince({
+        businessId,
+        startIso,
+        selectSql: 'id, total, created_at',
+        limit: 3
+      });
 
       if (recentSales) {
         recentSales.forEach(sale => {
@@ -61,18 +71,17 @@ export function useNotifications(businessId) {
       }
 
       // 3. Compras recientes - Últimas 3 compras de hoy
-      const { data: recentPurchases } = await supabase
-        .from('purchases')
-        .select(`
-          id, 
-          total, 
+      const { data: recentPurchases } = await readAdapter.getRecentPurchasesByBusinessSince({
+        businessId,
+        startIso,
+        selectSql: `
+          id,
+          total,
           created_at,
           supplier:suppliers(business_name, contact_name)
-        `)
-        .eq('business_id', businessId)
-        .gte('created_at', today.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(3);
+        `,
+        limit: 3
+      });
 
       if (recentPurchases) {
         recentPurchases.forEach(purchase => {
@@ -110,73 +119,42 @@ export function useNotifications(businessId) {
     loadNotifications();
 
     // Suscribirse a cambios en tiempo real
-    const salesChannel = supabase
-      .channel('sales-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'sales',
-          filter: `business_id=eq.${businessId}`
-        },
-        () => {
-          loadNotifications();
-        }
-      )
-      .subscribe();
+    const salesChannel = readAdapter.subscribeToPostgresChanges({
+      channelName: `sales-changes:${businessId}`,
+      event: 'INSERT',
+      table: 'sales',
+      filter: `business_id=eq.${businessId}`,
+      callback: () => {
+        loadNotifications();
+      }
+    });
 
-    const purchasesChannel = supabase
-      .channel('purchases-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'purchases',
-          filter: `business_id=eq.${businessId}`
-        },
-        () => {
-          loadNotifications();
-        }
-      )
-      .subscribe();
+    const purchasesChannel = readAdapter.subscribeToPostgresChanges({
+      channelName: `purchases-changes:${businessId}`,
+      event: 'INSERT',
+      table: 'purchases',
+      filter: `business_id=eq.${businessId}`,
+      callback: () => {
+        loadNotifications();
+      }
+    });
 
-    const productsChannel = supabase
-      .channel('products-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'products',
-          filter: `business_id=eq.${businessId}`
-        },
-        () => {
-          loadNotifications();
-        }
-      )
-      .subscribe();
+    const productsChannel = readAdapter.subscribeToPostgresChanges({
+      channelName: `products-changes:${businessId}`,
+      event: 'UPDATE',
+      table: 'products',
+      filter: `business_id=eq.${businessId}`,
+      callback: () => {
+        loadNotifications();
+      }
+    });
 
     return () => {
-      salesChannel.unsubscribe();
-      purchasesChannel.unsubscribe();
-      productsChannel.unsubscribe();
+      readAdapter.removeRealtimeChannel(salesChannel);
+      readAdapter.removeRealtimeChannel(purchasesChannel);
+      readAdapter.removeRealtimeChannel(productsChannel);
     };
   }, [businessId, loadNotifications]);
-
-  const getTimeAgo = (date) => {
-    const now = new Date();
-    const diffInMs = now - date;
-    const diffInMinutes = Math.floor(diffInMs / 60000);
-    const diffInHours = Math.floor(diffInMs / 3600000);
-    const diffInDays = Math.floor(diffInMs / 86400000);
-
-    if (diffInMinutes < 1) return 'Justo ahora';
-    if (diffInMinutes < 60) return `Hace ${diffInMinutes} min`;
-    if (diffInHours < 24) return `Hace ${diffInHours} hora${diffInHours > 1 ? 's' : ''}`;
-    return `Hace ${diffInDays} día${diffInDays > 1 ? 's' : ''}`;
-  };
 
   const markAsRead = (notificationId) => {
     setNotifications(prev =>

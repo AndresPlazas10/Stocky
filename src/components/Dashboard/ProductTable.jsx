@@ -29,6 +29,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
+const _motionLintUsage = motion;
+
 export function ProductTable({
   products = [],
   onEdit,

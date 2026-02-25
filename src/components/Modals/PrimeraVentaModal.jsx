@@ -19,6 +19,8 @@ import {
   Info
 } from 'lucide-react';
 
+const _motionLintUsage = motion;
+
 export default function PrimeraVentaModal({ isOpen, onClose }) {
   const [dontShowAgain, setDontShowAgain] = useState(false);
 

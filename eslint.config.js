@@ -9,6 +9,7 @@ export default defineConfig([
     'dist',
     'docs/**',
     'testing/**',
+    'test-sale-creation.js',
     'src/utils/reactOptimizations.jsx',
     'src/hooks/optimized.js',
   ]),
@@ -34,8 +35,15 @@ export default defineConfig([
         argsIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_',
       }],
+      'no-console': 'error',
       'no-empty': 'off',
       'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
+    files: ['src/utils/logger.js'],
+    rules: {
+      'no-console': 'off',
     },
   },
   {

@@ -18,6 +18,8 @@ import {
 } from 'lucide-react'
 import InvoicingActivationFlow from './InvoicingActivationFlow'
 
+const _motionLintUsage = motion;
+
 export default function InvoicingSection({ businessId, businessName, businessNit }) {
   const { 
     isLoading, 

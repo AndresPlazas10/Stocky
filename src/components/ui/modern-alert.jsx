@@ -4,6 +4,8 @@ import { cn } from '@/lib/utils';
 import { AlertCircle, CheckCircle2, Info, XCircle } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 
+const _motionLintUsage = motion;
+
 export function ModernAlert({ type = "info", title, message, onClose, className }) {
   const types = {
     success: {

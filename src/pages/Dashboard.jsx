@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../supabase/Client.jsx';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout.jsx';
 import PaymentWarningModal from '../components/PaymentWarningModal.jsx';
 import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
@@ -17,7 +16,28 @@ import Facturas from '../components/Dashboard/Facturas.jsx';
 import Clientes from '../components/Dashboard/Clientes.jsx';
 import Reportes from '../components/Dashboard/Reportes.jsx';
 import Configuracion from '../components/Dashboard/Configuracion.jsx';
+import IncidentesSync from '../components/Dashboard/IncidentesSync.jsx';
 import { AsyncStateWrapper } from '../ui/system/async-state/index.js';
+import { ModernToast } from '../components/ui/modern-alert.jsx';
+import { useToast } from '../hooks/useToast.js';
+import {
+  getAuthenticatedUser,
+  getBusinessById,
+  getOwnedBusinessByUserId,
+  getActiveEmployeeByUserId
+} from '../data/queries/authQueries.js';
+import {
+  updateBusinessLogo
+} from '../data/commands/businessCommands.js';
+import { signOutGlobalSession } from '../data/commands/authCommands.js';
+import { warmupDashboardData } from '../services/dashboardWarmupService.js';
+import { useWarmupStatus } from '../hooks/useWarmupStatus.js';
+import LOCAL_SYNC_CONFIG from '../config/localSync.js';
+import { reconcileTableOrderConsistency } from '../services/tableConsistencyService.js';
+
+const TABLE_CONSISTENCY_RECONCILE_MS = 60000;
+const TABLE_RECONCILE_TOAST_COOLDOWN_MS = 120000;
+const LAST_BUSINESS_ID_STORAGE_KEY = 'stocky.last_business_id';
 
 function Dashboard() {
   const [business, setBusiness] = useState(null);
@@ -28,15 +48,9 @@ function Dashboard() {
   const [businessLogo, setBusinessLogo] = useState(null);
   const [showPaymentWarning, setShowPaymentWarning] = useState(false);
   const [isBusinessDisabled, setIsBusinessDisabled] = useState(false);
-
-  useEffect(() => {
-    checkAuthAndLoadBusiness();
-    
-    // Limpiar localStorage viejo (solo la primera vez)
-    if (localStorage.getItem('businessLogo')) {
-      localStorage.removeItem('businessLogo');
-    }
-  }, []);
+  const lastTableReconcileToastRef = useRef(0);
+  const warmupStatus = useWarmupStatus(business?.id);
+  const { message: toastMessage, showWarning, clear: clearToast } = useToast(5000);
 
   // Sincronizar logo cuando cambia el business
   useEffect(() => {
@@ -45,25 +59,80 @@ function Dashboard() {
     }
   }, [business?.id, business?.logo_url]);
 
-  const checkAuthAndLoadBusiness = async () => {
+  useEffect(() => {
+    if (!business?.id) return;
+    warmupDashboardData(business.id).catch(() => {});
+  }, [business?.id]);
+
+  useEffect(() => {
+    if (!business?.id || typeof window === 'undefined') return undefined;
+
+    const handleOnline = () => {
+      warmupDashboardData(business.id, { force: true }).catch(() => {});
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [business?.id]);
+
+  const runTableConsistencyReconcile = useCallback(async ({ source = 'manual' } = {}) => {
+    if (!business?.id) return null;
+    const result = await reconcileTableOrderConsistency({
+      businessId: business.id,
+      source,
+      dryRun: false,
+      maxFixes: 25
+    });
+    return result;
+  }, [business?.id]);
+
+  useEffect(() => {
+    if (!business?.id || !LOCAL_SYNC_CONFIG.enabled) return undefined;
+
+    const runBackgroundReconcile = () => {
+      runTableConsistencyReconcile({ source: 'scheduler' })
+        .then((result) => {
+          if (!result || result.reason === 'clean' || result.reason === 'offline') return;
+          if (Number(result.appliedFixes || 0) > 0) {
+            const now = Date.now();
+            if (now - lastTableReconcileToastRef.current >= TABLE_RECONCILE_TOAST_COOLDOWN_MS) {
+              showWarning(`Auto-reconciliación aplicada: ${result.appliedFixes} ajustes en mesas.`);
+              lastTableReconcileToastRef.current = now;
+            }
+          }
+        })
+        .catch(() => {});
+    };
+
+    runBackgroundReconcile();
+    const timer = setInterval(runBackgroundReconcile, TABLE_CONSISTENCY_RECONCILE_MS);
+    return () => clearInterval(timer);
+  }, [business?.id, runTableConsistencyReconcile, showWarning]);
+
+  const checkAuthAndLoadBusiness = useCallback(async () => {
     try {
+      const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
       // Verificar autenticación con retry para dar tiempo a la sesión
       let user = null;
       let attempts = 0;
-      const maxAttempts = 3;
+      const maxAttempts = offlineMode ? 1 : 3;
       
       while (!user && attempts < maxAttempts) {
-        const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
-        
-        if (currentUser) {
+        let currentUser = null;
+
+        try {
+          currentUser = await getAuthenticatedUser();
+        } catch {
+          currentUser = null;
+        }
+
+        if (currentUser?.id) {
           user = currentUser;
           break;
         }
-        
-        if (userError) {
-          // Error obteniendo usuario
-        }
-        
+
         attempts++;
         if (attempts < maxAttempts) {
           // Esperando sesión
@@ -72,7 +141,26 @@ function Dashboard() {
       }
       
       if (!user) {
-        // No se pudo obtener usuario, redirigiendo
+        if (offlineMode) {
+          const lastBusinessId = localStorage.getItem(LAST_BUSINESS_ID_STORAGE_KEY);
+          if (lastBusinessId) {
+            try {
+              const cachedBusiness = await getBusinessById(lastBusinessId);
+              if (cachedBusiness?.id) {
+                setUser(null);
+                setBusiness(cachedBusiness);
+                setBusinessLogo(cachedBusiness.logo_url || null);
+                showWarning('Sin internet (modo offline). Trabajando con datos locales.');
+                return;
+              }
+            } catch {
+              // no-op
+            }
+          }
+          setError('⚠️ Sin internet y no hay sesión local disponible. Conéctate una vez para habilitar modo offline.');
+          return;
+        }
+
         window.location.href = '/login';
         return;
       }
@@ -90,11 +178,7 @@ function Dashboard() {
       // Si acabamos de crear un negocio, intentar cargarlo directamente
       if (justCreatedId && isRecent) {
         // Detectado negocio recién creado
-        const { data: newBusiness } = await supabase
-          .from('businesses')
-          .select('*')
-          .eq('id', justCreatedId)
-          .maybeSingle();
+        const newBusiness = await getBusinessById(justCreatedId);
         
         if (newBusiness) {
           finalBusiness = newBusiness;
@@ -107,34 +191,19 @@ function Dashboard() {
       // Si no encontramos el negocio recién creado, buscar normalmente
       if (!finalBusiness) {
         // Buscando negocio para usuario
-        
+
         // Verificar si el usuario tiene un negocio (SOLO por created_by)
-        const { data: business, error: businessError } = await supabase
-          .from('businesses')
-          .select('*')
-          .eq('created_by', user.id)
-          .maybeSingle();
-
-        if (businessError) {
-          // Error buscando negocio
-        }
-
-        finalBusiness = business;
+        finalBusiness = await getOwnedBusinessByUserId(user.id);
       }
 
-      const { data: employee, error: employeeError } = await supabase
-        .from('employees')
-        .select('id, business_id, role, is_active')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      // Ignorar error 406 si es por falta de datos (es válido no ser empleado)
-      if (employeeError && employeeError.code !== 'PGRST116') {
-      }
+      const employee = await getActiveEmployeeByUserId(user.id, 'id, business_id, role, is_active');
 
       // Si es empleado, redirigir al dashboard de empleados
       if (!finalBusiness && employee) {
+        if (offlineMode) {
+          setError('⚠️ Sin internet no se puede validar el contexto de empleado. Intenta de nuevo con conexión.');
+          return;
+        }
         window.location.href = '/employee-dashboard';
         return;
       }
@@ -150,6 +219,10 @@ function Dashboard() {
           }, 2000);
           return;
         }
+        if (offlineMode) {
+          setError('⚠️ Sin internet y no se encontró negocio local cacheado para este usuario.');
+          return;
+        }
         window.location.href = '/register';
         return;
       }
@@ -157,6 +230,7 @@ function Dashboard() {
       // Si llegamos aquí, es dueño del negocio
       setBusiness(finalBusiness);
       setBusinessLogo(finalBusiness.logo_url || null);
+      localStorage.setItem(LAST_BUSINESS_ID_STORAGE_KEY, finalBusiness.id);
 
       // � VERIFICAR SI EL NEGOCIO ESTÁ DESHABILITADO (PRIORIDAD MÁXIMA)
       if (finalBusiness.is_active === false) {
@@ -180,7 +254,16 @@ function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showWarning]);
+
+  useEffect(() => {
+    checkAuthAndLoadBusiness();
+
+    // Limpiar localStorage viejo (solo la primera vez)
+    if (localStorage.getItem('businessLogo')) {
+      localStorage.removeItem('businessLogo');
+    }
+  }, [checkAuthAndLoadBusiness]);
 
   const handleSignOut = async () => {
     try {
@@ -189,11 +272,7 @@ function Dashboard() {
       sessionStorage.clear();
       
       // Cerrar sesión en Supabase con scope global
-      const { error } = await supabase.auth.signOut({ scope: 'global' });
-      
-      if (error) {
-        // Error al cerrar sesión
-      }
+      await signOutGlobalSession();
       
       // Redirigir siempre, incluso si hay error
       window.location.href = '/login';
@@ -209,12 +288,10 @@ function Dashboard() {
 
     try {
       // Actualizar en Supabase
-      const { error } = await supabase
-        .from('businesses')
-        .update({ logo_url: newLogoUrl })
-        .eq('id', business.id);
-
-      if (error) throw error;
+      await updateBusinessLogo({
+        businessId: business.id,
+        logoUrl: newLogoUrl
+      });
 
       // Actualizar estado local
       setBusinessLogo(newLogoUrl);
@@ -223,6 +300,8 @@ function Dashboard() {
       setError('Error al actualizar el logo');
     }
   };
+
+  const handleSectionChange = (nextSection) => setActiveSection(nextSection);
 
   const renderContent = () => {
     switch (activeSection) {
@@ -248,7 +327,7 @@ function Dashboard() {
         return <Empleados key="empleados" businessId={business?.id} />;
       
       case 'facturas':
-        return <Facturas key="facturas" userRole="admin" />;
+        return <Facturas key="facturas" userRole="admin" businessId={business?.id} />;
       
       case 'clientes':
         return <Clientes key="clientes" businessId={business?.id} />;
@@ -258,6 +337,9 @@ function Dashboard() {
       
       case 'configuracion':
         return <Configuracion key="configuracion" user={user} business={business} onBusinessUpdate={setBusiness} />;
+
+      case 'incidentes-sync':
+        return <IncidentesSync key="incidentes-sync" businessId={business?.id} />;
       
       default:
         return <p>Selecciona una opción del menú</p>;
@@ -308,10 +390,20 @@ function Dashboard() {
         onLogoChange={handleLogoChange}
         onSignOut={handleSignOut}
         activeSection={activeSection}
-        onSectionChange={setActiveSection}
+        onSectionChange={handleSectionChange}
+        warmupStatus={warmupStatus}
       >
-        {renderContent()}
+        <div className="space-y-4">
+          {renderContent()}
+        </div>
       </DashboardLayout>
+      <ModernToast
+        isOpen={Boolean(toastMessage?.text)}
+        type={toastMessage?.type || 'info'}
+        message={toastMessage?.text || ''}
+        onClose={clearToast}
+        duration={5000}
+      />
     </>
   );
 }

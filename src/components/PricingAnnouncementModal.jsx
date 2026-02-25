@@ -12,6 +12,8 @@ import {
 import { Button } from './ui/button';
 import paymentQr from '../assets/QR.jpeg';
 
+const _motionLintUsage = motion;
+
 const PRICING_VERSION = 'v1.0.0-pricing-2026'; // Cambiar esto cuando actualices precios
 const START_DAY = 1; // Día del mes desde el que se muestra el recordatorio (incluido)
 const END_DAY = 5; // Día del mes hasta el que se muestra el recordatorio (incluido)

@@ -1,5 +1,8 @@
 import { Menu, Bell, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { WarmupStatusBadge } from '../WarmupStatusBadge.jsx';
+
+const _motionLintUsage = motion;
 
 /**
  * Header optimizado para móvil
@@ -14,7 +17,8 @@ export function MobileHeader({
   showSearch = false,
   showNotifications = false,
   onSearchClick,
-  onNotificationClick 
+  onNotificationClick,
+  warmupStatus = null
 }) {
   return (
     <header className="fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-200 sm:hidden">
@@ -30,9 +34,12 @@ export function MobileHeader({
         </motion.button>
 
         {/* Logo/Nombre del negocio */}
-        <h1 className="text-lg font-bold text-accent-600 truncate flex-1 text-center px-2">
-          {businessName}
-        </h1>
+        <div className="flex-1 min-w-0 px-2 flex items-center justify-center gap-2">
+          <h1 className="text-lg font-bold text-accent-600 truncate max-w-[160px]">
+            {businessName}
+          </h1>
+          <WarmupStatusBadge status={warmupStatus} className="px-2 py-0.5" />
+        </div>
 
         {/* Acciones rápidas */}
         <div className="flex items-center gap-1">

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/supabase/Client';
+import { readAdapter } from '../data/adapters/localAdapter.js';
 
 /**
  * Hook para gestionar proveedores de un negocio
@@ -21,15 +21,21 @@ export function useSuppliers(businessId) {
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await supabase
-        .from('suppliers')
-        .select('id, business_name, contact_name, email, phone, address')
-        .eq('business_id', businessId)
-        .order('business_name', { ascending: true });
+      const { data, error: fetchError } = await readAdapter.getSuppliersByBusinessWithSelect(
+        businessId,
+        'id, business_name, contact_name, email, phone, address'
+      );
 
       if (fetchError) throw fetchError;
-      
-      setSuppliers(data || []);
+
+      const sortedSuppliers = [...(data || [])].sort((a, b) =>
+        String(a?.business_name || '').localeCompare(String(b?.business_name || ''), 'es', {
+          numeric: true,
+          sensitivity: 'base'
+        })
+      );
+
+      setSuppliers(sortedSuppliers);
     } catch (err) {
       setError(err.message);
       setSuppliers([]);
