@@ -60,7 +60,8 @@ export async function setBusiness(businessData) {
       address: businessData.address || null,
       phone: businessData.phone || null,
       email: businessData.email || null,
-      created_by: user.id
+      created_by: user.id,
+      created_at: new Date().toISOString()
     });
 
     if (error) throw error;

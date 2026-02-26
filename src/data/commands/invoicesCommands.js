@@ -17,7 +17,13 @@ function canQueueLocalInvoices() {
 }
 
 function shouldForceInvoicesLocalFirst() {
-  return Boolean(canQueueLocalInvoices());
+  return Boolean(
+    canQueueLocalInvoices()
+    && (
+      LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
+      || LOCAL_SYNC_CONFIG.localWrites?.invoicesLocalFirst
+    )
+  );
 }
 
 function isConnectivityError(errorLike) {
