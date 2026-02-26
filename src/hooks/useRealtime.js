@@ -1,9 +1,10 @@
-import { useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { readAdapter } from '../data/adapters/localAdapter.js';
 import { logger } from '../utils/logger.js';
 
-const MAX_SUBSCRIPTION_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 800;
+const RETRY_MAX_DELAY_MS = 15000;
+const RETRYABLE_STATUSES = new Set(['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED']);
 
 function toChannelSegment(value, fallback = 'global') {
   const raw = String(value ?? '').trim();
@@ -51,19 +52,12 @@ export function useRealtimeSubscription(table, options = {}) {
     retryOnError = true
   } = options;
 
-  const handleInsert = useCallback((payload) => {
-    if (onInsert) onInsert(payload.new);
-  }, [onInsert]);
-
-  const handleUpdate = useCallback((payload) => {
-    if (onUpdate) onUpdate(payload.new, payload.old);
-  }, [onUpdate]);
-
-  const handleDelete = useCallback((payload) => {
-    if (onDelete && payload.old) onDelete(payload.old);
-  }, [onDelete]);
-
+  const handlersRef = useRef({ onInsert, onUpdate, onDelete });
   const filterKey = useMemo(() => JSON.stringify(filter || {}), [filter]);
+
+  useEffect(() => {
+    handlersRef.current = { onInsert, onUpdate, onDelete };
+  }, [onInsert, onUpdate, onDelete]);
 
   useEffect(() => {
     if (!enabled || !table) return;
@@ -84,6 +78,13 @@ export function useRealtimeSubscription(table, options = {}) {
     let retryTimer = null;
     let retryAttempts = 0;
 
+    const shouldLogRetry = (attempt) => (
+      attempt === 1
+      || attempt === 3
+      || attempt === 5
+      || attempt % 10 === 0
+    );
+
     const clearRetryTimer = () => {
       if (!retryTimer) return;
       clearTimeout(retryTimer);
@@ -94,6 +95,29 @@ export function useRealtimeSubscription(table, options = {}) {
       if (!activeChannel) return;
       readAdapter.removeRealtimeChannel(activeChannel);
       activeChannel = null;
+    };
+
+    const scheduleRetry = ({ status, channelName, error }) => {
+      retryAttempts += 1;
+      const delayMs = Math.min(RETRY_MAX_DELAY_MS, RETRY_BASE_DELAY_MS * (2 ** (retryAttempts - 1)));
+
+      if (shouldLogRetry(retryAttempts)) {
+        logger.warn('[realtime] channel retry scheduled', {
+          table,
+          channelName,
+          status,
+          retryAttempts,
+          delayMs,
+          error: error?.message || String(error || '')
+        });
+      }
+
+      removeActiveChannel();
+      clearRetryTimer();
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        subscribe();
+      }, delayMs);
     };
 
     const subscribe = () => {
@@ -107,56 +131,40 @@ export function useRealtimeSubscription(table, options = {}) {
         table,
         filter: filterString || undefined,
         callback: (payload) => {
-          if (payload.eventType === 'DELETE' && !payload.old) {
-            return;
-          }
+          const handlers = handlersRef.current || {};
 
           switch (payload.eventType) {
             case 'INSERT':
-              handleInsert(payload);
+              if (handlers.onInsert) handlers.onInsert(payload.new);
               break;
             case 'UPDATE':
-              handleUpdate(payload);
+              if (handlers.onUpdate) handlers.onUpdate(payload.new, payload.old);
               break;
-            case 'DELETE':
-              handleDelete(payload);
+            case 'DELETE': {
+              // En DELETE, según REPLICA IDENTITY, Supabase puede enviar old/new parcial.
+              const deletedRow = payload.old || payload.new || null;
+              if (handlers.onDelete && deletedRow) handlers.onDelete(deletedRow);
               break;
+            }
           }
         },
         onStatusChange: (status, error, channel) => {
           if (disposed || channel !== activeChannel) return;
           if (status === 'SUBSCRIBED') {
+            if (retryAttempts > 0) {
+              logger.warn('[realtime] channel recovered', {
+                table,
+                channelName,
+                retryAttempts
+              });
+            }
             retryAttempts = 0;
             return;
           }
 
           if (!retryOnError) return;
-          if (status !== 'CHANNEL_ERROR' && status !== 'TIMED_OUT') return;
-          if (retryAttempts >= MAX_SUBSCRIPTION_RETRIES) {
-            logger.warn('[realtime] max retries reached', {
-              table,
-              channelName,
-              status,
-              error: error?.message || String(error || '')
-            });
-            return;
-          }
-
-          retryAttempts += 1;
-          const delayMs = RETRY_BASE_DELAY_MS * retryAttempts;
-          logger.warn('[realtime] channel retry scheduled', {
-            table,
-            channelName,
-            status,
-            retryAttempts,
-            delayMs
-          });
-          removeActiveChannel();
-          clearRetryTimer();
-          retryTimer = setTimeout(() => {
-            retryTimer = null;
-            subscribe();
-          }, delayMs);
+          if (!RETRYABLE_STATUSES.has(status)) return;
+          scheduleRetry({ status, channelName, error });
         }
       });
     };
@@ -168,7 +176,7 @@ export function useRealtimeSubscription(table, options = {}) {
       clearRetryTimer();
       removeActiveChannel();
     };
-  }, [table, enabled, filterKey, handleInsert, handleUpdate, handleDelete, retryOnError]);
+  }, [table, enabled, filterKey, retryOnError]);
 }
 
 /**
