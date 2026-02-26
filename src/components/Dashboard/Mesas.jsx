@@ -114,13 +114,13 @@ const SHOULD_DEFER_REMOTE_MESAS_RELOAD_AFTER_LOCAL_SAVE = Boolean(
 const MESAS_REMOTE_FALLBACK_POLL_MS = 5000;
 
 const getMesaProductUnits = (mesa, { selectedMesa = null, orderItems = [] } = {}) => {
+  if (selectedMesa?.id && mesa?.id === selectedMesa.id && Array.isArray(orderItems) && orderItems.length > 0) {
+    return getTotalProductUnits(orderItems);
+  }
+
   const mesaItems = Array.isArray(mesa?.orders?.order_items) ? mesa.orders.order_items : [];
   if (mesaItems.length > 0) {
     return getTotalProductUnits(mesaItems);
-  }
-
-  if (selectedMesa?.id && mesa?.id === selectedMesa.id && Array.isArray(orderItems) && orderItems.length > 0) {
-    return getTotalProductUnits(orderItems);
   }
 
   const localUnits = Number(
@@ -906,24 +906,91 @@ function Mesas({ businessId }) {
         });
         if (!updatedOrder || justCompletedSaleRef.current) return;
 
-        setMesas((prev) => prev.map((mesa) => (
-          mesa.id === mesaId
-            ? { ...mesa, orders: updatedOrder }
-            : mesa
-        )));
+        const normalizedOrderStatus = String(updatedOrder?.status || '').trim().toLowerCase();
+        const shouldRetryItemsFetch = (
+          normalizedOrderStatus === 'open'
+          && toFiniteNumber(updatedOrder?.total, 0) > 0
+        );
+
+        let incomingOrderItems = applyPendingQuantities(
+          Array.isArray(updatedOrder?.order_items) ? updatedOrder.order_items : [],
+          pendingQuantityUpdatesRef.current
+        );
+
+        if (incomingOrderItems.length === 0 && shouldRetryItemsFetch) {
+          try {
+            const retryItems = await getOrderItemsByOrderId({
+              orderId,
+              selectSql: ORDER_ITEMS_SELECT
+            });
+            const normalizedRetryItems = applyPendingQuantities(
+              Array.isArray(retryItems) ? retryItems : [],
+              pendingQuantityUpdatesRef.current
+            );
+            if (normalizedRetryItems.length > 0) {
+              incomingOrderItems = normalizedRetryItems;
+            }
+          } catch {
+            // no-op
+          }
+        }
+
+        const resolvedUpdatedOrder = incomingOrderItems.length > 0
+          ? { ...updatedOrder, order_items: incomingOrderItems }
+          : updatedOrder;
+        const shouldProtectFromTransientEmpty = (
+          incomingOrderItems.length === 0
+          && (
+            orderItemsDirtyRef.current
+            || (normalizedOrderStatus === 'open' && toFiniteNumber(updatedOrder?.total, 0) > 0)
+          )
+        );
+
+        setMesas((prev) => prev.map((mesa) => {
+          if (mesa.id !== mesaId) return mesa;
+
+          const previousOrderItems = Array.isArray(mesa?.orders?.order_items)
+            ? mesa.orders.order_items
+            : [];
+          const preservePreviousOrderItems = shouldProtectFromTransientEmpty && previousOrderItems.length > 0;
+
+          return {
+            ...mesa,
+            orders: preservePreviousOrderItems
+              ? {
+                ...resolvedUpdatedOrder,
+                order_items: previousOrderItems,
+                total: toFiniteNumber(mesa?.orders?.total, Number(updatedOrder?.total || 0)),
+                local_units: getTotalProductUnits(previousOrderItems)
+              }
+              : resolvedUpdatedOrder
+          };
+        }));
 
         setSelectedMesa((prevSelected) => {
           if (prevSelected?.id !== mesaId) return prevSelected;
           setOrderItems((prevItems) =>
-            mergeOrderItemsPreservingPosition(
-              prevItems,
-              applyPendingQuantities(
-                Array.isArray(updatedOrder?.order_items) ? updatedOrder.order_items : [],
-                pendingQuantityUpdatesRef.current
-              )
-            )
+            (shouldProtectFromTransientEmpty && prevItems.length > 0)
+              ? prevItems
+              : mergeOrderItemsPreservingPosition(prevItems, incomingOrderItems)
           );
-          return { ...prevSelected, orders: updatedOrder };
+
+          const previousSelectedItems = Array.isArray(prevSelected?.orders?.order_items)
+            ? prevSelected.orders.order_items
+            : [];
+          const preservePreviousSelectedItems = shouldProtectFromTransientEmpty && previousSelectedItems.length > 0;
+
+          return {
+            ...prevSelected,
+            orders: preservePreviousSelectedItems
+              ? {
+                ...resolvedUpdatedOrder,
+                order_items: previousSelectedItems,
+                total: toFiniteNumber(prevSelected?.orders?.total, Number(updatedOrder?.total || 0)),
+                local_units: getTotalProductUnits(previousSelectedItems)
+              }
+              : resolvedUpdatedOrder
+          };
         });
       } catch {
         // no-op
@@ -1471,9 +1538,38 @@ function Mesas({ businessId }) {
         ? mesaSnapshot.orders.order_items
         : [];
       const hasLocalEdits = orderItemsDirtyRef.current;
-      const effectiveOrderItemsSnapshot = hasLocalEdits
+      let effectiveOrderItemsSnapshot = hasLocalEdits
         ? orderItemsSnapshot
         : (orderItemsSnapshot.length > 0 ? orderItemsSnapshot : mesaItemsSnapshot);
+
+      // Defensa ante snapshots vacíos transitorios en realtime (más frecuente en producción con latencia).
+      if (effectiveOrderItemsSnapshot.length === 0 && mesaSnapshot?.current_order_id) {
+        try {
+          let latestOrder = null;
+          try {
+            latestOrder = await getOrderForRealtimeById({
+              orderId: mesaSnapshot.current_order_id,
+              selectSql: ORDER_ITEMS_SELECT
+            });
+          } catch {
+            latestOrder = await getOrderWithItemsById({
+              orderId: mesaSnapshot.current_order_id,
+              selectSql: ORDER_ITEMS_SELECT
+            });
+          }
+
+          const latestOrderItems = applyPendingQuantities(
+            Array.isArray(latestOrder?.order_items) ? latestOrder.order_items : [],
+            pendingQuantityUpdatesRef.current
+          );
+          if (latestOrderItems.length > 0) {
+            effectiveOrderItemsSnapshot = latestOrderItems;
+          }
+        } catch {
+          // no-op
+        }
+      }
+
       const hasSavedItems = effectiveOrderItemsSnapshot.length > 0;
       const localOrderTotal = calculateOrderItemsTotal(effectiveOrderItemsSnapshot);
 
@@ -2439,7 +2535,11 @@ function Mesas({ businessId }) {
 
     const selectedOrderId = String(selectedMesa.current_order_id);
     const scopedOrderItems = Array.isArray(orderItems)
-      ? orderItems.filter((item) => String(item?.order_id || '') === selectedOrderId)
+      ? orderItems.filter((item) => {
+        const itemOrderId = String(item?.order_id || '').trim();
+        if (!itemOrderId) return true;
+        return itemOrderId === selectedOrderId;
+      })
       : [];
 
     const localUnits = getTotalProductUnits(scopedOrderItems);
