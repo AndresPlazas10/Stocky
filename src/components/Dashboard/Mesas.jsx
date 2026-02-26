@@ -524,6 +524,9 @@ function Mesas({ businessId }) {
   const pendingQuantityUpdatesRef = useRef({});
   const orderItemsDirtyRef = useRef(false);
   const orderItemsRef = useRef([]);
+  const selectedMesaRef = useRef(null);
+  const productCatalogByIdRef = useRef(new Map());
+  const comboCatalogByIdRef = useRef(new Map());
   const orderDetailsRequestRef = useRef(0);
   const lastSyncedOrderTotalsRef = useRef({});
   const pendingRemoteOrderTotalsRef = useRef({});
@@ -556,6 +559,28 @@ function Mesas({ businessId }) {
   useEffect(() => {
     orderItemsRef.current = Array.isArray(orderItems) ? orderItems : [];
   }, [orderItems]);
+
+  useEffect(() => {
+    selectedMesaRef.current = selectedMesa || null;
+  }, [selectedMesa]);
+
+  useEffect(() => {
+    const productMap = new Map();
+    (Array.isArray(productos) ? productos : []).forEach((product) => {
+      const productId = normalizeEntityId(product?.id);
+      if (productId) productMap.set(productId, product);
+    });
+    productCatalogByIdRef.current = productMap;
+  }, [productos]);
+
+  useEffect(() => {
+    const comboMap = new Map();
+    (Array.isArray(combos) ? combos : []).forEach((combo) => {
+      const comboId = normalizeEntityId(combo?.id);
+      if (comboId) comboMap.set(comboId, combo);
+    });
+    comboCatalogByIdRef.current = comboMap;
+  }, [combos]);
 
   const getCurrentUser = useCallback(async () => {
     try {
@@ -900,6 +925,103 @@ function Mesas({ businessId }) {
     });
   }, []);
 
+  const hydrateRealtimeOrderItem = useCallback((rawItem = {}, previousItem = null) => {
+    const mergedItem = {
+      ...(previousItem && typeof previousItem === 'object' ? previousItem : {}),
+      ...(rawItem && typeof rawItem === 'object' ? rawItem : {})
+    };
+    const normalizedItem = normalizeOrderItemNumericFields(mergedItem);
+    const productId = normalizeEntityId(normalizedItem?.product_id || normalizedItem?.products?.id);
+    const comboId = normalizeEntityId(normalizedItem?.combo_id || normalizedItem?.combos?.id);
+
+    if (productId) {
+      const catalogProduct = productCatalogByIdRef.current.get(productId);
+      normalizedItem.products = catalogProduct
+        ? {
+          id: catalogProduct.id,
+          name: catalogProduct.name || normalizedItem?.products?.name || 'Producto',
+          code: catalogProduct.code || normalizedItem?.products?.code || '',
+          category: catalogProduct.category || normalizedItem?.products?.category || null
+        }
+        : (normalizedItem.products || previousItem?.products || null);
+    }
+
+    if (comboId) {
+      const catalogCombo = comboCatalogByIdRef.current.get(comboId);
+      normalizedItem.combos = catalogCombo
+        ? {
+          id: catalogCombo.id,
+          nombre: catalogCombo.nombre || normalizedItem?.combos?.nombre || 'Combo',
+          descripcion: catalogCombo.descripcion || normalizedItem?.combos?.descripcion || null
+        }
+        : (normalizedItem.combos || previousItem?.combos || null);
+    }
+
+    return normalizedItem;
+  }, []);
+
+  const applyRealtimeOrderItemChange = useCallback((previousItems = [], rawItem, eventType = 'UPDATE') => {
+    const safePreviousItems = Array.isArray(previousItems) ? previousItems : [];
+    const normalizedType = String(eventType || 'UPDATE').trim().toUpperCase();
+    const itemId = normalizeEntityId(rawItem?.id);
+
+    if (normalizedType === 'DELETE') {
+      if (itemId) {
+        return safePreviousItems.filter((item) => normalizeEntityId(item?.id) !== itemId);
+      }
+
+      const targetProductId = normalizeEntityId(rawItem?.product_id);
+      const targetComboId = normalizeEntityId(rawItem?.combo_id);
+      if (!targetProductId && !targetComboId) return safePreviousItems;
+
+      return safePreviousItems.filter((item) => {
+        const sameProduct = targetProductId && normalizeEntityId(item?.product_id) === targetProductId;
+        const sameCombo = targetComboId && normalizeEntityId(item?.combo_id) === targetComboId;
+        return !(sameProduct || sameCombo);
+      });
+    }
+
+    if (!itemId) return safePreviousItems;
+
+    const existingIndex = safePreviousItems.findIndex((item) => normalizeEntityId(item?.id) === itemId);
+    const previousItem = existingIndex >= 0 ? safePreviousItems[existingIndex] : null;
+    const hydratedItem = hydrateRealtimeOrderItem(rawItem, previousItem);
+
+    if (existingIndex >= 0) {
+      return safePreviousItems.map((item, index) => (index === existingIndex ? hydratedItem : item));
+    }
+
+    const hydratedProductId = normalizeEntityId(hydratedItem?.product_id);
+    const hydratedComboId = normalizeEntityId(hydratedItem?.combo_id);
+    const tempDuplicateIndex = safePreviousItems.findIndex((item) => {
+      const isTemp = String(item?.id || '').startsWith('tmp-');
+      if (!isTemp) return false;
+
+      const sameProduct = hydratedProductId && normalizeEntityId(item?.product_id) === hydratedProductId;
+      const sameCombo = hydratedComboId && normalizeEntityId(item?.combo_id) === hydratedComboId;
+      return Boolean(sameProduct || sameCombo);
+    });
+
+    if (tempDuplicateIndex >= 0) {
+      return safePreviousItems.map((item, index) => (
+        index === tempDuplicateIndex ? { ...item, ...hydratedItem } : item
+      ));
+    }
+
+    return [hydratedItem, ...safePreviousItems];
+  }, [hydrateRealtimeOrderItem]);
+
+  const mergeOrderItemsConservatively = useCallback((previousItems = [], incomingItems = []) => {
+    const baseItems = Array.isArray(previousItems) ? previousItems : [];
+    const normalizedIncoming = Array.isArray(incomingItems) ? incomingItems.filter(Boolean) : [];
+    if (normalizedIncoming.length === 0) return baseItems;
+
+    return normalizedIncoming.reduce(
+      (acc, incomingItem) => applyRealtimeOrderItemChange(acc, incomingItem, 'UPDATE'),
+      baseItems
+    );
+  }, [applyRealtimeOrderItemChange]);
+
   const scheduleOrderRealtimeRefresh = useCallback((orderId, mesaId) => {
     if (!orderId || !mesaId) return;
     if (justCompletedSaleRef.current) return;
@@ -959,6 +1081,11 @@ function Mesas({ businessId }) {
             || (normalizedOrderStatus === 'open' && toFiniteNumber(updatedOrder?.total, 0) > 0)
           )
         );
+        const incomingOrderTotal = toFiniteNumber(updatedOrder?.total, NaN);
+        const pendingRemoteTotal = toFiniteNumber(
+          pendingRemoteOrderTotalsRef.current?.[orderId],
+          NaN
+        );
 
         setMesas((prev) => prev.map((mesa) => {
           if (mesa.id !== mesaId) return mesa;
@@ -966,18 +1093,36 @@ function Mesas({ businessId }) {
           const previousOrderItems = Array.isArray(mesa?.orders?.order_items)
             ? mesa.orders.order_items
             : [];
-          const preservePreviousOrderItems = shouldProtectFromTransientEmpty && previousOrderItems.length > 0;
+          const nextOrderItems = shouldProtectFromTransientEmpty
+            ? previousOrderItems
+            : (
+              normalizedOrderStatus === 'open'
+                ? mergeOrderItemsConservatively(previousOrderItems, incomingOrderItems)
+                : incomingOrderItems
+            );
+          const nextOrderTotal = nextOrderItems.length > 0
+            ? calculateOrderItemsTotal(nextOrderItems)
+            : (
+              Number.isFinite(pendingRemoteTotal)
+                ? pendingRemoteTotal
+                : (
+                  Number.isFinite(incomingOrderTotal)
+                    ? incomingOrderTotal
+                    : toFiniteNumber(mesa?.orders?.total, 0)
+                )
+            );
+          const nextOrder = normalizedOrderStatus === 'open'
+            ? {
+              ...updatedOrder,
+              order_items: nextOrderItems,
+              total: nextOrderTotal,
+              local_units: getTotalProductUnits(nextOrderItems)
+            }
+            : resolvedUpdatedOrder;
 
           return {
             ...mesa,
-            orders: preservePreviousOrderItems
-              ? {
-                ...resolvedUpdatedOrder,
-                order_items: previousOrderItems,
-                total: toFiniteNumber(mesa?.orders?.total, Number(updatedOrder?.total || 0)),
-                local_units: getTotalProductUnits(previousOrderItems)
-              }
-              : resolvedUpdatedOrder
+            orders: nextOrder
           };
         }));
 
@@ -986,31 +1131,53 @@ function Mesas({ businessId }) {
           setOrderItems((prevItems) =>
             (shouldProtectFromTransientEmpty && prevItems.length > 0)
               ? prevItems
-              : mergeOrderItemsPreservingPosition(prevItems, incomingOrderItems)
+              : (
+                normalizedOrderStatus === 'open'
+                  ? mergeOrderItemsConservatively(prevItems, incomingOrderItems)
+                  : mergeOrderItemsPreservingPosition(prevItems, incomingOrderItems)
+              )
           );
 
           const previousSelectedItems = Array.isArray(prevSelected?.orders?.order_items)
             ? prevSelected.orders.order_items
             : [];
-          const preservePreviousSelectedItems = shouldProtectFromTransientEmpty && previousSelectedItems.length > 0;
+          const nextSelectedItems = shouldProtectFromTransientEmpty
+            ? previousSelectedItems
+            : (
+              normalizedOrderStatus === 'open'
+                ? mergeOrderItemsConservatively(previousSelectedItems, incomingOrderItems)
+                : incomingOrderItems
+            );
+          const nextSelectedTotal = nextSelectedItems.length > 0
+            ? calculateOrderItemsTotal(nextSelectedItems)
+            : (
+              Number.isFinite(pendingRemoteTotal)
+                ? pendingRemoteTotal
+                : (
+                  Number.isFinite(incomingOrderTotal)
+                    ? incomingOrderTotal
+                    : toFiniteNumber(prevSelected?.orders?.total, 0)
+                )
+            );
+          const nextSelectedOrder = normalizedOrderStatus === 'open'
+            ? {
+              ...updatedOrder,
+              order_items: nextSelectedItems,
+              total: nextSelectedTotal,
+              local_units: getTotalProductUnits(nextSelectedItems)
+            }
+            : resolvedUpdatedOrder;
 
           return {
             ...prevSelected,
-            orders: preservePreviousSelectedItems
-              ? {
-                ...resolvedUpdatedOrder,
-                order_items: previousSelectedItems,
-                total: toFiniteNumber(prevSelected?.orders?.total, Number(updatedOrder?.total || 0)),
-                local_units: getTotalProductUnits(previousSelectedItems)
-              }
-              : resolvedUpdatedOrder
+            orders: nextSelectedOrder
           };
         });
       } catch {
         // no-op
       }
-    }, 180);
-  }, []);
+    }, 100);
+  }, [mergeOrderItemsConservatively]);
 
   // 🔥 TIEMPO REAL: Suscripción a cambios en mesas
   useRealtimeSubscription('tables', {
@@ -1030,26 +1197,94 @@ function Mesas({ businessId }) {
       if (justCompletedSaleRef.current) {
         return;
       }
-      
+
+      const normalizedOrderId = normalizeEntityId(updatedOrder?.id);
+      if (!normalizedOrderId) return;
+
+      const normalizedOrderStatus = String(updatedOrder?.status || '').trim().toLowerCase();
+      const incomingOrderTotal = toFiniteNumber(updatedOrder?.total, NaN);
+      const pendingRemoteTotal = toFiniteNumber(
+        pendingRemoteOrderTotalsRef.current?.[normalizedOrderId],
+        NaN
+      );
+
       // Actualizar la mesa correspondiente en el estado global
-      setMesas(prev => prev.map(mesa => {
-        if (mesa.current_order_id === updatedOrder.id) {
-          const nextMesa = {
-            ...mesa,
-            orders: { ...mesa.orders, ...updatedOrder }
-          };
-          if (String(updatedOrder?.status || '').toLowerCase() === 'closed') {
-            return normalizeTableRecord({
-              ...nextMesa,
-              current_order_id: null,
-              status: 'available'
-            });
+      setMesas((prev) => prev.map((mesa) => {
+        if (normalizeEntityId(mesa?.current_order_id) !== normalizedOrderId) return mesa;
+
+        const previousOrderItems = Array.isArray(mesa?.orders?.order_items)
+          ? mesa.orders.order_items
+          : [];
+        const stableOpenTotal = previousOrderItems.length > 0
+          ? calculateOrderItemsTotal(previousOrderItems)
+          : (
+            Number.isFinite(pendingRemoteTotal)
+              ? pendingRemoteTotal
+              : (
+                Number.isFinite(incomingOrderTotal)
+                  ? incomingOrderTotal
+                  : toFiniteNumber(mesa?.orders?.total, 0)
+              )
+          );
+        const nextOrder = normalizedOrderStatus === 'open'
+          ? {
+            ...(mesa.orders || {}),
+            ...updatedOrder,
+            order_items: previousOrderItems,
+            total: stableOpenTotal,
+            local_units: previousOrderItems.length > 0
+              ? getTotalProductUnits(previousOrderItems)
+              : toFiniteNumber(mesa?.orders?.local_units, 0)
           }
-          return normalizeTableRecord(nextMesa);
+          : { ...(mesa.orders || {}), ...updatedOrder };
+        const nextMesa = {
+          ...mesa,
+          orders: nextOrder
+        };
+
+        if (normalizedOrderStatus === 'closed') {
+          return normalizeTableRecord({
+            ...nextMesa,
+            current_order_id: null,
+            status: 'available'
+          });
         }
-        return mesa;
+        return normalizeTableRecord(nextMesa);
       }));
-      
+
+      setSelectedMesa((prevSelected) => {
+        if (normalizeEntityId(prevSelected?.current_order_id) !== normalizedOrderId) return prevSelected;
+        if (normalizedOrderStatus !== 'open') return prevSelected;
+
+        const previousSelectedItems = Array.isArray(prevSelected?.orders?.order_items)
+          ? prevSelected.orders.order_items
+          : [];
+        const stableSelectedTotal = previousSelectedItems.length > 0
+          ? calculateOrderItemsTotal(previousSelectedItems)
+          : (
+            Number.isFinite(pendingRemoteTotal)
+              ? pendingRemoteTotal
+              : (
+                Number.isFinite(incomingOrderTotal)
+                  ? incomingOrderTotal
+                  : toFiniteNumber(prevSelected?.orders?.total, 0)
+              )
+          );
+
+        return {
+          ...prevSelected,
+          orders: {
+            ...(prevSelected.orders || {}),
+            ...updatedOrder,
+            order_items: previousSelectedItems,
+            total: stableSelectedTotal,
+            local_units: previousSelectedItems.length > 0
+              ? getTotalProductUnits(previousSelectedItems)
+              : toFiniteNumber(prevSelected?.orders?.local_units, 0)
+          }
+        };
+      });
+
       // Los items se sincronizan exclusivamente desde la suscripción de `order_items`
       // para evitar doble fetch en background por cada cambio.
     }
@@ -1057,27 +1292,73 @@ function Mesas({ businessId }) {
 
   // 🔥 TIEMPO REAL: Suscripción a cambios en items de orden (NIVEL NEGOCIO)
   // Callback para manejar cambios en order_items
-  const handleOrderItemChange = useCallback((item) => {
-    // Obtener el order_id del item
-    const orderId = item.order_id;
-    
-    // Usar función de actualización de estado para evitar problemas de stale state
-    setMesas(prevMesas => {
-      // Encontrar la mesa asociada a esta orden
-      const mesaAfectada = prevMesas.find(m => m.current_order_id === orderId);
+  const handleOrderItemChange = useCallback((item, eventType = 'UPDATE') => {
+    const orderId = normalizeEntityId(item?.order_id);
+    if (!orderId) return;
+    if (justCompletedSaleRef.current) return;
+
+    let mesaAfectadaId = null;
+
+    setMesas((prevMesas) => {
+      const mesaAfectada = prevMesas.find((mesa) => normalizeEntityId(mesa?.current_order_id) === orderId);
       if (!mesaAfectada) return prevMesas;
-      
-      // NO actualizar si ya completamos una venta (bandera activa)
-      if (justCompletedSaleRef.current) {
-        return prevMesas;
-      }
-      
-      // Coalescer para evitar múltiples consultas consecutivas por item.
-      scheduleOrderRealtimeRefresh(orderId, mesaAfectada.id);
-      
-      return prevMesas;
+
+      mesaAfectadaId = mesaAfectada.id;
+      const previousOrderItems = Array.isArray(mesaAfectada?.orders?.order_items)
+        ? mesaAfectada.orders.order_items
+        : [];
+      const nextOrderItems = applyRealtimeOrderItemChange(previousOrderItems, item, eventType);
+      const nextOrderTotal = calculateOrderItemsTotal(nextOrderItems);
+      const nextLocalUnits = getTotalProductUnits(nextOrderItems);
+
+      return prevMesas.map((mesa) => (
+        mesa.id === mesaAfectada.id
+          ? {
+            ...mesa,
+            orders: {
+              ...(mesa.orders || {}),
+              id: normalizeEntityId(mesa?.orders?.id) || orderId,
+              order_items: nextOrderItems,
+              total: nextOrderTotal,
+              local_units: nextLocalUnits
+            }
+          }
+          : mesa
+      ));
     });
-  }, [scheduleOrderRealtimeRefresh]);
+
+    if (normalizeEntityId(selectedMesaRef.current?.current_order_id) === orderId) {
+      setOrderItems((prevItems) => {
+        const nextItems = applyRealtimeOrderItemChange(prevItems, item, eventType);
+        orderItemsRef.current = nextItems;
+        return nextItems;
+      });
+
+      setSelectedMesa((prevSelected) => {
+        if (normalizeEntityId(prevSelected?.current_order_id) !== orderId) return prevSelected;
+        const previousSelectedItems = Array.isArray(prevSelected?.orders?.order_items)
+          ? prevSelected.orders.order_items
+          : [];
+        const nextSelectedItems = applyRealtimeOrderItemChange(previousSelectedItems, item, eventType);
+
+        return {
+          ...prevSelected,
+          orders: {
+            ...(prevSelected.orders || {}),
+            id: normalizeEntityId(prevSelected?.orders?.id) || orderId,
+            order_items: nextSelectedItems,
+            total: calculateOrderItemsTotal(nextSelectedItems),
+            local_units: getTotalProductUnits(nextSelectedItems)
+          }
+        };
+      });
+    }
+
+    if (mesaAfectadaId) {
+      // Reconciliación en background para blindar consistencia si llega evento parcial.
+      scheduleOrderRealtimeRefresh(orderId, mesaAfectadaId);
+    }
+  }, [applyRealtimeOrderItemChange, scheduleOrderRealtimeRefresh]);
 
   // Suscripción a order_items a nivel de negocio (sin filtrar por order_id específico)
   // Nota: RLS automáticamente filtra por business_id del usuario autenticado

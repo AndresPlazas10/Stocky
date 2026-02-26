@@ -14,6 +14,53 @@ function normalizeIdArray(values = []) {
   return [...new Set((values || []).map((value) => normalizeText(value)).filter(Boolean))];
 }
 
+function isAdminRoleLike(role) {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  return normalizedRole === 'owner'
+    || normalizedRole === 'admin'
+    || normalizedRole === 'administrador'
+    || normalizedRole === 'propietario'
+    || normalizedRole.includes('admin');
+}
+
+async function resolveSellerNameForSaleSync({
+  businessId,
+  userId,
+  payloadSellerName,
+  fallbackEmail = null
+}) {
+  const normalizedPayloadName = normalizeText(payloadSellerName);
+  const normalizedPayloadLabel = String(normalizedPayloadName || '').trim().toLowerCase();
+  const payloadLooksAdmin = normalizedPayloadLabel === 'administrador' || normalizedPayloadLabel === 'admin';
+  const shouldRecompute = !normalizedPayloadName || payloadLooksAdmin;
+
+  if (!shouldRecompute) {
+    return normalizedPayloadName;
+  }
+
+  try {
+    const [{ data: employee }, { data: business }] = await Promise.all([
+      supabaseAdapter.getEmployeeByUserAndBusiness(userId, businessId, 'full_name, role'),
+      supabaseAdapter.getBusinessById(businessId, 'created_by')
+    ]);
+
+    const normalizedBusinessOwnerId = normalizeText(business?.created_by);
+    const isOwner = Boolean(normalizedBusinessOwnerId && normalizedBusinessOwnerId === userId);
+    const isAdmin = isAdminRoleLike(employee?.role);
+
+    if (isOwner || isAdmin) {
+      return 'Administrador';
+    }
+
+    const employeeName = normalizeText(employee?.full_name);
+    if (employeeName) return employeeName;
+  } catch {
+    // no-op
+  }
+
+  return normalizedPayloadName || normalizeText(fallbackEmail) || 'Vendedor';
+}
+
 function ackPayload(event, mode = 'verify', details = {}) {
   return {
     mode,
@@ -398,6 +445,7 @@ async function pushSaleCreateToRemote(event) {
   }
 
   let userId = normalizeText(payload?.user_id);
+  let sessionUserEmail = null;
   if (!userId) {
     const { data, error } = await supabaseAdapter.getCurrentSession();
     if (error) {
@@ -410,6 +458,7 @@ async function pushSaleCreateToRemote(event) {
       });
     }
     userId = normalizeText(data?.session?.user?.id);
+    sessionUserEmail = normalizeText(data?.session?.user?.email);
   }
 
   if (!userId) {
@@ -419,7 +468,12 @@ async function pushSaleCreateToRemote(event) {
   }
 
   const paymentMethod = normalizeText(payload?.payment_method) || 'cash';
-  const sellerName = normalizeText(payload?.seller_name) || 'Vendedor';
+  const sellerName = await resolveSellerNameForSaleSync({
+    businessId,
+    userId,
+    payloadSellerName: payload?.seller_name,
+    fallbackEmail: sessionUserEmail
+  });
   const orderId = normalizeText(payload?.order_id);
   const tableId = normalizeText(payload?.table_id);
   const amountReceived = normalizeNumber(payload?.amount_received);
