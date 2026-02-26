@@ -56,6 +56,7 @@ check_required_file ".env.production.example"
 check_required_file "vite.config.js"
 check_required_file "supabase/migrations/20260226_0100_harden_realtime_publication_and_rls.sql"
 check_required_file "supabase/migrations/20260226_0200_fix_businesses_created_at.sql"
+check_required_file "supabase/migrations/20260226_0300_fix_can_access_business_null_active_and_backfill.sql"
 
 if git ls-files --error-unmatch ".env.production" >/dev/null 2>&1; then
   fail ".env.production esta trackeado en git. Debe permanecer solo local."
