@@ -78,10 +78,12 @@ const SHOULD_DEFER_REMOTE_MESAS_RELOAD_AFTER_LOCAL_SAVE = Boolean(
   LOCAL_SYNC_CONFIG.enabled
   && LOCAL_SYNC_CONFIG.shadowWritesEnabled
   && (
-    LOCAL_SYNC_CONFIG.localWrites?.orders
-    || LOCAL_SYNC_CONFIG.localWrites?.tables
+    LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
+    || LOCAL_SYNC_CONFIG.localWrites?.ordersLocalFirst
+    || LOCAL_SYNC_CONFIG.localWrites?.tablesLocalFirst
   )
 );
+const MESAS_REMOTE_FALLBACK_POLL_MS = 5000;
 
 const getMesaProductUnits = (mesa, { selectedMesa = null, orderItems = [] } = {}) => {
   const mesaItems = Array.isArray(mesa?.orders?.order_items) ? mesa.orders.order_items : [];
@@ -751,6 +753,32 @@ function Mesas({ businessId }) {
       checkIfEmployee();
     }
   }, [businessId, loadData, getCurrentUser, checkIfEmployee]);
+
+  useEffect(() => {
+    if (!businessId) return undefined;
+
+    const syncFromRemote = () => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      loadMesas().catch(() => {});
+    };
+
+    const handleVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        syncFromRemote();
+      }
+    };
+
+    const timer = setInterval(syncFromRemote, MESAS_REMOTE_FALLBACK_POLL_MS);
+    window.addEventListener('online', syncFromRemote);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('online', syncFromRemote);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [businessId, loadMesas]);
 
   useEffect(() => {
     if (!businessId || !Array.isArray(mesas)) return;

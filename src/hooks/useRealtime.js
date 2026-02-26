@@ -1,5 +1,33 @@
 import { useEffect, useCallback, useMemo } from 'react';
 import { readAdapter } from '../data/adapters/localAdapter.js';
+import { logger } from '../utils/logger.js';
+
+const MAX_SUBSCRIPTION_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 800;
+
+function toChannelSegment(value, fallback = 'global') {
+  const raw = String(value ?? '').trim();
+  if (!raw) return fallback;
+  return raw.replace(/[^a-zA-Z0-9:_-]/g, '_').slice(0, 96) || fallback;
+}
+
+function isFilterValuePresent(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim() !== '';
+  return true;
+}
+
+function encodeRealtimeFilterValue(value) {
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  return encodeURIComponent(String(value).trim());
+}
+
+function buildRealtimeFilterString(filter = {}) {
+  return Object.entries(filter || {})
+    .filter(([, value]) => isFilterValuePresent(value))
+    .map(([key, value]) => `${key}=eq.${encodeRealtimeFilterValue(value)}`)
+    .join(',');
+}
 
 /**
  * Hook optimizado para suscribirse a cambios en tiempo real de Supabase
@@ -19,7 +47,8 @@ export function useRealtimeSubscription(table, options = {}) {
     onUpdate,
     onDelete,
     filter = {},
-    enabled = true
+    enabled = true,
+    retryOnError = true
   } = options;
 
   const handleInsert = useCallback((payload) => {
@@ -39,43 +68,107 @@ export function useRealtimeSubscription(table, options = {}) {
   useEffect(() => {
     if (!enabled || !table) return;
 
-    const parsedFilter = JSON.parse(filterKey || '{}');
-    const businessId = parsedFilter?.business_id || 'global';
-    const channelName = `realtime:${table}:${businessId}`;
+    let parsedFilter = {};
+    try {
+      parsedFilter = JSON.parse(filterKey || '{}') || {};
+    } catch {
+      parsedFilter = {};
+    }
 
-    // Construir filtro para Supabase
-    const filterString = Object.keys(parsedFilter).length > 0
-      ? Object.entries(parsedFilter).map(([key, value]) => `${key}=eq.${value}`).join(',')
-      : undefined;
+    const businessId = toChannelSegment(parsedFilter?.business_id, 'global');
+    const channelBase = `realtime:${table}:${businessId}`;
+    const filterString = buildRealtimeFilterString(parsedFilter);
 
-    const channel = readAdapter.subscribeToPostgresChanges({
-      channelName,
-      table,
-      filter: filterString,
-      callback: (payload) => {
-        // Validación para DELETE sin datos
-        if (payload.eventType === 'DELETE' && !payload.old) {
-          return;
+    let disposed = false;
+    let activeChannel = null;
+    let retryTimer = null;
+    let retryAttempts = 0;
+
+    const clearRetryTimer = () => {
+      if (!retryTimer) return;
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    };
+
+    const removeActiveChannel = () => {
+      if (!activeChannel) return;
+      readAdapter.removeRealtimeChannel(activeChannel);
+      activeChannel = null;
+    };
+
+    const subscribe = () => {
+      if (disposed) return;
+
+      const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const channelName = `${channelBase}:${nonce}`;
+
+      activeChannel = readAdapter.subscribeToPostgresChanges({
+        channelName,
+        table,
+        filter: filterString || undefined,
+        callback: (payload) => {
+          if (payload.eventType === 'DELETE' && !payload.old) {
+            return;
+          }
+
+          switch (payload.eventType) {
+            case 'INSERT':
+              handleInsert(payload);
+              break;
+            case 'UPDATE':
+              handleUpdate(payload);
+              break;
+            case 'DELETE':
+              handleDelete(payload);
+              break;
+          }
+        },
+        onStatusChange: (status, error, channel) => {
+          if (disposed || channel !== activeChannel) return;
+          if (status === 'SUBSCRIBED') {
+            retryAttempts = 0;
+            return;
+          }
+
+          if (!retryOnError) return;
+          if (status !== 'CHANNEL_ERROR' && status !== 'TIMED_OUT') return;
+          if (retryAttempts >= MAX_SUBSCRIPTION_RETRIES) {
+            logger.warn('[realtime] max retries reached', {
+              table,
+              channelName,
+              status,
+              error: error?.message || String(error || '')
+            });
+            return;
+          }
+
+          retryAttempts += 1;
+          const delayMs = RETRY_BASE_DELAY_MS * retryAttempts;
+          logger.warn('[realtime] channel retry scheduled', {
+            table,
+            channelName,
+            status,
+            retryAttempts,
+            delayMs
+          });
+          removeActiveChannel();
+          clearRetryTimer();
+          retryTimer = setTimeout(() => {
+            retryTimer = null;
+            subscribe();
+          }, delayMs);
         }
+      });
+    };
 
-        switch (payload.eventType) {
-          case 'INSERT':
-            handleInsert(payload);
-            break;
-          case 'UPDATE':
-            handleUpdate(payload);
-            break;
-          case 'DELETE':
-            handleDelete(payload);
-            break;
-        }
-      }
-    });
+    subscribe();
 
     return () => {
-      readAdapter.removeRealtimeChannel(channel);
+      disposed = true;
+      clearRetryTimer();
+      removeActiveChannel();
     };
-  }, [table, enabled, filterKey, handleInsert, handleUpdate, handleDelete]);
+  }, [table, enabled, filterKey, handleInsert, handleUpdate, handleDelete, retryOnError]);
 }
 
 /**
@@ -91,14 +184,8 @@ export function useRealtimeSubscriptions(subscriptions = [], enabled = true) {
     subscriptions.forEach((sub, index) => {
       const { table, filter = {}, onInsert, onUpdate, onDelete } = sub;
       
-      const channelName = `realtime:${table}:${index}:${Date.now()}`;
-
-      let filterString = '';
-      if (Object.keys(filter).length > 0) {
-        filterString = Object.entries(filter)
-          .map(([key, value]) => `${key}=eq.${value}`)
-          .join(',');
-      }
+      const channelName = `realtime:${table}:${index}:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const filterString = buildRealtimeFilterString(filter);
 
       const channel = readAdapter.subscribeToPostgresChanges({
         channelName,

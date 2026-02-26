@@ -22,7 +22,14 @@ function canQueueLocalOrders() {
 }
 
 function shouldForceOrdersLocalFirst() {
-  return Boolean(canQueueLocalOrders());
+  return Boolean(
+    canQueueLocalOrders()
+    && (
+      LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
+      || LOCAL_SYNC_CONFIG.localWrites?.ordersLocalFirst
+      || LOCAL_SYNC_CONFIG.localWrites?.tablesLocalFirst
+    )
+  );
 }
 
 function isConnectivityError(errorLike) {

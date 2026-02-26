@@ -46,7 +46,15 @@ function canQueueLocalOrderSales() {
 }
 
 function shouldForceOrderSalesLocalFirst() {
-  return Boolean(canQueueLocalOrderSales());
+  return Boolean(
+    canQueueLocalOrderSales()
+    && (
+      LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
+      || LOCAL_SYNC_CONFIG.localWrites?.ordersLocalFirst
+      || LOCAL_SYNC_CONFIG.localWrites?.tablesLocalFirst
+      || LOCAL_SYNC_CONFIG.localWrites?.salesLocalFirst
+    )
+  );
 }
 
 function isConnectivityError(errorLike) {

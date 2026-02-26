@@ -68,23 +68,40 @@ export async function signOutGlobalSession() {
 }
 
 export async function createBusinessRecord(payload) {
+  const createdAt = String(payload?.created_at || '').trim() || new Date().toISOString();
+  const normalizedPayload = {
+    ...payload,
+    created_at: createdAt
+  };
+
   const rpcPayload = {
-    p_name: payload?.name || null,
-    p_nit: payload?.nit || null,
-    p_address: payload?.address || null,
-    p_phone: payload?.phone || null,
-    p_email: payload?.email || null,
-    p_username: payload?.username || null
+    p_name: normalizedPayload?.name || null,
+    p_nit: normalizedPayload?.nit || null,
+    p_address: normalizedPayload?.address || null,
+    p_phone: normalizedPayload?.phone || null,
+    p_email: normalizedPayload?.email || null,
+    p_username: normalizedPayload?.username || null
   };
 
   const { data: rpcData, error: rpcError } = await supabaseAdapter.createBusinessForCurrentUserRpc(rpcPayload);
-  if (!rpcError) return rpcData || null;
+  if (!rpcError) {
+    if (rpcData?.id && !rpcData?.created_at) {
+      const { data: patchedBusiness, error: patchError } = await supabaseAdapter.updateBusinessById(
+        rpcData.id,
+        { created_at: createdAt }
+      );
+      if (!patchError && patchedBusiness) {
+        return patchedBusiness;
+      }
+    }
+    return rpcData || null;
+  }
 
   const rpcMessage = String(rpcError?.message || '').toLowerCase();
   const rpcMissing = rpcMessage.includes('does not exist') || rpcMessage.includes('not found');
   if (!rpcMissing) throw rpcError;
 
-  const { data, error } = await supabaseAdapter.insertBusiness(payload);
+  const { data, error } = await supabaseAdapter.insertBusiness(normalizedPayload);
   if (error) throw error;
   return data || null;
 }

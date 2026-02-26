@@ -29,7 +29,13 @@ function canQueueLocalProducts() {
 }
 
 function shouldForceProductsLocalFirst() {
-  return Boolean(canQueueLocalProducts());
+  return Boolean(
+    canQueueLocalProducts()
+    && (
+      LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
+      || LOCAL_SYNC_CONFIG.localWrites?.productsLocalFirst
+    )
+  );
 }
 
 function isConnectivityError(errorLike) {

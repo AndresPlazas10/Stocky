@@ -16,6 +16,16 @@ function canQueueLocalPurchases() {
   );
 }
 
+function shouldForcePurchasesLocalFirst() {
+  return Boolean(
+    canQueueLocalPurchases()
+    && (
+      LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
+      || LOCAL_SYNC_CONFIG.localWrites?.purchasesLocalFirst
+    )
+  );
+}
+
 function normalizePurchasePaymentMethod(paymentMethod) {
   const normalized = String(paymentMethod || '').trim().toLowerCase();
   if (!normalized) return 'cash';
@@ -278,7 +288,7 @@ export async function createPurchaseWithRpcFallback({
 }) {
   await assertPurchasableProductsManageStock({ businessId, cart });
 
-  const forceLocalFirst = Boolean(canQueueLocalPurchases());
+  const forceLocalFirst = shouldForcePurchasesLocalFirst();
   if (forceLocalFirst) {
     const queuedResult = await enqueueOfflinePurchaseMutation({
       businessId,

@@ -1,4 +1,5 @@
 import { supabase } from '../../supabase/Client';
+import { logger } from '../../utils/logger.js';
 
 const AUTH_STORAGE_KEY = 'supabase.auth.token';
 
@@ -224,8 +225,18 @@ export const supabaseAdapter = {
     schema = 'public',
     table,
     filter,
-    callback
+    callback,
+    onStatusChange
   }) {
+    if (!channelName || !table || typeof callback !== 'function') {
+      logger.warn('[realtime] invalid subscription config', {
+        channelName,
+        table,
+        hasCallback: typeof callback === 'function'
+      });
+      return null;
+    }
+
     const channel = supabase.channel(channelName);
     channel.on(
       'postgres_changes',
@@ -237,7 +248,11 @@ export const supabaseAdapter = {
       },
       callback
     );
-    channel.subscribe();
+    channel.subscribe((status, err) => {
+      if (typeof onStatusChange === 'function') {
+        onStatusChange(status, err || null, channel);
+      }
+    });
     return channel;
   },
 
