@@ -24,9 +24,6 @@ export function normalizeTableRecord(table) {
   const normalizedCurrentOrderId = normalizeOrderReference(table.current_order_id);
   const normalizedOrderStatus = normalizeOrderStatus(table?.orders?.status);
   const normalizedRawStatus = normalizeTableStatus(table.status);
-  const hasExplicitEmptyItems =
-    Array.isArray(table?.orders?.order_items)
-    && table.orders.order_items.length === 0;
   const isClosedOrder =
     normalizedOrderStatus === 'closed'
     || normalizedOrderStatus === 'cancelled';
@@ -34,7 +31,8 @@ export function normalizeTableRecord(table) {
   // Regla de seguridad offline: si la mesa ya está marcada como disponible,
   // nunca preservar punteros/ordenes antiguas del snapshot local.
   const shouldForceClearByStatus = normalizedRawStatus === 'available';
-  const shouldClearOrder = shouldForceClearByStatus || !hasCurrentOrder || isClosedOrder || hasExplicitEmptyItems;
+  // No limpiar por `order_items` vacío: en producción puede llegar vacío de forma transitoria.
+  const shouldClearOrder = shouldForceClearByStatus || !hasCurrentOrder || isClosedOrder;
   const normalizedStatus = shouldClearOrder ? 'available' : 'occupied';
 
   return {
