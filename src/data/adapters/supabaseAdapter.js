@@ -2,6 +2,76 @@ import { supabase } from '../../supabase/Client';
 
 const AUTH_STORAGE_KEY = 'supabase.auth.token';
 
+function parseJson(value, fallback = null) {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function isOfflineRuntime() {
+  return typeof navigator !== 'undefined' && navigator.onLine === false;
+}
+
+function pickStoredSession(parsed) {
+  if (!parsed) return null;
+  if (parsed?.user) return parsed;
+  if (parsed?.session?.user) return parsed.session;
+  if (parsed?.currentSession?.user) return parsed.currentSession;
+  if (Array.isArray(parsed)) {
+    for (const item of parsed) {
+      if (item?.user) return item;
+      if (item?.session?.user) return item.session;
+      if (item?.currentSession?.user) return item.currentSession;
+    }
+  }
+  return null;
+}
+
+function getStoredSessionFallback() {
+  if (typeof window === 'undefined') return null;
+
+  const keys = new Set([AUTH_STORAGE_KEY]);
+  try {
+    for (let i = 0; i < (window.localStorage?.length || 0); i += 1) {
+      const key = window.localStorage.key(i);
+      if (typeof key === 'string' && key.includes('auth-token')) {
+        keys.add(key);
+      }
+    }
+    for (let i = 0; i < (window.sessionStorage?.length || 0); i += 1) {
+      const key = window.sessionStorage.key(i);
+      if (typeof key === 'string' && key.includes('auth-token')) {
+        keys.add(key);
+      }
+    }
+  } catch {
+    // best-effort
+  }
+
+  for (const key of keys) {
+    try {
+      const localParsed = parseJson(window.localStorage?.getItem(key), null);
+      const localSession = pickStoredSession(localParsed);
+      if (localSession?.user) return localSession;
+    } catch {
+      // best-effort
+    }
+
+    try {
+      const sessionParsed = parseJson(window.sessionStorage?.getItem(key), null);
+      const session = pickStoredSession(sessionParsed);
+      if (session?.user) return session;
+    } catch {
+      // best-effort
+    }
+  }
+
+  return null;
+}
+
 function isInvalidRefreshTokenError(error) {
   const message = String(error?.message || '').toLowerCase();
   return (
@@ -10,7 +80,20 @@ function isInvalidRefreshTokenError(error) {
   );
 }
 
-async function recoverInvalidRefreshTokenSession(fallbackData) {
+async function recoverInvalidRefreshTokenSession(fallbackData, { allowOfflineFallback = false } = {}) {
+  if (allowOfflineFallback && isOfflineRuntime()) {
+    const storedSession = getStoredSessionFallback();
+    if (storedSession?.user) {
+      if (Object.prototype.hasOwnProperty.call(fallbackData || {}, 'session')) {
+        return { data: { session: storedSession }, error: null };
+      }
+      return { data: { user: storedSession.user }, error: null };
+    }
+
+    // En offline no forzamos limpieza de token/sesión local.
+    return { data: fallbackData, error: null };
+  }
+
   try {
     await supabase.auth.signOut({ scope: 'local' });
   } catch {
@@ -56,11 +139,24 @@ export const supabaseAdapter = {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       const sessionResult = await supabase.auth.getSession();
       if (sessionResult?.error && isInvalidRefreshTokenError(sessionResult.error)) {
-        return recoverInvalidRefreshTokenSession({ user: null });
+        return recoverInvalidRefreshTokenSession(
+          { user: null },
+          { allowOfflineFallback: true }
+        );
       }
+
+      const liveUser = sessionResult?.data?.session?.user || null;
+      if (liveUser) {
+        return {
+          data: { user: liveUser },
+          error: null
+        };
+      }
+
+      const storedSession = getStoredSessionFallback();
       return {
         data: {
-          user: sessionResult?.data?.session?.user || null
+          user: storedSession?.user || null
         },
         error: null
       };
@@ -80,8 +176,21 @@ export const supabaseAdapter = {
   async getCurrentSession() {
     const result = await supabase.auth.getSession();
     if (result?.error && isInvalidRefreshTokenError(result.error)) {
-      return recoverInvalidRefreshTokenSession({ session: null });
+      return recoverInvalidRefreshTokenSession(
+        { session: null },
+        { allowOfflineFallback: true }
+      );
     }
+
+    if (result?.data?.session) {
+      return result;
+    }
+
+    const storedSession = getStoredSessionFallback();
+    if (storedSession?.user) {
+      return { data: { session: storedSession }, error: null };
+    }
+
     return result;
   },
 

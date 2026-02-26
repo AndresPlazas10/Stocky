@@ -151,12 +151,14 @@ export class OutboxProcessor {
     handlers = {},
     pollMs = 4000,
     batchSize = 20,
+    maxEventsPerTick = 200,
     maxRetries = 5
   } = {}) {
     this.db = db;
     this.handlers = handlers;
     this.pollMs = pollMs;
     this.batchSize = batchSize;
+    this.maxEventsPerTick = Math.max(Number(batchSize) || 1, Number(maxEventsPerTick) || 1);
     this.maxRetries = maxRetries;
     this.reconciler = new SyncReconciler({ db });
     this.timer = null;
@@ -191,13 +193,29 @@ export class OutboxProcessor {
     try {
       await this.reviveDurableRejectedEvents();
 
-      const events = await this.db.listOutboxEvents({
-        status: 'pending',
-        limit: this.batchSize
-      });
+      let processedCount = 0;
+      const normalizedBatchSize = Math.max(1, Number(this.batchSize) || 1);
+      while (processedCount < this.maxEventsPerTick) {
+        const remainingBudget = this.maxEventsPerTick - processedCount;
+        const currentBatchLimit = Math.min(normalizedBatchSize, remainingBudget);
+        const events = await this.db.listOutboxEvents({
+          status: 'pending',
+          limit: currentBatchLimit
+        });
 
-      for (const event of events) {
-        await this.processEvent(event);
+        if (!Array.isArray(events) || events.length === 0) {
+          break;
+        }
+
+        for (const event of events) {
+          await this.processEvent(event);
+          processedCount += 1;
+          if (processedCount >= this.maxEventsPerTick) break;
+        }
+
+        if (events.length < currentBatchLimit) {
+          break;
+        }
       }
     } finally {
       this.processing = false;

@@ -31,7 +31,7 @@ export const SUPABASE_CONFIG = {
 export const EMAIL_CONFIG = {
   provider: import.meta.env.VITE_EMAIL_PROVIDER || 'resend',
   resendApiKey: import.meta.env.VITE_RESEND_API_KEY,
-  fromEmail: import.meta.env.VITE_FROM_EMAIL || 'noreply@stockly.app',
+  fromEmail: import.meta.env.VITE_RESEND_FROM_EMAIL || import.meta.env.VITE_FROM_EMAIL || 'noreply@stocky.app',
   testMode: IS_DEVELOPMENT
 };
 
@@ -55,10 +55,10 @@ export const LIMITS = {
 export const APP_CONFIG = {
   appName: 'Stocky',
   appVersion: '1.0.0',
-  baseUrl: IS_PRODUCTION 
-    ? 'https://stockly.vercel.app' 
+  baseUrl: IS_PRODUCTION
+    ? (import.meta.env.VITE_APP_URL || 'https://stocky.vercel.app')
     : 'http://localhost:5173',
-  supportEmail: 'support@stockly.app'
+  supportEmail: 'support@stocky.app'
 };
 
 // Feature flags
@@ -82,7 +82,10 @@ export const validateConfig = () => {
     errors.push('VITE_SUPABASE_ANON_KEY no está configurado');
   }
   
-  if (IS_PRODUCTION && !EMAIL_CONFIG.resendApiKey) {
+  const normalizedProvider = String(EMAIL_CONFIG.provider || '').trim().toLowerCase();
+  const requiresResendKey = normalizedProvider === '' || normalizedProvider === 'resend';
+
+  if (IS_PRODUCTION && requiresResendKey && !EMAIL_CONFIG.resendApiKey) {
     errors.push('VITE_RESEND_API_KEY no está configurado para producción');
   }
   
