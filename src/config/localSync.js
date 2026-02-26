@@ -16,7 +16,7 @@ export const LOCAL_SYNC_CONFIG = {
   electricPullEnabled: parseBooleanEnv(import.meta.env.VITE_ELECTRIC_PULL_ENABLED, false),
   shadowWritesEnabled: parseBooleanEnv(import.meta.env.VITE_LOCAL_SYNC_SHADOW_WRITES, true),
   outboxRemoteVerifyEnabled: parseBooleanEnv(import.meta.env.VITE_LOCAL_SYNC_VERIFY_REMOTE, false),
-  outboxPollMs: parseNumberEnv(import.meta.env.VITE_LOCAL_SYNC_OUTBOX_POLL_MS, 4000),
+  outboxPollMs: parseNumberEnv(import.meta.env.VITE_LOCAL_SYNC_OUTBOX_POLL_MS, 1500),
   outboxBatchSize: parseNumberEnv(import.meta.env.VITE_LOCAL_SYNC_OUTBOX_BATCH_SIZE, 20),
   outboxMaxEventsPerTick: parseNumberEnv(import.meta.env.VITE_LOCAL_SYNC_OUTBOX_MAX_EVENTS_PER_TICK, 200),
   outboxMaxRetries: parseNumberEnv(import.meta.env.VITE_LOCAL_SYNC_OUTBOX_MAX_RETRIES, 5),
