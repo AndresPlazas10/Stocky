@@ -188,7 +188,10 @@ export async function createTable({ businessId, tableNumber }) {
   });
   if (error) {
     if (canQueueLocalOrders() && isConnectivityError(error)) {
-      return enqueueLocalTableCreate({ businessId, tableNumber });
+      const localResult = await enqueueLocalTableCreate({ businessId, tableNumber });
+      await invalidateOrderCache({ businessId });
+      await triggerBackgroundOutboxSync();
+      return localResult;
     }
     throw error;
   }
@@ -304,7 +307,10 @@ export async function createOrderAndOccupyTable({ businessId, tableId, userId = 
     }
 
     if (canQueueLocalOrders() && isConnectivityError(orderError)) {
-      return enqueueLocalOrderCreate({ businessId, tableId, userId });
+      const localResult = await enqueueLocalOrderCreate({ businessId, tableId, userId });
+      await invalidateOrderCache({ businessId, tableId, orderId: localResult?.id || null });
+      await triggerBackgroundOutboxSync();
+      return localResult;
     }
     throw orderError;
   }
@@ -387,11 +393,14 @@ export async function updateOrderTotalById({ orderId, total, businessId = null }
   const { error } = await supabaseAdapter.updateOrderById(orderId, { total });
   if (error) {
     if (canQueueLocalOrders() && isConnectivityError(error)) {
-      return enqueueLocalOrderTotalUpdate({
+      const localResult = await enqueueLocalOrderTotalUpdate({
         orderId,
         total,
         businessId
       });
+      await invalidateOrderCache({ businessId, orderId });
+      await triggerBackgroundOutboxSync();
+      return localResult;
     }
     throw error;
   }
@@ -474,7 +483,10 @@ export async function persistOrderItemQuantities(
   const failedUpdate = updateResults.find((result) => result.error);
   if (failedUpdate?.error) {
     if (canQueueLocalOrders() && isConnectivityError(failedUpdate.error)) {
-      return enqueueLocalBulkQuantityUpdate(pendingEntries, { businessId, orderId });
+      const localResult = await enqueueLocalBulkQuantityUpdate(pendingEntries, { businessId, orderId });
+      await invalidateOrderCache({ businessId, orderId });
+      await triggerBackgroundOutboxSync();
+      return localResult;
     }
     throw failedUpdate.error;
   }
@@ -540,7 +552,10 @@ export async function deleteOrderItemById(itemId, { businessId = null, orderId =
   const { error } = await supabaseAdapter.deleteOrderItemById(itemId);
   if (error) {
     if (canQueueLocalOrders() && isConnectivityError(error)) {
-      return enqueueLocalOrderItemDelete(itemId, { businessId, orderId });
+      const localResult = await enqueueLocalOrderItemDelete(itemId, { businessId, orderId });
+      await invalidateOrderCache({ businessId, orderId });
+      await triggerBackgroundOutboxSync();
+      return localResult;
     }
     throw error;
   }
@@ -620,12 +635,15 @@ export async function updateOrderItemQuantityById({ itemId, quantity, businessId
   const { error } = await supabaseAdapter.updateOrderItemById(itemId, { quantity });
   if (error) {
     if (canQueueLocalOrders() && isConnectivityError(error)) {
-      return enqueueLocalOrderItemQuantityUpdate({
+      const localResult = await enqueueLocalOrderItemQuantityUpdate({
         itemId,
         quantity,
         businessId,
         orderId
       });
+      await invalidateOrderCache({ businessId, orderId });
+      await triggerBackgroundOutboxSync();
+      return localResult;
     }
     throw error;
   }
@@ -771,7 +789,10 @@ export async function insertOrderItem({ row, selectSql = 'id', businessId = null
   const { data, error } = await supabaseAdapter.insertOrderItem(row, selectSql);
   if (error) {
     if (canQueueLocalOrders() && isConnectivityError(error)) {
-      return enqueueLocalOrderItemInsert({ row, businessId });
+      const localResult = await enqueueLocalOrderItemInsert({ row, businessId });
+      await invalidateOrderCache({ businessId, orderId: row?.order_id || null });
+      await triggerBackgroundOutboxSync();
+      return localResult;
     }
     if (isConflictError(error)) {
       const mergedResult = await mergeDuplicateOrderItemInsert({
@@ -876,6 +897,7 @@ export async function deleteOrderAndReleaseTable({ orderId, tableId, businessId 
         businessId
       });
       await invalidateOrderCache({ businessId, orderId, tableId });
+      await triggerBackgroundOutboxSync();
       return localResult;
     }
     throw releaseTableError;
@@ -890,6 +912,7 @@ export async function deleteOrderAndReleaseTable({ orderId, tableId, businessId 
         businessId
       });
       await invalidateOrderCache({ businessId, orderId, tableId });
+      await triggerBackgroundOutboxSync();
       return localResult;
     }
     throw deleteOrderError;
@@ -984,6 +1007,7 @@ export async function deleteTableCascadeOrders(tableId, { businessId = null } = 
       });
       const localResult = await enqueueLocalTableDeleteCascade(tableId, { businessId });
       await invalidateOrderCache({ businessId, tableId });
+      await triggerBackgroundOutboxSync();
       return localResult;
     }
     throw releaseTableError;
@@ -1001,6 +1025,7 @@ export async function deleteTableCascadeOrders(tableId, { businessId = null } = 
       });
       const localResult = await enqueueLocalTableDeleteCascade(tableId, { businessId });
       await invalidateOrderCache({ businessId, tableId });
+      await triggerBackgroundOutboxSync();
       return localResult;
     }
     throw ordersError;
