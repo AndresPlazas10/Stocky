@@ -491,7 +491,7 @@ function Mesas({ businessId }) {
   
   // Estados para la orden
   const [orderItems, setOrderItems] = useState([]);
-  const [pendingQuantityUpdates, setPendingQuantityUpdates] = useState({});
+  const [, setPendingQuantityUpdates] = useState({});
   const [productos, setProductos] = useState([]);
   const [combos, setCombos] = useState([]);
   const [searchProduct, setSearchProduct] = useState('');
@@ -510,7 +510,7 @@ function Mesas({ businessId }) {
   const [clientes, setClientes] = useState([]);
   const [isClosingOrder, setIsClosingOrder] = useState(false);
   const [isCreatingTable, setIsCreatingTable] = useState(false);
-  const [pendingOrderItemOps, setPendingOrderItemOps] = useState(0);
+  const [, setPendingOrderItemOps] = useState(0);
 
   // Form data para crear mesa
   const [newTableNumber, setNewTableNumber] = useState('');
@@ -552,10 +552,6 @@ function Mesas({ businessId }) {
   const markOrderItemOpFinished = useCallback(() => {
     setPendingOrderItemOps((prev) => Math.max(prev - 1, 0));
   }, []);
-
-  const hasPendingOptimisticOrderItems = Array.isArray(orderItems)
-    && orderItems.some((item) => String(item?.id || '').startsWith('tmp-'));
-  const hasPendingOrderWrites = pendingOrderItemOps > 0 || hasPendingOptimisticOrderItems;
 
   useEffect(() => {
     orderItemsRef.current = Array.isArray(orderItems) ? orderItems : [];
@@ -648,22 +644,23 @@ function Mesas({ businessId }) {
         saveOfflineSnapshot(offlineSnapshotKey, sanitizedMesas);
       }
     } catch {
+      const cached = readOfflineSnapshot(offlineSnapshotKey, []);
+      if (Array.isArray(cached) && cached.length > 0) {
+        const normalizedCached = cached.map(normalizeTableRecord).sort(compareTableIdentifiers);
+        const withOpenOrdersCached = await reconcileTablesWithOpenOrders({
+          mesas: normalizedCached,
+          businessId
+        });
+        const reconciledCached = await reconcileClosedOrdersFromOutbox(withOpenOrdersCached);
+        const finalCached = reconciledCached.map(normalizeTableRecord).sort(compareTableIdentifiers);
+        const sanitizedCached = finalCached.map(sanitizeMesaOrderAssociation).sort(compareTableIdentifiers);
+        setMesas(sanitizedCached);
+        saveOfflineSnapshot(offlineSnapshotKey, sanitizedCached);
+        return;
+      }
+
       if (offline) {
-        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
-        if (Array.isArray(cached)) {
-          const normalizedCached = cached.map(normalizeTableRecord).sort(compareTableIdentifiers);
-          const withOpenOrdersCached = await reconcileTablesWithOpenOrders({
-            mesas: normalizedCached,
-            businessId
-          });
-          const reconciledCached = await reconcileClosedOrdersFromOutbox(withOpenOrdersCached);
-          const finalCached = reconciledCached.map(normalizeTableRecord).sort(compareTableIdentifiers);
-          const sanitizedCached = finalCached.map(sanitizeMesaOrderAssociation).sort(compareTableIdentifiers);
-          setMesas(sanitizedCached);
-          saveOfflineSnapshot(offlineSnapshotKey, sanitizedCached);
-        } else {
-          setMesas([]);
-        }
+        setMesas([]);
       } else {
         setError('No se pudo cargar las mesas. Revisa tu conexión e intenta de nuevo.');
       }
@@ -721,9 +718,14 @@ function Mesas({ businessId }) {
         saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
       }
     } catch {
+      const cached = readOfflineSnapshot(offlineSnapshotKey, []);
+      if (Array.isArray(cached) && cached.length > 0) {
+        setProductos(cached);
+        return;
+      }
+
       if (offline) {
-        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
-        setProductos(Array.isArray(cached) ? cached : []);
+        setProductos([]);
       } else {
         setError('No se pudo cargar los productos. Revisa tu conexión e intenta de nuevo.');
       }
@@ -754,9 +756,14 @@ function Mesas({ businessId }) {
         saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
       }
     } catch {
+      const cached = readOfflineSnapshot(offlineSnapshotKey, []);
+      if (Array.isArray(cached) && cached.length > 0) {
+        setCombos(cached);
+        return;
+      }
+
       if (offline) {
-        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
-        setCombos(Array.isArray(cached) ? cached : []);
+        setCombos([]);
       } else {
         setError('No se pudo cargar los combos. Revisa tu conexión e intenta de nuevo.');
       }
@@ -1192,6 +1199,7 @@ function Mesas({ businessId }) {
         orders: newOrder
       }));
       orderItemsDirtyRef.current = false;
+      orderItemsRef.current = [];
       setOrderItems([]);
       setPendingQuantityUpdatesSafe({});
       setModalOpenIntent(true);
@@ -1227,16 +1235,18 @@ function Mesas({ businessId }) {
             orders: recoveredOrder || normalizedLatestMesa?.orders || null
           }));
           orderItemsDirtyRef.current = false;
-          setOrderItems(
-            applyPendingQuantities(
+          {
+            const recoveredItems = applyPendingQuantities(
               Array.isArray(recoveredOrder?.order_items)
                 ? recoveredOrder.order_items
                 : (Array.isArray(normalizedLatestMesa?.orders?.order_items)
                   ? normalizedLatestMesa.orders.order_items
                   : []),
               pendingQuantityUpdatesRef.current
-            )
-          );
+            );
+            orderItemsRef.current = recoveredItems;
+            setOrderItems(recoveredItems);
+          }
           setPendingQuantityUpdatesSafe({});
           setModalOpenIntent(true);
           setShowOrderDetails(true);
@@ -1371,12 +1381,16 @@ function Mesas({ businessId }) {
 
     if (normalizedMesa.status === 'occupied' && normalizedMesa.current_order_id) {
       // Pintado inmediato con datos ya presentes en la card y refresh remoto en background.
-      setOrderItems(
-        applyPendingQuantities(preloadedOrderItems, pendingQuantityUpdatesRef.current)
+      const initialOrderItems = applyPendingQuantities(
+        preloadedOrderItems,
+        pendingQuantityUpdatesRef.current
       );
+      orderItemsRef.current = initialOrderItems;
+      setOrderItems(initialOrderItems);
       loadOrderDetails(normalizedMesa, { requestId }).catch(() => {});
     } else {
       // Crear nueva orden
+      orderItemsRef.current = [];
       setOrderItems([]);
       await createNewOrder(normalizedMesa);
     }
@@ -1502,11 +1516,29 @@ function Mesas({ businessId }) {
   }, [businessId, flushPendingRemoteOrderTotals]);
 
   const persistPendingQuantityUpdates = useCallback(async (orderId, { refreshItems = true } = {}) => {
-    const pendingEntries = Object.entries(pendingQuantityUpdates || {});
+    const pendingEntries = Object.entries(pendingQuantityUpdatesRef.current || {});
     if (!orderId || pendingEntries.length === 0) return;
 
-    const persistResult = await persistOrderItemQuantities(pendingEntries, { businessId, orderId });
-    setPendingQuantityUpdatesSafe({});
+    const persistableEntries = pendingEntries.filter(([itemId, quantity]) => {
+      const normalizedItemId = String(itemId || '').trim();
+      const normalizedQuantity = toFiniteNumber(quantity, NaN);
+      return (
+        normalizedItemId
+        && !normalizedItemId.startsWith('tmp-')
+        && Number.isFinite(normalizedQuantity)
+        && normalizedQuantity > 0
+      );
+    });
+    if (persistableEntries.length === 0) return;
+
+    const persistResult = await persistOrderItemQuantities(persistableEntries, { businessId, orderId });
+    setPendingQuantityUpdatesSafe((prev) => {
+      const next = { ...(prev || {}) };
+      persistableEntries.forEach(([itemId]) => {
+        delete next[itemId];
+      });
+      return next;
+    });
     if (persistResult?.__localOnly) {
       return;
     }
@@ -1526,7 +1558,7 @@ function Mesas({ businessId }) {
         applyPendingQuantities(freshItems, pendingQuantityUpdatesRef.current)
       )
     );
-  }, [pendingQuantityUpdates, setPendingQuantityUpdatesSafe, businessId]);
+  }, [setPendingQuantityUpdatesSafe, businessId]);
 
   const releaseEmptyOrderAndCloseModal = useCallback((mesaSnapshot) => {
     const normalizedTableId = normalizeEntityId(mesaSnapshot?.id);
@@ -1559,6 +1591,7 @@ function Mesas({ businessId }) {
       setShowOrderDetails(false);
       setModalOpenIntent(false);
       setSelectedMesa(null);
+      orderItemsRef.current = [];
       setOrderItems([]);
       setPendingQuantityUpdatesSafe({});
       setSearchProduct('');
@@ -1593,8 +1626,10 @@ function Mesas({ businessId }) {
       });
 
       // Actualización optimista: remover del estado local
-      const nextOrderItems = orderItems.filter(item => item.id !== itemId);
+      const currentOrderItems = Array.isArray(orderItemsRef.current) ? orderItemsRef.current : [];
+      const nextOrderItems = currentOrderItems.filter(item => item.id !== itemId);
       orderItemsDirtyRef.current = true;
+      orderItemsRef.current = nextOrderItems;
       setOrderItems(nextOrderItems);
       setPendingQuantityUpdatesSafe(prev => {
         const next = { ...prev };
@@ -1625,18 +1660,14 @@ function Mesas({ businessId }) {
     } finally {
       markOrderItemOpFinished();
     }
-  }, [selectedMesa, orderItems, updateOrderTotal, setPendingQuantityUpdatesSafe, businessId, markOrderItemOpStarted, markOrderItemOpFinished]);
+  }, [selectedMesa, updateOrderTotal, setPendingQuantityUpdatesSafe, businessId, markOrderItemOpStarted, markOrderItemOpFinished]);
 
   const handleRefreshOrder = useCallback(async () => {
     if (!selectedMesa) return;
-    if (hasPendingOrderWrites) {
-      setError('⏳ Espera un momento: aún se están guardando cambios de productos en la orden.');
-      return;
-    }
     
     try {
       const mesaSnapshot = { ...selectedMesa };
-      const orderItemsSnapshot = Array.isArray(orderItems) ? [...orderItems] : [];
+      const orderItemsSnapshot = Array.isArray(orderItemsRef.current) ? [...orderItemsRef.current] : [];
       const mesaItemsSnapshot = Array.isArray(mesaSnapshot?.orders?.order_items)
         ? mesaSnapshot.orders.order_items
         : [];
@@ -1707,6 +1738,7 @@ function Mesas({ businessId }) {
       setShowOrderDetails(false);
       setModalOpenIntent(false);
       setSelectedMesa(null);
+      orderItemsRef.current = [];
       setOrderItems([]);
       setPendingQuantityUpdatesSafe({});
       setSearchProduct('');
@@ -1744,8 +1776,6 @@ function Mesas({ businessId }) {
     }
   }, [
     selectedMesa,
-    orderItems,
-    hasPendingOrderWrites,
     updateOrderTotal,
     persistPendingQuantityUpdates,
     setPendingQuantityUpdatesSafe,
@@ -1793,11 +1823,12 @@ function Mesas({ businessId }) {
         setError(`⚠️ Stock insuficiente para ${itemName}. Disponibles: ${catalogItem.stock}. Considera crear una compra.`);
       }
 
-      let nextOrderItems = orderItems;
+      const currentOrderItems = Array.isArray(orderItemsRef.current) ? orderItemsRef.current : [];
+      let nextOrderItems = currentOrderItems;
       let orderItemsChanged = false;
 
       // Verificar si el item ya está en la orden
-      const existingItem = orderItems.find((item) => (
+      const existingItem = currentOrderItems.find((item) => (
         isCombo ? item.combo_id === itemId : item.product_id === itemId
       ));
 
@@ -1806,7 +1837,7 @@ function Mesas({ businessId }) {
         const newQuantity = toFiniteNumber(existingItem.quantity, 0) + qty;
         const nextQuantity = Number(newQuantity || 0);
         const isOptimisticExistingItem = String(existingItem?.id || '').startsWith('tmp-');
-        nextOrderItems = orderItems.map((item) => (
+        nextOrderItems = currentOrderItems.map((item) => (
           item.id === existingItem.id
             ? {
               ...item,
@@ -1816,6 +1847,7 @@ function Mesas({ businessId }) {
             : item
         ));
         orderItemsDirtyRef.current = true;
+        orderItemsRef.current = nextOrderItems;
         setOrderItems(nextOrderItems);
         orderItemsChanged = true;
         if (!isOptimisticExistingItem) {
@@ -1874,8 +1906,9 @@ function Mesas({ businessId }) {
             nombre: itemName
           } : null
         };
-        nextOrderItems = [optimisticItem, ...orderItems];
+        nextOrderItems = [optimisticItem, ...currentOrderItems];
         orderItemsDirtyRef.current = true;
+        orderItemsRef.current = nextOrderItems;
         setOrderItems(nextOrderItems);
         orderItemsChanged = true;
         markOrderItemOpStarted();
@@ -1967,6 +2000,11 @@ function Mesas({ businessId }) {
         }).catch(async () => {
           setError('❌ No se pudo agregar el item. Por favor, intenta de nuevo.');
           setOrderItems((prevItems) => prevItems.filter((item) => item.id !== tempId));
+          setPendingQuantityUpdatesSafe((prev) => {
+            const next = { ...(prev || {}) };
+            delete next[tempId];
+            return next;
+          });
           try {
             const freshItems = await getOrderItemsByOrderId({
               orderId: selectedMesa.current_order_id,
@@ -2014,7 +2052,7 @@ function Mesas({ businessId }) {
         // no-op
       }
     }
-  }, [selectedMesa, orderItems, quantityToAdd, updateOrderTotal, setPendingQuantityUpdatesSafe, businessId, markOrderItemOpStarted, markOrderItemOpFinished]);
+  }, [selectedMesa, quantityToAdd, updateOrderTotal, setPendingQuantityUpdatesSafe, businessId, markOrderItemOpStarted, markOrderItemOpFinished]);
 
   const updateItemQuantity = useCallback(async (itemId, newQuantity) => {
     try {
@@ -2025,16 +2063,17 @@ function Mesas({ businessId }) {
       }
 
       // Actualizar solo estado local. Se persiste al presionar "Guardar".
-      setOrderItems(prevItems =>
-        prevItems.map(item => {
+      const currentOrderItems = Array.isArray(orderItemsRef.current) ? orderItemsRef.current : [];
+      const nextOrderItems = currentOrderItems.map(item => {
           if (item.id === itemId) {
             const normalizedPrice = toFiniteNumber(item.price, 0);
             const newSubtotal = normalizedQuantity * normalizedPrice;
             return { ...item, quantity: normalizedQuantity, subtotal: newSubtotal };
           }
           return item;
-        })
-      );
+        });
+      orderItemsRef.current = nextOrderItems;
+      setOrderItems(nextOrderItems);
       orderItemsDirtyRef.current = true;
 
       setPendingQuantityUpdatesSafe(prev => ({ ...prev, [itemId]: normalizedQuantity }));
@@ -2059,7 +2098,7 @@ function Mesas({ businessId }) {
   const handleCloseModal = () => {
     // Capturar snapshot para uso en background o rollback
     const mesaSnapshot = selectedMesa ? { ...selectedMesa } : null;
-    const itemsSnapshot = [...orderItems];
+    const itemsSnapshot = Array.isArray(orderItemsRef.current) ? [...orderItemsRef.current] : [];
     const mesaItemsSnapshot = Array.isArray(mesaSnapshot?.orders?.order_items)
       ? mesaSnapshot.orders.order_items
       : [];
@@ -2112,16 +2151,13 @@ function Mesas({ businessId }) {
       setShowOrderDetails(false);
       setModalOpenIntent(false);
       setSelectedMesa(null);
+      orderItemsRef.current = [];
       setOrderItems([]);
       setPendingQuantityUpdatesSafe({});
     }, backgroundWork);
   };
 
   const handleCloseOrder = () => {
-    if (hasPendingOrderWrites) {
-      setError('⏳ Espera un momento: aún se están guardando cambios de productos en la orden.');
-      return;
-    }
     // Mostrar elección: pagar todo junto o dividir cuenta
     setShowCloseOrderChoiceModal(true);
   };
@@ -2222,6 +2258,7 @@ function Mesas({ businessId }) {
     setModalOpenIntent(false);
     setSelectedMesa(null);
     orderItemsDirtyRef.current = false;
+    orderItemsRef.current = [];
     setOrderItems([]);
     setPendingQuantityUpdatesSafe({});
     setIsGeneratingSplitSales(false);
@@ -2321,7 +2358,7 @@ function Mesas({ businessId }) {
 
     // Snapshot
     const mesaSnapshot = selectedMesa ? { ...selectedMesa } : null;
-    const orderItemsSnapshot = Array.isArray(orderItems) ? [...orderItems] : [];
+    const orderItemsSnapshot = Array.isArray(orderItemsRef.current) ? [...orderItemsRef.current] : [];
     const optimisticSaleTotal = calculateOrderItemsTotal(orderItemsSnapshot);
 
     // Optimistic UI: mark mesa available and close modal immediately
@@ -2341,6 +2378,7 @@ function Mesas({ businessId }) {
     setModalOpenIntent(false);
     setSelectedMesa(null);
     orderItemsDirtyRef.current = false;
+    orderItemsRef.current = [];
     setOrderItems([]);
     setPendingQuantityUpdatesSafe({});
     setPaymentMethod('cash');
@@ -2616,6 +2654,7 @@ function Mesas({ businessId }) {
         setShowOrderDetails(false);
         setModalOpenIntent(false);
         setSelectedMesa(null);
+        orderItemsRef.current = [];
         setOrderItems([]);
         setPendingQuantityUpdatesSafe({});
       });
@@ -3255,7 +3294,6 @@ function Mesas({ businessId }) {
                         onClick={handleRefreshOrder}
                         variant="outline"
                         className="border-2 border-accent-300 text-accent-700 hover:bg-accent-50 h-12 px-6 w-full sm:w-auto"
-                        disabled={hasPendingOrderWrites}
                       >
                         <Save className="w-5 h-5 mr-2" />
                         Guardar
@@ -3271,7 +3309,7 @@ function Mesas({ businessId }) {
                       </Button>
                       <Button
                         onClick={handleCloseOrder}
-                        disabled={orderItems.length === 0 || hasPendingOrderWrites}
+                        disabled={orderItems.length === 0}
                         className="gradient-primary text-white hover:opacity-90 h-12 px-8 text-lg w-full sm:w-auto"
                       >
                         <CheckCircle2 className="w-5 h-5 mr-2" />
