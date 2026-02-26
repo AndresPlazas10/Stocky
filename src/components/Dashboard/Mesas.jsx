@@ -1011,17 +1011,6 @@ function Mesas({ businessId }) {
     return [hydratedItem, ...safePreviousItems];
   }, [hydrateRealtimeOrderItem]);
 
-  const mergeOrderItemsConservatively = useCallback((previousItems = [], incomingItems = []) => {
-    const baseItems = Array.isArray(previousItems) ? previousItems : [];
-    const normalizedIncoming = Array.isArray(incomingItems) ? incomingItems.filter(Boolean) : [];
-    if (normalizedIncoming.length === 0) return baseItems;
-
-    return normalizedIncoming.reduce(
-      (acc, incomingItem) => applyRealtimeOrderItemChange(acc, incomingItem, 'UPDATE'),
-      baseItems
-    );
-  }, [applyRealtimeOrderItemChange]);
-
   const scheduleOrderRealtimeRefresh = useCallback((orderId, mesaId) => {
     if (!orderId || !mesaId) return;
     if (justCompletedSaleRef.current) return;
@@ -1048,10 +1037,29 @@ function Mesas({ businessId }) {
           && toFiniteNumber(updatedOrder?.total, 0) > 0
         );
 
-        let incomingOrderItems = applyPendingQuantities(
+        const joinedOrderItems = applyPendingQuantities(
           Array.isArray(updatedOrder?.order_items) ? updatedOrder.order_items : [],
           pendingQuantityUpdatesRef.current
         );
+        let incomingOrderItems = joinedOrderItems;
+
+        if (normalizedOrderStatus === 'open') {
+          try {
+            const directItems = await getOrderItemsByOrderId({
+              orderId,
+              selectSql: ORDER_ITEMS_SELECT
+            });
+            const normalizedDirectItems = applyPendingQuantities(
+              Array.isArray(directItems) ? directItems : [],
+              pendingQuantityUpdatesRef.current
+            );
+            if (normalizedDirectItems.length > 0 || joinedOrderItems.length === 0) {
+              incomingOrderItems = normalizedDirectItems;
+            }
+          } catch {
+            // no-op
+          }
+        }
 
         if (incomingOrderItems.length === 0 && shouldRetryItemsFetch) {
           try {
@@ -1095,11 +1103,7 @@ function Mesas({ businessId }) {
             : [];
           const nextOrderItems = shouldProtectFromTransientEmpty
             ? previousOrderItems
-            : (
-              normalizedOrderStatus === 'open'
-                ? mergeOrderItemsConservatively(previousOrderItems, incomingOrderItems)
-                : incomingOrderItems
-            );
+            : incomingOrderItems;
           const nextOrderTotal = nextOrderItems.length > 0
             ? calculateOrderItemsTotal(nextOrderItems)
             : (
@@ -1131,11 +1135,7 @@ function Mesas({ businessId }) {
           setOrderItems((prevItems) =>
             (shouldProtectFromTransientEmpty && prevItems.length > 0)
               ? prevItems
-              : (
-                normalizedOrderStatus === 'open'
-                  ? mergeOrderItemsConservatively(prevItems, incomingOrderItems)
-                  : mergeOrderItemsPreservingPosition(prevItems, incomingOrderItems)
-              )
+              : mergeOrderItemsPreservingPosition(prevItems, incomingOrderItems)
           );
 
           const previousSelectedItems = Array.isArray(prevSelected?.orders?.order_items)
@@ -1143,11 +1143,7 @@ function Mesas({ businessId }) {
             : [];
           const nextSelectedItems = shouldProtectFromTransientEmpty
             ? previousSelectedItems
-            : (
-              normalizedOrderStatus === 'open'
-                ? mergeOrderItemsConservatively(previousSelectedItems, incomingOrderItems)
-                : incomingOrderItems
-            );
+            : incomingOrderItems;
           const nextSelectedTotal = nextSelectedItems.length > 0
             ? calculateOrderItemsTotal(nextSelectedItems)
             : (
@@ -1177,7 +1173,7 @@ function Mesas({ businessId }) {
         // no-op
       }
     }, 100);
-  }, [mergeOrderItemsConservatively]);
+  }, []);
 
   // 🔥 TIEMPO REAL: Suscripción a cambios en mesas
   useRealtimeSubscription('tables', {
@@ -1207,10 +1203,12 @@ function Mesas({ businessId }) {
         pendingRemoteOrderTotalsRef.current?.[normalizedOrderId],
         NaN
       );
+      let affectedMesaId = null;
 
       // Actualizar la mesa correspondiente en el estado global
       setMesas((prev) => prev.map((mesa) => {
         if (normalizeEntityId(mesa?.current_order_id) !== normalizedOrderId) return mesa;
+        affectedMesaId = mesa.id;
 
         const previousOrderItems = Array.isArray(mesa?.orders?.order_items)
           ? mesa.orders.order_items
@@ -1284,6 +1282,11 @@ function Mesas({ businessId }) {
           }
         };
       });
+
+      if (normalizedOrderStatus === 'open' && affectedMesaId) {
+        // Producción: refuerza consistencia cuando llegan eventos fuera de orden o parciales.
+        scheduleOrderRealtimeRefresh(normalizedOrderId, affectedMesaId);
+      }
 
       // Los items se sincronizan exclusivamente desde la suscripción de `order_items`
       // para evitar doble fetch en background por cada cambio.
