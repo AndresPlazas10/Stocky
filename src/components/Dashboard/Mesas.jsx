@@ -526,6 +526,7 @@ function Mesas({ businessId }) {
   const orderItemsRef = useRef([]);
   const orderDetailsRequestRef = useRef(0);
   const lastSyncedOrderTotalsRef = useRef({});
+  const pendingRemoteOrderTotalsRef = useRef({});
   const orderTotalSyncQueueRef = useRef({});
   const orderRealtimeRefreshTimersRef = useRef({});
 
@@ -1388,9 +1389,13 @@ function Mesas({ businessId }) {
       if (!normalizedOrderId) return;
 
       const total = calculateOrderItemsTotal(itemsSnapshot);
+      const hasPendingRemoteSync = Object.prototype.hasOwnProperty.call(
+        pendingRemoteOrderTotalsRef.current,
+        normalizedOrderId
+      );
       const previousTotal = Number(lastSyncedOrderTotalsRef.current[normalizedOrderId]);
       const alreadySynced = Number.isFinite(previousTotal) && Math.abs(previousTotal - total) < 0.0001;
-      if (alreadySynced) return;
+      if (alreadySynced && !hasPendingRemoteSync) return;
 
       // Actualizar estado local primero (instantáneo)
       setMesas(prevMesas => 
@@ -1407,7 +1412,12 @@ function Mesas({ businessId }) {
       const nextWrite = previousWrite
         .catch(() => {})
         .then(async () => {
-          await updateOrderTotalById({ orderId: normalizedOrderId, total, businessId });
+          const updateResult = await updateOrderTotalById({ orderId: normalizedOrderId, total, businessId });
+          if (updateResult?.__localOnly) {
+            pendingRemoteOrderTotalsRef.current[normalizedOrderId] = total;
+            return;
+          }
+          delete pendingRemoteOrderTotalsRef.current[normalizedOrderId];
           lastSyncedOrderTotalsRef.current[normalizedOrderId] = total;
         });
 
@@ -1421,6 +1431,75 @@ function Mesas({ businessId }) {
       // Error silencioso
     }
   }, [orderItems, businessId]);
+
+  const flushPendingRemoteOrderTotals = useCallback(async () => {
+    if (!businessId) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+
+    const pendingEntries = Object.entries(pendingRemoteOrderTotalsRef.current || {});
+    if (pendingEntries.length === 0) return;
+
+    for (const [orderId, totalValue] of pendingEntries) {
+      const normalizedOrderId = normalizeEntityId(orderId);
+      if (!normalizedOrderId) {
+        delete pendingRemoteOrderTotalsRef.current[orderId];
+        continue;
+      }
+      const normalizedTotal = toFiniteNumber(totalValue, 0);
+
+      try {
+        const writeQueueByOrderId = orderTotalSyncQueueRef.current;
+        const previousWrite = writeQueueByOrderId[normalizedOrderId] || Promise.resolve();
+        const nextWrite = previousWrite
+          .catch(() => {})
+          .then(async () => {
+            const updateResult = await updateOrderTotalById({
+              orderId: normalizedOrderId,
+              total: normalizedTotal,
+              businessId
+            });
+            if (updateResult?.__localOnly) return;
+            delete pendingRemoteOrderTotalsRef.current[normalizedOrderId];
+            lastSyncedOrderTotalsRef.current[normalizedOrderId] = normalizedTotal;
+          });
+
+        writeQueueByOrderId[normalizedOrderId] = nextWrite;
+        await nextWrite;
+
+        if (writeQueueByOrderId[normalizedOrderId] === nextWrite) {
+          delete writeQueueByOrderId[normalizedOrderId];
+        }
+      } catch {
+        // Mantener pendiente para próximo intento.
+      }
+    }
+  }, [businessId]);
+
+  useEffect(() => {
+    if (!businessId) return undefined;
+
+    const flushIfVisible = () => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      flushPendingRemoteOrderTotals().catch(() => {});
+    };
+
+    const handleVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        flushIfVisible();
+      }
+    };
+
+    const timer = setInterval(flushIfVisible, MESAS_REMOTE_FALLBACK_POLL_MS);
+    window.addEventListener('online', flushIfVisible);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('online', flushIfVisible);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [businessId, flushPendingRemoteOrderTotals]);
 
   const persistPendingQuantityUpdates = useCallback(async (orderId, { refreshItems = true } = {}) => {
     const pendingEntries = Object.entries(pendingQuantityUpdates || {});
@@ -1452,6 +1531,10 @@ function Mesas({ businessId }) {
   const releaseEmptyOrderAndCloseModal = useCallback((mesaSnapshot) => {
     const normalizedTableId = normalizeEntityId(mesaSnapshot?.id);
     const normalizedOrderId = normalizeEntityId(mesaSnapshot?.current_order_id);
+    if (normalizedOrderId) {
+      delete pendingRemoteOrderTotalsRef.current[normalizedOrderId];
+      delete lastSyncedOrderTotalsRef.current[normalizedOrderId];
+    }
 
     if (normalizedTableId) {
       setMesas((prevMesas) => prevMesas.map((mesa) => (
