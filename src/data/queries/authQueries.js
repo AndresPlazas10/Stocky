@@ -98,7 +98,7 @@ export async function getCurrentSession() {
   return data?.session || getStoredSession() || null;
 }
 
-export async function getOwnedBusinessByUserId(userId, selectSql = 'id') {
+export async function getOwnedBusinessByUserId(userId, selectSql = '*') {
   const { data, error } = await readAdapter.getBusinessByOwnerId(userId, selectSql);
   if (error) throw error;
   return data || null;

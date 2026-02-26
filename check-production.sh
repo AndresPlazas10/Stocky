@@ -54,6 +54,8 @@ check_required_file "package.json"
 check_required_file "vercel.json"
 check_required_file ".env.production.example"
 check_required_file "vite.config.js"
+check_required_file "supabase/migrations/20260226_0100_harden_realtime_publication_and_rls.sql"
+check_required_file "supabase/migrations/20260226_0200_fix_businesses_created_at.sql"
 
 if git ls-files --error-unmatch ".env.production" >/dev/null 2>&1; then
   fail ".env.production esta trackeado en git. Debe permanecer solo local."
@@ -70,6 +72,9 @@ check_key_in_file "VITE_SUPABASE_ANON_KEY" ".env.production.example"
 check_key_in_file "VITE_APP_URL" ".env.production.example"
 check_key_in_file "RESEND_API_KEY" ".env.production.example"
 check_key_in_file "RESEND_FROM_EMAIL" ".env.production.example"
+check_key_in_file "VITE_FF_LOCAL_FIRST_ALL" ".env.production.example"
+check_key_in_file "VITE_FF_LOCAL_FIRST_ORDERS" ".env.production.example"
+check_key_in_file "VITE_FF_LOCAL_FIRST_TABLES" ".env.production.example"
 ok "Template de variables de produccion verificado"
 
 if [[ ! -f ".env" ]]; then
@@ -79,6 +84,12 @@ else
     ok ".env local contiene claves minimas de Supabase"
   else
     warn ".env local no tiene todas las claves minimas de Supabase"
+  fi
+
+  if rg -n "^VITE_FF_LOCAL_FIRST_.*=true$" ".env" >/dev/null 2>&1; then
+    warn "Tu .env local tiene local-first forzado activo (VITE_FF_LOCAL_FIRST_*=true). Para Realtime estable en producción se recomienda false."
+  else
+    ok "Sin local-first forzado en .env local"
   fi
 fi
 

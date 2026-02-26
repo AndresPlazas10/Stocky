@@ -61,6 +61,16 @@ function canQueueLocalSales() {
   );
 }
 
+function shouldForceSalesLocalFirst() {
+  return Boolean(
+    canQueueLocalSales()
+    && (
+      LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
+      || LOCAL_SYNC_CONFIG.localWrites?.salesLocalFirst
+    )
+  );
+}
+
 function isConnectivityError(errorLike) {
   const message = String(errorLike?.message || errorLike || '').toLowerCase();
   return (
@@ -181,7 +191,7 @@ export async function createSaleWithOutbox({
   total = 0,
   idempotencyKey = null
 }) {
-  const forceLocalFirst = Boolean(canQueueLocalSales());
+  const forceLocalFirst = shouldForceSalesLocalFirst();
   if (forceLocalFirst) {
     const queuedResult = await enqueueOfflineSaleMutation({
       businessId,

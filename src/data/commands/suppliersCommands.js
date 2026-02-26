@@ -33,7 +33,13 @@ function canQueueLocalSuppliers() {
 }
 
 function shouldForceSuppliersLocalFirst() {
-  return Boolean(canQueueLocalSuppliers());
+  return Boolean(
+    canQueueLocalSuppliers()
+    && (
+      LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
+      || LOCAL_SYNC_CONFIG.localWrites?.suppliersLocalFirst
+    )
+  );
 }
 
 function isConnectivityError(errorLike) {
