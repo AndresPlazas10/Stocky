@@ -163,6 +163,7 @@ export class OutboxProcessor {
     this.reconciler = new SyncReconciler({ db });
     this.timer = null;
     this.processing = false;
+    this.rerunRequested = false;
   }
 
   start() {
@@ -185,38 +186,46 @@ export class OutboxProcessor {
   }
 
   async tick() {
-    if (this.processing || !this.db) return;
+    if (!this.db) return;
+    if (this.processing) {
+      // Si llega una nueva solicitud de tick mientras procesamos, ejecutar otro ciclo al terminar.
+      this.rerunRequested = true;
+      return;
+    }
     const canSync = await this.canSyncNow();
     if (!canSync) return;
 
     this.processing = true;
     try {
-      await this.reviveDurableRejectedEvents();
+      do {
+        this.rerunRequested = false;
+        await this.reviveDurableRejectedEvents();
 
-      let processedCount = 0;
-      const normalizedBatchSize = Math.max(1, Number(this.batchSize) || 1);
-      while (processedCount < this.maxEventsPerTick) {
-        const remainingBudget = this.maxEventsPerTick - processedCount;
-        const currentBatchLimit = Math.min(normalizedBatchSize, remainingBudget);
-        const events = await this.db.listOutboxEvents({
-          status: 'pending',
-          limit: currentBatchLimit
-        });
+        let processedCount = 0;
+        const normalizedBatchSize = Math.max(1, Number(this.batchSize) || 1);
+        while (processedCount < this.maxEventsPerTick) {
+          const remainingBudget = this.maxEventsPerTick - processedCount;
+          const currentBatchLimit = Math.min(normalizedBatchSize, remainingBudget);
+          const events = await this.db.listOutboxEvents({
+            status: 'pending',
+            limit: currentBatchLimit
+          });
 
-        if (!Array.isArray(events) || events.length === 0) {
-          break;
+          if (!Array.isArray(events) || events.length === 0) {
+            break;
+          }
+
+          for (const event of events) {
+            await this.processEvent(event);
+            processedCount += 1;
+            if (processedCount >= this.maxEventsPerTick) break;
+          }
+
+          if (events.length < currentBatchLimit) {
+            break;
+          }
         }
-
-        for (const event of events) {
-          await this.processEvent(event);
-          processedCount += 1;
-          if (processedCount >= this.maxEventsPerTick) break;
-        }
-
-        if (events.length < currentBatchLimit) {
-          break;
-        }
-      }
+      } while (this.rerunRequested);
     } finally {
       this.processing = false;
     }

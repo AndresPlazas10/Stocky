@@ -523,8 +523,10 @@ function Mesas({ businessId }) {
   const [updatingItemId] = useState(null);
   const pendingQuantityUpdatesRef = useRef({});
   const orderItemsDirtyRef = useRef(false);
+  const orderItemsRef = useRef([]);
   const orderDetailsRequestRef = useRef(0);
   const lastSyncedOrderTotalsRef = useRef({});
+  const orderTotalSyncQueueRef = useRef({});
   const orderRealtimeRefreshTimersRef = useRef({});
 
   // Ref para prevenir que el modal se reabra después de completar una venta
@@ -553,6 +555,10 @@ function Mesas({ businessId }) {
   const hasPendingOptimisticOrderItems = Array.isArray(orderItems)
     && orderItems.some((item) => String(item?.id || '').startsWith('tmp-'));
   const hasPendingOrderWrites = pendingOrderItemOps > 0 || hasPendingOptimisticOrderItems;
+
+  useEffect(() => {
+    orderItemsRef.current = Array.isArray(orderItems) ? orderItems : [];
+  }, [orderItems]);
 
   const getCurrentUser = useCallback(async () => {
     try {
@@ -1378,25 +1384,39 @@ function Mesas({ businessId }) {
   // IMPORTANTE: Definir updateOrderTotal PRIMERO (otras funciones dependen de esta)
   const updateOrderTotal = useCallback(async (orderId, itemsSnapshot = orderItems) => {
     try {
-      if (!orderId) return;
+      const normalizedOrderId = normalizeEntityId(orderId);
+      if (!normalizedOrderId) return;
 
       const total = calculateOrderItemsTotal(itemsSnapshot);
-      const previousTotal = Number(lastSyncedOrderTotalsRef.current[orderId]);
+      const previousTotal = Number(lastSyncedOrderTotalsRef.current[normalizedOrderId]);
       const alreadySynced = Number.isFinite(previousTotal) && Math.abs(previousTotal - total) < 0.0001;
       if (alreadySynced) return;
 
       // Actualizar estado local primero (instantáneo)
       setMesas(prevMesas => 
         prevMesas.map(mesa => 
-          mesa.current_order_id === orderId 
+          normalizeEntityId(mesa?.current_order_id) === normalizedOrderId
             ? { ...mesa, orders: { ...mesa.orders, total } }
             : mesa
         )
       );
 
-      // Actualizar DB en background
-      await updateOrderTotalById({ orderId, total, businessId });
-      lastSyncedOrderTotalsRef.current[orderId] = total;
+      // Serializar escrituras por orden para evitar desorden por latencia en producción.
+      const writeQueueByOrderId = orderTotalSyncQueueRef.current;
+      const previousWrite = writeQueueByOrderId[normalizedOrderId] || Promise.resolve();
+      const nextWrite = previousWrite
+        .catch(() => {})
+        .then(async () => {
+          await updateOrderTotalById({ orderId: normalizedOrderId, total, businessId });
+          lastSyncedOrderTotalsRef.current[normalizedOrderId] = total;
+        });
+
+      writeQueueByOrderId[normalizedOrderId] = nextWrite;
+      await nextWrite;
+
+      if (writeQueueByOrderId[normalizedOrderId] === nextWrite) {
+        delete writeQueueByOrderId[normalizedOrderId];
+      }
     } catch {
       // Error silencioso
     }
@@ -1702,6 +1722,7 @@ function Mesas({ businessId }) {
         // Incrementar cantidad con la cantidad especificada
         const newQuantity = toFiniteNumber(existingItem.quantity, 0) + qty;
         const nextQuantity = Number(newQuantity || 0);
+        const isOptimisticExistingItem = String(existingItem?.id || '').startsWith('tmp-');
         nextOrderItems = orderItems.map((item) => (
           item.id === existingItem.id
             ? {
@@ -1714,38 +1735,40 @@ function Mesas({ businessId }) {
         orderItemsDirtyRef.current = true;
         setOrderItems(nextOrderItems);
         orderItemsChanged = true;
-        markOrderItemOpStarted();
-        updateOrderItemQuantityById({
-          itemId: existingItem.id,
-          quantity: nextQuantity,
-          businessId,
-          orderId: selectedMesa.current_order_id
-        }).catch(async () => {
-          setError('❌ No se pudo agregar el item. Por favor, intenta de nuevo.');
-          try {
-            const freshItems = await getOrderItemsByOrderId({
-              orderId: selectedMesa.current_order_id,
-              selectSql: ORDER_ITEMS_SELECT
-            });
-            if (Array.isArray(freshItems)) {
-              setOrderItems((prevItems) =>
-                mergeOrderItemsPreservingPosition(
-                  prevItems,
-                  applyPendingQuantities(freshItems, pendingQuantityUpdatesRef.current)
-                )
-              );
+        if (!isOptimisticExistingItem) {
+          markOrderItemOpStarted();
+          updateOrderItemQuantityById({
+            itemId: existingItem.id,
+            quantity: nextQuantity,
+            businessId,
+            orderId: selectedMesa.current_order_id
+          }).catch(async () => {
+            setError('❌ No se pudo agregar el item. Por favor, intenta de nuevo.');
+            try {
+              const freshItems = await getOrderItemsByOrderId({
+                orderId: selectedMesa.current_order_id,
+                selectSql: ORDER_ITEMS_SELECT
+              });
+              if (Array.isArray(freshItems)) {
+                setOrderItems((prevItems) =>
+                  mergeOrderItemsPreservingPosition(
+                    prevItems,
+                    applyPendingQuantities(freshItems, pendingQuantityUpdatesRef.current)
+                  )
+                );
+              }
+            } catch {
+              // no-op
             }
-          } catch {
-            // no-op
-          }
-        }).finally(() => {
-          markOrderItemOpFinished();
-        });
-        setPendingQuantityUpdatesSafe(prev => {
-          const next = { ...prev };
-          delete next[existingItem.id];
-          return next;
-        });
+          }).finally(() => {
+            markOrderItemOpFinished();
+          });
+          setPendingQuantityUpdatesSafe(prev => {
+            const next = { ...prev };
+            delete next[existingItem.id];
+            return next;
+          });
+        }
       } else {
         const optimisticQuantity = Number(qty || 0);
         const optimisticPrice = Number(parseFloat(precio) || 0);
@@ -1787,15 +1810,77 @@ function Mesas({ businessId }) {
           businessId
         }).then((newItem) => {
           if (!newItem?.id) return;
+
+          const latestTempItem = (Array.isArray(orderItemsRef.current) ? orderItemsRef.current : [])
+            .find((item) => item.id === tempId);
+          const resolvedQuantity = toFiniteNumber(latestTempItem?.quantity, optimisticQuantity);
+          const resolvedPrice = toFiniteNumber(latestTempItem?.price, optimisticPrice);
+          const pendingTempQuantity = toFiniteNumber(
+            pendingQuantityUpdatesRef.current?.[tempId],
+            NaN
+          );
+          const quantityToPersist = (
+            Number.isFinite(pendingTempQuantity) && pendingTempQuantity > 0
+          ) ? pendingTempQuantity : resolvedQuantity;
+          const shouldPersistResolvedQuantity = Math.abs(quantityToPersist - optimisticQuantity) > 0.0001;
+
           setOrderItems((prevItems) => prevItems.map((item) => (
             item.id === tempId
               ? {
                 ...item,
                 id: newItem.id,
-                subtotal: Number(newItem?.subtotal ?? item.subtotal ?? 0)
+                quantity: resolvedQuantity,
+                subtotal: resolvedQuantity * resolvedPrice
               }
               : item
           )));
+
+          setPendingQuantityUpdatesSafe((prev) => {
+            const next = { ...(prev || {}) };
+            delete next[tempId];
+            if (shouldPersistResolvedQuantity) {
+              next[newItem.id] = quantityToPersist;
+            } else {
+              delete next[newItem.id];
+            }
+            return next;
+          });
+
+          if (!shouldPersistResolvedQuantity) return;
+
+          markOrderItemOpStarted();
+          updateOrderItemQuantityById({
+            itemId: newItem.id,
+            quantity: quantityToPersist,
+            businessId,
+            orderId: selectedMesa.current_order_id
+          }).then(() => {
+            setPendingQuantityUpdatesSafe((prev) => {
+              const next = { ...(prev || {}) };
+              delete next[newItem.id];
+              return next;
+            });
+          }).catch(async () => {
+            setError('❌ No se pudo sincronizar la cantidad del item. Por favor, intenta guardar la orden.');
+            try {
+              const freshItems = await getOrderItemsByOrderId({
+                orderId: selectedMesa.current_order_id,
+                selectSql: ORDER_ITEMS_SELECT
+              });
+              if (Array.isArray(freshItems)) {
+                setOrderItems((prevItems) =>
+                  mergeOrderItemsPreservingPosition(
+                    prevItems,
+                    applyPendingQuantities(freshItems, pendingQuantityUpdatesRef.current)
+                  )
+                );
+              }
+            } catch {
+              // no-op
+            }
+          }).finally(() => {
+            markOrderItemOpFinished();
+          });
         }).catch(async () => {
           setError('❌ No se pudo agregar el item. Por favor, intenta de nuevo.');
           setOrderItems((prevItems) => prevItems.filter((item) => item.id !== tempId));
