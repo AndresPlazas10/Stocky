@@ -37,7 +37,8 @@
     "reinstall": "npm run clean && npm install",
     "analyze": "vite build --mode analyze",
     "check": "npm run lint && npm run build",
-    "predeploy": "npm run lint && npm run test && npm run build"
+    "predeploy": "npm run lint && npm run test && npm run build",
+    "check:production": "./check-production.sh"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.15",

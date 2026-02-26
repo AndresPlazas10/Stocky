@@ -168,6 +168,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [searchProduct, setSearchProduct] = useState('');
+  const [saleModalPanel, setSaleModalPanel] = useState('catalog');
   
   // Modal de facturación
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -183,6 +184,15 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const saleIntentKeyRef = useRef(null);
   const saleIntentSignatureRef = useRef('');
+
+  const closeSaleModal = useCallback(() => {
+    setShowSaleModal(false);
+    setCart([]);
+    setSelectedCustomer('');
+    setPaymentMethod('cash');
+    setSearchProduct('');
+    setSaleModalPanel('catalog');
+  }, []);
 
   // Funciones de carga memoizadas SIN cache para evitar problemas de actualización
   const loadVentas = useCallback(async (filters = currentFilters, pagination = {}) => {
@@ -776,6 +786,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setShowSaleModal(false);
       saleIntentKeyRef.current = null;
       saleIntentSignatureRef.current = '';
+      setSaleModalPanel('catalog');
 
       // Recargar ventas inmediatamente
       if (!result?.localOnly) {
@@ -1149,334 +1160,352 @@ function Ventas({ businessId, userRole = 'admin' }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto"
-            onClick={() => {
-              setShowSaleModal(false);
-              // Limpiar carrito al cerrar
-              setCart([]);
-              setSelectedCustomer('');
-              setPaymentMethod('cash');
-              setSearchProduct('');
-            }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm p-2 sm:p-4 flex items-center justify-center"
+            onClick={closeSaleModal}
           >
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
+              initial={{ scale: 0.96, opacity: 0, y: 16 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
+              exit={{ scale: 0.96, opacity: 0, y: 16 }}
               transition={{ duration: 0.2 }}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[94vh] overflow-hidden my-1 sm:my-0"
+              className="w-full max-w-[1260px] max-h-[95vh] overflow-hidden rounded-3xl border border-accent-200 bg-white shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header del Modal */}
-              <div className="gradient-primary p-4 sm:p-6 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                  <h2 className="text-xl sm:text-2xl font-bold text-white">Nueva Venta</h2>
+              <div className="gradient-primary p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3 text-white">
+                  <div className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur-sm">
+                    <ShoppingCart className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-bold leading-tight">Nueva Venta</h2>
+                    <p className="text-xs sm:text-sm text-white/80">Catálogo y carrito en una sola vista</p>
+                  </div>
                 </div>
                 <button
-                  onClick={() => {
-                    setShowSaleModal(false);
-                    setCart([]);
-                    setSelectedCustomer('');
-                    setPaymentMethod('cash');
-                    setSearchProduct('');
-                  }}
-                  className="text-white/80 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg"
+                  onClick={closeSaleModal}
+                  className="text-white/80 hover:text-white transition-colors p-2 hover:bg-white/15 rounded-lg"
                 >
                   <X className="w-6 h-6" />
                 </button>
               </div>
 
+              <div className="xl:hidden border-b border-accent-100 bg-white px-3 py-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSaleModalPanel('catalog')}
+                    className={`h-10 rounded-lg text-sm font-semibold transition ${
+                      saleModalPanel === 'catalog'
+                        ? 'gradient-primary text-white shadow-sm'
+                        : 'bg-accent-50 text-accent-600'
+                    }`}
+                  >
+                    Catálogo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSaleModalPanel('cart')}
+                    className={`h-10 rounded-lg text-sm font-semibold transition ${
+                      saleModalPanel === 'cart'
+                        ? 'gradient-primary text-white shadow-sm'
+                        : 'bg-accent-50 text-accent-600'
+                    }`}
+                  >
+                    Carrito ({cart.length})
+                  </button>
+                </div>
+              </div>
+
               {/* Contenido del Modal */}
-              <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(94vh-80px)]">
-                <div className="grid xl:grid-cols-2 gap-3 sm:gap-6">
-          {/* Panel izquierdo - Productos y combos */}
-          <Card className="shadow-xl rounded-2xl bg-white border-none">
-            <div className="p-4 sm:p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 gradient-primary rounded-lg">
-                  <Search className="w-5 h-5 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-accent-600">Productos y Combos</h3>
-              </div>
-              
-              <div className="relative mb-6">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <Input
-                  type="text"
-                  className="pl-10 h-12 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
-                  placeholder="Buscar producto o combo..."
-                  value={searchProduct}
-                  onChange={(e) => setSearchProduct(e.target.value)}
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 max-h-[42vh] sm:max-h-[600px] overflow-y-auto pr-1 sm:pr-2 custom-scrollbar">
-                {filteredCatalog.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500 lg:col-span-2">
-                    <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                    <p className="font-medium">No hay items disponibles</p>
-                  </div>
-                ) : (
-                  filteredCatalog.map((catalogItem) => (
-                    <motion.div
-                      key={`${catalogItem.item_type}:${catalogItem.item_id}`}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="cursor-pointer"
-                    >
-                      <Card
-                        className="h-full hover:shadow-lg transition-all duration-300 rounded-xl border-gray-200 bg-gradient-to-br from-white to-gray-50 overflow-hidden"
-                        onClick={() => addToCart(catalogItem)}
-                      >
-                        <div className="p-3 sm:p-4 h-full flex flex-col gap-3">
-                          <div className="min-w-0">
-                            <p className="font-bold text-accent-600 text-base sm:text-lg truncate" title={catalogItem.name}>
-                              {catalogItem.name}
-                            </p>
-                            <p className="text-sm text-gray-500 mt-1 truncate" title={catalogItem.code}>
-                              Código: {catalogItem.code || 'N/A'}
-                            </p>
-                            {catalogItem.item_type === SALE_ITEM_TYPE.COMBO ? (
-                              <Badge className="mt-2 bg-blue-100 text-blue-800">
-                                Combo ({catalogItem.combo_items?.length || 0} productos)
-                              </Badge>
-                            ) : catalogItem.manage_stock === false ? (
-                              <Badge className="mt-2 bg-slate-100 text-slate-700">
-                                Sin control de stock
-                              </Badge>
-                            ) : (
-                              <Badge
-                                className={`mt-2 ${
-                                  catalogItem.stock > 10
-                                    ? 'bg-green-100 text-green-800'
-                                    : catalogItem.stock > 0
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}
-                              >
-                                Stock: {catalogItem.stock}
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="mt-auto flex items-end justify-between gap-3">
-                            <p className="text-lg sm:text-xl font-bold text-secondary-600">
-                              {formatPrice(catalogItem.sale_price)}
-                            </p>
-                            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-accent-100 text-accent-700">
-                              <Plus className="w-5 h-5" />
-                            </span>
-                          </div>
+              <div className="p-3 sm:p-5 xl:p-6 overflow-y-auto max-h-[calc(95vh-136px)] xl:max-h-[calc(95vh-88px)]">
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+                  {/* Panel izquierdo - Productos y combos */}
+                  <Card className={`rounded-2xl border border-accent-200 bg-white shadow-sm ${saleModalPanel === 'cart' ? 'hidden xl:block' : ''}`}>
+                    <CardHeader className="pb-4 border-b border-accent-100">
+                      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+                        <div>
+                          <CardTitle className="text-xl text-accent-600">Productos y Combos</CardTitle>
+                          <p className="text-sm text-gray-500 mt-1">Explora y agrega items al carrito</p>
                         </div>
-                      </Card>
-                    </motion.div>
-                  ))
-                )}
-              </div>
-            </div>
-          </Card>
-
-          {/* Panel derecho - Carrito */}
-          <Card className="shadow-xl rounded-2xl bg-white border-none">
-            <div className="p-4 sm:p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 gradient-primary rounded-lg">
-                  <ShoppingCart className="w-5 h-5 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-accent-600">Carrito de Venta</h3>
-              </div>
-              
-              <div className="space-y-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    Cliente (opcional)
-                  </label>
-                  <select
-                    value={selectedCustomer}
-                    onChange={(e) => setSelectedCustomer(e.target.value)}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#edb886] focus:ring-[#edb886] transition-all duration-300"
-                  >
-                    <option value="">Venta general</option>
-                    {clientes.map(cliente => (
-                      <option key={cliente.id} value={cliente.id}>
-                        {cliente.full_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                    <CreditCard className="w-4 h-4" />
-                    Método de pago
-                  </label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#edb886] focus:ring-[#edb886] transition-all duration-300"
-                  >
-                    <option value="cash">💵 Efectivo</option>
-                    <option value="card">💳 Tarjeta</option>
-                    <option value="transfer">🏦 Transferencia</option>
-                    <option value="mixed">🔀 Mixto</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* DESHABILITADO - Requiere dominio verificado en Resend */}
-              {/* Opción de Facturación Electrónica */}
-
-              <div className="border-t border-gray-200 pt-4 mb-4">
-                <p className="text-sm font-medium text-gray-700 mb-3">Items en el carrito:</p>
-                <div className="space-y-2 max-h-[34vh] sm:max-h-[280px] overflow-y-auto pr-1 sm:pr-2 custom-scrollbar">
-                  {cart.length === 0 ? (
-                    <div className="text-center py-8 text-gray-400">
-                      <ShoppingCart className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                      <p className="font-medium">El carrito está vacío</p>
-                      <p className="text-sm mt-1">Selecciona productos para agregar</p>
-                    </div>
-                  ) : (
-                    cart.map(item => (
-                      <motion.div
-                        key={item.item_key}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 20 }}
-                        transition={{ duration: 0.3 }}
-                      >
-                        <Card className="bg-gradient-to-br from-gray-50 to-white border-gray-200 rounded-xl">
-                          <div className="p-3">
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                <p className="font-bold text-accent-600">{item.name}</p>
-                                <p className="text-xs text-gray-500">{item.code}</p>
-                                {item.item_type === SALE_ITEM_TYPE.COMBO && (
-                                  <Badge className="mt-1 bg-blue-100 text-blue-700">Combo</Badge>
+                        <Badge className="w-fit bg-accent-100 text-accent-700 border border-accent-200">
+                          {filteredCatalog.length} resultados
+                        </Badge>
+                      </div>
+                      <div className="relative mt-4">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          type="text"
+                          className="pl-9 h-11 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
+                          placeholder="Buscar producto o combo..."
+                          value={searchProduct}
+                          onChange={(e) => setSearchProduct(e.target.value)}
+                        />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 sm:p-5">
+                      {filteredCatalog.length === 0 ? (
+                        <div className="text-center py-16 text-gray-500 border border-dashed border-gray-300 rounded-xl bg-gray-50">
+                          <AlertCircle className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+                          <p className="font-medium">No hay items disponibles</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3 xl:max-h-[56vh] xl:overflow-y-auto xl:pr-1 custom-scrollbar">
+                          {filteredCatalog.map((catalogItem) => (
+                            <motion.button
+                              key={`${catalogItem.item_type}:${catalogItem.item_id}`}
+                              type="button"
+                              whileHover={{ y: -2 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => addToCart(catalogItem)}
+                              className="text-left rounded-xl border border-gray-200 bg-gradient-to-b from-white to-gray-50 p-3.5 transition hover:border-primary-300 hover:shadow-md"
+                            >
+                              <div className="min-w-0">
+                                <p className="font-bold text-accent-600 text-base truncate" title={catalogItem.name}>
+                                  {catalogItem.name}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1 truncate" title={catalogItem.code}>
+                                  Código: {catalogItem.code || 'N/A'}
+                                </p>
+                                {catalogItem.item_type === SALE_ITEM_TYPE.COMBO ? (
+                                  <Badge className="mt-2 bg-blue-100 text-blue-800 border border-blue-200">
+                                    Combo ({catalogItem.combo_items?.length || 0} productos)
+                                  </Badge>
+                                ) : catalogItem.manage_stock === false ? (
+                                  <Badge className="mt-2 bg-slate-100 text-slate-700 border border-slate-200">
+                                    Sin control de stock
+                                  </Badge>
+                                ) : (
+                                  <Badge
+                                    className={`mt-2 border ${
+                                      catalogItem.stock > 10
+                                        ? 'bg-green-100 text-green-800 border-green-200'
+                                        : catalogItem.stock > 0
+                                        ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                                        : 'bg-red-100 text-red-800 border-red-200'
+                                    }`}
+                                  >
+                                    Stock: {catalogItem.stock}
+                                  </Badge>
                                 )}
                               </div>
-                              <Button
-                                onClick={() => removeFromCart(item.item_key)}
-                                className="h-7 w-7 p-0 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg border-none"
+                              <div className="mt-4 flex items-center justify-between gap-2">
+                                <p className="text-lg font-bold text-secondary-600">
+                                  {formatPrice(catalogItem.sale_price)}
+                                </p>
+                                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-accent-100 text-accent-700">
+                                  <Plus className="w-4 h-4" />
+                                </span>
+                              </div>
+                            </motion.button>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Panel derecho - Carrito */}
+                  <Card className={`rounded-2xl border border-accent-200 bg-white shadow-sm ${saleModalPanel === 'catalog' ? 'hidden xl:block' : ''} xl:sticky xl:top-0 xl:h-fit`}>
+                    <CardHeader className="pb-4 border-b border-accent-100">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-xl text-accent-600">Carrito de Venta</CardTitle>
+                          <p className="text-sm text-gray-500 mt-1">{cart.length} items cargados</p>
+                        </div>
+                        <Badge className="bg-accent-50 text-accent-700 border border-accent-200">
+                          {formatPrice(total)}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 sm:p-5">
+                      <div className="space-y-4 mb-5">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                            <User className="w-4 h-4" />
+                            Cliente (opcional)
+                          </label>
+                          <select
+                            value={selectedCustomer}
+                            onChange={(e) => setSelectedCustomer(e.target.value)}
+                            className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#edb886] focus:ring-[#edb886] transition-all duration-300"
+                          >
+                            <option value="">Venta general</option>
+                            {clientes.map((cliente) => (
+                              <option key={cliente.id} value={cliente.id}>
+                                {cliente.full_name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                            <CreditCard className="w-4 h-4" />
+                            Método de pago
+                          </label>
+                          <select
+                            value={paymentMethod}
+                            onChange={(e) => setPaymentMethod(e.target.value)}
+                            className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#edb886] focus:ring-[#edb886] transition-all duration-300"
+                          >
+                            <option value="cash">💵 Efectivo</option>
+                            <option value="card">💳 Tarjeta</option>
+                            <option value="transfer">🏦 Transferencia</option>
+                            <option value="mixed">🔀 Mixto</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-gray-200 pt-4 mb-4">
+                        <p className="text-sm font-medium text-gray-700 mb-3">Items en el carrito:</p>
+                        <div className="space-y-2 xl:max-h-[30vh] xl:overflow-y-auto xl:pr-1 custom-scrollbar">
+                          {cart.length === 0 ? (
+                            <div className="text-center py-8 text-gray-400 border border-dashed border-gray-300 rounded-xl bg-gray-50">
+                              <ShoppingCart className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                              <p className="font-medium">El carrito está vacío</p>
+                              <p className="text-sm mt-1">Selecciona productos para agregar</p>
+                            </div>
+                          ) : (
+                            cart.map((item) => (
+                              <motion.div
+                                key={item.item_key}
+                                initial={{ opacity: 0, x: -14 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: 14 }}
+                                transition={{ duration: 0.2 }}
                               >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                              <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1 w-fit">
-                                <button
-                                  onClick={() => updateQuantity(item.item_key, item.quantity - 1)}
-                                  className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold transition-colors"
-                                >
-                                  -
-                                </button>
-                                <input
-                                  type="number"
-                                  value={item.quantity}
-                                  onChange={(e) => updateQuantity(item.item_key, parseInt(e.target.value, 10) || 0)}
-                                  min="1"
-                                  className="w-12 text-center border-none focus:outline-none focus:ring-0 font-bold text-accent-600"
-                                />
-                                <button
-                                  onClick={() => updateQuantity(item.item_key, item.quantity + 1)}
-                                  className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold transition-colors"
-                                >
-                                  +
-                                </button>
-                              </div>
-                              <p className="text-lg font-bold text-secondary-600">
-                                {formatPrice(item.subtotal)}
-                              </p>
-                            </div>
-                            {(() => {
-                              if (item.item_type !== SALE_ITEM_TYPE.PRODUCT || !item.product_id) return false;
-                              if (item.manage_stock === false) return false;
-                              const liveStock = stockByProductId.get(item.product_id);
-                              const available = Number.isFinite(liveStock) ? liveStock : item.available_stock;
-                              return typeof available === 'number' && item.quantity > available;
-                            })() && (
-                              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
-                                <div className="flex items-center gap-3">
-                                  <AlertCircle className="w-5 h-5 text-red-600" />
-                                  <div>
-                                    <p className="text-sm font-semibold text-red-800">⚠️ Stock quedará negativo</p>
-                                    <p className="text-xs text-red-700">
-                                      Disponibles: {Number.isFinite(stockByProductId.get(item.product_id)) ? stockByProductId.get(item.product_id) : item.available_stock} — Pedido: {item.quantity}
-                                    </p>
+                                <Card className="bg-gradient-to-br from-gray-50 to-white border-gray-200 rounded-xl shadow-none">
+                                  <div className="p-3">
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-bold text-accent-600 truncate">{item.name}</p>
+                                        <p className="text-xs text-gray-500 truncate">{item.code}</p>
+                                        {item.item_type === SALE_ITEM_TYPE.COMBO && (
+                                          <Badge className="mt-1 bg-blue-100 text-blue-700 border border-blue-200">Combo</Badge>
+                                        )}
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        onClick={() => removeFromCart(item.item_key)}
+                                        className="h-7 w-7 p-0 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg border-none"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                      <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1 w-fit">
+                                        <button
+                                          type="button"
+                                          onClick={() => updateQuantity(item.item_key, item.quantity - 1)}
+                                          className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold transition-colors"
+                                        >
+                                          -
+                                        </button>
+                                        <input
+                                          type="number"
+                                          value={item.quantity}
+                                          onChange={(e) => updateQuantity(item.item_key, parseInt(e.target.value, 10) || 0)}
+                                          min="1"
+                                          className="w-12 text-center border-none focus:outline-none focus:ring-0 font-bold text-accent-600 bg-transparent"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => updateQuantity(item.item_key, item.quantity + 1)}
+                                          className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold transition-colors"
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                      <p className="text-lg font-bold text-secondary-600">
+                                        {formatPrice(item.subtotal)}
+                                      </p>
+                                    </div>
+                                    {(() => {
+                                      if (item.item_type !== SALE_ITEM_TYPE.PRODUCT || !item.product_id) return false;
+                                      if (item.manage_stock === false) return false;
+                                      const liveStock = stockByProductId.get(item.product_id);
+                                      const available = Number.isFinite(liveStock) ? liveStock : item.available_stock;
+                                      return typeof available === 'number' && item.quantity > available;
+                                    })() && (
+                                      <div className="mt-3 p-2.5 bg-red-50 border border-red-200 rounded-md">
+                                        <div className="flex items-center gap-2">
+                                          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                                          <p className="text-xs text-red-700">
+                                            Disponibles: {Number.isFinite(stockByProductId.get(item.product_id)) ? stockByProductId.get(item.product_id) : item.available_stock} - Pedido: {item.quantity}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
-                                </div>
-                              </div>
-                            )}
+                                </Card>
+                              </motion.div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+
+                      {comboStockShortages.length > 0 && (
+                        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertCircle className="w-4 h-4 text-red-600" />
+                            <p className="text-sm font-semibold text-red-800">Stock insuficiente en combos</p>
                           </div>
-                        </Card>
-                      </motion.div>
-                    ))
-                  )}
-                </div>
-              </div>
+                          <div className="space-y-1 text-xs text-red-700">
+                            {comboStockShortages.map((item) => (
+                              <p key={item.product_id}>
+                                {item.product_name}: disponibles {item.available_stock} / requeridos {item.required_quantity}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
-              {comboStockShortages.length > 0 && (
-                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertCircle className="w-4 h-4 text-red-600" />
-                    <p className="text-sm font-semibold text-red-800">Stock insuficiente para productos internos de combos</p>
-                  </div>
-                  <div className="space-y-1 text-xs text-red-700">
-                    {comboStockShortages.map((item) => (
-                      <p key={item.product_id}>
-                        {item.product_name}: disponibles {item.available_stock} / requeridos {item.required_quantity}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )}
+                      {simpleStockShortages.length > 0 && (
+                        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertCircle className="w-4 h-4 text-red-600" />
+                            <p className="text-sm font-semibold text-red-800">Stock insuficiente en productos</p>
+                          </div>
+                          <div className="space-y-1 text-xs text-red-700">
+                            {simpleStockShortages.map((item) => (
+                              <p key={`simple-shortage-${item.product_id}`}>
+                                {item.product_name}: disponibles {item.available_stock} / requeridos {item.required_quantity}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
-              {simpleStockShortages.length > 0 && (
-                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertCircle className="w-4 h-4 text-red-600" />
-                    <p className="text-sm font-semibold text-red-800">Stock insuficiente en productos</p>
-                  </div>
-                  <div className="space-y-1 text-xs text-red-700">
-                    {simpleStockShortages.map((item) => (
-                      <p key={`simple-shortage-${item.product_id}`}>
-                        {item.product_name}: disponibles {item.available_stock} / requeridos {item.required_quantity}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )}
+                      <Card className="gradient-primary text-white shadow-md rounded-xl border-none mb-3">
+                        <div className="p-4 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="w-5 h-5" />
+                            <span className="text-sm sm:text-base font-semibold">Total:</span>
+                          </div>
+                          <span className="text-2xl sm:text-3xl font-bold">{formatPrice(total)}</span>
+                        </div>
+                      </Card>
 
-              <Card className="gradient-primary text-white shadow-lg rounded-xl border-none mb-3 sm:mb-4">
-                <div className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="w-6 h-6" />
-                    <span className="text-lg font-semibold">Total:</span>
-                  </div>
-                  <span className="text-3xl font-bold">{formatPrice(total)}</span>
-                </div>
-              </Card>
-
-              <Button
-                onClick={processSale}
-                disabled={cart.length === 0 || isSubmitting || comboStockShortages.length > 0 || simpleStockShortages.length > 0}
-                className="w-full h-11 sm:h-14 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold text-sm sm:text-lg rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 sm:gap-3"
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    Procesando venta...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-6 h-6" />
-                    Completar Venta
-                  </>
-                )}
-              </Button>
-            </div>
-          </Card>
+                      <Button
+                        onClick={processSale}
+                        disabled={cart.length === 0 || isSubmitting || comboStockShortages.length > 0 || simpleStockShortages.length > 0}
+                        className="w-full h-11 sm:h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold text-sm sm:text-base rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                            Procesando venta...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-5 h-5" />
+                            Completar Venta
+                          </>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
             </motion.div>

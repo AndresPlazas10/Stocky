@@ -117,6 +117,7 @@ export async function bootstrapLocalSync() {
       handlers,
       pollMs: LOCAL_SYNC_CONFIG.outboxPollMs,
       batchSize: LOCAL_SYNC_CONFIG.outboxBatchSize,
+      maxEventsPerTick: LOCAL_SYNC_CONFIG.outboxMaxEventsPerTick,
       maxRetries: LOCAL_SYNC_CONFIG.outboxMaxRetries
     });
     outboxProcessor.start();
@@ -210,6 +211,7 @@ export async function runOutboxTick() {
     handlers: createSyncHandlers(),
     pollMs: LOCAL_SYNC_CONFIG.outboxPollMs,
     batchSize: LOCAL_SYNC_CONFIG.outboxBatchSize,
+    maxEventsPerTick: LOCAL_SYNC_CONFIG.outboxMaxEventsPerTick,
     maxRetries: LOCAL_SYNC_CONFIG.outboxMaxRetries
   });
   await processor.tick();
