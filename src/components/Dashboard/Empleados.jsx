@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
+import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import {
   getBusinessUsernameById,
   getEmployeesForManagement,
@@ -75,6 +76,45 @@ function Empleados({ businessId }) {
       loadEmpleados();
     }
   }, [businessId, loadEmpleados]);
+
+  useRealtimeSubscription('employees', {
+    filter: { business_id: businessId },
+    enabled: !!businessId,
+    onInsert: (newEmployee) => {
+      if (isOwnerRole(newEmployee?.role)) return;
+      const normalizedEmployee = {
+        ...newEmployee,
+        is_active: newEmployee?.is_active !== false,
+        status: newEmployee?.is_active !== false ? 'active' : 'inactive'
+      };
+      setEmpleados((prev) => {
+        const exists = prev.some((employee) => employee.id === normalizedEmployee.id);
+        if (exists) {
+          return prev.map((employee) => (
+            employee.id === normalizedEmployee.id ? { ...employee, ...normalizedEmployee } : employee
+          ));
+        }
+        return [normalizedEmployee, ...prev];
+      });
+    },
+    onUpdate: (updatedEmployee) => {
+      if (isOwnerRole(updatedEmployee?.role)) {
+        setEmpleados((prev) => prev.filter((employee) => employee.id !== updatedEmployee?.id));
+        return;
+      }
+      const normalizedEmployee = {
+        ...updatedEmployee,
+        is_active: updatedEmployee?.is_active !== false,
+        status: updatedEmployee?.is_active !== false ? 'active' : 'inactive'
+      };
+      setEmpleados((prev) => prev.map((employee) => (
+        employee.id === normalizedEmployee.id ? { ...employee, ...normalizedEmployee } : employee
+      )));
+    },
+    onDelete: (deletedEmployee) => {
+      setEmpleados((prev) => prev.filter((employee) => employee.id !== deletedEmployee?.id));
+    }
+  });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -149,12 +189,34 @@ function Empleados({ businessId }) {
         throw new Error('No puedes usar el nombre de usuario del negocio');
       }
 
-      await createEmployeeWithRpc({
+      const createdEmployee = await createEmployeeWithRpc({
         businessId,
         fullName: formData.full_name.trim(),
         username: cleanUsername,
         password: cleanPassword,
         role: fixedRole
+      });
+
+      const optimisticEmployee = {
+        id: createdEmployee?.employeeId,
+        business_id: businessId,
+        user_id: null,
+        full_name: formData.full_name.trim(),
+        username: cleanUsername,
+        role: fixedRole,
+        is_active: true,
+        status: 'active',
+        created_at: new Date().toISOString()
+      };
+      setEmpleados((prev) => {
+        if (!optimisticEmployee.id) return prev;
+        const exists = prev.some((employee) => employee.id === optimisticEmployee.id);
+        if (exists) {
+          return prev.map((employee) => (
+            employee.id === optimisticEmployee.id ? { ...employee, ...optimisticEmployee } : employee
+          ));
+        }
+        return [optimisticEmployee, ...prev];
       });
 
       // Código de éxito
@@ -167,7 +229,7 @@ function Empleados({ businessId }) {
       setFormData({ full_name: '', username: '', password: '', role: 'employee' });
       setShowForm(false);
       setSuccess('✅ Empleado creado exitosamente');
-      loadEmpleados();
+      loadEmpleados().catch(() => {});
       
     } catch (err) {
       
@@ -192,8 +254,8 @@ function Empleados({ businessId }) {
       });
 
       setSuccess('✅ Empleado eliminado exitosamente');
-
-      await loadEmpleados();
+      setEmpleados((prev) => prev.filter((employee) => employee.id !== employeeToDelete.id));
+      loadEmpleados().catch(() => {});
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
     } catch {
