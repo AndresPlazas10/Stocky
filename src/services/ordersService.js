@@ -211,7 +211,9 @@ async function enqueueLocalSingleClose({
   paymentMethod,
   amountReceived = null,
   changeBreakdown = [],
-  itemsForRpc
+  itemsForRpc,
+  sellerName = 'Administrador',
+  userId = null
 }) {
   const mutationId = buildIdempotencyKey({
     action: 'close-order-single',
@@ -229,7 +231,8 @@ async function enqueueLocalSingleClose({
     tableId,
     amountReceived,
     changeBreakdown,
-    userId: null
+    sellerName,
+    userId
   });
 
   await triggerBackgroundOutboxSync();
@@ -246,7 +249,9 @@ async function enqueueLocalSplitClose({
   businessId,
   orderId,
   tableId,
-  subAccountsWithItems = []
+  subAccountsWithItems = [],
+  sellerName = 'Administrador',
+  userId = null
 }) {
   const parentMutationId = buildIdempotencyKey({
     action: 'close-order-split',
@@ -271,7 +276,8 @@ async function enqueueLocalSplitClose({
       tableId: isLast ? tableId : null,
       amountReceived: sub.amountReceived ?? sub.amount_received ?? null,
       changeBreakdown: sub.changeBreakdown ?? sub.change_breakdown ?? [],
-      userId: null
+      sellerName,
+      userId
     });
 
     totalSold += Number(queuedSale.total || 0);
@@ -515,6 +521,33 @@ async function getSellerName(businessId) {
   return { user, sellerName };
 }
 
+async function getSellerIdentityForLocalClose(businessId) {
+  try {
+    const { user, sellerName } = await getSellerName(businessId);
+    return {
+      userId: user?.id || null,
+      sellerName: sellerName || 'Administrador'
+    };
+  } catch {
+    try {
+      const { data: { user } } = await supabaseAdapter.getCurrentUser();
+      if (user?.id) {
+        return {
+          userId: user.id,
+          sellerName: user.email || 'Empleado'
+        };
+      }
+    } catch {
+      // no-op
+    }
+
+    return {
+      userId: null,
+      sellerName: 'Administrador'
+    };
+  }
+}
+
 /**
  * Cierra la orden dividida en varias ventas, descuenta stock y libera la mesa.
  * OPTIMIZADO: Usa RPC create_split_sales_complete en una transacción atómica.
@@ -529,23 +562,24 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     throw new Error('No hay subcuentas con productos válidos para procesar.');
   }
   const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
-
-  if (shouldForceOrderSalesLocalFirst()) {
+  const enqueueSplitCloseWithIdentity = async () => {
+    const { userId, sellerName: localSellerName } = await getSellerIdentityForLocalClose(businessId);
     return enqueueLocalSplitClose({
       businessId,
       orderId,
       tableId,
-      subAccountsWithItems
+      subAccountsWithItems,
+      sellerName: localSellerName,
+      userId
     });
+  };
+
+  if (shouldForceOrderSalesLocalFirst()) {
+    return enqueueSplitCloseWithIdentity();
   }
 
   if (offlineMode && canQueueLocalOrderSales()) {
-    return enqueueLocalSplitClose({
-      businessId,
-      orderId,
-      tableId,
-      subAccountsWithItems
-    });
+    return enqueueSplitCloseWithIdentity();
   }
   if (offlineMode && !canQueueLocalOrderSales()) {
     throw new Error(buildOfflineCloseUnavailableMessage());
@@ -558,12 +592,7 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
   } catch (error) {
     if (isConnectivityError(error)) {
       if (canQueueLocalOrderSales()) {
-        return enqueueLocalSplitClose({
-          businessId,
-          orderId,
-          tableId,
-          subAccountsWithItems
-        });
+        return enqueueSplitCloseWithIdentity();
       }
       throw new Error(buildOfflineCloseUnavailableMessage());
     }
@@ -615,12 +644,7 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
   }
 
   if (atomicError && canQueueLocalOrderSales() && isConnectivityError(atomicError)) {
-    return enqueueLocalSplitClose({
-      businessId,
-      orderId,
-      tableId,
-      subAccountsWithItems
-    });
+    return enqueueSplitCloseWithIdentity();
   }
 
   if (!atomicError && atomicResult?.[0]?.status === 'success') {
@@ -838,8 +862,8 @@ export async function closeOrderSingle(
     (sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)),
     0
   );
-
-  if (shouldForceOrderSalesLocalFirst()) {
+  const enqueueSingleCloseWithIdentity = async () => {
+    const { userId, sellerName: localSellerName } = await getSellerIdentityForLocalClose(businessId);
     return enqueueLocalSingleClose({
       businessId,
       orderId,
@@ -847,20 +871,18 @@ export async function closeOrderSingle(
       paymentMethod,
       amountReceived: normalizedAmountReceived,
       changeBreakdown: normalizedChangeBreakdown ?? [],
-      itemsForRpc
+      itemsForRpc,
+      sellerName: localSellerName,
+      userId
     });
+  };
+
+  if (shouldForceOrderSalesLocalFirst()) {
+    return enqueueSingleCloseWithIdentity();
   }
 
   if (offlineMode && canQueueLocalOrderSales()) {
-    return enqueueLocalSingleClose({
-      businessId,
-      orderId,
-      tableId,
-      paymentMethod,
-      amountReceived: normalizedAmountReceived,
-      changeBreakdown: normalizedChangeBreakdown ?? [],
-      itemsForRpc
-    });
+    return enqueueSingleCloseWithIdentity();
   }
 
   let user = null;
@@ -870,15 +892,7 @@ export async function closeOrderSingle(
   } catch (error) {
     if (isConnectivityError(error)) {
       if (canQueueLocalOrderSales()) {
-        return enqueueLocalSingleClose({
-          businessId,
-          orderId,
-          tableId,
-          paymentMethod,
-          amountReceived: normalizedAmountReceived,
-          changeBreakdown: normalizedChangeBreakdown ?? [],
-          itemsForRpc
-        });
+        return enqueueSingleCloseWithIdentity();
       }
       throw new Error(buildOfflineCloseUnavailableMessage());
     }
@@ -916,15 +930,7 @@ export async function closeOrderSingle(
   let resolvedSaleId = result?.[0]?.sale_id || null;
   if (rpcError || !result?.[0]) {
     if (canQueueLocalOrderSales() && isConnectivityError(rpcError)) {
-      return enqueueLocalSingleClose({
-        businessId,
-        orderId,
-        tableId,
-        paymentMethod,
-        amountReceived: normalizedAmountReceived,
-        changeBreakdown: normalizedChangeBreakdown ?? [],
-        itemsForRpc
-      });
+      return enqueueSingleCloseWithIdentity();
     }
 
     if (!isOrderContextError(rpcError)) {
@@ -953,15 +959,7 @@ export async function closeOrderSingle(
 
     if (fallbackError || !fallbackResult?.[0]) {
       if (canQueueLocalOrderSales() && isConnectivityError(fallbackError)) {
-        return enqueueLocalSingleClose({
-          businessId,
-          orderId,
-          tableId,
-          paymentMethod,
-          amountReceived: normalizedAmountReceived,
-          changeBreakdown: normalizedChangeBreakdown ?? [],
-          itemsForRpc
-        });
+        return enqueueSingleCloseWithIdentity();
       }
 
       throw new Error(getFriendlySaleErrorMessage(
