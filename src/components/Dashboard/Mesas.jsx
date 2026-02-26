@@ -5,6 +5,7 @@ import { fetchComboCatalog } from '../../services/combosService.js';
 import {
   createOrderAndOccupyTable,
   createTable,
+  deleteOrderAndReleaseTable,
   deleteOrderItemById,
   deleteTableCascadeOrders,
   insertOrderItem,
@@ -57,6 +58,7 @@ import { printSaleReceipt } from '../../utils/saleReceiptPrint.js';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
 import { getLocalDbClient } from '../../localdb/client.js';
 import { invalidateOrderCache } from '../../data/adapters/cacheInvalidation.js';
+import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
 
 const getPaymentMethodLabel = (method) => {
   if (method === 'cash') return 'Efectivo';
@@ -71,6 +73,15 @@ const getTotalProductUnits = (items = []) =>
 
 const calculateOrderItemsTotal = (items = []) =>
   items.reduce((sum, item) => sum + Number(item?.subtotal || 0), 0);
+
+const SHOULD_DEFER_REMOTE_MESAS_RELOAD_AFTER_LOCAL_SAVE = Boolean(
+  LOCAL_SYNC_CONFIG.enabled
+  && LOCAL_SYNC_CONFIG.shadowWritesEnabled
+  && (
+    LOCAL_SYNC_CONFIG.localWrites?.orders
+    || LOCAL_SYNC_CONFIG.localWrites?.tables
+  )
+);
 
 const getMesaProductUnits = (mesa, { selectedMesa = null, orderItems = [] } = {}) => {
   const mesaItems = Array.isArray(mesa?.orders?.order_items) ? mesa.orders.order_items : [];
@@ -479,6 +490,7 @@ function Mesas({ businessId }) {
   const [updatingItemId] = useState(null);
   const pendingQuantityUpdatesRef = useRef({});
   const orderItemsDirtyRef = useRef(false);
+  const orderDetailsRequestRef = useRef(0);
   const lastSyncedOrderTotalsRef = useRef({});
   const orderRealtimeRefreshTimersRef = useRef({});
 
@@ -1108,7 +1120,13 @@ function Mesas({ businessId }) {
     }
   }, [businessId, currentUser, loadMesas, setPendingQuantityUpdatesSafe]);
 
-  const loadOrderDetails = useCallback(async (mesa) => {
+  const loadOrderDetails = useCallback(async (mesa, { requestId = null } = {}) => {
+    const normalizedRequestId = Number(requestId);
+    const hasRequestId = Number.isFinite(normalizedRequestId) && normalizedRequestId > 0;
+    const isStaleRequest = () => (
+      hasRequestId && orderDetailsRequestRef.current !== normalizedRequestId
+    );
+
     try {
       if (isOfflineMode()) {
         const mesaOrderItems = Array.isArray(mesa?.orders?.order_items) ? mesa.orders.order_items : [];
@@ -1144,6 +1162,7 @@ function Mesas({ businessId }) {
           ...mesa,
           orders: fallbackOrder
         });
+        if (isStaleRequest()) return;
         setSelectedMesa(sanitizedMesa);
         orderItemsDirtyRef.current = false;
         setOrderItems((prevItems) =>
@@ -1171,6 +1190,7 @@ function Mesas({ businessId }) {
           selectSql: ORDER_ITEMS_SELECT
         });
       }
+      if (isStaleRequest()) return;
 
       const mesaOrderItems = Array.isArray(mesa?.orders?.order_items) ? mesa.orders.order_items : [];
       const resolvedOrder = order || mesa?.orders || null;
@@ -1193,27 +1213,38 @@ function Mesas({ businessId }) {
       setModalOpenIntent(true);
       setShowOrderDetails(true);
     } catch {
+      if (isStaleRequest()) return;
       setError('❌ No se pudieron cargar los detalles de la orden. Por favor, intenta de nuevo.');
     }
   }, [setPendingQuantityUpdatesSafe]);
 
   const handleOpenTable = useCallback(async (mesa) => {
+    const requestId = orderDetailsRequestRef.current + 1;
+    orderDetailsRequestRef.current = requestId;
+
     // Evitar arrastrar items de otra mesa mientras carga la orden actual.
     orderItemsDirtyRef.current = false;
-    setOrderItems([]);
     setPendingQuantityUpdatesSafe({});
 
+    const normalizedMesa = normalizeTableRecord(mesa);
+    const preloadedOrderItems = Array.isArray(normalizedMesa?.orders?.order_items)
+      ? normalizedMesa.orders.order_items
+      : [];
+
     // Actualizar estado local inmediatamente para UI responsive
-    setSelectedMesa(mesa);
+    setSelectedMesa(normalizedMesa);
     setModalOpenIntent(true);
     setShowOrderDetails(true);
-    
-    const normalizedMesa = normalizeTableRecord(mesa);
+
     if (normalizedMesa.status === 'occupied' && normalizedMesa.current_order_id) {
-      // Cargar la orden actual
-      await loadOrderDetails(normalizedMesa);
+      // Pintado inmediato con datos ya presentes en la card y refresh remoto en background.
+      setOrderItems(
+        applyPendingQuantities(preloadedOrderItems, pendingQuantityUpdatesRef.current)
+      );
+      loadOrderDetails(normalizedMesa, { requestId }).catch(() => {});
     } else {
       // Crear nueva orden
+      setOrderItems([]);
       await createNewOrder(normalizedMesa);
     }
   }, [loadOrderDetails, createNewOrder, setPendingQuantityUpdatesSafe]);
@@ -1271,6 +1302,58 @@ function Mesas({ businessId }) {
       )
     );
   }, [pendingQuantityUpdates, setPendingQuantityUpdatesSafe, businessId]);
+
+  const releaseEmptyOrderAndCloseModal = useCallback((mesaSnapshot) => {
+    const normalizedTableId = normalizeEntityId(mesaSnapshot?.id);
+    const normalizedOrderId = normalizeEntityId(mesaSnapshot?.current_order_id);
+
+    if (normalizedTableId) {
+      setMesas((prevMesas) => prevMesas.map((mesa) => (
+        normalizeEntityId(mesa?.id) === normalizedTableId
+          ? normalizeTableRecord({
+            ...mesa,
+            status: 'available',
+            current_order_id: null,
+            orders: null
+          })
+          : mesa
+      )));
+    }
+
+    clearClosedMesaCache({
+      tableId: normalizedTableId || null,
+      orderId: normalizedOrderId || null
+    }).catch(() => {});
+
+    closeModalImmediate(() => {
+      orderItemsDirtyRef.current = false;
+      setShowOrderDetails(false);
+      setModalOpenIntent(false);
+      setSelectedMesa(null);
+      setOrderItems([]);
+      setPendingQuantityUpdatesSafe({});
+      setSearchProduct('');
+    }, async () => {
+      if (!normalizedOrderId || !normalizedTableId) return;
+      try {
+        const releaseResult = await deleteOrderAndReleaseTable({
+          orderId: normalizedOrderId,
+          tableId: normalizedTableId,
+          businessId
+        });
+        if (
+          !releaseResult?.__localOnly
+          && !SHOULD_DEFER_REMOTE_MESAS_RELOAD_AFTER_LOCAL_SAVE
+        ) {
+          await loadMesas();
+        }
+      } catch {
+        if (!SHOULD_DEFER_REMOTE_MESAS_RELOAD_AFTER_LOCAL_SAVE) {
+          try { await loadMesas(); } catch { /* no-op */ }
+        }
+      }
+    });
+  }, [businessId, clearClosedMesaCache, loadMesas, setPendingQuantityUpdatesSafe]);
 
   const removeItem = useCallback(async (itemId) => {
     markOrderItemOpStarted();
@@ -1335,18 +1418,9 @@ function Mesas({ businessId }) {
       const hasSavedItems = effectiveOrderItemsSnapshot.length > 0;
       const localOrderTotal = calculateOrderItemsTotal(effectiveOrderItemsSnapshot);
 
-      // Si no hay productos, no persistir ni modificar estado de mesa:
-      // solo cerrar modal para evitar inconsistencias.
+      // Si no hay productos, la mesa debe quedar disponible.
       if (!hasSavedItems) {
-        closeModalImmediate(() => {
-          orderItemsDirtyRef.current = false;
-          setShowOrderDetails(false);
-          setModalOpenIntent(false);
-          setSelectedMesa(null);
-          setOrderItems([]);
-          setPendingQuantityUpdatesSafe({});
-          setSearchProduct('');
-        });
+        releaseEmptyOrderAndCloseModal(mesaSnapshot);
         return;
       }
       
@@ -1394,12 +1468,17 @@ function Mesas({ businessId }) {
           await persistPendingQuantityUpdates(mesaSnapshot.current_order_id, { refreshItems: false });
           await updateOrderTotal(mesaSnapshot.current_order_id, effectiveOrderItemsSnapshot);
 
-          if (typeof navigator === 'undefined' || navigator.onLine) {
+          if (
+            (typeof navigator === 'undefined' || navigator.onLine)
+            && !SHOULD_DEFER_REMOTE_MESAS_RELOAD_AFTER_LOCAL_SAVE
+          ) {
             loadMesas().catch(() => {});
           }
         } catch {
           // Mantener recuperación silenciosa para evitar alertas intrusivas.
-          try { await loadMesas(); } catch { /* no-op */ }
+          if (!SHOULD_DEFER_REMOTE_MESAS_RELOAD_AFTER_LOCAL_SAVE) {
+            try { await loadMesas(); } catch { /* no-op */ }
+          }
         }
       })();
     } catch {
@@ -1412,7 +1491,8 @@ function Mesas({ businessId }) {
     updateOrderTotal,
     persistPendingQuantityUpdates,
     setPendingQuantityUpdatesSafe,
-    loadMesas
+    loadMesas,
+    releaseEmptyOrderAndCloseModal
   ]);
 
   const addCatalogItemToOrder = useCallback(async (catalogItem) => {
@@ -1664,16 +1744,9 @@ function Mesas({ businessId }) {
       : (itemsSnapshot.length > 0 ? itemsSnapshot : mesaItemsSnapshot);
     const pendingEntriesSnapshot = Object.entries(pendingQuantityUpdatesRef.current || {});
 
-    // Si no hay productos, no guardar ni sincronizar nada.
+    // Si no hay productos, la mesa debe quedar disponible.
     if (effectiveItemsSnapshot.length === 0) {
-      closeModalImmediate(() => {
-        orderItemsDirtyRef.current = false;
-        setShowOrderDetails(false);
-        setModalOpenIntent(false);
-        setSelectedMesa(null);
-        setOrderItems([]);
-        setPendingQuantityUpdatesSafe({});
-      });
+      releaseEmptyOrderAndCloseModal(mesaSnapshot);
       return;
     }
 
