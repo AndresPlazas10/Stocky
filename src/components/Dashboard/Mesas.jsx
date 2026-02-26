@@ -68,11 +68,39 @@ const getPaymentMethodLabel = (method) => {
   return method || '-';
 };
 
+const toFiniteNumber = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const normalizeOrderItemNumericFields = (item) => {
+  if (!item || typeof item !== 'object') return item;
+
+  const quantity = toFiniteNumber(item.quantity, 0);
+  const price = toFiniteNumber(item.price, 0);
+  const subtotalFromRow = Number(item.subtotal);
+  const subtotal = Number.isFinite(subtotalFromRow) ? subtotalFromRow : (quantity * price);
+
+  return {
+    ...item,
+    quantity,
+    price,
+    subtotal
+  };
+};
+
 const getTotalProductUnits = (items = []) =>
-  items.reduce((sum, item) => sum + Number(item?.quantity || 0), 0);
+  items.reduce((sum, item) => sum + toFiniteNumber(item?.quantity, 0), 0);
 
 const calculateOrderItemsTotal = (items = []) =>
-  items.reduce((sum, item) => sum + Number(item?.subtotal || 0), 0);
+  items.reduce((sum, item) => {
+    const subtotal = Number(item?.subtotal);
+    if (Number.isFinite(subtotal)) return sum + subtotal;
+
+    const quantity = toFiniteNumber(item?.quantity, 0);
+    const price = toFiniteNumber(item?.price, 0);
+    return sum + (quantity * price);
+  }, 0);
 
 const SHOULD_DEFER_REMOTE_MESAS_RELOAD_AFTER_LOCAL_SAVE = Boolean(
   LOCAL_SYNC_CONFIG.enabled
@@ -218,18 +246,21 @@ const _motionLintUsage = motion;
 
 const applyPendingQuantities = (items = [], pendingUpdates = {}) => {
   if (!Array.isArray(items) || items.length === 0) return [];
-  if (!pendingUpdates || Object.keys(pendingUpdates).length === 0) return items;
+  if (!pendingUpdates || Object.keys(pendingUpdates).length === 0) {
+    return items.map((item) => normalizeOrderItemNumericFields(item));
+  }
 
   return items.map((item) => {
-    const pendingQuantity = pendingUpdates[item?.id];
-    if (pendingQuantity === undefined || pendingQuantity === null) return item;
+    const normalizedItem = normalizeOrderItemNumericFields(item);
+    const pendingQuantity = pendingUpdates[normalizedItem?.id];
+    if (pendingQuantity === undefined || pendingQuantity === null) return normalizedItem;
 
     const normalizedQuantity = Number(pendingQuantity);
-    if (!Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0) return item;
+    if (!Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0) return normalizedItem;
 
-    const normalizedPrice = Number(item?.price || 0);
+    const normalizedPrice = toFiniteNumber(normalizedItem?.price, 0);
     return {
-      ...item,
+      ...normalizedItem,
       quantity: normalizedQuantity,
       subtotal: normalizedQuantity * normalizedPrice
     };
@@ -1573,7 +1604,7 @@ function Mesas({ businessId }) {
 
       if (existingItem) {
         // Incrementar cantidad con la cantidad especificada
-        const newQuantity = existingItem.quantity + qty;
+        const newQuantity = toFiniteNumber(existingItem.quantity, 0) + qty;
         const nextQuantity = Number(newQuantity || 0);
         nextOrderItems = orderItems.map((item) => (
           item.id === existingItem.id
@@ -1590,7 +1621,7 @@ function Mesas({ businessId }) {
         markOrderItemOpStarted();
         updateOrderItemQuantityById({
           itemId: existingItem.id,
-          quantity: newQuantity,
+          quantity: nextQuantity,
           businessId,
           orderId: selectedMesa.current_order_id
         }).catch(async () => {
@@ -1723,7 +1754,8 @@ function Mesas({ businessId }) {
 
   const updateItemQuantity = useCallback(async (itemId, newQuantity) => {
     try {
-      if (newQuantity <= 0) {
+      const normalizedQuantity = toFiniteNumber(newQuantity, NaN);
+      if (!Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0) {
         await removeItem(itemId);
         return;
       }
@@ -1732,15 +1764,16 @@ function Mesas({ businessId }) {
       setOrderItems(prevItems =>
         prevItems.map(item => {
           if (item.id === itemId) {
-            const newSubtotal = newQuantity * item.price;
-            return { ...item, quantity: newQuantity, subtotal: newSubtotal };
+            const normalizedPrice = toFiniteNumber(item.price, 0);
+            const newSubtotal = normalizedQuantity * normalizedPrice;
+            return { ...item, quantity: normalizedQuantity, subtotal: newSubtotal };
           }
           return item;
         })
       );
       orderItemsDirtyRef.current = true;
 
-      setPendingQuantityUpdatesSafe(prev => ({ ...prev, [itemId]: newQuantity }));
+      setPendingQuantityUpdatesSafe(prev => ({ ...prev, [itemId]: normalizedQuantity }));
     } catch {
       setError('❌ No se pudo actualizar la cantidad. Por favor, intenta de nuevo.');
       const freshItems = await getOrderItemsByOrderId({
@@ -2909,7 +2942,7 @@ function Mesas({ businessId }) {
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        onClick={() => updateItemQuantity(item.id, item.quantity - 1)}
+                                        onClick={() => updateItemQuantity(item.id, toFiniteNumber(item.quantity, 0) - 1)}
                                         disabled={updatingItemId !== null}
                                         className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                       >
@@ -2921,7 +2954,7 @@ function Mesas({ businessId }) {
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
+                                        onClick={() => updateItemQuantity(item.id, toFiniteNumber(item.quantity, 0) + 1)}
                                         disabled={updatingItemId !== null}
                                         className="h-8 w-8 p-0 border-green-300 text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                       >
