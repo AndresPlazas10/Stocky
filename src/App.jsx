@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Suspense, lazy, useEffect, useState } from 'react';
@@ -27,6 +27,11 @@ const PageLoader = () => (
 
 function App() {
   const [showBraveWarning, setShowBraveWarning] = useState(false);
+  const location = useLocation();
+  const showOnlineSyncBlockingAlert = (
+    location.pathname === '/dashboard'
+    || location.pathname === '/employee-dashboard'
+  );
 
   useEffect(() => {
     // Detectar Brave y mostrar advertencia si es necesario
@@ -90,7 +95,7 @@ function App() {
 
   return (
     <>
-      <OnlineSyncBlockingAlert />
+      {showOnlineSyncBlockingAlert && <OnlineSyncBlockingAlert />}
       {/* Advertencia para Brave */}
       {showBraveWarning && (
         <div className="fixed top-0 left-0 right-0 z-[200] bg-orange-500 text-white p-3 sm:p-4 shadow-lg">
