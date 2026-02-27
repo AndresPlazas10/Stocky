@@ -264,11 +264,13 @@ export const sendInvoiceEmailResend = async ({
 
 /**
  * Verifica si Resend está configurado
- * DESHABILITADO: Resend requiere dominio verificado en plan gratuito
- * Usar EmailJS que no tiene esta restricción
  */
-export const isResendConfigured = () => {
-  // Retorna false para usar EmailJS directamente
-  // Resend requiere verificar dominio para enviar a cualquier email
-  return false;
+export const isResendConfigured = (env = import.meta.env || {}) => {
+  const providerHint = String(env.VITE_EMAIL_PROVIDER || 'auto').trim().toLowerCase();
+  if (providerHint === 'emailjs') return false;
+
+  const hasApiKey = !!String(env.VITE_RESEND_API_KEY || '').trim();
+  const hasFromEmail = !!String(env.VITE_RESEND_FROM_EMAIL || env.VITE_FROM_EMAIL || '').trim();
+
+  return hasApiKey && hasFromEmail;
 };

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
  * Hook para gestionar mensajes de toast/notificaciones
  * @returns {object} { message, showSuccess, showError, showWarning, showInfo, clear }
  */
-export function useToast(duration = 4000) {
+export function useToast(duration = 1000) {
   const [message, setMessage] = useState({ type: null, text: '' });
 
   useEffect(() => {

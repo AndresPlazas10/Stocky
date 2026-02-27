@@ -510,7 +510,7 @@ function Mesas({ businessId }) {
   const [clientes, setClientes] = useState([]);
   const [isClosingOrder, setIsClosingOrder] = useState(false);
   const [isCreatingTable, setIsCreatingTable] = useState(false);
-  const [, setPendingOrderItemOps] = useState(0);
+  const [pendingOrderItemOps, setPendingOrderItemOps] = useState(0);
 
   // Form data para crear mesa
   const [newTableNumber, setNewTableNumber] = useState('');
@@ -519,8 +519,6 @@ function Mesas({ businessId }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [mesaToDelete, setMesaToDelete] = useState(null);
   
-  // Estado para prevenir clics múltiples (almacena el ID del item siendo actualizado)
-  const [updatingItemId] = useState(null);
   const pendingQuantityUpdatesRef = useRef({});
   const orderItemsDirtyRef = useRef(false);
   const orderItemsRef = useRef([]);
@@ -532,28 +530,64 @@ function Mesas({ businessId }) {
   const pendingRemoteOrderTotalsRef = useRef({});
   const orderTotalSyncQueueRef = useRef({});
   const orderRealtimeRefreshTimersRef = useRef({});
+  const optimisticTempItemQuantitiesRef = useRef({});
+  const pendingOrderItemOpsRef = useRef(0);
+  const orderItemWriteQueueRef = useRef({});
 
   // Ref para prevenir que el modal se reabra después de completar una venta
   const justCompletedSaleRef = useRef(false);
   
   // Estado para bloquear completamente el renderizado del modal mientras se procesa la venta
   const [canShowOrderModal, setCanShowOrderModal] = useState(true);
+  const isOrderItemsSyncing = pendingOrderItemOps > 0;
 
   const setPendingQuantityUpdatesSafe = useCallback((updater) => {
-    setPendingQuantityUpdates((prev) => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      const normalizedNext = next && typeof next === 'object' ? next : {};
-      pendingQuantityUpdatesRef.current = normalizedNext;
-      return normalizedNext;
-    });
+    const prev = pendingQuantityUpdatesRef.current || {};
+    const next = typeof updater === 'function' ? updater(prev) : updater;
+    const normalizedNext = next && typeof next === 'object' ? next : {};
+    pendingQuantityUpdatesRef.current = normalizedNext;
+    setPendingQuantityUpdates(normalizedNext);
   }, []);
 
   const markOrderItemOpStarted = useCallback(() => {
+    pendingOrderItemOpsRef.current += 1;
     setPendingOrderItemOps((prev) => prev + 1);
   }, []);
 
   const markOrderItemOpFinished = useCallback(() => {
+    pendingOrderItemOpsRef.current = Math.max(pendingOrderItemOpsRef.current - 1, 0);
     setPendingOrderItemOps((prev) => Math.max(prev - 1, 0));
+  }, []);
+
+  const waitForPendingOrderItemOps = useCallback(async ({ timeoutMs = 2000, pollMs = 40 } = {}) => {
+    const startedAt = Date.now();
+    while (
+      pendingOrderItemOpsRef.current > 0
+      && (Date.now() - startedAt) < timeoutMs
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+    }
+    return pendingOrderItemOpsRef.current <= 0;
+  }, []);
+
+  const enqueueOrderItemWrite = useCallback((itemId, task) => {
+    const normalizedItemId = String(itemId || '').trim();
+    if (!normalizedItemId || typeof task !== 'function') return Promise.resolve(null);
+
+    const queueByItem = orderItemWriteQueueRef.current || {};
+    const previous = queueByItem[normalizedItemId] || Promise.resolve();
+    const next = previous
+      .catch(() => {})
+      .then(() => task());
+
+    queueByItem[normalizedItemId] = next;
+    orderItemWriteQueueRef.current = queueByItem;
+
+    return next.finally(() => {
+      if (orderItemWriteQueueRef.current?.[normalizedItemId] === next) {
+        delete orderItemWriteQueueRef.current[normalizedItemId];
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -1553,15 +1587,47 @@ function Mesas({ businessId }) {
     const isStaleRequest = () => (
       hasRequestId && orderDetailsRequestRef.current !== normalizedRequestId
     );
+    const openWithMesaSnapshot = (mesaSnapshot) => {
+      const mesaOrderItems = Array.isArray(mesaSnapshot?.orders?.order_items)
+        ? mesaSnapshot.orders.order_items
+        : [];
+      const fallbackOrder = mesaSnapshot?.orders || {
+        id: mesaSnapshot?.current_order_id || null,
+        order_items: mesaOrderItems
+      };
+      const sanitizedMesa = sanitizeMesaOrderAssociation({
+        ...mesaSnapshot,
+        orders: fallbackOrder
+      });
+
+      setSelectedMesa(sanitizedMesa);
+      orderItemsDirtyRef.current = false;
+      setOrderItems((prevItems) =>
+        mergeOrderItemsPreservingPosition(
+          prevItems,
+          applyPendingQuantities(mesaOrderItems, pendingQuantityUpdatesRef.current)
+        )
+      );
+      setPendingQuantityUpdatesSafe({});
+      setModalOpenIntent(true);
+      setShowOrderDetails(true);
+    };
 
     try {
+      const normalizedOrderId = normalizeEntityId(mesa?.current_order_id);
+      if (!normalizedOrderId) {
+        if (isStaleRequest()) return;
+        openWithMesaSnapshot(mesa);
+        return;
+      }
+
       if (isOfflineMode()) {
         const mesaOrderItems = Array.isArray(mesa?.orders?.order_items) ? mesa.orders.order_items : [];
         let cachedOrder = null;
-        if (mesaOrderItems.length === 0 && mesa?.current_order_id) {
+        if (mesaOrderItems.length === 0 && normalizedOrderId) {
           try {
             cachedOrder = await getOrderWithItemsById({
-              orderId: mesa.current_order_id,
+              orderId: normalizedOrderId,
               selectSql: ORDER_ITEMS_SELECT
             });
           } catch {
@@ -1608,12 +1674,12 @@ function Mesas({ businessId }) {
       let order = null;
       try {
         order = await getOrderForRealtimeById({
-          orderId: mesa.current_order_id,
+          orderId: normalizedOrderId,
           selectSql: ORDER_ITEMS_SELECT
         });
       } catch {
         order = await getOrderWithItemsById({
-          orderId: mesa.current_order_id,
+          orderId: normalizedOrderId,
           selectSql: ORDER_ITEMS_SELECT
         });
       }
@@ -1639,9 +1705,22 @@ function Mesas({ businessId }) {
       setPendingQuantityUpdatesSafe({});
       setModalOpenIntent(true);
       setShowOrderDetails(true);
-    } catch {
+    } catch (error) {
       if (isStaleRequest()) return;
-      setError('❌ No se pudieron cargar los detalles de la orden. Por favor, intenta de nuevo.');
+      const hasMesaSnapshotContext = Boolean(
+        normalizeEntityId(mesa?.current_order_id)
+        || (Array.isArray(mesa?.orders?.order_items) && mesa.orders.order_items.length >= 0)
+      );
+
+      if (hasMesaSnapshotContext) {
+        openWithMesaSnapshot(mesa);
+        return;
+      }
+
+      setError(buildDiagnosticAlertMessage(
+        error,
+        'No se pudieron cargar los detalles de la orden. Por favor, intenta de nuevo.'
+      ));
     }
   }, [setPendingQuantityUpdatesSafe]);
 
@@ -1902,6 +1981,11 @@ function Mesas({ businessId }) {
   }, [businessId, clearClosedMesaCache, loadMesas, setPendingQuantityUpdatesSafe]);
 
   const removeItem = useCallback(async (itemId) => {
+    if (pendingOrderItemOpsRef.current > 0) {
+      setError('⚠️ Espera un momento. Estamos sincronizando los cambios de la orden.');
+      return;
+    }
+
     markOrderItemOpStarted();
     try {
       await deleteOrderItemById(itemId, {
@@ -1920,6 +2004,7 @@ function Mesas({ businessId }) {
         delete next[itemId];
         return next;
       });
+      delete optimisticTempItemQuantitiesRef.current[itemId];
 
       updateOrderTotal(selectedMesa.current_order_id, nextOrderItems).catch(() => {});
     } catch {
@@ -1950,6 +2035,12 @@ function Mesas({ businessId }) {
     if (!selectedMesa) return;
     
     try {
+      const hasSettledPendingOps = await waitForPendingOrderItemOps();
+      if (!hasSettledPendingOps) {
+        setError('⚠️ Espera un momento. Aún estamos aplicando el último cambio en la orden.');
+        return;
+      }
+
       const mesaSnapshot = { ...selectedMesa };
       const orderItemsSnapshot = Array.isArray(orderItemsRef.current) ? [...orderItemsRef.current] : [];
       const mesaItemsSnapshot = Array.isArray(mesaSnapshot?.orders?.order_items)
@@ -1990,9 +2081,26 @@ function Mesas({ businessId }) {
 
       const hasSavedItems = effectiveOrderItemsSnapshot.length > 0;
       const localOrderTotal = calculateOrderItemsTotal(effectiveOrderItemsSnapshot);
+      const normalizedSnapshotOrderId = normalizeEntityId(mesaSnapshot?.current_order_id);
+      const snapshotOrderTotal = toFiniteNumber(mesaSnapshot?.orders?.total, 0);
+      const pendingSnapshotTotal = normalizedSnapshotOrderId
+        ? toFiniteNumber(pendingRemoteOrderTotalsRef.current?.[normalizedSnapshotOrderId], 0)
+        : 0;
+      const hasOrderTotalSignal = snapshotOrderTotal > 0.0001 || pendingSnapshotTotal > 0.0001;
 
       // Si no hay productos, la mesa debe quedar disponible.
       if (!hasSavedItems) {
+        if (hasOrderTotalSignal) {
+          setError('⚠️ Detectamos una orden en sincronización. No se liberó la mesa automáticamente.');
+          orderItemsDirtyRef.current = false;
+          setShowOrderDetails(false);
+          setModalOpenIntent(false);
+          setSelectedMesa(null);
+          orderItemsRef.current = [];
+          setOrderItems([]);
+          setSearchProduct('');
+          return;
+        }
         releaseEmptyOrderAndCloseModal(mesaSnapshot);
         return;
       }
@@ -2024,7 +2132,6 @@ function Mesas({ businessId }) {
       setSelectedMesa(null);
       orderItemsRef.current = [];
       setOrderItems([]);
-      setPendingQuantityUpdatesSafe({});
       setSearchProduct('');
       
       setSuccessTitle('✨ Mesa Actualizada');
@@ -2062,9 +2169,9 @@ function Mesas({ businessId }) {
     selectedMesa,
     updateOrderTotal,
     persistPendingQuantityUpdates,
-    setPendingQuantityUpdatesSafe,
     loadMesas,
-    releaseEmptyOrderAndCloseModal
+    releaseEmptyOrderAndCloseModal,
+    waitForPendingOrderItemOps
   ]);
 
   const addCatalogItemToOrder = useCallback(async (catalogItem) => {
@@ -2134,14 +2241,22 @@ function Mesas({ businessId }) {
         orderItemsRef.current = nextOrderItems;
         setOrderItems(nextOrderItems);
         orderItemsChanged = true;
-        if (!isOptimisticExistingItem) {
+        if (isOptimisticExistingItem) {
+          optimisticTempItemQuantitiesRef.current[existingItem.id] = nextQuantity;
+          setPendingQuantityUpdatesSafe((prev) => ({
+            ...(prev || {}),
+            [existingItem.id]: nextQuantity
+          }));
+        } else {
           markOrderItemOpStarted();
-          updateOrderItemQuantityById({
-            itemId: existingItem.id,
-            quantity: nextQuantity,
-            businessId,
-            orderId: selectedMesa.current_order_id
-          }).catch(async () => {
+          enqueueOrderItemWrite(existingItem.id, () => (
+            updateOrderItemQuantityById({
+              itemId: existingItem.id,
+              quantity: nextQuantity,
+              businessId,
+              orderId: selectedMesa.current_order_id
+            })
+          )).catch(async () => {
             setError('❌ No se pudo agregar el item. Por favor, intenta de nuevo.');
             try {
               const freshItems = await getOrderItemsByOrderId({
@@ -2190,6 +2305,7 @@ function Mesas({ businessId }) {
             nombre: itemName
           } : null
         };
+        optimisticTempItemQuantitiesRef.current[tempId] = optimisticQuantity;
         nextOrderItems = [optimisticItem, ...currentOrderItems];
         orderItemsDirtyRef.current = true;
         orderItemsRef.current = nextOrderItems;
@@ -2209,11 +2325,22 @@ function Mesas({ businessId }) {
           selectSql: 'id',
           businessId
         }).then((newItem) => {
-          if (!newItem?.id) return;
+          if (!newItem?.id) {
+            delete optimisticTempItemQuantitiesRef.current[tempId];
+            return;
+          }
 
           const latestTempItem = (Array.isArray(orderItemsRef.current) ? orderItemsRef.current : [])
             .find((item) => item.id === tempId);
-          const resolvedQuantity = toFiniteNumber(latestTempItem?.quantity, optimisticQuantity);
+          const trackedTempQuantity = toFiniteNumber(
+            optimisticTempItemQuantitiesRef.current?.[tempId],
+            NaN
+          );
+          const resolvedQuantity = (
+            Number.isFinite(trackedTempQuantity) && trackedTempQuantity > 0
+          )
+            ? trackedTempQuantity
+            : toFiniteNumber(latestTempItem?.quantity, optimisticQuantity);
           const resolvedPrice = toFiniteNumber(latestTempItem?.price, optimisticPrice);
           const pendingTempQuantity = toFiniteNumber(
             pendingQuantityUpdatesRef.current?.[tempId],
@@ -2245,16 +2372,19 @@ function Mesas({ businessId }) {
             }
             return next;
           });
+          delete optimisticTempItemQuantitiesRef.current[tempId];
 
           if (!shouldPersistResolvedQuantity) return;
 
           markOrderItemOpStarted();
-          updateOrderItemQuantityById({
-            itemId: newItem.id,
-            quantity: quantityToPersist,
-            businessId,
-            orderId: selectedMesa.current_order_id
-          }).then(() => {
+          enqueueOrderItemWrite(newItem.id, () => (
+            updateOrderItemQuantityById({
+              itemId: newItem.id,
+              quantity: quantityToPersist,
+              businessId,
+              orderId: selectedMesa.current_order_id
+            })
+          )).then(() => {
             setPendingQuantityUpdatesSafe((prev) => {
               const next = { ...(prev || {}) };
               delete next[newItem.id];
@@ -2283,6 +2413,7 @@ function Mesas({ businessId }) {
           });
         }).catch(async () => {
           setError('❌ No se pudo agregar el item. Por favor, intenta de nuevo.');
+          delete optimisticTempItemQuantitiesRef.current[tempId];
           setOrderItems((prevItems) => prevItems.filter((item) => item.id !== tempId));
           setPendingQuantityUpdatesSafe((prev) => {
             const next = { ...(prev || {}) };
@@ -2336,12 +2467,20 @@ function Mesas({ businessId }) {
         // no-op
       }
     }
-  }, [selectedMesa, quantityToAdd, updateOrderTotal, setPendingQuantityUpdatesSafe, businessId, markOrderItemOpStarted, markOrderItemOpFinished]);
+  }, [selectedMesa, quantityToAdd, updateOrderTotal, setPendingQuantityUpdatesSafe, businessId, markOrderItemOpStarted, markOrderItemOpFinished, enqueueOrderItemWrite]);
 
   const updateItemQuantity = useCallback(async (itemId, newQuantity) => {
     try {
+      if (pendingOrderItemOpsRef.current > 0) {
+        setError('⚠️ Espera un momento. Estamos sincronizando los cambios de la orden.');
+        return;
+      }
+
       const normalizedQuantity = toFiniteNumber(newQuantity, NaN);
       if (!Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0) {
+        if (String(itemId || '').startsWith('tmp-')) {
+          delete optimisticTempItemQuantitiesRef.current[itemId];
+        }
         await removeItem(itemId);
         return;
       }
@@ -2361,6 +2500,9 @@ function Mesas({ businessId }) {
       orderItemsDirtyRef.current = true;
 
       setPendingQuantityUpdatesSafe(prev => ({ ...prev, [itemId]: normalizedQuantity }));
+      if (String(itemId || '').startsWith('tmp-')) {
+        optimisticTempItemQuantitiesRef.current[itemId] = normalizedQuantity;
+      }
     } catch {
       setError('❌ No se pudo actualizar la cantidad. Por favor, intenta de nuevo.');
       const freshItems = await getOrderItemsByOrderId({
@@ -2391,9 +2533,28 @@ function Mesas({ businessId }) {
       ? itemsSnapshot
       : (itemsSnapshot.length > 0 ? itemsSnapshot : mesaItemsSnapshot);
     const pendingEntriesSnapshot = Object.entries(pendingQuantityUpdatesRef.current || {});
+    const normalizedSnapshotOrderId = normalizeEntityId(mesaSnapshot?.current_order_id);
+    const snapshotOrderTotal = toFiniteNumber(mesaSnapshot?.orders?.total, 0);
+    const pendingSnapshotTotal = normalizedSnapshotOrderId
+      ? toFiniteNumber(pendingRemoteOrderTotalsRef.current?.[normalizedSnapshotOrderId], 0)
+      : 0;
+    const hasOrderTotalSignal = snapshotOrderTotal > 0.0001 || pendingSnapshotTotal > 0.0001;
 
     // Si no hay productos, la mesa debe quedar disponible.
     if (effectiveItemsSnapshot.length === 0) {
+      if (hasOrderTotalSignal) {
+        setError('⚠️ Detectamos una orden en sincronización. No se liberó la mesa automáticamente.');
+        closeModalImmediate(() => {
+          orderItemsDirtyRef.current = false;
+          setShowOrderDetails(false);
+          setModalOpenIntent(false);
+          setSelectedMesa(null);
+          orderItemsRef.current = [];
+          setOrderItems([]);
+          setPendingQuantityUpdatesSafe({});
+        });
+        return;
+      }
       releaseEmptyOrderAndCloseModal(mesaSnapshot);
       return;
     }
@@ -3217,8 +3378,8 @@ function Mesas({ businessId }) {
               duration={6000}
             />
             
-            {/* Alerta de actualización - amarillo */}
-            <SaleUpdateAlert 
+            {/* Alerta de actualización de mesa con icono de check */}
+            <SaleSuccessAlert 
               isVisible={success && alertType === 'update'}
               onClose={() => setSuccess(false)}
               title={successTitle}
@@ -3461,8 +3622,10 @@ function Mesas({ businessId }) {
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
                               transition={{ delay: index * 0.02 }}
-                              onClick={() => addCatalogItemToOrder(catalogItem)}
-                              className="p-4 cursor-pointer border-b border-accent-100 last:border-0 hover:bg-accent-50 transition-colors flex justify-between items-center"
+                              onClick={() => {
+                                addCatalogItemToOrder(catalogItem);
+                              }}
+                              className="p-4 border-b border-accent-100 last:border-0 transition-colors flex cursor-pointer justify-between items-center hover:bg-accent-50"
                             >
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className="font-semibold text-primary-900 truncate">
@@ -3534,7 +3697,7 @@ function Mesas({ businessId }) {
                                         size="sm"
                                         variant="outline"
                                         onClick={() => updateItemQuantity(item.id, toFiniteNumber(item.quantity, 0) - 1)}
-                                        disabled={updatingItemId !== null}
+                                        disabled={isOrderItemsSyncing}
                                         className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                       >
                                         -
@@ -3546,7 +3709,7 @@ function Mesas({ businessId }) {
                                         size="sm"
                                         variant="outline"
                                         onClick={() => updateItemQuantity(item.id, toFiniteNumber(item.quantity, 0) + 1)}
-                                        disabled={updatingItemId !== null}
+                                        disabled={isOrderItemsSyncing}
                                         className="h-8 w-8 p-0 border-green-300 text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                       >
                                         +
@@ -3577,10 +3740,11 @@ function Mesas({ businessId }) {
                       <Button
                         onClick={handleRefreshOrder}
                         variant="outline"
+                        disabled={isOrderItemsSyncing}
                         className="border-2 border-accent-300 text-accent-700 hover:bg-accent-50 h-12 px-6 w-full sm:w-auto"
                       >
                         <Save className="w-5 h-5 mr-2" />
-                        Guardar
+                        {isOrderItemsSyncing ? 'Sincronizando...' : 'Guardar'}
                       </Button>
                       <Button
                         onClick={handlePrintOrder}

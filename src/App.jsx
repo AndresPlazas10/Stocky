@@ -5,6 +5,7 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import { Loader2, AlertCircle, X } from 'lucide-react';
 import LOCAL_SYNC_CONFIG from './config/localSync.js';
 import PricingAnnouncementModal from './components/PricingAnnouncementModal';
+import OnlineSyncBlockingAlert from './components/OnlineSyncBlockingAlert.jsx';
 import { registerLocalSyncDevtools } from './sync/devtools.js';
 import { bootstrapLocalSync, runOutboxTick, stopLocalSync } from './sync/syncBootstrap.js';
 import { isBraveBrowser } from './utils/braveDetection';
@@ -89,6 +90,7 @@ function App() {
 
   return (
     <>
+      <OnlineSyncBlockingAlert />
       {/* Advertencia para Brave */}
       {showBraveWarning && (
         <div className="fixed top-0 left-0 right-0 z-[200] bg-orange-500 text-white p-3 sm:p-4 shadow-lg">
