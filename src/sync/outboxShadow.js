@@ -19,7 +19,10 @@ function isLocalWriteMutation({ payload, mutationId, queuedEvent }) {
 
 function persistOfflineSyncMarkerIfNeeded({ localWrite, online }) {
   if (typeof window === 'undefined' || !window.sessionStorage) return;
-  if (!localWrite && online) return;
+  // El marcador solo representa trabajo generado estando offline.
+  // Evita falsos positivos en sesiones online normales.
+  if (online) return;
+  if (!localWrite) return;
 
   try {
     const existing = Number(window.sessionStorage.getItem(OFFLINE_SYNC_MARKER_KEY));
