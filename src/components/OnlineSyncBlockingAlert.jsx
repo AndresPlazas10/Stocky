@@ -9,7 +9,6 @@ import {
 import LOCAL_SYNC_CONFIG from '../config/localSync.js';
 import { useOnlineStatus } from '../hooks/useOnlineStatus.js';
 import { listOutboxEvents, runOutboxTick } from '../sync/syncBootstrap.js';
-import { getLocalDbClient } from '../localdb/client.js';
 
 const OUTBOX_POLL_MS = 700;
 const OFFLINE_QUEUE_POLL_MS = 900;
@@ -109,35 +108,6 @@ async function hasInFlightOutboxEvents({ sinceMs = null, localWriteOnly = false 
     if (inFlightEvents.length === 0) return false;
 
     return inFlightEvents.some((event) => eventCreatedAtOrAfter(event, sinceMs));
-  } catch {
-    return false;
-  }
-}
-
-async function hasOutboxActivitySince(timestampMs, { localWriteOnly = false } = {}) {
-  if (!LOCAL_SYNC_CONFIG.enabled) return false;
-  const normalizedSinceMs = toValidTimestamp(timestampMs);
-  if (!normalizedSinceMs) return false;
-
-  try {
-    const db = getLocalDbClient();
-    await db.init();
-    const [pendingEvents, syncingEvents, terminalEvents] = await Promise.all([
-      db.listOutboxEvents({ status: 'pending', limit: 200 }),
-      db.listOutboxEvents({ status: 'syncing', limit: 200 }),
-      db.listTerminalOutboxEvents({ limit: 300 })
-    ]);
-
-    let allEvents = [
-      ...(Array.isArray(pendingEvents) ? pendingEvents : []),
-      ...(Array.isArray(syncingEvents) ? syncingEvents : []),
-      ...(Array.isArray(terminalEvents) ? terminalEvents : [])
-    ];
-    if (localWriteOnly) {
-      allEvents = allEvents.filter((event) => isLocalWriteOutboxEvent(event));
-    }
-
-    return allEvents.some((event) => eventCreatedAtOrAfter(event, normalizedSinceMs));
   } catch {
     return false;
   }
@@ -272,33 +242,30 @@ export default function OnlineSyncBlockingAlert() {
     let cancelled = false;
 
     const guardReconnectSync = async () => {
+      if (!shouldEvaluateReconnectSync) {
+        if (cancelled || !mountedRef.current) return;
+        setIsBlocking(false);
+        return;
+      }
+
       let offlineWindowStartMs = (
         toValidTimestamp(offlineStartedAtRef.current)
         || persistedOfflineMarkerMs
       );
-      const hasAnyLocalWorkToSync = await hasInFlightOutboxEvents({
-        localWriteOnly: true
-      });
 
       let hasWorkToSync = false;
-      let hadOfflineActivity = false;
       if (offlineWindowStartMs) {
         hasWorkToSync = await hasInFlightOutboxEvents({
           sinceMs: offlineWindowStartMs,
           localWriteOnly: true
         });
-        hadOfflineActivity = await hasOutboxActivitySince(offlineWindowStartMs, {
+      } else {
+        hasWorkToSync = await hasInFlightOutboxEvents({
           localWriteOnly: true
         });
       }
 
-      const shouldBlock = shouldEvaluateReconnectSync
-        ? (
-          offlineHadPendingRef.current
-          || hadOfflineActivity
-          || hasWorkToSync
-        )
-        : hasAnyLocalWorkToSync;
+      const shouldBlock = hasWorkToSync;
 
       if (cancelled || !mountedRef.current) return;
 
