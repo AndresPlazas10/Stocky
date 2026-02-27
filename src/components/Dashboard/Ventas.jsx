@@ -740,16 +740,13 @@ function Ventas({ businessId, userRole = 'admin' }) {
         { label: 'Total', value: formatPrice(saleTotal) },
         { label: 'Método', value: getPaymentMethodLabel(paymentMethod) },
         { label: 'Tiempo', value: `${elapsedMs.toFixed(0)}ms` },
-        { label: 'Artículos', value: cart.length },
-        ...(result?.localOnly
-          ? [{ label: 'Sync', value: 'Guardada localmente (pendiente)' }]
-          : [])
+        { label: 'Artículos', value: cart.length }
       ]);
       setAlertType('success');
       setSuccess(true);
 
       // Autoimprimir recibo si el usuario lo tiene activado en configuración.
-      if (!result?.localOnly && isAutoPrintReceiptEnabled()) {
+      if (isAutoPrintReceiptEnabled()) {
         try {
           const [saleRow, saleDetails] = await Promise.all([
             getSaleForPrintById(result.data.id),
@@ -789,9 +786,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setSaleModalPanel('catalog');
 
       // Recargar ventas inmediatamente
-      if (!result?.localOnly) {
-        await loadVentas(currentFilters, { limit, offset: (page - 1) * limit, includeCount: false });
-      }
+      await loadVentas(currentFilters, { limit, offset: (page - 1) * limit, includeCount: false });
       
     } catch (error) {
       

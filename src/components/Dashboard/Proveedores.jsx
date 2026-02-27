@@ -137,25 +137,10 @@ function Proveedores({ businessId }) {
       if (taxColumn !== supplierTaxColumn) setSupplierTaxColumn(taxColumn);
 
       // Código de éxito
-      setSuccess(
-        result?.localOnly
-          ? (editingSupplier ? 'Proveedor actualizado localmente (pendiente sync)' : 'Proveedor creado localmente (pendiente sync)')
-          : (editingSupplier ? 'Proveedor actualizado exitosamente' : 'Proveedor creado exitosamente')
-      );
+      setSuccess(editingSupplier ? 'Proveedor actualizado exitosamente' : 'Proveedor creado exitosamente');
       resetForm();
-      if (result?.localOnly) {
-        setProveedores((prev) => {
-          const nextSupplier = result?.supplier || null;
-          if (!nextSupplier) return prev;
-
-          if (editingSupplier?.id) {
-            return prev.map((item) => (item.id === editingSupplier.id ? { ...item, ...nextSupplier } : item));
-          }
-          return [nextSupplier, ...prev];
-        });
-      } else {
-        await loadProveedores();
-      }
+      void result;
+      await loadProveedores();
       setShowModal(false);
       
     } catch (error) {
@@ -190,15 +175,11 @@ function Proveedores({ businessId }) {
 
     try {
       try {
-        const result = await deleteSupplierById({
+        await deleteSupplierById({
           supplierId: supplierToDelete,
           businessId
         });
-        if (result?.localOnly) {
-          setProveedores((prev) => prev.filter((item) => item.id !== supplierToDelete));
-        } else {
-          loadProveedores();
-        }
+        loadProveedores();
       } catch (error) {
         if (error?.code === '23503') {
           setError('❌ No se puede eliminar este proveedor porque tiene compras asociadas');
