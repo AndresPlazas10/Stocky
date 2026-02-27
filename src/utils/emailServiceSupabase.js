@@ -175,6 +175,10 @@ export const sendInvoiceEmail = async ({
  * Valida si el servicio de email está configurado correctamente
  */
 export const isEmailConfigured = () => {
-  // Siempre true porque usamos Supabase Edge Functions
-  return true;
+  const env = import.meta.env || {};
+  return !!(
+    String(env.VITE_EMAILJS_SERVICE_ID || '').trim()
+    && String(env.VITE_EMAILJS_TEMPLATE_ID || '').trim()
+    && String(env.VITE_EMAILJS_PUBLIC_KEY || '').trim()
+  );
 };

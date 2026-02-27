@@ -391,6 +391,27 @@ function normalizeReference(value) {
   return raw;
 }
 
+function resolveUserDisplayName(user) {
+  if (!user || typeof user !== 'object') return null;
+  const metadata = user?.user_metadata && typeof user.user_metadata === 'object'
+    ? user.user_metadata
+    : {};
+
+  const candidates = [
+    metadata.full_name,
+    metadata.name,
+    metadata.display_name,
+    user?.full_name
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeReference(candidate);
+    if (normalized) return normalized;
+  }
+
+  return null;
+}
+
 function normalizeCashBreakdownEntries(changeBreakdown) {
   if (!Array.isArray(changeBreakdown)) return [];
 
@@ -513,10 +534,12 @@ async function getSellerName(businessId) {
 
   const isOwner = user.id && business?.created_by && String(user.id).trim() === String(business.created_by).trim();
   const isAdmin = isAdminRole(employee?.role);
+  const employeeFullName = normalizeReference(employee?.full_name);
+  const userDisplayName = resolveUserDisplayName(user);
 
   const sellerName = isOwner || isAdmin
     ? 'Administrador'
-    : (employee?.full_name || user.email || 'Empleado');
+    : (employeeFullName || userDisplayName || 'Empleado');
 
   return { user, sellerName };
 }
@@ -534,7 +557,7 @@ async function getSellerIdentityForLocalClose(businessId) {
       if (user?.id) {
         return {
           userId: user.id,
-          sellerName: user.email || 'Empleado'
+          sellerName: resolveUserDisplayName(user) || 'Empleado'
         };
       }
     } catch {

@@ -50,7 +50,7 @@ function Dashboard() {
   const [isBusinessDisabled, setIsBusinessDisabled] = useState(false);
   const lastTableReconcileToastRef = useRef(0);
   const warmupStatus = useWarmupStatus(business?.id);
-  const { message: toastMessage, showWarning, clear: clearToast } = useToast(5000);
+  const { message: toastMessage, showWarning, clear: clearToast } = useToast(1000);
 
   // Sincronizar logo cuando cambia el business
   useEffect(() => {
@@ -402,7 +402,6 @@ function Dashboard() {
         type={toastMessage?.type || 'info'}
         message={toastMessage?.text || ''}
         onClose={clearToast}
-        duration={5000}
       />
     </>
   );

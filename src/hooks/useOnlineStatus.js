@@ -29,13 +29,19 @@ export function useOnlineStatus() {
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('focus', syncFromNavigator);
+    document.addEventListener('visibilitychange', syncFromNavigator);
 
     // Sincronizar estado al montar sin sondas de red.
     syncFromNavigator();
+    const pollId = window.setInterval(syncFromNavigator, 1200);
 
     return () => {
+      window.clearInterval(pollId);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('focus', syncFromNavigator);
+      document.removeEventListener('visibilitychange', syncFromNavigator);
     };
   }, []);
 

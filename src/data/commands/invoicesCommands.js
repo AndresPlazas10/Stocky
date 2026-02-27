@@ -1,4 +1,5 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
+import { invalidateInvoiceCache } from '../adapters/cacheInvalidation.js';
 import { enqueueOutboxMutation } from '../../sync/outboxShadow.js';
 import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
 import { runOutboxTick } from '../../sync/syncBootstrap.js';
@@ -209,6 +210,11 @@ export async function createInvoiceWithItemsAndStock({
       }
     }
 
+    await invalidateInvoiceCache({
+      businessId,
+      invoiceId: invoice?.id || null
+    });
+
     await enqueueOutboxMutation({
       businessId,
       mutationType: 'invoice.create',
@@ -305,6 +311,11 @@ export async function markInvoiceAsSent({ invoiceId, businessId = null }) {
 
     throw new Error(`Error al actualizar estado de factura: ${error.message}`);
   }
+
+  await invalidateInvoiceCache({
+    businessId,
+    invoiceId
+  });
 
   await enqueueOutboxMutation({
     businessId,
@@ -416,6 +427,11 @@ export async function cancelInvoiceAndRestoreStock({
     }
   }
 
+  await invalidateInvoiceCache({
+    businessId,
+    invoiceId
+  });
+
   await enqueueOutboxMutation({
     businessId,
     mutationType: 'invoice.cancel',
@@ -499,6 +515,11 @@ export async function deleteInvoiceCascade({ invoiceId, businessId = null }) {
 
     throw new Error(`Error al eliminar factura: ${deleteError.message}`);
   }
+
+  await invalidateInvoiceCache({
+    businessId,
+    invoiceId
+  });
 
   await enqueueOutboxMutation({
     businessId,

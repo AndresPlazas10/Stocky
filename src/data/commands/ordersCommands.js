@@ -607,8 +607,14 @@ async function enqueueLocalOrderItemQuantityUpdate({
   };
 }
 
-export async function updateOrderItemQuantityById({ itemId, quantity, businessId = null, orderId = null }) {
-  if (shouldForceOrdersLocalFirst()) {
+export async function updateOrderItemQuantityById({
+  itemId,
+  quantity,
+  businessId = null,
+  orderId = null,
+  preferLocal = false
+}) {
+  if (shouldForceOrdersLocalFirst() || (preferLocal && canQueueLocalOrders())) {
     const localResult = await enqueueLocalOrderItemQuantityUpdate({
       itemId,
       quantity,
@@ -771,8 +777,13 @@ async function mergeDuplicateOrderItemInsert({
   };
 }
 
-export async function insertOrderItem({ row, selectSql = 'id', businessId = null }) {
-  if (shouldForceOrdersLocalFirst()) {
+export async function insertOrderItem({
+  row,
+  selectSql = 'id',
+  businessId = null,
+  preferLocal = false
+}) {
+  if (shouldForceOrdersLocalFirst() || (preferLocal && canQueueLocalOrders())) {
     const localResult = await enqueueLocalOrderItemInsert({ row, businessId });
     await invalidateOrderCache({ businessId, orderId: row?.order_id || null });
     await triggerBackgroundOutboxSync();
@@ -860,7 +871,7 @@ export async function deleteOrderAndReleaseTable({ orderId, tableId, businessId 
       tableId,
       businessId
     });
-    await invalidateOrderCache({ businessId, orderId, tableId });
+    await invalidateOrderCache({ businessId, orderId, tableId, releaseMesaSnapshot: true });
     await triggerBackgroundOutboxSync();
     return localResult;
   }
@@ -872,7 +883,7 @@ export async function deleteOrderAndReleaseTable({ orderId, tableId, businessId 
       tableId,
       businessId
     });
-    await invalidateOrderCache({ businessId, orderId, tableId });
+    await invalidateOrderCache({ businessId, orderId, tableId, releaseMesaSnapshot: true });
     return localResult;
   }
 
@@ -896,7 +907,7 @@ export async function deleteOrderAndReleaseTable({ orderId, tableId, businessId 
         tableId,
         businessId
       });
-      await invalidateOrderCache({ businessId, orderId, tableId });
+      await invalidateOrderCache({ businessId, orderId, tableId, releaseMesaSnapshot: true });
       await triggerBackgroundOutboxSync();
       return localResult;
     }
@@ -911,7 +922,7 @@ export async function deleteOrderAndReleaseTable({ orderId, tableId, businessId 
         tableId,
         businessId
       });
-      await invalidateOrderCache({ businessId, orderId, tableId });
+      await invalidateOrderCache({ businessId, orderId, tableId, releaseMesaSnapshot: true });
       await triggerBackgroundOutboxSync();
       return localResult;
     }
@@ -927,7 +938,7 @@ export async function deleteOrderAndReleaseTable({ orderId, tableId, businessId 
     },
     mutationId: buildMutationId('order.delete_and_release_table', businessId)
   });
-  await invalidateOrderCache({ businessId, orderId, tableId });
+  await invalidateOrderCache({ businessId, orderId, tableId, releaseMesaSnapshot: true });
 
   return {
     order_id: orderId,
@@ -968,7 +979,7 @@ export async function deleteTableCascadeOrders(tableId, { businessId = null } = 
       orderIds: associatedOrderIds
     });
     const localResult = await enqueueLocalTableDeleteCascade(tableId, { businessId });
-    await invalidateOrderCache({ businessId, tableId });
+    await invalidateOrderCache({ businessId, tableId, releaseMesaSnapshot: true });
     await triggerBackgroundOutboxSync();
     return localResult;
   }
@@ -981,7 +992,7 @@ export async function deleteTableCascadeOrders(tableId, { businessId = null } = 
       orderIds: associatedOrderIds
     });
     const localResult = await enqueueLocalTableDeleteCascade(tableId, { businessId });
-    await invalidateOrderCache({ businessId, tableId });
+    await invalidateOrderCache({ businessId, tableId, releaseMesaSnapshot: true });
     return localResult;
   }
 
@@ -1006,7 +1017,7 @@ export async function deleteTableCascadeOrders(tableId, { businessId = null } = 
         orderIds: associatedOrderIds
       });
       const localResult = await enqueueLocalTableDeleteCascade(tableId, { businessId });
-      await invalidateOrderCache({ businessId, tableId });
+      await invalidateOrderCache({ businessId, tableId, releaseMesaSnapshot: true });
       await triggerBackgroundOutboxSync();
       return localResult;
     }
@@ -1024,7 +1035,7 @@ export async function deleteTableCascadeOrders(tableId, { businessId = null } = 
         orderIds: associatedOrderIds
       });
       const localResult = await enqueueLocalTableDeleteCascade(tableId, { businessId });
-      await invalidateOrderCache({ businessId, tableId });
+      await invalidateOrderCache({ businessId, tableId, releaseMesaSnapshot: true });
       await triggerBackgroundOutboxSync();
       return localResult;
     }

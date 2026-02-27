@@ -1,4 +1,5 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
+import { invalidatePurchaseCache } from '../adapters/cacheInvalidation.js';
 import { enqueueOutboxMutation } from '../../sync/outboxShadow.js';
 import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
 import { runOutboxTick } from '../../sync/syncBootstrap.js';
@@ -375,6 +376,12 @@ export async function createPurchaseWithRpcFallback({
     purchaseId = rpcRow?.purchase_id || null;
   }
 
+  await invalidatePurchaseCache({
+    businessId,
+    purchaseId,
+    supplierId: supplierId || null
+  });
+
   await enqueueOutboxMutation({
     businessId,
     mutationType: 'purchase.create',
@@ -491,6 +498,11 @@ export async function deletePurchaseWithStockFallback({ purchaseId, businessId }
       appliedManualFallback = true;
     }
   }
+
+  await invalidatePurchaseCache({
+    businessId,
+    purchaseId
+  });
 
   await enqueueOutboxMutation({
     businessId,

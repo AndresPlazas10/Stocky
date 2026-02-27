@@ -7,6 +7,66 @@ function nonEmpty(value) {
   return normalized || null;
 }
 
+function getOfflineSnapshotStorageKey(key) {
+  const normalizedKey = nonEmpty(key);
+  if (!normalizedKey) return null;
+  return `stocky.offline_snapshot.${normalizedKey}`;
+}
+
+function forceMesaSnapshotAsAvailable({
+  businessId,
+  tableId = null,
+  orderId = null
+} = {}) {
+  if (typeof window === 'undefined') return false;
+  const bid = nonEmpty(businessId);
+  if (!bid) return false;
+
+  const tid = nonEmpty(tableId);
+  const oid = nonEmpty(orderId);
+  if (!tid && !oid) return false;
+
+  const snapshotStorageKey = getOfflineSnapshotStorageKey(`mesas.list:${bid}`);
+  if (!snapshotStorageKey) return false;
+
+  try {
+    const raw = window.localStorage.getItem(snapshotStorageKey);
+    if (!raw) return false;
+
+    const parsed = JSON.parse(raw);
+    const mesas = Array.isArray(parsed?.payload) ? parsed.payload : null;
+    if (!mesas || mesas.length === 0) return false;
+
+    let touched = false;
+    const nextMesas = mesas.map((mesa) => {
+      const mesaId = nonEmpty(mesa?.id);
+      const mesaOrderId = nonEmpty(mesa?.current_order_id);
+      const matchesTable = Boolean(tid && mesaId && mesaId === tid);
+      const matchesOrder = Boolean(oid && mesaOrderId && mesaOrderId === oid);
+
+      if (!matchesTable && !matchesOrder) return mesa;
+      touched = true;
+
+      return {
+        ...mesa,
+        status: 'available',
+        current_order_id: null,
+        orders: null
+      };
+    });
+
+    if (!touched) return false;
+
+    window.localStorage.setItem(snapshotStorageKey, JSON.stringify({
+      updated_at: new Date().toISOString(),
+      payload: nextMesas
+    }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function invalidateLocalReadCachePrefixes(prefixes = []) {
   if (!LOCAL_SYNC_CONFIG.enabled) return 0;
 
@@ -41,6 +101,9 @@ export async function invalidateSaleCache({
     bid ? `tables:${bid}:current_order` : null,
     bid ? `business:${bid}:name` : null,
     bid ? `sales:${bid}:` : null,
+    bid ? `sales:list:${bid}:` : null,
+    bid ? `reports:${bid}:sales:` : null,
+    bid ? `reports:${bid}:sale_details_cost` : null,
     sid ? `sales:${sid}:` : null
   ];
 
@@ -62,6 +125,8 @@ export async function invalidatePurchaseCache({
     bid ? `products:orders:${bid}:` : null,
     bid ? `products:subset:${bid}:` : null,
     bid ? `suppliers:${bid}:` : null,
+    bid ? `purchases:list:${bid}:` : null,
+    bid ? `reports:${bid}:purchases:` : null,
     pid ? `purchases:${pid}:` : null,
     spid ? `supplier:${spid}` : null
   ];
@@ -73,7 +138,8 @@ export async function invalidateOrderCache({
   businessId,
   orderId = null,
   tableId = null,
-  saleId = null
+  saleId = null,
+  releaseMesaSnapshot = false
 } = {}) {
   const bid = nonEmpty(businessId);
   const oid = nonEmpty(orderId);
@@ -82,6 +148,7 @@ export async function invalidateOrderCache({
 
   const prefixes = [
     bid ? `tables:${bid}:` : null,
+    bid ? `orders:${bid}:open` : null,
     bid ? `products:orders:${bid}:` : null,
     bid ? `products:subset:${bid}:` : null,
     bid ? `sales:${bid}:` : null,
@@ -89,8 +156,15 @@ export async function invalidateOrderCache({
     sid ? `sales:${sid}:` : null,
     tid ? `table:${tid}` : null
   ];
-
-  return invalidateLocalReadCachePrefixes(prefixes);
+  const deleted = await invalidateLocalReadCachePrefixes(prefixes);
+  if (releaseMesaSnapshot) {
+    forceMesaSnapshotAsAvailable({
+      businessId: bid,
+      tableId: tid,
+      orderId: oid
+    });
+  }
+  return deleted;
 }
 
 export async function invalidateInventoryCache({
@@ -159,6 +233,28 @@ export async function invalidateFromOutboxEvent(event = {}) {
   if (!mutationType || !businessId) return 0;
 
   if (mutationType.startsWith('sale.')) {
+    const orderId = payload?.order_id || null;
+    const tableId = payload?.table_id || null;
+    const hasMesaContext = Boolean(nonEmpty(orderId) || nonEmpty(tableId));
+
+    if (hasMesaContext) {
+      const shouldReleaseMesaSnapshot = mutationType === 'sale.create';
+      const [saleInvalidated, orderInvalidated] = await Promise.all([
+        invalidateSaleCache({
+          businessId,
+          saleId: payload?.sale_id || null
+        }),
+        invalidateOrderCache({
+          businessId,
+          orderId,
+          tableId,
+          saleId: payload?.sale_id || null,
+          releaseMesaSnapshot: shouldReleaseMesaSnapshot
+        })
+      ]);
+      return Number(saleInvalidated || 0) + Number(orderInvalidated || 0);
+    }
+
     return invalidateSaleCache({
       businessId,
       saleId: payload?.sale_id || null
@@ -177,11 +273,18 @@ export async function invalidateFromOutboxEvent(event = {}) {
     mutationType.startsWith('order.')
     || mutationType.startsWith('table.')
   ) {
+    const shouldReleaseMesaSnapshot = (
+      mutationType === 'order.delete_and_release_table'
+      || mutationType === 'table.delete_cascade_orders'
+      || mutationType === 'order.close.single'
+      || mutationType === 'order.close.split'
+    );
     return invalidateOrderCache({
       businessId,
       orderId: payload?.order_id || null,
       tableId: payload?.table_id || null,
-      saleId: pickFirstSaleIdFromPayload(payload)
+      saleId: pickFirstSaleIdFromPayload(payload),
+      releaseMesaSnapshot: shouldReleaseMesaSnapshot
     });
   }
 

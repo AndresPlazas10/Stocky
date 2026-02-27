@@ -1,266 +1,79 @@
-# 📚 Índice de Documentación - Stocky
+# Documentacion Stocky
 
-Bienvenido a la documentación completa de Stocky. Aquí encontrarás todo lo necesario para configurar, usar y desplegar el sistema.
+Indice principal de documentacion tecnica y operativa.
 
----
+## Estado de referencia (Febrero 2026)
 
-## 🚀 Inicio Rápido
+- Stack actual: React 19, Vite 7, Supabase JS 2.x.
+- Sincronizacion local-first habilitable por flags.
+- Facturacion operativa activa en app.
+- Integracion Siigo interna removida de runtime (estado sunset documentado).
 
-¿Primera vez usando Stocky? Empieza aquí:
+## 1. Inicio y setup
 
-1. **[Guía de Inicio Rápido](setup/QUICK_START.md)** - Prueba el sistema en 2 minutos
-2. **[Instalación](../README.md#instalación-rápida)** - Setup completo paso a paso
-3. **[Configuración de Base de Datos](setup/FACTURACION_SETUP.md)** - Ejecutar scripts SQL
+- `../README.md`: arranque del proyecto, scripts y entorno.
+- `setup/QUICK_START.md`: guia rapida.
+- `setup/FACTURACION_SETUP.md`: setup funcional de facturacion/BD.
+- `sql/supabase_functions.sql`: script base de funciones y estructura.
 
----
+## 2. Email y comprobantes
 
-## ⚙️ Configuración Inicial
+- `setup/CONFIGURAR_EMAILJS.md`: configuracion EmailJS.
+- `setup/RESEND_SETUP.md`: configuracion Resend.
+- `setup/EMAIL_CONFIGURATION.md`: referencia de configuracion de correo.
+- `guides/ENVIO_FACTURAS.md`: flujo funcional de envio.
 
-### Base de Datos
-- 📄 **[Script SQL Completo](sql/supabase_functions.sql)** - Todas las funciones y triggers
-- 🔧 **[Setup de Facturación](setup/FACTURACION_SETUP.md)** - Configurar sistema completo
-  - Funciones RPC
-  - Triggers automáticos
-  - Tabla de clientes
-  - Row Level Security
+## 3. Sincronizacion local-first
 
-### Servicios Externos
-- 📧 **[Configurar EmailJS](setup/CONFIGURAR_EMAILJS.md)** - Envío de facturas por email
-  - Crear cuenta (gratis)
-  - Configurar servicio de email
-  - Crear template
-  - Variables de entorno
+- `ARQUITECTURA_LOCAL_FIRST_ELECTRICSQL.md`: arquitectura general.
+- `LOCAL_SYNC_DEV_CHECKLIST.md`: checklist para pruebas y diagnostico.
+- `GUIA_TECNICA_REALTIME.md`: detalles de realtime y consistencia.
 
----
-
-## 📖 Guías de Uso
+## 4. Despliegue
 
-### Sistema de Facturación
-- 📄 **[Envío de Facturas](guides/ENVIO_FACTURAS.md)** - Guía completa de facturación
-  - Crear facturas
-  - Enviar por email
-  - Cancelar y restaurar stock
-  - Generar desde ventas
-
-### Mejoras y Changelog
-- 📝 **[Mejoras de Facturación](guides/MEJORAS_FACTURACION.md)** - Historial de cambios
-  - Validaciones implementadas
-  - Gestión de stock
-  - Experiencia de usuario
-  - Base de datos
+- `DEPLOY.md`: guia principal de despliegue.
+- `DEPLOY_GUIDE.md`: guia extendida.
+- `DEPLOYMENT_CHECKLIST.md`: checklist de produccion.
+- `COMANDOS_DEPLOY.md`: comandos operativos.
 
----
+## 5. Seguridad y RLS
 
-## 🚀 Despliegue
-
-- 🌐 **[Guía de Despliegue](../DEPLOY.md)** - Deploy a producción
-  - Checklist pre-despliegue
-  - Vercel (recomendado)
-  - Netlify
-  - VPS manual
-  - Troubleshooting
-  - Monitoreo
-
----
-
-## 📋 Referencia Técnica
-
-### Estructura del Proyecto
-```
-stockly/
-├── src/
-│   ├── components/Dashboard/   # Módulos principales
-│   ├── pages/                   # Páginas de navegación
-│   ├── services/                # Lógica de negocio
-│   ├── supabase/                # Cliente Supabase
-│   └── utils/                   # Utilidades
-├── docs/                        # Documentación
-└── public/                      # Assets estáticos
-```
-
-### Tecnologías
-- **Frontend:** React 18 + Vite + TailwindCSS
-- **Backend:** Supabase (PostgreSQL + Auth)
-- **Email:** EmailJS
-- **Hosting:** Vercel / Netlify
-
----
-
-## 🔍 Troubleshooting
-
-### Problemas Comunes
-
-#### Error 500 al enviar emails
-**Solución:** [Ver guía de EmailJS](setup/CONFIGURAR_EMAILJS.md)
-
-#### Stock no se restaura
-**Solución:** [Ver setup de facturación](setup/FACTURACION_SETUP.md#verificar-triggers)
-
-#### RLS policy violation
-**Solución:** [Ejecutar script SQL](sql/supabase_functions.sql)
+- `AUDITORIA_SEGURIDAD.md`: auditoria y hallazgos.
+- `GUIA_RLS.md`: conceptos y operacion.
+- `sql/README_RLS.md`: scripts y notas RLS.
 
-#### Emails no llegan
-**Solución:** [Verificar configuración EmailJS](setup/CONFIGURAR_EMAILJS.md#troubleshooting)
-
----
-
-## 📊 Funcionalidades por Módulo
-
-### 🏪 Inventario
-- CRUD de productos
-- Control de stock automático
-- Categorías
-- Códigos de barras
-- Alertas de stock bajo
-
-### 💰 Punto de Venta
-- Interfaz POS rápida
-- Búsqueda de productos
-- Carrito de compras
-- Múltiples métodos de pago
-- Registro de ventas
-
-### 📄 Facturación
-- Generación automática
-- Números secuenciales
-- Envío por email
-- Cancelación con restauración de stock
-- Generación desde ventas
+## 6. Facturacion legacy (Siigo)
 
-### 👥 Empleados
-- Gestión de usuarios
-- Permisos por módulo
-- Rastreo de ventas
-- Comisiones
-
-### 🏢 Proveedores
-- Base de datos de proveedores
-- Registro de compras
-- Historial de transacciones
+Documentacion historica y de referencia:
 
-### 📊 Reportes
-- Dashboard con métricas
-- Ventas por período
-- Productos más vendidos
-- Análisis de rentabilidad
+- `INTEGRACION_SIIGO.md`
+- `FACTURACION_OPCIONAL.md`
+- `adr/ADR-0001-siigo-legacy-strategy.md` (decision oficial)
 
----
+Codigo relacionado (para consolidacion/migracion):
 
-## 🔒 Seguridad
+- Runtime legacy removido en PR-4 (hooks/services/context/componentes Siigo).
+- Edge Function `siigo-invoice` removida del repositorio activo.
+- Referencia de decision: `adr/ADR-0001-siigo-legacy-strategy.md`.
 
-### Row Level Security (RLS)
-- Todas las tablas tienen RLS habilitado
-- Políticas de aislamiento por negocio
-- Validación de permisos en cada consulta
+Estado esperado:
 
-### Autenticación
-- JWT tokens con Supabase
-- Roles: Admin y Empleado
-- Sesiones seguras
+- Integracion Siigo interna en modo sunset.
+- Stocky runtime no debe exponer generacion de factura electronica Siigo.
 
-### Variables de Entorno
-- API keys no expuestas en código
-- Configuración por ambiente
-- Rotación periódica de keys
+## 7. Pruebas
 
----
+- Carpeta: `../testing/`
+- Comando: `npm run test -- --run`
 
-## 🎓 Tutoriales Paso a Paso
+Nota: la cobertura actual es limitada frente al dominio. Priorizar tests de Mesas, sync offline/online, facturacion y email.
 
-### 1. Configurar desde Cero
-1. [Crear proyecto Supabase](setup/FACTURACION_SETUP.md#paso-1)
-2. [Ejecutar scripts SQL](sql/supabase_functions.sql)
-3. [Configurar EmailJS](setup/CONFIGURAR_EMAILJS.md)
-4. [Variables de entorno](../README.md#configuración)
-5. [Ejecutar aplicación](setup/QUICK_START.md)
+## 8. Diagnosticos y reportes tecnicos
 
-### 2. Primera Venta y Factura
-1. Crear productos en Inventario
-2. Ir a Punto de Venta
-3. Agregar productos al carrito
-4. Completar venta
-5. Generar factura desde Ventas
+La carpeta `docs/` incluye multiples analisis historicos (`ANALISIS_*`, `SOLUCION_*`, `RESUMEN_*`).
+Usarlos como contexto, no como fuente unica de verdad de arquitectura actual.
 
-### 3. Gestión de Empleados
-1. Crear empleado en módulo Empleados
-2. Asignar permisos
-3. Empleado puede hacer login
-4. Verificar acceso a módulos permitidos
+## Convenciones
 
----
-
-## 📞 Soporte y Ayuda
-
-### ¿Tienes dudas?
-
-1. **Busca en la documentación** - Usa Ctrl+F en cada archivo
-2. **Revisa el troubleshooting** - Problemas comunes resueltos
-3. **Consulta los logs** - Consola del navegador (F12)
-4. **Verifica Supabase** - Dashboard → Logs
-
-### Recursos Adicionales
-
-- [Documentación de Supabase](https://supabase.com/docs)
-- [Documentación de EmailJS](https://www.emailjs.com/docs/)
-- [Documentación de React](https://react.dev)
-- [Documentación de Vite](https://vitejs.dev)
-
----
-
-## 📅 Mantenimiento
-
-### Actualizaciones Regulares
-- Dependencias: `npm update`
-- Supabase: Revisar dashboard
-- EmailJS: Verificar cuota
-
-### Backups
-- Base de datos: Semanal
-- Código: Git automático
-- Configuración: Documentada
-
----
-
-## 🗺️ Roadmap
-
-### Versión 1.1 (Próximamente)
-- [ ] Generación de PDF de facturas
-- [ ] Notas crédito
-- [ ] Reportes avanzados
-- [ ] App móvil
-
-### Versión 1.2 (Planificado)
-- [ ] Múltiples sucursales
-- [ ] Integración con pasarelas de pago
-- [ ] Sistema de lealtad
-
-Ver [CHANGELOG](../CHANGELOG.md) para historial completo.
-
----
-
-## 🤝 Contribuir
-
-¿Quieres mejorar Stocky?
-
-1. Fork el repositorio
-2. Crea una rama: `git checkout -b feature/mejora`
-3. Haz tus cambios
-4. Commit: `git commit -m 'feat: nueva funcionalidad'`
-5. Push: `git push origin feature/mejora`
-6. Abre un Pull Request
-
----
-
-## 📜 Licencia
-
-Stocky está bajo la Licencia MIT. Ver [LICENSE](../LICENSE) para más información.
-
----
-
-<div align="center">
-
-**¿Necesitas ayuda adicional?** Abre un issue en GitHub o consulta el [README principal](../README.md)
-
-Hecho con ❤️ para facilitar la gestión de tu negocio
-
-</div>
+- Si hay conflicto entre documentos, manda el codigo fuente en `src/`.
+- Actualizar este indice cuando se agreguen o retiren guias.

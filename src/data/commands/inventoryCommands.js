@@ -1,4 +1,5 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
+import { invalidateInventoryCache } from '../adapters/cacheInvalidation.js';
 import { enqueueOutboxMutation } from '../../sync/outboxShadow.js';
 import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
 import { runOutboxTick } from '../../sync/syncBootstrap.js';
@@ -288,6 +289,12 @@ export async function createProductWithFallback(productData) {
     }
   }
 
+  await invalidateInventoryCache({
+    businessId: productData.business_id || null,
+    productId: createdProduct?.id || null,
+    supplierId: productData?.supplier_id || null
+  });
+
   await enqueueOutboxMutation({
     businessId: productData.business_id,
     mutationType: 'product.create',
@@ -342,6 +349,12 @@ export async function updateProductById({ productId, businessId = null, payload 
     throw wrapped;
   }
 
+  await invalidateInventoryCache({
+    businessId,
+    productId,
+    supplierId: payload?.supplier_id || null
+  });
+
   await enqueueOutboxMutation({
     businessId,
     mutationType: 'product.update',
@@ -382,6 +395,11 @@ export async function deleteProductById({ productId, businessId = null }) {
     wrapped.code = error.code;
     throw wrapped;
   }
+
+  await invalidateInventoryCache({
+    businessId,
+    productId
+  });
 
   await enqueueOutboxMutation({
     businessId,
@@ -434,6 +452,11 @@ export async function setProductActiveStatus({ productId, isActive, businessId =
     wrapped.code = error.code;
     throw wrapped;
   }
+
+  await invalidateInventoryCache({
+    businessId,
+    productId
+  });
 
   await enqueueOutboxMutation({
     businessId,

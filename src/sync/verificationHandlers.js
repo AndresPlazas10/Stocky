@@ -23,6 +23,49 @@ function isAdminRoleLike(role) {
     || normalizedRole.includes('admin');
 }
 
+const GENERIC_SELLER_LABELS = new Set([
+  'empleado',
+  'employee',
+  'vendedor',
+  'seller',
+  'usuario',
+  'user',
+  'vendedor desconocido'
+]);
+
+function isEmailLike(value) {
+  const normalized = String(value || '').trim();
+  if (!normalized) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
+}
+
+function isGenericSellerLabel(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return true;
+  if (GENERIC_SELLER_LABELS.has(normalized)) return true;
+  return isEmailLike(normalized);
+}
+
+function sanitizeSellerFallback(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) return null;
+
+  if (!isEmailLike(normalized)) return normalized;
+
+  const localPart = normalizeText(normalized.split('@')[0]);
+  if (!localPart) return null;
+
+  const normalizedLocalPart = localPart
+    .replace(/[._-]+/g, ' ')
+    .trim()
+    .toLowerCase();
+  if (!normalizedLocalPart || GENERIC_SELLER_LABELS.has(normalizedLocalPart)) {
+    return null;
+  }
+
+  return normalizedLocalPart;
+}
+
 async function resolveSellerNameForSaleSync({
   businessId,
   userId,
@@ -32,7 +75,8 @@ async function resolveSellerNameForSaleSync({
   const normalizedPayloadName = normalizeText(payloadSellerName);
   const normalizedPayloadLabel = String(normalizedPayloadName || '').trim().toLowerCase();
   const payloadLooksAdmin = normalizedPayloadLabel === 'administrador' || normalizedPayloadLabel === 'admin';
-  const shouldRecompute = !normalizedPayloadName || payloadLooksAdmin;
+  const payloadLooksGeneric = isGenericSellerLabel(normalizedPayloadName);
+  const shouldRecompute = !normalizedPayloadName || payloadLooksAdmin || payloadLooksGeneric;
 
   if (!shouldRecompute) {
     return normalizedPayloadName;
@@ -58,7 +102,13 @@ async function resolveSellerNameForSaleSync({
     // no-op
   }
 
-  return normalizedPayloadName || normalizeText(fallbackEmail) || 'Vendedor';
+  if (payloadLooksAdmin) return 'Administrador';
+
+  return (
+    sanitizeSellerFallback(normalizedPayloadName)
+    || sanitizeSellerFallback(fallbackEmail)
+    || 'Empleado'
+  );
 }
 
 function ackPayload(event, mode = 'verify', details = {}) {
@@ -85,6 +135,15 @@ function reject(error, details = null) {
     ok: false,
     error,
     details
+  };
+}
+
+function rejectRetryable(error, details = null) {
+  return {
+    ok: false,
+    error,
+    details,
+    retryable: true
   };
 }
 
@@ -525,7 +584,6 @@ async function pushSaleCreateToRemote(event) {
   }
 
   const hasOrderContext = Boolean(orderId || tableId);
-  let syncedWithoutOrderContext = false;
   const shouldRetryWithoutOrderContext = Boolean(
     rpcError
     && hasOrderContext
@@ -533,7 +591,6 @@ async function pushSaleCreateToRemote(event) {
   );
 
   if (shouldRetryWithoutOrderContext) {
-    syncedWithoutOrderContext = true;
     ({ data: rpcData, error: rpcError } = await supabaseAdapter.createSaleCompleteIdempotentRpc(
       buildIdempotentPayload({ includeOrderContext: false })
     ));
@@ -573,51 +630,16 @@ async function pushSaleCreateToRemote(event) {
     });
   }
 
-  // Si el fallback creó la venta sin contexto de orden/mesa, cerrar/liberar explícitamente
-  // para evitar que la mesa reaparezca ocupada con items ya vendidos.
-  if (syncedWithoutOrderContext && hasOrderContext) {
-    if (orderId) {
-      const { error: closeOrderError } = await supabaseAdapter.updateOrderByBusinessAndId({
-        businessId,
-        orderId,
-        payload: {
-          status: 'closed'
-        }
-      });
-      if (closeOrderError && !isNotFoundLikeError(closeOrderError)) {
-        if (isRetriableSyncError(closeOrderError)) {
-          throw new Error(`SYNC_RETRYABLE_CLOSE_ORDER_AFTER_SALE: ${closeOrderError?.message || String(closeOrderError)}`);
-        }
-        return reject('Venta sincronizada pero no se pudo cerrar la orden asociada', {
-          business_id: businessId,
-          order_id: orderId,
-          sale_id: remoteSaleId,
-          error: closeOrderError?.message || String(closeOrderError)
-        });
-      }
-    }
-
-    if (tableId) {
-      const { error: releaseTableError } = await supabaseAdapter.updateTableById(tableId, {
-        current_order_id: null,
-        status: 'available'
-      });
-      if (
-        releaseTableError
-        && !isMissingTablesUpdatedAtColumnError(releaseTableError)
-        && !isNotFoundLikeError(releaseTableError)
-      ) {
-        if (isRetriableSyncError(releaseTableError)) {
-          throw new Error(`SYNC_RETRYABLE_RELEASE_TABLE_AFTER_SALE: ${releaseTableError?.message || String(releaseTableError)}`);
-        }
-        return reject('Venta sincronizada pero no se pudo liberar la mesa asociada', {
-          business_id: businessId,
-          table_id: tableId,
-          sale_id: remoteSaleId,
-          error: releaseTableError?.message || String(releaseTableError)
-        });
-      }
-    }
+  // Garantizar consistencia fuerte: después de sincronizar la venta, la orden debe
+  // quedar cerrada y la mesa sin puntero activo.
+  if (hasOrderContext) {
+    const ensureReleaseResult = await ensureReleasedOrderAndTableAfterSale({
+      businessId,
+      orderId,
+      tableId,
+      saleId: remoteSaleId
+    });
+    if (!ensureReleaseResult?.ok) return ensureReleaseResult;
   }
 
   return {
@@ -673,6 +695,133 @@ async function getTableState({ businessId, tableId }) {
   });
   if (error) throw error;
   return data || null;
+}
+
+async function ensureReleasedOrderAndTableAfterSale({
+  businessId,
+  orderId = null,
+  tableId = null,
+  saleId = null
+}) {
+  const normalizedBusinessId = normalizeText(businessId);
+  const normalizedOrderId = normalizeText(orderId);
+  const normalizedTableId = normalizeText(tableId);
+  const normalizedSaleId = normalizeText(saleId);
+
+  if (!normalizedBusinessId) {
+    return reject('No se pudo validar liberación de mesa: business_id inválido', {
+      business_id: normalizedBusinessId,
+      order_id: normalizedOrderId,
+      table_id: normalizedTableId,
+      sale_id: normalizedSaleId
+    });
+  }
+
+  if (!normalizedOrderId && !normalizedTableId) {
+    return { ok: true };
+  }
+
+  if (normalizedOrderId) {
+    const orderState = await getOrderState({
+      businessId: normalizedBusinessId,
+      orderId: normalizedOrderId
+    });
+
+    const currentOrderStatus = normalizeText(orderState?.status);
+    if (orderState && currentOrderStatus !== 'closed') {
+      const { error: closeOrderError } = await supabaseAdapter.updateOrderByBusinessAndId({
+        businessId: normalizedBusinessId,
+        orderId: normalizedOrderId,
+        payload: {
+          status: 'closed',
+          closed_at: new Date().toISOString()
+        }
+      });
+
+      if (closeOrderError && !isNotFoundLikeError(closeOrderError)) {
+        if (isRetriableSyncError(closeOrderError)) {
+          throw new Error(`SYNC_RETRYABLE_CLOSE_ORDER_AFTER_SALE: ${closeOrderError?.message || String(closeOrderError)}`);
+        }
+        return reject('Venta sincronizada, pero no se pudo cerrar la orden asociada', {
+          business_id: normalizedBusinessId,
+          order_id: normalizedOrderId,
+          sale_id: normalizedSaleId,
+          error: closeOrderError?.message || String(closeOrderError)
+        });
+      }
+
+      const refreshedOrder = await getOrderState({
+        businessId: normalizedBusinessId,
+        orderId: normalizedOrderId
+      });
+      const refreshedStatus = normalizeText(refreshedOrder?.status);
+      if (refreshedOrder && refreshedStatus !== 'closed') {
+        return rejectRetryable('La orden sigue abierta tras sincronizar la venta', {
+          business_id: normalizedBusinessId,
+          order_id: normalizedOrderId,
+          sale_id: normalizedSaleId,
+          current_status: refreshedStatus
+        });
+      }
+    }
+  }
+
+  if (normalizedTableId) {
+    const tableState = await getTableState({
+      businessId: normalizedBusinessId,
+      tableId: normalizedTableId
+    });
+
+    const currentOrderId = normalizeText(tableState?.current_order_id);
+    const currentStatus = normalizeText(tableState?.status);
+    const tableNeedsRelease = Boolean(currentOrderId) || currentStatus === 'occupied' || currentStatus === 'open';
+
+    if (tableState && tableNeedsRelease) {
+      const { error: releaseTableError } = await supabaseAdapter.updateTableByBusinessAndId({
+        businessId: normalizedBusinessId,
+        tableId: normalizedTableId,
+        payload: {
+          current_order_id: null,
+          status: 'available'
+        }
+      });
+
+      if (
+        releaseTableError
+        && !isMissingTablesUpdatedAtColumnError(releaseTableError)
+        && !isNotFoundLikeError(releaseTableError)
+      ) {
+        if (isRetriableSyncError(releaseTableError)) {
+          throw new Error(`SYNC_RETRYABLE_RELEASE_TABLE_AFTER_SALE: ${releaseTableError?.message || String(releaseTableError)}`);
+        }
+        return reject('Venta sincronizada, pero no se pudo liberar la mesa asociada', {
+          business_id: normalizedBusinessId,
+          table_id: normalizedTableId,
+          sale_id: normalizedSaleId,
+          error: releaseTableError?.message || String(releaseTableError)
+        });
+      }
+
+      const refreshedTable = await getTableState({
+        businessId: normalizedBusinessId,
+        tableId: normalizedTableId
+      });
+      const refreshedOrderId = normalizeText(refreshedTable?.current_order_id);
+      const refreshedStatus = normalizeText(refreshedTable?.status);
+
+      if (refreshedTable && (refreshedOrderId || (refreshedStatus && refreshedStatus !== 'available'))) {
+        return rejectRetryable('La mesa sigue con datos de orden tras sincronizar la venta', {
+          business_id: normalizedBusinessId,
+          table_id: normalizedTableId,
+          sale_id: normalizedSaleId,
+          current_order_id: refreshedOrderId,
+          current_status: refreshedStatus
+        });
+      }
+    }
+  }
+
+  return { ok: true };
 }
 
 async function getOrderItemState(itemId) {
@@ -804,6 +953,18 @@ async function verifySaleCreate(event) {
       expected_total: normalizeNumber(event?.payload?.total),
       current_total: normalizeNumber(state.total)
     });
+  }
+
+  const contextOrderId = normalizeText(event?.payload?.order_id);
+  const contextTableId = normalizeText(event?.payload?.table_id);
+  if (contextOrderId || contextTableId) {
+    const ensureReleaseResult = await ensureReleasedOrderAndTableAfterSale({
+      businessId,
+      orderId: contextOrderId,
+      tableId: contextTableId,
+      saleId
+    });
+    if (!ensureReleaseResult?.ok) return ensureReleaseResult;
   }
 
   return {

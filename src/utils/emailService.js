@@ -1,48 +1,64 @@
 /**
- * 🎯 Servicio Unificado de Email
- * 
- * Envía comprobantes de venta por email (NO facturas electrónicas).
- * 
- * IMPORTANTE: Los comprobantes enviados NO tienen validez ante DIAN.
- * Para facturación electrónica oficial, usar Siigo directamente.
- * 
- * Detecta automáticamente qué proveedor usar según la configuración:
- * 1. Resend (si está configurado) - Óptimo para alto volumen (3,000/mes)
- * 2. EmailJS (fallback) - Funciona en producción (200/mes)
- * 
- * Ambos proveedores funcionan tanto en desarrollo como en producción.
- * 
- * Uso:
- * import { sendInvoiceEmail } from './emailService';
- * await sendInvoiceEmail({ email, invoiceNumber, customerName, total, items });
+ * Servicio unificado de envio de comprobantes por email.
+ *
+ * Prioridad de proveedores:
+ * 1. Resend (si esta configurado y habilitado)
+ * 2. EmailJS (fallback)
  */
 
-import { isResendConfigured } from './emailServiceResend';
-import { sendInvoiceEmail as sendInvoiceEmailJS } from './emailServiceSupabase';
+import { isResendConfigured, sendInvoiceEmailResend } from './emailServiceResend';
+import {
+  isEmailConfigured as isEmailJSConfigured,
+  sendInvoiceEmail as sendInvoiceEmailJS,
+} from './emailServiceSupabase';
+import { EMAIL_PROVIDERS, resolveEmailProviderFromConfig } from './emailProviderResolver';
 
-/**
- * Envía comprobante de venta usando el mejor proveedor disponible
- * IMPORTANTE: NO es factura electrónica válida ante DIAN
- * Usando EmailJS (Resend deshabilitado porque requiere dominio verificado)
- */
+export const resolveEmailProvider = ({
+  providerHint = import.meta.env?.VITE_EMAIL_PROVIDER,
+  resendReady = isResendConfigured(),
+  emailJsReady = isEmailJSConfigured(),
+} = {}) => {
+  return resolveEmailProviderFromConfig({ providerHint, resendReady, emailJsReady });
+};
+
 export const sendInvoiceEmail = async (params) => {
-  // Usar EmailJS directamente
-  // Resend está deshabilitado porque requiere verificar dominio
-  return await sendInvoiceEmailJS(params);
+  const provider = resolveEmailProvider();
+
+  if (provider === EMAIL_PROVIDERS.RESEND) {
+    const resendResult = await sendInvoiceEmailResend(params);
+    if (resendResult?.success) {
+      return {
+        ...resendResult,
+        provider: EMAIL_PROVIDERS.RESEND,
+      };
+    }
+
+    const fallbackResult = await sendInvoiceEmailJS(params);
+    return {
+      ...fallbackResult,
+      provider: EMAIL_PROVIDERS.EMAILJS,
+      fallbackFrom: EMAIL_PROVIDERS.RESEND,
+      previousError: resendResult?.error || null,
+    };
+  }
+
+  if (provider === EMAIL_PROVIDERS.EMAILJS) {
+    const emailJsResult = await sendInvoiceEmailJS(params);
+    return {
+      ...emailJsResult,
+      provider: EMAIL_PROVIDERS.EMAILJS,
+    };
+  }
+
+  return {
+    success: false,
+    provider: EMAIL_PROVIDERS.NONE,
+    error: 'No hay un proveedor de email configurado (Resend/EmailJS).',
+  };
 };
 
-/**
- * Obtiene el proveedor de email activo
- */
-export const getEmailProvider = () => {
-  if (isResendConfigured()) return 'Resend';
-  return 'EmailJS';
-};
+export const getEmailProvider = () => resolveEmailProvider();
 
-/**
- * Verifica que al menos un proveedor esté configurado
- */
 export const isEmailServiceConfigured = () => {
-  return isResendConfigured() || 
-         !!(import.meta.env.VITE_EMAILJS_PUBLIC_KEY);
+  return resolveEmailProvider() !== EMAIL_PROVIDERS.NONE;
 };
