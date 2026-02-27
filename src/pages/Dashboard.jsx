@@ -305,7 +305,7 @@ function Dashboard() {
   const renderContent = () => {
     switch (activeSection) {
       case 'home':
-        return <Home key="home" business={business} />;
+        return <Home key="home" business={business} userRole="admin" />;
       
       case 'ventas':
         return <Ventas key="ventas" businessId={business?.id} />;
