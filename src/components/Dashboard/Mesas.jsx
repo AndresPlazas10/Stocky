@@ -437,8 +437,9 @@ async function reconcileTablesWithOpenOrders({ mesas = [], businessId }) {
   }
 }
 
-function Mesas({ businessId }) {
+function Mesas({ businessId, userRole = 'admin' }) {
   const MODAL_REOPEN_GUARD_MS = 600;
+  const canManageTables = isAdminRole(userRole);
   const [mesas, setMesas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -561,6 +562,12 @@ function Mesas({ businessId }) {
   useEffect(() => {
     selectedMesaRef.current = selectedMesa || null;
   }, [selectedMesa]);
+
+  useEffect(() => {
+    if (!canManageTables && showAddForm) {
+      setShowAddForm(false);
+    }
+  }, [canManageTables, showAddForm]);
 
   useEffect(() => {
     const productMap = new Map();
@@ -1391,6 +1398,12 @@ function Mesas({ businessId }) {
 
   const handleCreateTable = useCallback(async (e) => {
     e.preventDefault();
+
+    if (!canManageTables || isEmployee) {
+      setShowAddForm(false);
+      setError('⚠️ Solo el administrador puede crear mesas.');
+      return;
+    }
     
     if (isCreatingTable) return; // Prevenir doble click
     
@@ -1439,13 +1452,12 @@ function Mesas({ businessId }) {
       setNewTableNumber('');
       setShowAddForm(false);
       
-    } catch {
-      
-      setError('❌ No se pudo crear la mesa. Por favor, intenta de nuevo.');
+    } catch (error) {
+      setError(error?.message || '❌ No se pudo crear la mesa. Por favor, intenta de nuevo.');
     } finally {
       setIsCreatingTable(false); // SIEMPRE desbloquear
     }
-  }, [isCreatingTable, newTableNumber, businessId, loadMesas]);
+  }, [canManageTables, isEmployee, isCreatingTable, newTableNumber, businessId, loadMesas]);
 
   // IMPORTANTE: Definir estas funciones ANTES de handleOpenTable
   const createNewOrder = useCallback(async (mesa) => {
@@ -3293,7 +3305,7 @@ function Mesas({ businessId }) {
       skeletonType="mesas"
       emptyTitle="Aun no hay mesas creadas"
       emptyDescription="Crea tu primera mesa para empezar a registrar ordenes."
-      emptyAction={
+      emptyAction={canManageTables ? (
         <Button
           type="button"
           onClick={() => setShowAddForm(true)}
@@ -3301,7 +3313,7 @@ function Mesas({ businessId }) {
         >
           Crear Primera Mesa
         </Button>
-      }
+      ) : null}
       bypassStateRendering={showAddForm}
     >
       <motion.section
@@ -3319,13 +3331,15 @@ function Mesas({ businessId }) {
               </div>
               Gestión de Mesas
             </CardTitle>
-            <Button 
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="gradient-primary text-white hover:opacity-90 text-sm sm:text-base px-3 sm:px-4 h-9 sm:h-11"
-            >
-              <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" />
-              Agregar Mesa
-            </Button>
+            {canManageTables && (
+              <Button 
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="gradient-primary text-white hover:opacity-90 text-sm sm:text-base px-3 sm:px-4 h-9 sm:h-11"
+              >
+                <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" />
+                Agregar Mesa
+              </Button>
+            )}
           </div>
         </CardHeader>
 
@@ -3381,7 +3395,7 @@ function Mesas({ businessId }) {
 
           {/* Formulario para agregar mesa */}
           <AnimatePresence>
-            {showAddForm && (
+            {showAddForm && canManageTables && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
@@ -3527,13 +3541,15 @@ function Mesas({ businessId }) {
               <p className="text-primary-600 mb-6">
                 Comienza agregando tu primera mesa
               </p>
-              <Button 
-                onClick={() => setShowAddForm(true)}
-                className="gradient-primary text-white hover:opacity-90"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Agregar Mesa
-              </Button>
+              {canManageTables && (
+                <Button 
+                  onClick={() => setShowAddForm(true)}
+                  className="gradient-primary text-white hover:opacity-90"
+                >
+                  <Plus className="w-5 h-5 mr-2" />
+                  Agregar Mesa
+                </Button>
+              )}
             </div>
           )}
         </CardContent>
