@@ -1,101 +1,58 @@
-/**
- * 🔌 Banner de alerta cuando no hay conexión a Internet
- * Se muestra en la parte superior de la aplicación
- */
-
-import { WifiOff, RefreshCw } from 'lucide-react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
-import { useState, useEffect } from 'react';
-import LOCAL_SYNC_CONFIG from '../config/localSync.js';
+import { AnimatePresence, motion } from 'framer-motion';
+import { WifiOff } from 'lucide-react';
+
+const _motionLintUsage = motion;
 
 export default function OfflineBanner() {
   const isOnline = useOnlineStatus();
-  const [showBanner, setShowBanner] = useState(false);
-  const [wasOffline, setWasOffline] = useState(false);
-  const canWriteOffline = Boolean(
-    LOCAL_SYNC_CONFIG.enabled
-    && (
-      LOCAL_SYNC_CONFIG.localWrites?.sales
-      || LOCAL_SYNC_CONFIG.localWrites?.purchases
-      || LOCAL_SYNC_CONFIG.localWrites?.products
-      || LOCAL_SYNC_CONFIG.localWrites?.suppliers
-    )
-  );
-
-  useEffect(() => {
-    if (!isOnline) {
-      // Usuario se desconectó
-      setShowBanner(true);
-      setWasOffline(true);
-    } else if (isOnline && wasOffline) {
-      // Usuario se reconectó - mostrar mensaje breve
-      setShowBanner(true);
-      // Ocultar banner después de 3 segundos
-      const timer = setTimeout(() => {
-        setShowBanner(false);
-        setWasOffline(false);
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [isOnline, wasOffline]);
-
-  if (!showBanner) return null;
 
   return (
-    <div
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isOnline
-          ? 'bg-green-600 text-white'
-          : 'bg-red-600 text-white'
-      }`}
-      role="alert"
-      aria-live="assertive"
-    >
-      <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-3 flex-1">
-            {isOnline ? (
-              <>
-                <RefreshCw className="h-5 w-5 animate-spin" />
-                <div className="flex-1">
-                  <p className="font-medium text-sm sm:text-base">
-                    ✅ Conexión restablecida
-                  </p>
-                  <p className="text-xs sm:text-sm opacity-90">
-                    Ya puedes continuar trabajando normalmente
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-5 w-5 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="font-medium text-sm sm:text-base">
-                    ⚠️ Sin conexión a Internet
-                  </p>
-                  <p className="text-xs sm:text-sm opacity-90">
-                    {canWriteOffline
-                      ? 'Puedes seguir operando localmente. La sincronización se reanudará al reconectar.'
-                      : 'No puedes crear registros ni sincronizar datos. Verifica tu conexión WiFi o datos móviles.'}
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
+    <AnimatePresence>
+      {!isOnline && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          role="alert"
+          aria-live="assertive"
+          aria-modal="true"
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0, y: 12 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.95, opacity: 0, y: 12 }}
+            className="w-full max-w-md rounded-2xl border border-white/15 bg-slate-950/75 text-white shadow-2xl"
+          >
+            <div className="p-6 sm:p-7 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-white/10">
+                <WifiOff className="h-7 w-7" />
+              </div>
 
-          {/* Indicador visual de estado */}
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-2 h-2 rounded-full animate-pulse ${
-                isOnline ? 'bg-green-200' : 'bg-red-200'
-              }`}
-            />
-            <span className="text-xs font-mono hidden sm:inline">
-              {isOnline ? 'ONLINE' : 'OFFLINE'}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
+              <p className="text-base sm:text-lg font-semibold">
+                Perdiste la conexión, intentando reconectar...
+              </p>
+
+              <div className="mt-4 flex items-center justify-center gap-2" aria-hidden="true">
+                {[0, 1, 2].map((index) => (
+                  <motion.span
+                    key={index}
+                    className="h-2.5 w-2.5 rounded-full bg-white/90"
+                    animate={{ y: [0, -6, 0], opacity: [0.45, 1, 0.45] }}
+                    transition={{
+                      duration: 0.9,
+                      repeat: Infinity,
+                      ease: 'easeInOut',
+                      delay: index * 0.18
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

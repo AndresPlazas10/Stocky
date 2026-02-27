@@ -6,13 +6,14 @@ Sistema POS multi-tenant con inventario, ventas, compras, mesas, proveedores, em
 
 - Frontend: React 19 + Vite 7.
 - Backend: Supabase (PostgreSQL + Auth + Realtime).
-- Sincronizacion local-first disponible por feature flags (`LOCAL_SYNC_CONFIG`).
+- Arquitectura operativa: 100% online (sin persistencia local-first/outbox).
 - Flujo de facturacion/comprobantes activo en app.
 - Integracion Siigo interna removida de runtime (modo sunset documentado por ADR).
 
 ## Modulos principales
 
 - `Home/Mesas`: apertura de mesa, ordenes, cierre de venta, sincronizacion offline/online.
+- `Home/Mesas`: apertura de mesa, ordenes y cierre de venta online.
 - `Ventas`: registro de ventas y trazabilidad.
 - `Compras`: registro de compras e impacto en stock.
 - `Inventario`: productos, stock, precios.
@@ -82,15 +83,22 @@ Opcionales comunes:
 
 - Email: `VITE_EMAILJS_*`, `VITE_RESEND_*`, `VITE_TEST_EMAIL`
 - App URL: `VITE_APP_URL`
-- Local sync: `VITE_LOCAL_SYNC_*` y `VITE_FF_LOCAL_*`
+- Flags `VITE_LOCAL_SYNC_*` y `VITE_FF_LOCAL_*` se mantienen por compatibilidad, pero en runtime están desactivadas por rollback online-only.
 
-## Sincronizacion local-first
+## Estado online-only
 
-Stocky incluye outbox y cache local con flags para habilitacion gradual.
+Stocky opera en modo online-only:
 
-Ver:
+- No guarda datos offline para sincronizar después.
+- Si no hay conexión, muestra: `Perdiste la conexión, intentando reconectar...`.
+- Al reconectar, reanuda operaciones directas contra Supabase.
 
-- `src/config/localSync.js`
+SQL recomendado de rollback/aseguramiento:
+
+- `scripts/ROLLBACK_ONLINE_ONLY.sql`
+
+Documentación histórica (no vigente en runtime):
+
 - `docs/ARQUITECTURA_LOCAL_FIRST_ELECTRICSQL.md`
 - `docs/LOCAL_SYNC_DEV_CHECKLIST.md`
 

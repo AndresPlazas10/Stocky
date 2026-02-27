@@ -5,7 +5,7 @@ Indice principal de documentacion tecnica y operativa.
 ## Estado de referencia (Febrero 2026)
 
 - Stack actual: React 19, Vite 7, Supabase JS 2.x.
-- Sincronizacion local-first habilitable por flags.
+- Arquitectura operativa: online-only (sin outbox/sync local en runtime).
 - Facturacion operativa activa en app.
 - Integracion Siigo interna removida de runtime (estado sunset documentado).
 
@@ -23,11 +23,15 @@ Indice principal de documentacion tecnica y operativa.
 - `setup/EMAIL_CONFIGURATION.md`: referencia de configuracion de correo.
 - `guides/ENVIO_FACTURAS.md`: flujo funcional de envio.
 
-## 3. Sincronizacion local-first
+## 3. Estado online-only y rollback
 
-- `ARQUITECTURA_LOCAL_FIRST_ELECTRICSQL.md`: arquitectura general.
-- `LOCAL_SYNC_DEV_CHECKLIST.md`: checklist para pruebas y diagnostico.
-- `GUIA_TECNICA_REALTIME.md`: detalles de realtime y consistencia.
+- `../scripts/ROLLBACK_ONLINE_ONLY.sql`: script conservador para asegurar operación online.
+- `GUIA_TECNICA_REALTIME.md`: detalles de realtime y consistencia online.
+
+Documentación histórica (referencia, no runtime actual):
+
+- `ARQUITECTURA_LOCAL_FIRST_ELECTRICSQL.md`
+- `LOCAL_SYNC_DEV_CHECKLIST.md`
 
 ## 4. Despliegue
 
@@ -66,7 +70,7 @@ Estado esperado:
 - Carpeta: `../testing/`
 - Comando: `npm run test -- --run`
 
-Nota: la cobertura actual es limitada frente al dominio. Priorizar tests de Mesas, sync offline/online, facturacion y email.
+Nota: la cobertura actual es limitada frente al dominio. Priorizar tests de Mesas, facturacion y email.
 
 ## 8. Diagnosticos y reportes tecnicos
 

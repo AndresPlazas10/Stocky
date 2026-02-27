@@ -56,7 +56,6 @@ import { normalizeTableRecord } from '../../utils/tableStatus.js';
 import { getThermalPaperWidthMm, isAutoPrintReceiptEnabled } from '../../utils/printer.js';
 import { printSaleReceipt } from '../../utils/saleReceiptPrint.js';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
-import { getLocalDbClient } from '../../localdb/client.js';
 import { invalidateOrderCache } from '../../data/adapters/cacheInvalidation.js';
 import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
 
@@ -131,6 +130,19 @@ const getMesaProductUnits = (mesa, { selectedMesa = null, orderItems = [] } = {}
   );
 
   return Number.isFinite(localUnits) ? localUnits : 0;
+};
+
+const getOrderItemRenderKey = (item, index = 0) => {
+  const comboId = normalizeEntityId(item?.combo_id);
+  if (comboId) return `combo:${comboId}`;
+
+  const productId = normalizeEntityId(item?.product_id);
+  if (productId) return `product:${productId}`;
+
+  const itemId = normalizeEntityId(item?.id);
+  if (itemId) return `id:${itemId}`;
+
+  return `fallback:${index}`;
 };
 
 const mergeOrderItemsPreservingPosition = (previousItems = [], incomingItems = []) => {
@@ -349,57 +361,9 @@ function sanitizeMesaOrderAssociation(mesa) {
   return normalizeTableRecord(mesa);
 }
 
-const isLocalCloseMutationType = (mutationType) => (
-  mutationType === 'sale.create'
-  || mutationType === 'order.close.single'
-  || mutationType === 'order.close.split'
-);
-
 async function reconcileClosedOrdersFromOutbox(mesas = []) {
   if (!Array.isArray(mesas) || mesas.length === 0) return mesas;
-
-  try {
-    const db = getLocalDbClient();
-    await db.init();
-
-    const [pendingEvents, terminalEvents] = await Promise.all([
-      db.listOutboxEvents({ status: 'pending', limit: 500 }),
-      db.listTerminalOutboxEvents({ limit: 500 })
-    ]);
-
-    const closedOrderIds = new Set();
-    const ackedTerminalEvents = (terminalEvents || []).filter(
-      (event) => String(event?.status || '').toLowerCase() === 'acked'
-    );
-    const allEvents = [...(pendingEvents || []), ...ackedTerminalEvents];
-
-    allEvents.forEach((event) => {
-      const mutationType = String(event?.mutation_type || '').trim();
-      if (!isLocalCloseMutationType(mutationType)) return;
-
-      const payload = event?.payload && typeof event.payload === 'object' ? event.payload : {};
-      const orderId = normalizeEntityId(payload?.order_id);
-      if (orderId) closedOrderIds.add(orderId);
-    });
-
-    if (closedOrderIds.size === 0) return mesas;
-
-    return mesas.map((mesa) => {
-      const orderId = normalizeEntityId(mesa?.current_order_id);
-      const shouldForceAvailable = Boolean(orderId && closedOrderIds.has(orderId));
-
-      if (!shouldForceAvailable) return mesa;
-
-      return normalizeTableRecord({
-        ...mesa,
-        status: 'available',
-        current_order_id: null,
-        orders: null
-      });
-    });
-  } catch {
-    return mesas;
-  }
+  return mesas;
 }
 
 function pickCanonicalOpenOrderForTable(openOrders = []) {
@@ -900,8 +864,13 @@ function Mesas({ businessId }) {
       }
       return [...prev, normalizedTable].sort(compareTableIdentifiers);
     });
-    setSuccess(`✨ Nueva mesa #${normalizedTable.table_number} agregada`);
-    setTimeout(() => setSuccess(null), 3000);
+    setAlertType('success');
+    setSuccessTitle('✨ Mesa Agregada');
+    setSuccessDetails([
+      { label: 'Mesa', value: `#${normalizedTable.table_number}` }
+    ]);
+    setSuccess(true);
+    setTimeout(() => setSuccess(false), 3000);
   }, []);
 
   const handleTableUpdate = useCallback((updatedTable) => {
@@ -1461,7 +1430,12 @@ function Mesas({ businessId }) {
       }
 
       // Código de éxito
-      setSuccess('✅ Mesa creada exitosamente');
+      setAlertType('success');
+      setSuccessTitle('✅ Mesa Creada');
+      setSuccessDetails([
+        { label: 'Mesa', value: `#${tableIdentifier}` }
+      ]);
+      setSuccess(true);
       setNewTableNumber('');
       setShowAddForm(false);
       
@@ -3090,6 +3064,8 @@ function Mesas({ businessId }) {
     // Snapshot antes de eliminar
     const mesaId = mesaToDelete;
     const snapshotMesas = mesas.slice();
+    const deletedTable = snapshotMesas.find((m) => m.id === mesaId) || null;
+    const deletedTableLabel = deletedTable?.table_number ? `#${deletedTable.table_number}` : '-';
 
     // Aplicar cambio optimista: remover de UI inmediatamente
     setMesas(prevMesas => prevMesas.filter(m => m.id !== mesaId));
@@ -3110,8 +3086,13 @@ function Mesas({ businessId }) {
     try {
       const deleteResult = await deleteTableCascadeOrders(mesaId, { businessId });
 
-      setSuccess('✅ Mesa eliminada exitosamente');
-      setTimeout(() => setSuccess(null), 3000);
+      setAlertType('success');
+      setSuccessTitle('🗑️ Mesa Eliminada');
+      setSuccessDetails([
+        { label: 'Mesa', value: deletedTableLabel }
+      ]);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
 
       // Recargar mesas para asegurar sincronización con servidor (cuando aplica).
       if (!deleteResult?.__localOnly) {
@@ -3659,7 +3640,7 @@ function Mesas({ businessId }) {
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                         {orderItems.map((item, index) => (
                           <motion.div
-                            key={item.id || `temp-${item.product_id || item.combo_id}-${index}`}
+                            key={getOrderItemRenderKey(item, index)}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: index * 0.05 }}

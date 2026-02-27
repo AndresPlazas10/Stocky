@@ -230,18 +230,24 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
     setItems(prevItems => prevItems.filter(item => item.product_id !== productId));
   }, []);
 
-    const updateQuantity = useCallback((productId, newQuantity) => {
-    if (newQuantity <= 0) {
-      handleRemoveItem(productId);
-      return;
-    }
+  const updateQuantity = useCallback((productId, newQuantity) => {
+    setItems((prevItems) => prevItems.map((item) => {
+      if (item.product_id !== productId) return item;
 
-    setItems(prevItems => prevItems.map(item =>
-      item.product_id === productId
-        ? { ...item, quantity: newQuantity, total: newQuantity * item.unit_price }
-        : item
-    ));
-  }, [handleRemoveItem]);
+      const rawValue = String(newQuantity ?? '').trim();
+      if (rawValue === '') {
+        return { ...item, quantity: '', total: 0 };
+      }
+
+      const parsedValue = Number(rawValue);
+      if (!Number.isFinite(parsedValue)) return item;
+      if (parsedValue <= 0) {
+        return { ...item, quantity: '', total: 0 };
+      }
+
+      return { ...item, quantity: parsedValue, total: parsedValue * item.unit_price };
+    }));
+  }, []);
 
   // Memoizar cálculo de total
   const totalFactura = useMemo(() => {
@@ -745,7 +751,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                             <div className="flex items-center justify-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
+                                onClick={() => updateQuantity(item.product_id, Math.max(0, Number(item.quantity || 0) - 1))}
                                 className="bg-gray-200 px-2 py-1 rounded hover:bg-gray-300 text-sm"
                                 title="Disminuir cantidad"
                               >
@@ -753,8 +759,8 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                               </button>
                               <input
                                 type="number"
-                                value={item.quantity}
-                                onChange={(e) => updateQuantity(item.product_id, parseFloat(e.target.value) || 0)}
+                                value={item.quantity === '' ? '' : item.quantity}
+                                onChange={(e) => updateQuantity(item.product_id, e.target.value)}
                                 className="w-16 p-1 border rounded text-center"
                                 min="0.01"
                                 max={item.max_stock || 99999}
@@ -762,7 +768,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                               />
                               <button
                                 type="button"
-                                onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
+                                onClick={() => updateQuantity(item.product_id, Number(item.quantity || 0) + 1)}
                                 className="bg-gray-200 px-2 py-1 rounded hover:bg-gray-300 text-sm"
                                 title="Aumentar cantidad"
                               >

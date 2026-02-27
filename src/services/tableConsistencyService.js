@@ -1,5 +1,3 @@
-import LOCAL_SYNC_CONFIG from '../config/localSync.js';
-import { getLocalDbClient } from '../localdb/client.js';
 import { getOpenOrdersByBusiness, getTablesWithCurrentOrderByBusiness } from '../data/queries/ordersQueries.js';
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { logger } from '../utils/logger.js';
@@ -34,22 +32,11 @@ async function appendConflict({
   reason,
   details = null
 }) {
-  if (!LOCAL_SYNC_CONFIG.enabled) return;
-  try {
-    const db = getLocalDbClient();
-    await db.init();
-    await db.appendConflictLog({
-      businessId,
-      mutationType,
-      mutationId,
-      reason,
-      details
-    });
-  } catch (error) {
-    logger.warn('[table-consistency] no se pudo registrar conflicto local', {
-      error: error?.message || String(error)
-    });
-  }
+  void businessId;
+  void mutationType;
+  void mutationId;
+  void reason;
+  void details;
 }
 
 async function applyFixOperation(operation) {

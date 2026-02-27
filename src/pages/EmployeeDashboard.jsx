@@ -8,7 +8,6 @@ import {
 import { signOutGlobalSession } from '../data/commands/authCommands.js';
 import PaymentWarningModal from '../components/PaymentWarningModal.jsx';
 import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
-import PlatformUpdateModal from '../components/PlatformUpdateModal.jsx';
 import { shouldShowPaymentWarning } from '../config/unpaidBusinesses.js';
 import Ventas from '../components/Dashboard/Ventas.jsx';
 import Inventario from '../components/Dashboard/Inventario.jsx';
@@ -40,7 +39,6 @@ function EmployeeDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showPaymentWarning, setShowPaymentWarning] = useState(false);
   const [isBusinessDisabled, setIsBusinessDisabled] = useState(false);
-  const [authUserId, setAuthUserId] = useState(null);
   const warmupStatus = useWarmupStatus(business?.id);
 
   useEffect(() => {
@@ -81,7 +79,6 @@ function EmployeeDashboard() {
         window.location.href = '/login';
         return;
       }
-      setAuthUserId(user.id);
 
       // Buscar el empleado directamente en la tabla employees
       let employeeData = null;
@@ -285,7 +282,6 @@ function EmployeeDashboard() {
         onClose={() => setShowPaymentWarning(false)}
         businessName={business?.name}
       />
-      <PlatformUpdateModal userId={authUserId} businessId={business?.id} />
       
       <div className="flex h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 overflow-hidden">
       {/* Sidebar */}

@@ -47,6 +47,7 @@ export function useRealtimeSubscription(table, options = {}) {
     onInsert,
     onUpdate,
     onDelete,
+    onReconnect,
     filter = {},
     enabled = true,
     retryOnError = true
@@ -157,6 +158,9 @@ export function useRealtimeSubscription(table, options = {}) {
                 channelName,
                 retryAttempts
               });
+              if (typeof onReconnect === 'function') {
+                onReconnect();
+              }
             }
             retryAttempts = 0;
             return;
@@ -176,7 +180,7 @@ export function useRealtimeSubscription(table, options = {}) {
       clearRetryTimer();
       removeActiveChannel();
     };
-  }, [table, enabled, filterKey, retryOnError]);
+  }, [table, enabled, filterKey, retryOnError, onReconnect]);
 }
 
 /**

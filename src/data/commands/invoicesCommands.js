@@ -10,21 +10,12 @@ function buildMutationId(prefix, businessId = null) {
 }
 
 function canQueueLocalInvoices() {
-  return Boolean(
-    LOCAL_SYNC_CONFIG.enabled
-    && LOCAL_SYNC_CONFIG.shadowWritesEnabled
-    && LOCAL_SYNC_CONFIG.localWrites?.invoices
-  );
+  void LOCAL_SYNC_CONFIG;
+  return false;
 }
 
 function shouldForceInvoicesLocalFirst() {
-  return Boolean(
-    canQueueLocalInvoices()
-    && (
-      LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
-      || LOCAL_SYNC_CONFIG.localWrites?.invoicesLocalFirst
-    )
-  );
+  return false;
 }
 
 function isConnectivityError(errorLike) {

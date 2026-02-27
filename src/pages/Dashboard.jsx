@@ -3,7 +3,6 @@ import { DashboardLayout } from '../components/layout/DashboardLayout.jsx';
 import PaymentWarningModal from '../components/PaymentWarningModal.jsx';
 import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
 import PricingAnnouncementModal from '../components/PricingAnnouncementModal.jsx';
-import PlatformUpdateModal from '../components/PlatformUpdateModal.jsx';
 import { shouldShowPaymentWarning } from '../config/unpaidBusinesses.js';
 import Home from '../components/Dashboard/Home.jsx';
 import Ventas from '../components/Dashboard/Ventas.jsx';
@@ -377,8 +376,6 @@ function Dashboard() {
       />
       {/* Modal de planes y precios (se muestra según fecha: día 1-5 de cada mes) */}
       <PricingAnnouncementModal />
-      {/* Modal de novedades/versionado (se muestra 1 vez por versión y usuario/negocio) */}
-      <PlatformUpdateModal userId={user?.id} businessId={business?.id} />
       
       <DashboardLayout
         userName={business?.owner_name || 'Usuario'}

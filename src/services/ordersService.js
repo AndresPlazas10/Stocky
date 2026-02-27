@@ -32,29 +32,12 @@ async function enqueueOrderCloseOutbox({
 }
 
 function canQueueLocalOrderSales() {
-  const hasAnyOrderCloseWritePath = Boolean(
-    LOCAL_SYNC_CONFIG.localWrites?.orders
-    || LOCAL_SYNC_CONFIG.localWrites?.tables
-    || LOCAL_SYNC_CONFIG.localWrites?.sales
-  );
-
-  return Boolean(
-    LOCAL_SYNC_CONFIG.enabled
-    && LOCAL_SYNC_CONFIG.shadowWritesEnabled
-    && hasAnyOrderCloseWritePath
-  );
+  void LOCAL_SYNC_CONFIG;
+  return false;
 }
 
 function shouldForceOrderSalesLocalFirst() {
-  return Boolean(
-    canQueueLocalOrderSales()
-    && (
-      LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
-      || LOCAL_SYNC_CONFIG.localWrites?.ordersLocalFirst
-      || LOCAL_SYNC_CONFIG.localWrites?.tablesLocalFirst
-      || LOCAL_SYNC_CONFIG.localWrites?.salesLocalFirst
-    )
-  );
+  return false;
 }
 
 function isConnectivityError(errorLike) {
@@ -70,7 +53,7 @@ function isConnectivityError(errorLike) {
 }
 
 function buildOfflineCloseUnavailableMessage() {
-  return 'Sin internet: el cierre offline de mesas no está habilitado en esta configuración.';
+  return 'Perdiste la conexión, intentando reconectar...';
 }
 
 async function triggerBackgroundOutboxSync() {
@@ -585,6 +568,9 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     throw new Error('No hay subcuentas con productos válidos para procesar.');
   }
   const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
+  if (offlineMode) {
+    throw new Error(buildOfflineCloseUnavailableMessage());
+  }
   const enqueueSplitCloseWithIdentity = async () => {
     const { userId, sellerName: localSellerName } = await getSellerIdentityForLocalClose(businessId);
     return enqueueLocalSplitClose({
@@ -599,13 +585,6 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
 
   if (shouldForceOrderSalesLocalFirst()) {
     return enqueueSplitCloseWithIdentity();
-  }
-
-  if (offlineMode && canQueueLocalOrderSales()) {
-    return enqueueSplitCloseWithIdentity();
-  }
-  if (offlineMode && !canQueueLocalOrderSales()) {
-    throw new Error(buildOfflineCloseUnavailableMessage());
   }
 
   let user = null;
@@ -837,7 +816,7 @@ export async function closeOrderSingle(
   }
 ) {
   const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (offlineMode && !canQueueLocalOrderSales()) {
+  if (offlineMode) {
     throw new Error(buildOfflineCloseUnavailableMessage());
   }
 
@@ -859,7 +838,7 @@ export async function closeOrderSingle(
     itemsForRpc = normalizeOrderItemsForSale(orderItems);
   } else {
     if (offlineMode) {
-      throw new Error('Sin internet: no se pudieron recuperar los productos de la orden para cerrar la mesa.');
+      throw new Error(buildOfflineCloseUnavailableMessage());
     }
     try {
       const { data: orderData, error: orderFetchError } = await supabaseAdapter.getOrderWithItemsById(
@@ -871,7 +850,7 @@ export async function closeOrderSingle(
       itemsForRpc = normalizeOrderItemsForSale(orderData.order_items || []);
     } catch (error) {
       if (isConnectivityError(error)) {
-        throw new Error('Sin internet: no se pudieron recuperar los productos de la orden para cerrar la mesa.');
+        throw new Error(buildOfflineCloseUnavailableMessage());
       }
       throw error;
     }
@@ -901,10 +880,6 @@ export async function closeOrderSingle(
   };
 
   if (shouldForceOrderSalesLocalFirst()) {
-    return enqueueSingleCloseWithIdentity();
-  }
-
-  if (offlineMode && canQueueLocalOrderSales()) {
     return enqueueSingleCloseWithIdentity();
   }
 

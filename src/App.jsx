@@ -1,13 +1,10 @@
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { Loader2, AlertCircle, X } from 'lucide-react';
-import LOCAL_SYNC_CONFIG from './config/localSync.js';
 import PricingAnnouncementModal from './components/PricingAnnouncementModal';
-import OnlineSyncBlockingAlert from './components/OnlineSyncBlockingAlert.jsx';
-import { registerLocalSyncDevtools } from './sync/devtools.js';
-import { bootstrapLocalSync, runOutboxTick, stopLocalSync } from './sync/syncBootstrap.js';
+import OfflineBanner from './components/OfflineBanner.jsx';
 import { isBraveBrowser } from './utils/braveDetection';
 
 // Lazy loading de páginas para optimizar carga inicial
@@ -27,11 +24,6 @@ const PageLoader = () => (
 
 function App() {
   const [showBraveWarning, setShowBraveWarning] = useState(false);
-  const location = useLocation();
-  const showOnlineSyncBlockingAlert = (
-    location.pathname === '/dashboard'
-    || location.pathname === '/employee-dashboard'
-  );
 
   useEffect(() => {
     // Detectar Brave y mostrar advertencia si es necesario
@@ -52,50 +44,27 @@ function App() {
   }, []);
 
   useEffect(() => {
-    registerLocalSyncDevtools();
-  }, []);
-
-  useEffect(() => {
-    if (!LOCAL_SYNC_CONFIG.enabled) return undefined;
-
-    let mounted = true;
-    bootstrapLocalSync().catch(() => {});
-
-    return () => {
-      if (!mounted) return;
-      mounted = false;
-      stopLocalSync().catch(() => {});
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!LOCAL_SYNC_CONFIG.enabled || typeof window === 'undefined') return undefined;
-
-    const flushOutbox = () => {
-      runOutboxTick().catch(() => {});
-    };
-
-    const handleOnline = () => {
-      flushOutbox();
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== 'visible') return;
-      flushOutbox();
-    };
-
-    window.addEventListener('online', handleOnline);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
+    if (typeof window === 'undefined') return;
+    try {
+      const keysToDelete = [];
+      for (let i = 0; i < (window.localStorage?.length || 0); i += 1) {
+        const key = window.localStorage.key(i);
+        if (
+          typeof key === 'string'
+          && (key.startsWith('stocky.local_sync.') || key.startsWith('stocky.offline_snapshot.'))
+        ) {
+          keysToDelete.push(key);
+        }
+      }
+      keysToDelete.forEach((key) => window.localStorage.removeItem(key));
+    } catch {
+      // no-op
+    }
   }, []);
 
   return (
     <>
-      {showOnlineSyncBlockingAlert && <OnlineSyncBlockingAlert />}
+      <OfflineBanner />
       {/* Advertencia para Brave */}
       {showBraveWarning && (
         <div className="fixed top-0 left-0 right-0 z-[200] bg-orange-500 text-white p-3 sm:p-4 shadow-lg">

@@ -80,7 +80,14 @@ function Empleados({ businessId }) {
   useRealtimeSubscription('employees', {
     filter: { business_id: businessId },
     enabled: !!businessId,
+    onReconnect: () => {
+      loadEmpleados().catch(() => {});
+    },
     onInsert: (newEmployee) => {
+      if (!newEmployee?.id) {
+        loadEmpleados().catch(() => {});
+        return;
+      }
       if (isOwnerRole(newEmployee?.role)) return;
       const normalizedEmployee = {
         ...newEmployee,
@@ -98,6 +105,10 @@ function Empleados({ businessId }) {
       });
     },
     onUpdate: (updatedEmployee) => {
+      if (!updatedEmployee?.id) {
+        loadEmpleados().catch(() => {});
+        return;
+      }
       if (isOwnerRole(updatedEmployee?.role)) {
         setEmpleados((prev) => prev.filter((employee) => employee.id !== updatedEmployee?.id));
         return;
@@ -112,6 +123,10 @@ function Empleados({ businessId }) {
       )));
     },
     onDelete: (deletedEmployee) => {
+      if (!deletedEmployee?.id) {
+        loadEmpleados().catch(() => {});
+        return;
+      }
       setEmpleados((prev) => prev.filter((employee) => employee.id !== deletedEmployee?.id));
     }
   });
