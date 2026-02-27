@@ -217,7 +217,7 @@ function EmployeeDashboard() {
             </motion.div>
             
             {/* Gestión de mesas */}
-            <Mesas businessId={business?.id} />
+            <Mesas businessId={business?.id} userRole={employee?.role || 'employee'} />
           </div>
         );
       
