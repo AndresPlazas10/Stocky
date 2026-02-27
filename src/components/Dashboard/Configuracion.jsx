@@ -25,7 +25,6 @@ import {
   Shield,
   Printer
 } from 'lucide-react';
-import { InvoicingProvider } from '../../context/InvoicingContext';
 import InvoicingSection from '../Settings/InvoicingSection';
 import {
   getThermalPaperWidthMm,
@@ -527,13 +526,11 @@ function Configuracion({ user, business, onBusinessUpdate }) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <InvoicingProvider businessId={business.id}>
-              <InvoicingSection 
-                businessId={business.id}
-                businessName={business.name}
-                businessNit={business.nit}
-              />
-            </InvoicingProvider>
+            <InvoicingSection
+              businessId={business.id}
+              businessName={business.name}
+              businessNit={business.nit}
+            />
           </motion.div>
         )}
       </div>

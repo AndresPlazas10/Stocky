@@ -1,5 +1,6 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
 import { isMissingSupplierColumnError } from '../queries/suppliersQueries.js';
+import { invalidatePurchaseCache } from '../adapters/cacheInvalidation.js';
 import { enqueueOutboxMutation } from '../../sync/outboxShadow.js';
 import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
 import { runOutboxTick } from '../../sync/syncBootstrap.js';
@@ -216,6 +217,11 @@ export async function saveSupplierWithTaxFallback({
 
   if (error) throw error;
 
+  await invalidatePurchaseCache({
+    businessId,
+    supplierId: supplierId || data?.id || null
+  });
+
   await enqueueOutboxMutation({
     businessId,
     mutationType: supplierId ? 'supplier.update' : 'supplier.create',
@@ -294,6 +300,11 @@ export async function deleteSupplierById(supplierIdOrOptions) {
     });
   }
   if (error) throw error;
+
+  await invalidatePurchaseCache({
+    businessId,
+    supplierId
+  });
 
   await enqueueOutboxMutation({
     businessId,
