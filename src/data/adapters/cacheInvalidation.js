@@ -1,89 +1,19 @@
-import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
-import { getLocalDbClient } from '../../localdb/client.js';
-import { logger } from '../../utils/logger.js';
-
 function nonEmpty(value) {
   const normalized = String(value || '').trim();
   return normalized || null;
 }
 
-function getOfflineSnapshotStorageKey(key) {
-  const normalizedKey = nonEmpty(key);
-  if (!normalizedKey) return null;
-  return `stocky.offline_snapshot.${normalizedKey}`;
-}
-
 function forceMesaSnapshotAsAvailable({
-  businessId,
-  tableId = null,
-  orderId = null
+  businessId: _businessId,
+  tableId: _tableId = null,
+  orderId: _orderId = null
 } = {}) {
-  if (typeof window === 'undefined') return false;
-  const bid = nonEmpty(businessId);
-  if (!bid) return false;
-
-  const tid = nonEmpty(tableId);
-  const oid = nonEmpty(orderId);
-  if (!tid && !oid) return false;
-
-  const snapshotStorageKey = getOfflineSnapshotStorageKey(`mesas.list:${bid}`);
-  if (!snapshotStorageKey) return false;
-
-  try {
-    const raw = window.localStorage.getItem(snapshotStorageKey);
-    if (!raw) return false;
-
-    const parsed = JSON.parse(raw);
-    const mesas = Array.isArray(parsed?.payload) ? parsed.payload : null;
-    if (!mesas || mesas.length === 0) return false;
-
-    let touched = false;
-    const nextMesas = mesas.map((mesa) => {
-      const mesaId = nonEmpty(mesa?.id);
-      const mesaOrderId = nonEmpty(mesa?.current_order_id);
-      const matchesTable = Boolean(tid && mesaId && mesaId === tid);
-      const matchesOrder = Boolean(oid && mesaOrderId && mesaOrderId === oid);
-
-      if (!matchesTable && !matchesOrder) return mesa;
-      touched = true;
-
-      return {
-        ...mesa,
-        status: 'available',
-        current_order_id: null,
-        orders: null
-      };
-    });
-
-    if (!touched) return false;
-
-    window.localStorage.setItem(snapshotStorageKey, JSON.stringify({
-      updated_at: new Date().toISOString(),
-      payload: nextMesas
-    }));
-    return true;
-  } catch {
-    return false;
-  }
+  return false;
 }
 
 async function invalidateLocalReadCachePrefixes(prefixes = []) {
-  if (!LOCAL_SYNC_CONFIG.enabled) return 0;
-
   const filtered = [...new Set((prefixes || []).map(nonEmpty).filter(Boolean))];
-  if (filtered.length === 0) return 0;
-
-  try {
-    const db = getLocalDbClient();
-    await db.init();
-    return db.deleteCacheByPrefixes(filtered);
-  } catch (error) {
-    logger.warn('[local-cache] invalidation failed', {
-      prefixes: filtered,
-      error: error?.message || String(error)
-    });
-    return 0;
-  }
+  return filtered.length > 0 ? 0 : 0;
 }
 
 export async function invalidateSaleCache({

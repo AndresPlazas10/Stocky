@@ -440,23 +440,45 @@ function Compras({ businessId }) {
 
   const updateQuantity = useCallback((productId, newQuantity) => {
     setCart(prevCart => prevCart.map(item =>
-      item.product_id === productId
-        ? { ...item, quantity: parseInt(newQuantity) || 0 }
-        : item
+      item.product_id !== productId
+        ? item
+        : (() => {
+          const rawValue = String(newQuantity ?? '').trim();
+          if (rawValue === '') {
+            return { ...item, quantity: '' };
+          }
+          const parsedValue = Number(rawValue);
+          if (!Number.isFinite(parsedValue)) return item;
+          return { ...item, quantity: parsedValue };
+        })()
     ));
   }, []);
 
   const updatePrice = useCallback((productId, newPrice) => {
     setCart(prevCart => prevCart.map(item =>
-      item.product_id === productId
-        ? { ...item, unit_price: parseFloat(newPrice) || 0 }
-        : item
+      item.product_id !== productId
+        ? item
+        : (() => {
+          const rawValue = String(newPrice ?? '').trim();
+          if (rawValue === '') {
+            return { ...item, unit_price: '' };
+          }
+          const parsedValue = Number(rawValue);
+          if (!Number.isFinite(parsedValue)) return item;
+          return { ...item, unit_price: parsedValue };
+        })()
     ));
   }, []);
 
   // Memoizar cálculo de total
   const total = useMemo(() => {
-    return cart.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+    return cart.reduce((sum, item) => {
+      const quantity = Number(item.quantity);
+      const unitPrice = Number(item.unit_price);
+      const safeQuantity = Number.isFinite(quantity) ? quantity : 0;
+      const safeUnitPrice = Number.isFinite(unitPrice) ? unitPrice : 0;
+      return sum + (safeQuantity * safeUnitPrice);
+    }, 0);
   }, [cart]);
 
   const handleSubmit = useCallback(async (e) => {
@@ -475,6 +497,18 @@ function Compras({ businessId }) {
       if (cart.some((item) => item?.manage_stock === false)) {
         throw new Error('Hay productos sin control de stock en el carrito. Retíralos para continuar.');
       }
+      if (cart.some((item) => {
+        const quantity = Number(item.quantity);
+        const unitPrice = Number(item.unit_price);
+        return (
+          !Number.isFinite(quantity)
+          || quantity <= 0
+          || !Number.isFinite(unitPrice)
+          || unitPrice < 0
+        );
+      })) {
+        throw new Error('Hay productos con cantidad o precio inválido.');
+      }
       if (!total || total <= 0) throw new Error('El total de la compra debe ser mayor a 0');
 
       const user = await getAuthenticatedUser();
@@ -487,21 +521,19 @@ function Compras({ businessId }) {
         paymentMethod,
         notes,
         total,
-        cart
+        cart: cart.map((item) => ({
+          ...item,
+          quantity: Number(item.quantity),
+          unit_price: Number(item.unit_price)
+        }))
       });
 
-      setSuccess(
-        result?.localOnly
-          ? '✅ Compra guardada localmente. Se sincronizará al reconectar.'
-          : '✅ Compra registrada exitosamente'
-      );
+      setSuccess('✅ Compra registrada exitosamente');
       resetForm();
       setShowModal(false);
-
-      if (!result?.localOnly) {
-        loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (pagePurchases - 1) * limitPurchases });
-        loadProductos();
-      }
+      void result;
+      loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (pagePurchases - 1) * limitPurchases });
+      loadProductos();
       
     } catch (err) {
       setError('❌ Error al registrar la compra: ' + err.message);
@@ -1016,7 +1048,7 @@ function Compras({ businessId }) {
                             <Input
                               type="number"
                               min="1"
-                              value={item.quantity}
+                              value={item.quantity === '' ? '' : item.quantity}
                               onChange={(e) => updateQuantity(item.product_id, e.target.value)}
                               className="w-full h-10 text-center border-gray-300"
                             />
@@ -1024,12 +1056,12 @@ function Compras({ businessId }) {
                               type="number"
                               min="0"
                               step="0.01"
-                              value={item.unit_price}
+                              value={item.unit_price === '' ? '' : item.unit_price}
                               onChange={(e) => updatePrice(item.product_id, e.target.value)}
                               className="w-full h-10 border-gray-300"
                             />
                             <span className="text-left sm:text-right font-semibold text-gray-700">
-                              {formatPrice(item.quantity * item.unit_price)}
+                              {formatPrice((Number(item.quantity) || 0) * (Number(item.unit_price) || 0))}
                             </span>
                           </div>
                         </div>

@@ -1,6 +1,4 @@
 import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
-import { getLocalDbClient } from '../../localdb/client.js';
-import { logger } from '../../utils/logger.js';
 import { supabaseAdapter } from './supabaseAdapter.js';
 
 function buildCacheKey(parts = []) {
@@ -55,86 +53,12 @@ function shouldUseCriticalInvoicesReadCache() {
   return navigator.onLine === false;
 }
 
-function isOfflineRuntime() {
-  return typeof navigator !== 'undefined' && navigator.onLine === false;
-}
-
 async function readThroughCache({
-  cacheKey,
-  enabled,
+  cacheKey: _cacheKey,
+  enabled: _enabled,
   fetcher
 }) {
-  const offlineRuntime = isOfflineRuntime();
-  const cacheEnabled = Boolean(LOCAL_SYNC_CONFIG.enabled && enabled && cacheKey);
-  const offlineCacheEnabled = Boolean(LOCAL_SYNC_CONFIG.enabled && cacheKey && offlineRuntime);
-  const canUseCache = cacheEnabled || offlineCacheEnabled;
-  let staleCachedValue = null;
-  let hasStaleCachedValue = false;
-
-  if (canUseCache) {
-    try {
-      const db = getLocalDbClient();
-      await db.init();
-      const cached = await db.getCacheEntry(cacheKey, {
-        maxAgeMs: LOCAL_SYNC_CONFIG.localReadCacheTtlMs
-      });
-      if (cached !== null && cached !== undefined) {
-        return { data: cached, error: null };
-      }
-
-      staleCachedValue = await db.getCacheEntry(cacheKey, { maxAgeMs: 0 });
-      hasStaleCachedValue = staleCachedValue !== null && staleCachedValue !== undefined;
-    } catch (error) {
-      logger.warn('[local-adapter] cache read failed', {
-        cacheKey,
-        error: error?.message || String(error)
-      });
-    }
-  }
-
-  if (canUseCache && offlineRuntime) {
-    if (hasStaleCachedValue) {
-      return { data: staleCachedValue, error: null };
-    }
-    return { data: null, error: null };
-  }
-
-  let result = null;
-  try {
-    result = await fetcher();
-  } catch (error) {
-    if (canUseCache && hasStaleCachedValue) {
-      logger.warn('[local-adapter] fetch failed, using stale cache', {
-        cacheKey,
-        error: error?.message || String(error)
-      });
-      return { data: staleCachedValue, error: null };
-    }
-    throw error;
-  }
-
-  if (result?.error && canUseCache && hasStaleCachedValue) {
-    logger.warn('[local-adapter] fetch returned error, using stale cache', {
-      cacheKey,
-      error: result?.error?.message || String(result?.error)
-    });
-    return { data: staleCachedValue, error: null };
-  }
-
-  if (result?.error || !canUseCache) return result;
-
-  try {
-    const db = getLocalDbClient();
-    await db.init();
-    await db.setCacheEntry(cacheKey, result.data ?? null);
-  } catch (error) {
-    logger.warn('[local-adapter] cache write failed', {
-      cacheKey,
-      error: error?.message || String(error)
-    });
-  }
-
-  return result;
+  return fetcher();
 }
 
 export const readAdapter = {

@@ -22,21 +22,12 @@ function buildMutationId(prefix, businessId = null) {
 }
 
 function canQueueLocalProducts() {
-  return Boolean(
-    LOCAL_SYNC_CONFIG.enabled
-    && LOCAL_SYNC_CONFIG.shadowWritesEnabled
-    && LOCAL_SYNC_CONFIG.localWrites?.products
-  );
+  void LOCAL_SYNC_CONFIG;
+  return false;
 }
 
 function shouldForceProductsLocalFirst() {
-  return Boolean(
-    canQueueLocalProducts()
-    && (
-      LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
-      || LOCAL_SYNC_CONFIG.localWrites?.productsLocalFirst
-    )
-  );
+  return false;
 }
 
 function isConnectivityError(errorLike) {

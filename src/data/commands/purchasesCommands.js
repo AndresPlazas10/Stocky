@@ -1,31 +1,5 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
 import { invalidatePurchaseCache } from '../adapters/cacheInvalidation.js';
-import { enqueueOutboxMutation } from '../../sync/outboxShadow.js';
-import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
-import { runOutboxTick } from '../../sync/syncBootstrap.js';
-import { getCurrentSession } from '../queries/authQueries.js';
-
-function buildLocalPurchaseId(mutationId) {
-  return `local:${mutationId}`;
-}
-
-function canQueueLocalPurchases() {
-  return Boolean(
-    LOCAL_SYNC_CONFIG.enabled
-    && LOCAL_SYNC_CONFIG.shadowWritesEnabled
-    && LOCAL_SYNC_CONFIG.localWrites?.purchases
-  );
-}
-
-function shouldForcePurchasesLocalFirst() {
-  return Boolean(
-    canQueueLocalPurchases()
-    && (
-      LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
-      || LOCAL_SYNC_CONFIG.localWrites?.purchasesLocalFirst
-    )
-  );
-}
 
 function normalizePurchasePaymentMethod(paymentMethod) {
   const normalized = String(paymentMethod || '').trim().toLowerCase();
@@ -46,31 +20,6 @@ function isConnectivityError(errorLike) {
     || message.includes('load failed')
     || message.includes('network')
   );
-}
-
-function normalizePurchaseItemsForOutbox(cart = []) {
-  const sourceItems = Array.isArray(cart) ? cart : [];
-  return sourceItems.map((item = {}) => {
-    const productId = String(item?.product_id || '').trim() || null;
-    const quantity = Number(item?.quantity);
-    const unitCost = Number(item?.unit_price);
-
-    if (!productId) {
-      throw new Error('Item inválido: falta product_id');
-    }
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      throw new Error('Item inválido: cantidad incorrecta');
-    }
-    if (!Number.isFinite(unitCost) || unitCost < 0) {
-      throw new Error('Item inválido: costo unitario incorrecto');
-    }
-
-    return {
-      product_id: productId,
-      quantity,
-      unit_cost: unitCost
-    };
-  });
 }
 
 async function assertPurchasableProductsManageStock({ businessId, cart = [] }) {
@@ -110,83 +59,6 @@ async function assertPurchasableProductsManageStock({ businessId, cart = [] }) {
   if (blockedIds.length > 0) {
     throw new Error('No puedes registrar compras de productos sin control de stock.');
   }
-}
-
-async function enqueueOfflinePurchaseMutation({
-  businessId,
-  userId = null,
-  supplierId,
-  paymentMethod,
-  notes,
-  total,
-  cart,
-  idempotencyKey = null
-}) {
-  if (!canQueueLocalPurchases()) {
-    return {
-      success: false,
-      error: 'Las compras offline no están habilitadas en esta configuración.'
-    };
-  }
-
-  const normalizedItems = normalizePurchaseItemsForOutbox(cart);
-  const fallbackTotal = normalizedItems.reduce(
-    (sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_cost || 0)),
-    0
-  );
-  const normalizedTotal = Number.isFinite(Number(total)) ? Number(total) : fallbackTotal;
-  const normalizedPaymentMethod = normalizePurchasePaymentMethod(paymentMethod);
-
-  let resolvedUserId = String(userId || '').trim() || null;
-  if (!resolvedUserId) {
-    try {
-      const session = await getCurrentSession();
-      resolvedUserId = session?.user?.id || null;
-    } catch {
-      resolvedUserId = null;
-    }
-  }
-
-  const mutationId = String(idempotencyKey || '').trim()
-    || (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`);
-  const nowIso = new Date().toISOString();
-  const queued = await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'purchase.create',
-    payload: {
-      local_write: true,
-      user_id: resolvedUserId,
-      supplier_id: supplierId || null,
-      payment_method: normalizedPaymentMethod,
-      notes: notes || null,
-      total: normalizedTotal,
-      items_count: normalizedItems.length,
-      items: normalizedItems,
-      created_at: nowIso,
-      idempotency_key: mutationId
-    },
-    mutationId
-  });
-
-  if (!queued) {
-    return {
-      success: false,
-      error: 'No se pudo guardar la compra localmente. Intenta de nuevo.'
-    };
-  }
-
-  return {
-    success: true,
-    localOnly: true,
-    pendingSync: true,
-    data: {
-      id: buildLocalPurchaseId(mutationId),
-      total: normalizedTotal,
-      items_count: normalizedItems.length,
-      payment_method: normalizedPaymentMethod,
-      created_at: nowIso
-    }
-  };
 }
 
 function isMissingCreatePurchaseRpcError(error) {
@@ -287,41 +159,15 @@ export async function createPurchaseWithRpcFallback({
   cart,
   idempotencyKey = null
 }) {
-  await assertPurchasableProductsManageStock({ businessId, cart });
-
-  const forceLocalFirst = shouldForcePurchasesLocalFirst();
-  if (forceLocalFirst) {
-    const queuedResult = await enqueueOfflinePurchaseMutation({
-      businessId,
-      userId,
-      supplierId,
-      paymentMethod,
-      notes,
-      total,
-      cart,
-      idempotencyKey
-    });
-
-    if (queuedResult?.success && typeof navigator !== 'undefined' && navigator.onLine) {
-      runOutboxTick().catch(() => {});
-    }
-
-    return queuedResult;
-  }
-
   const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (offlineMode && canQueueLocalPurchases()) {
-    return enqueueOfflinePurchaseMutation({
-      businessId,
-      userId,
-      supplierId,
-      paymentMethod,
-      notes,
-      total,
-      cart,
-      idempotencyKey
-    });
+  if (offlineMode) {
+    return {
+      success: false,
+      error: 'Perdiste la conexión, intentando reconectar...'
+    };
   }
+
+  await assertPurchasableProductsManageStock({ businessId, cart });
 
   const purchaseItemsPayload = cart.map((item) => ({
     product_id: item.product_id,
@@ -343,17 +189,11 @@ export async function createPurchaseWithRpcFallback({
 
   let purchaseId = null;
   if (rpcError) {
-    if (canQueueLocalPurchases() && isConnectivityError(rpcError)) {
-      return enqueueOfflinePurchaseMutation({
-        businessId,
-        userId,
-        supplierId,
-        paymentMethod: normalizedPaymentMethod,
-        notes,
-        total,
-        cart,
-        idempotencyKey
-      });
+    if (isConnectivityError(rpcError)) {
+      return {
+        success: false,
+        error: 'Perdiste la conexión, intentando reconectar...'
+      };
     }
 
     if (!isMissingCreatePurchaseRpcError(rpcError)) {
@@ -381,23 +221,10 @@ export async function createPurchaseWithRpcFallback({
     purchaseId,
     supplierId: supplierId || null
   });
-
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'purchase.create',
-    payload: {
-      purchase_id: purchaseId,
-      supplier_id: supplierId,
-      payment_method: normalizedPaymentMethod,
-      total,
-      items_count: cart.length
-    },
-    mutationId: idempotencyKey || `${businessId}:${userId}:${Date.now()}:purchase.create`
-  });
+  void idempotencyKey;
 
   return {
     success: true,
-    localOnly: false,
     data: {
       id: purchaseId,
       total: Number(total || 0),
@@ -502,16 +329,6 @@ export async function deletePurchaseWithStockFallback({ purchaseId, businessId }
   await invalidatePurchaseCache({
     businessId,
     purchaseId
-  });
-
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'purchase.delete',
-    payload: {
-      purchase_id: purchaseId,
-      products_affected: productIds.length
-    },
-    mutationId: `${businessId}:${purchaseId}:purchase.delete`
   });
 
   return { appliedManualFallback };

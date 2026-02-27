@@ -6,8 +6,6 @@
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { isAdminRole } from '../utils/roles.js';
 import { buildUtcRangeFromLocalDates } from '../utils/dateRange.js';
-import LOCAL_SYNC_CONFIG from '../config/localSync.js';
-import { getLocalDbClient } from '../localdb/client.js';
 import { logger } from '../utils/logger.js';
 
 const SALES_LIST_COLUMNS = `
@@ -61,41 +59,13 @@ function buildSalesListCacheKey({ businessId, filters = {}, pagination = {} }) {
 }
 
 async function readCachedSalesList(cacheKey) {
-  if (!LOCAL_SYNC_CONFIG.enabled || !LOCAL_SYNC_CONFIG.localReads?.sales) return null;
-  try {
-    const db = getLocalDbClient();
-    await db.init();
-    const exact = await db.getCacheEntry(cacheKey);
-    if (exact) return exact;
-
-    const keyParts = String(cacheKey || '').split(':');
-    const businessId = keyParts[2] || '';
-    if (businessId) {
-      const fallbackByBusiness = await db.getLatestCacheEntryByPrefix(`sales:list:${businessId}:`);
-      if (fallbackByBusiness) return fallbackByBusiness;
-    }
-    return null;
-  } catch (error) {
-    logger.warn('[sales-service] cache read failed', {
-      cacheKey,
-      error: error?.message || String(error)
-    });
-    return null;
-  }
+  void cacheKey;
+  return null;
 }
 
 async function writeCachedSalesList(cacheKey, payload) {
-  if (!LOCAL_SYNC_CONFIG.enabled || !LOCAL_SYNC_CONFIG.localReads?.sales) return;
-  try {
-    const db = getLocalDbClient();
-    await db.init();
-    await db.setCacheEntry(cacheKey, payload);
-  } catch (error) {
-    logger.warn('[sales-service] cache write failed', {
-      cacheKey,
-      error: error?.message || String(error)
-    });
-  }
+  void cacheKey;
+  void payload;
 }
 
 function isConnectivityError(errorLike) {

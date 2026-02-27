@@ -142,10 +142,21 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel })
   };
 
   const setItemQuantityForAccount = (itemId, accountId, qty) => {
-    const numQty = Math.max(0, Math.floor(Number(qty)) || 0);
     setItemAssignments((prev) => {
       const byAccount = { ...(prev[itemId] || {}) };
-      byAccount[accountId] = numQty;
+      const rawValue = String(qty ?? '').trim();
+
+      if (rawValue === '') {
+        delete byAccount[accountId];
+      } else {
+        const numQty = Math.max(0, Math.floor(Number(rawValue)) || 0);
+        if (numQty <= 0) {
+          delete byAccount[accountId];
+        } else {
+          byAccount[accountId] = numQty;
+        }
+      }
+
       return { ...prev, [itemId]: byAccount };
     });
   };
@@ -396,7 +407,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel })
                                   type="number"
                                   min={0}
                                   max={totalQty}
-                                  value={itemAssignments[item.id]?.[acc.id] ?? 0}
+                                  value={itemAssignments[item.id]?.[acc.id] ?? ''}
                                   onChange={(e) =>
                                     setItemQuantityForAccount(item.id, acc.id, e.target.value)
                                   }

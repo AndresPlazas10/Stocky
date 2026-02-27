@@ -3,7 +3,6 @@ import { enqueueOutboxMutation } from '../../sync/outboxShadow.js';
 import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
 import { runOutboxTick } from '../../sync/syncBootstrap.js';
 import { invalidateOrderCache } from '../adapters/cacheInvalidation.js';
-import { getLocalDbClient } from '../../localdb/client.js';
 
 function buildMutationId(prefix, businessId = null) {
   const nonce = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
@@ -11,25 +10,12 @@ function buildMutationId(prefix, businessId = null) {
 }
 
 function canQueueLocalOrders() {
-  return Boolean(
-    LOCAL_SYNC_CONFIG.enabled
-    && LOCAL_SYNC_CONFIG.shadowWritesEnabled
-    && (
-      LOCAL_SYNC_CONFIG.localWrites?.orders
-      || LOCAL_SYNC_CONFIG.localWrites?.tables
-    )
-  );
+  void LOCAL_SYNC_CONFIG;
+  return false;
 }
 
 function shouldForceOrdersLocalFirst() {
-  return Boolean(
-    canQueueLocalOrders()
-    && (
-      LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
-      || LOCAL_SYNC_CONFIG.localWrites?.ordersLocalFirst
-      || LOCAL_SYNC_CONFIG.localWrites?.tablesLocalFirst
-    )
-  );
+  return false;
 }
 
 function isConnectivityError(errorLike) {
@@ -109,19 +95,8 @@ async function purgeLocalTableCascadeArtifacts({
   preserveMutationIds = []
 }) {
   if (!businessId || !tableId) return;
-
-  try {
-    const db = getLocalDbClient();
-    await db.init();
-    await db.purgeOutboxEventsForTable({
-      businessId,
-      tableId,
-      orderIds,
-      preserveMutationIds
-    });
-  } catch {
-    // best-effort
-  }
+  if (!LOCAL_SYNC_CONFIG.enabled) return;
+  void preserveMutationIds;
 
   await invalidateOrderCache({ businessId, tableId });
   if (Array.isArray(orderIds) && orderIds.length > 0) {
