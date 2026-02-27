@@ -77,10 +77,14 @@ function eventCreatedAtOrAfter(event, sinceMs) {
   if (!normalizedSinceMs) return true;
 
   const createdAtMs = Date.parse(event?.created_at || '');
-  if (Number.isFinite(createdAtMs)) return createdAtMs >= normalizedSinceMs;
+  if (Number.isFinite(createdAtMs) && createdAtMs >= normalizedSinceMs) return true;
 
   const updatedAtMs = Date.parse(event?.updated_at || '');
-  if (Number.isFinite(updatedAtMs)) return updatedAtMs >= normalizedSinceMs;
+  if (Number.isFinite(updatedAtMs) && updatedAtMs >= normalizedSinceMs) return true;
+
+  if (Number.isFinite(createdAtMs) || Number.isFinite(updatedAtMs)) {
+    return false;
+  }
 
   // Si no hay timestamps parseables, considerarlo relevante para no perder sincronización.
   return true;
@@ -226,8 +230,7 @@ export default function OnlineSyncBlockingAlert() {
 
     const handleOutboxEnqueued = (event) => {
       const enqueuedOnline = event?.detail?.online === true;
-      const isLocalWrite = event?.detail?.localWrite === true;
-      if (isLocalWrite || !enqueuedOnline || isOnlineRef.current === false) {
+      if (!enqueuedOnline || isOnlineRef.current === false) {
         offlineHadPendingRef.current = true;
         const markerSinceMs = toValidTimestamp(offlineStartedAtRef.current) || Date.now();
         offlineStartedAtRef.current = markerSinceMs;
@@ -276,11 +279,9 @@ export default function OnlineSyncBlockingAlert() {
       const hasAnyLocalWorkToSync = await hasInFlightOutboxEvents({
         localWriteOnly: true
       });
-      const hasAnyWorkToSync = await hasInFlightOutboxEvents();
 
       let hasWorkToSync = false;
       let hadOfflineActivity = false;
-      let hadOfflineAnyActivity = false;
       if (offlineWindowStartMs) {
         hasWorkToSync = await hasInFlightOutboxEvents({
           sinceMs: offlineWindowStartMs,
@@ -289,17 +290,13 @@ export default function OnlineSyncBlockingAlert() {
         hadOfflineActivity = await hasOutboxActivitySince(offlineWindowStartMs, {
           localWriteOnly: true
         });
-        hadOfflineAnyActivity = await hasOutboxActivitySince(offlineWindowStartMs);
       }
 
       const shouldBlock = shouldEvaluateReconnectSync
         ? (
           offlineHadPendingRef.current
-          || Boolean(persistedOfflineMarkerMs)
           || hadOfflineActivity
           || hasWorkToSync
-          || hadOfflineAnyActivity
-          || hasAnyWorkToSync
         )
         : hasAnyLocalWorkToSync;
 
@@ -313,7 +310,7 @@ export default function OnlineSyncBlockingAlert() {
         return;
       }
 
-      if (!offlineWindowStartMs) {
+      if (shouldEvaluateReconnectSync && !offlineWindowStartMs) {
         offlineWindowStartMs = Date.now();
         offlineStartedAtRef.current = offlineWindowStartMs;
         writeOfflineSyncMarker(offlineWindowStartMs);
@@ -334,7 +331,8 @@ export default function OnlineSyncBlockingAlert() {
         }
 
         const stillHasWork = await hasInFlightOutboxEvents({
-          sinceMs: offlineWindowStartMs
+          sinceMs: shouldEvaluateReconnectSync ? offlineWindowStartMs : null,
+          localWriteOnly: true
         });
         const elapsedMs = Date.now() - startedAtMs;
         if (!stillHasWork && elapsedMs >= MIN_BLOCKING_MS) {
