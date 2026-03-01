@@ -166,7 +166,7 @@ function PricingAnnouncementModal({ forceOpen = false, onClose }) {
                   </div>
 
                   <p className="text-xs text-yellow-900 bg-yellow-50 border border-yellow-300 rounded-lg p-2 mt-3 leading-snug">
-                    <strong>Importante:</strong> Realiza el pago con este QR y envía el comprobante por WhatsApp con el nombre de tu negocio.
+                    <strong>Importante:</strong> Realiza el pago con este QR y envía el comprobante por nuestro medio de WhatsApp 318-824-6925 con el nombre de tu negocio.
                   </p>
                 </div>
               </div>

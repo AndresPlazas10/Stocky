@@ -2072,7 +2072,9 @@ function Mesas({ businessId, userRole = 'admin' }) {
       const pendingSnapshotTotal = normalizedSnapshotOrderId
         ? toFiniteNumber(pendingRemoteOrderTotalsRef.current?.[normalizedSnapshotOrderId], 0)
         : 0;
-      const hasOrderTotalSignal = snapshotOrderTotal > 0.0001 || pendingSnapshotTotal > 0.0001;
+      const hasOrderTotalSignal = !hasLocalEdits && (
+        snapshotOrderTotal > 0.0001 || pendingSnapshotTotal > 0.0001
+      );
 
       // Si no hay productos, la mesa debe quedar disponible.
       if (!hasSavedItems) {
