@@ -6,9 +6,7 @@ import {
   getEmployeeByUserId
 } from '../data/queries/authQueries.js';
 import { signOutGlobalSession } from '../data/commands/authCommands.js';
-import PaymentWarningModal from '../components/PaymentWarningModal.jsx';
 import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
-import { shouldShowPaymentWarning } from '../config/unpaidBusinesses.js';
 import Ventas from '../components/Dashboard/Ventas.jsx';
 import Inventario from '../components/Dashboard/Inventario.jsx';
 import Mesas from '../components/Dashboard/Mesas.jsx';
@@ -37,7 +35,6 @@ function EmployeeDashboard() {
   const [error, setError] = useState(null);
   const [activeSection, setActiveSection] = useState('home');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showPaymentWarning, setShowPaymentWarning] = useState(false);
   const [isBusinessDisabled, setIsBusinessDisabled] = useState(false);
   const warmupStatus = useWarmupStatus(business?.id);
 
@@ -138,14 +135,6 @@ function EmployeeDashboard() {
         setIsBusinessDisabled(true);
         setLoading(false);
         return; // Detener ejecución y mostrar modal bloqueante
-      }
-      
-      // 🚨 VERIFICAR SI HOY ES DÍA DE ADVERTENCIA DE PAGO (para todos los negocios)
-      if (shouldShowPaymentWarning()) {
-        // Mostrar el modal de advertencia después de 1 segundo
-        setTimeout(() => {
-          setShowPaymentWarning(true);
-        }, 1000);
       }
       
       setLoading(false);
@@ -276,13 +265,6 @@ function EmployeeDashboard() {
 
   return (
     <>
-      {/* Modal de advertencia de pago pendiente */}
-      <PaymentWarningModal 
-        isOpen={showPaymentWarning}
-        onClose={() => setShowPaymentWarning(false)}
-        businessName={business?.name}
-      />
-      
       <div className="flex h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 overflow-hidden">
       {/* Sidebar */}
       <motion.aside

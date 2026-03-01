@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout.jsx';
-import PaymentWarningModal from '../components/PaymentWarningModal.jsx';
 import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
 import PricingAnnouncementModal from '../components/PricingAnnouncementModal.jsx';
-import { shouldShowPaymentWarning } from '../config/unpaidBusinesses.js';
 import Home from '../components/Dashboard/Home.jsx';
 import Ventas from '../components/Dashboard/Ventas.jsx';
 import Compras from '../components/Dashboard/Compras.jsx';
@@ -45,7 +43,6 @@ function Dashboard() {
   const [user, setUser] = useState(null);
   const [activeSection, setActiveSection] = useState('home');
   const [businessLogo, setBusinessLogo] = useState(null);
-  const [showPaymentWarning, setShowPaymentWarning] = useState(false);
   const [isBusinessDisabled, setIsBusinessDisabled] = useState(false);
   const lastTableReconcileToastRef = useRef(0);
   const warmupStatus = useWarmupStatus(business?.id);
@@ -238,14 +235,6 @@ function Dashboard() {
         return; // Detener ejecución y mostrar modal bloqueante
       }
 
-      // 🚨 VERIFICAR SI HOY ES DÍA DE ADVERTENCIA DE PAGO (para todos los negocios)
-      if (shouldShowPaymentWarning()) {
-        // Mostrar el modal de advertencia después de 1 segundo
-        setTimeout(() => {
-          setShowPaymentWarning(true);
-        }, 1000);
-      }
-
       // Tabla users (public) no existe - no crear registro
       
     } catch {
@@ -368,13 +357,6 @@ function Dashboard() {
 
   return (
     <>
-      {/* Modal de advertencia de pago pendiente */}
-      <PaymentWarningModal 
-        isOpen={showPaymentWarning}
-        onClose={() => setShowPaymentWarning(false)}
-        businessName={business?.name}
-      />
-      {/* Modal de planes y precios (se muestra según fecha: día 1-5 de cada mes) */}
       <PricingAnnouncementModal />
       
       <DashboardLayout
