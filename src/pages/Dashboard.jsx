@@ -1,19 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout.jsx';
 import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
 import PricingAnnouncementModal from '../components/PricingAnnouncementModal.jsx';
-import Home from '../components/Dashboard/Home.jsx';
-import Ventas from '../components/Dashboard/Ventas.jsx';
-import Compras from '../components/Dashboard/Compras.jsx';
-import Inventario from '../components/Dashboard/Inventario.jsx';
-import Combos from '../components/Dashboard/Combos.jsx';
-import Proveedores from '../components/Dashboard/Proveedores.jsx';
-import Empleados from '../components/Dashboard/Empleados.jsx';
-import Facturas from '../components/Dashboard/Facturas.jsx';
-import Clientes from '../components/Dashboard/Clientes.jsx';
-import Reportes from '../components/Dashboard/Reportes.jsx';
-import Configuracion from '../components/Dashboard/Configuracion.jsx';
-import IncidentesSync from '../components/Dashboard/IncidentesSync.jsx';
 import { AsyncStateWrapper } from '../ui/system/async-state/index.js';
 import { ModernToast } from '../components/ui/modern-alert.jsx';
 import { useToast } from '../hooks/useToast.js';
@@ -35,6 +23,25 @@ import { reconcileTableOrderConsistency } from '../services/tableConsistencyServ
 const TABLE_CONSISTENCY_RECONCILE_MS = 60000;
 const TABLE_RECONCILE_TOAST_COOLDOWN_MS = 120000;
 const LAST_BUSINESS_ID_STORAGE_KEY = 'stocky.last_business_id';
+
+const Home = lazy(() => import('../components/Dashboard/Home.jsx'));
+const Ventas = lazy(() => import('../components/Dashboard/Ventas.jsx'));
+const Compras = lazy(() => import('../components/Dashboard/Compras.jsx'));
+const Inventario = lazy(() => import('../components/Dashboard/Inventario.jsx'));
+const Combos = lazy(() => import('../components/Dashboard/Combos.jsx'));
+const Proveedores = lazy(() => import('../components/Dashboard/Proveedores.jsx'));
+const Empleados = lazy(() => import('../components/Dashboard/Empleados.jsx'));
+const Facturas = lazy(() => import('../components/Dashboard/Facturas.jsx'));
+const Clientes = lazy(() => import('../components/Dashboard/Clientes.jsx'));
+const Reportes = lazy(() => import('../components/Dashboard/Reportes.jsx'));
+const Configuracion = lazy(() => import('../components/Dashboard/Configuracion.jsx'));
+const IncidentesSync = lazy(() => import('../components/Dashboard/IncidentesSync.jsx'));
+
+const SectionLoader = () => (
+  <div className="rounded-xl border border-indigo-100 bg-white/80 p-4 text-sm text-indigo-700">
+    Cargando modulo...
+  </div>
+);
 
 function Dashboard() {
   const [business, setBusiness] = useState(null);
@@ -373,7 +380,9 @@ function Dashboard() {
         warmupStatus={warmupStatus}
       >
         <div className="space-y-4">
-          {renderContent()}
+          <Suspense fallback={<SectionLoader />}>
+            {renderContent()}
+          </Suspense>
         </div>
       </DashboardLayout>
       <ModernToast
