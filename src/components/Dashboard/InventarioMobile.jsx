@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { formatPrice } from '../../utils/formatters.js';
+import { formatPrice, parsePriceInput } from '../../utils/formatters.js';
 import { useViewport } from '../../hooks/useViewport';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
 import {
@@ -132,12 +132,12 @@ function InventarioMobile({ businessId }) {
   const handleSave = async () => {
     try {
       const name = String(formData.name || '').trim();
-      const purchasePrice = Number(formData.purchase_price);
-      const salePrice = Number(formData.sale_price);
+      const purchasePrice = parsePriceInput(formData.purchase_price, 0);
+      const salePrice = parsePriceInput(formData.sale_price, NaN);
       const stock = Number(formData.stock || 0);
       const minStock = Number(formData.min_stock || 0);
 
-      if (!name || !Number.isFinite(purchasePrice) || !Number.isFinite(salePrice)) {
+      if (!name || !Number.isFinite(purchasePrice) || !Number.isFinite(salePrice) || salePrice <= 0 || purchasePrice < 0) {
         return;
       }
 

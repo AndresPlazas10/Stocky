@@ -1,451 +1,294 @@
-import { useEffect, useState } from "react";
-import { motion } from 'framer-motion';
-import { useNavigate } from "react-router-dom";
-import { signOutSession } from "../data/commands/authCommands.js";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-
+import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { signOutSession } from '../data/commands/authCommands.js';
+import { Button } from '@/components/ui/button';
 import {
   Store,
-  Package,
-  TrendingUp,
-  Users,
-  BarChart3,
-  ShoppingCart,
-  Coffee,
-  Utensils,
-  Zap,
-  Check,
-  ArrowRight,
   Menu,
   X,
+  ArrowRight,
+  Sparkles,
+  ShoppingCart,
+  Receipt,
+  BarChart3,
+  Users,
   Shield,
-} from "lucide-react";
+  Clock3,
+  Check
+} from 'lucide-react';
 
 const _motionLintUsage = motion;
+
+const quickStats = [
+  { value: '99.9%', label: 'Disponibilidad operativa' },
+  { value: '2 min', label: 'Tiempo promedio de cobro' },
+  { value: '+28%', label: 'Mejora en eficiencia diaria' }
+];
+
+const modules = [
+  {
+    icon: ShoppingCart,
+    title: 'Punto de venta veloz',
+    text: 'Flujo optimizado para turnos exigentes y atención continua.'
+  },
+  {
+    icon: Receipt,
+    title: 'Facturación y comprobantes',
+    text: 'Documentación clara y trazable desde la venta hasta el cierre.'
+  },
+  {
+    icon: BarChart3,
+    title: 'Reportes útiles',
+    text: 'Métricas que ayudan a decidir mejor cada día.'
+  },
+  {
+    icon: Users,
+    title: 'Gestión por roles',
+    text: 'Permisos por empleado para operar con control y seguridad.'
+  },
+  {
+    icon: Shield,
+    title: 'Datos protegidos',
+    text: 'Infraestructura estable para cuidar tu información crítica.'
+  },
+  {
+    icon: Clock3,
+    title: 'Cierre simplificado',
+    text: 'Consolidación de jornada sin procesos manuales repetitivos.'
+  }
+];
+
+const process = [
+  'Configura productos, categorías y usuarios.',
+  'Opera ventas e inventario en la misma interfaz.',
+  'Revisa resultados y ajusta con datos reales.'
+];
 
 function Home() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Cerrar sesión al cargar la página
   useEffect(() => {
     const signOut = async () => {
       try {
         await signOutSession();
       } catch {
-        // Error silencioso
+        // no-op
       }
     };
     signOut();
   }, []);
 
-  const features = [
-    {
-      icon: Store,
-      title: "Gestión de Inventario",
-      description:
-        "Control completo de tus productos, stock y movimientos en tiempo real.",
-    },
-    {
-      icon: ShoppingCart,
-      title: "Punto de Venta",
-      description:
-        "Sistema POS rápido y eficiente para procesar ventas en segundos.",
-    },
-    {
-      icon: BarChart3,
-      title: "Reportes Inteligentes",
-      description:
-        "Analiza tu negocio con reportes detallados y visualizaciones claras.",
-    },
-    {
-      icon: Users,
-      title: "Multi-Usuario",
-      description: "Gestiona empleados y permisos de acceso para tu equipo.",
-    },
-    {
-      icon: TrendingUp,
-      title: "Analytics Avanzado",
-      description:
-        "Toma decisiones informadas con métricas de rendimiento en tiempo real.",
-    },
-    {
-      icon: Shield,
-      title: "Seguro y Confiable",
-      description:
-        "Tus datos protegidos con la mejor infraestructura de seguridad.",
-    },
-  ];
-
-  const benefits = [
-    "Control total de inventario",
-    "Ventas y facturación rápida",
-    "Reportes en tiempo real",
-    "Gestión de empleados",
-    "Acceso desde cualquier dispositivo",
-    "Soporte técnico 24/7",
-  ];
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100">
-      {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-b">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="flex items-center gap-2"
-            >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center">
-                <Store className="w-6 h-6 text-white" />
-              </div>
-            </motion.div>
+    <div className="min-h-screen bg-gradient-to-b from-[#f8f5ff] via-[#f2edff] to-[#ebe4ff] text-slate-900">
+      <div className="pointer-events-none fixed inset-0 -z-0 bg-[radial-gradient(circle_at_15%_10%,rgba(139,92,246,0.25),transparent_34%),radial-gradient(circle_at_85%_5%,rgba(99,102,241,0.2),transparent_32%),radial-gradient(circle_at_50%_95%,rgba(168,85,247,0.18),transparent_40%)]" />
 
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-6">
-              <a
-                href="#features"
-                className="text-sm font-medium text-gray-700 hover:text-indigo-600 transition-colors"
-              >
-                Características
-              </a>
-              <a
-                href="#benefits"
-                className="text-sm font-medium text-gray-700 hover:text-indigo-600 transition-colors"
-              >
-                Beneficios
-              </a>
-              <Button
-                variant="ghost"
-                onClick={() => navigate("/login")}
-                className="text-gray-700"
-              >
-                Iniciar Sesión
-              </Button>
-              <Button
-                onClick={() => navigate("/register")}
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90"
-              >
-                Registra tu negocio
-              </Button>
-            </div>
+      <header className="sticky top-0 z-50 border-b border-violet-200/60 bg-[#f8f5ff]/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <button onClick={() => navigate('/')} className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-violet-100/70">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600">
+              <Store className="h-5 w-5 text-slate-50" />
+            </span>
+            <span className="text-lg font-black tracking-tight text-violet-950">Stocky</span>
+          </button>
 
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-indigo-100 transition-colors"
-            >
-              {mobileMenuOpen ? (
-                <X className="w-6 h-6" />
-              ) : (
-                <Menu className="w-6 h-6" />
-              )}
-            </button>
+          <nav className="hidden items-center gap-8 md:flex">
+            <a href="#modules" className="text-sm font-semibold text-slate-700 hover:text-violet-700">Módulos</a>
+            <a href="#process" className="text-sm font-semibold text-slate-700 hover:text-violet-700">Proceso</a>
+            <a href="#start" className="text-sm font-semibold text-slate-700 hover:text-violet-700">Empezar</a>
+          </nav>
+
+          <div className="hidden items-center gap-2 md:flex">
+            <Button variant="ghost" onClick={() => navigate('/login')} className="font-semibold text-slate-700">
+              Iniciar sesión
+            </Button>
+            <Button onClick={() => navigate('/register')} className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 font-semibold text-slate-50 hover:opacity-90">
+              Crear cuenta
+            </Button>
           </div>
+
+          <button
+            className="rounded-lg p-2 text-slate-700 hover:bg-violet-100 md:hidden"
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            aria-label="Abrir menú"
+          >
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
 
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden border-t bg-white/90 backdrop-blur-xl"
-          >
-            <div className="container mx-auto px-4 py-4 flex flex-col gap-2">
-              <a
-                href="#features"
-                className="py-2 text-sm font-medium text-gray-700 hover:text-indigo-600"
-              >
-                Características
-              </a>
-              <a
-                href="#benefits"
-                className="py-2 text-sm font-medium text-gray-700 hover:text-indigo-600"
-              >
-                Beneficios
-              </a>
-              <div className="flex flex-col gap-2 mt-2">
-                <Button
-                  variant="ghost"
-                  onClick={() => navigate("/login")}
-                  className="w-full"
-                >
-                  Iniciar Sesión
-                </Button>
-                <Button
-                  onClick={() => navigate("/register")}
-                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white"
-                >
-                  Comenzar Gratis
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </nav>
-
-      {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-        <div className="absolute inset-0 bg-grid-pattern opacity-50"></div>
-        <div className="container mx-auto relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-center max-w-4xl mx-auto"
-          >
+        <AnimatePresence>
+          {mobileMenuOpen && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2 }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-100 text-indigo-700 text-sm font-medium mb-6"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="border-t border-violet-200 bg-[#f8f5ff] px-4 py-4 md:hidden"
             >
-              <Zap className="w-4 h-4" />
-              <span>Sistema POS para restaurantes y bares</span>
+              <div className="flex flex-col gap-2">
+                <a href="#modules" onClick={() => setMobileMenuOpen(false)} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-violet-100">Módulos</a>
+                <a href="#process" onClick={() => setMobileMenuOpen(false)} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-violet-100">Proceso</a>
+                <a href="#start" onClick={() => setMobileMenuOpen(false)} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-violet-100">Empezar</a>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <Button variant="outline" onClick={() => navigate('/login')} className="border-violet-300">Entrar</Button>
+                  <Button onClick={() => navigate('/register')} className="bg-gradient-to-r from-violet-600 to-indigo-600 text-slate-50 hover:opacity-90">Registro</Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
+
+      <main className="relative z-10">
+        <section className="px-4 pb-12 pt-12 sm:px-6 sm:pt-14 lg:px-8 lg:pb-20 lg:pt-24">
+          <div className="mx-auto flex w-full max-w-7xl flex-col items-center text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45 }}
+              className="inline-flex items-center gap-2 rounded-full border border-violet-300/70 bg-violet-100/70 px-3 py-1.5 text-xs font-semibold text-violet-700"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              POS integral para restaurantes y bares
             </motion.div>
 
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 animate-fade-in leading-tight">
-              Gestiona tu negocio con{" Stocky"}
+            <h1 className="mt-6 max-w-4xl text-4xl font-black leading-[1.05] tracking-tight text-violet-950 sm:text-5xl lg:text-6xl">
+              Una experiencia limpia y potente para controlar todo tu negocio
             </h1>
 
-            <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-8 max-w-2xl mx-auto animate-fade-in px-4">
-              La solución completa para controlar inventario, ventas y reportes
-              de tu restaurante o bar. Simple, rápido y confiable.
+            <p className="mt-6 max-w-2xl text-base leading-relaxed text-slate-700 sm:text-lg">
+              Stocky reúne ventas, inventario y reportes en una sola plataforma.
+              Diseñado para que tu equipo trabaje más rápido, con menos errores y mejor control diario.
             </p>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="flex flex-col sm:flex-row gap-4 justify-center"
-            >
+            <div className="mt-8 flex w-full max-w-md flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center">
               <Button
                 size="lg"
-                onClick={() => navigate("/register")}
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90 text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 hover-lift w-full sm:w-auto"
+                onClick={() => navigate('/register')}
+                className="group h-12 w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 font-semibold text-slate-50 hover:opacity-90 sm:w-auto"
               >
-                Registra tu negocio
-                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
+                Crear cuenta gratis
+                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                onClick={() => navigate("/login")}
-                className="border-2 border-indigo-500 text-indigo-700 hover:bg-indigo-50 text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto"
+                onClick={() => navigate('/login')}
+                className="h-12 w-full rounded-xl border-violet-300 bg-white/80 px-6 font-semibold text-slate-700 hover:bg-violet-50 sm:w-auto"
               >
-                Iniciar Sesión
+                Ya tengo cuenta
               </Button>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
+            </div>
 
-      {/* Features Section */}
-      <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 bg-white/50">
-        <div className="container mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4 px-4">
-              Todo lo que necesitas en un solo lugar
-            </h2>
-            <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto px-4">
-              Stocky ofrece las herramientas esenciales para gestionar tu
-              negocio de manera eficiente
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <Card className="p-4 sm:p-6 h-full hover-lift group cursor-pointer">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
-                    <feature.icon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-900" />
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
-                    {feature.title}
-                  </h3>
-                  <p className="text-sm sm:text-base text-gray-600">{feature.description}</p>
-                </Card>
-              </motion.div>
-            ))}
+            <div className="mt-12 grid w-full gap-4 md:grid-cols-3">
+              {quickStats.map((item, index) => (
+                <motion.article
+                  key={item.label}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.18 + (index * 0.08) }}
+                  className="rounded-2xl border border-violet-200/80 bg-white/75 p-5 shadow-[0_16px_30px_-22px_rgba(99,102,241,0.6)] backdrop-blur-sm"
+                >
+                  <p className="text-2xl font-black text-violet-900">{item.value}</p>
+                  <p className="mt-1 text-sm text-slate-600">{item.label}</p>
+                </motion.article>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Benefits Section */}
-      <section id="benefits" className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="container mx-auto">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-            >
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-6">
-                ¿Por qué elegir Stocky?
+        <section id="modules" className="px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+          <div className="mx-auto w-full max-w-7xl">
+            <div className="mb-10 max-w-2xl">
+              <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-violet-600">Módulos</p>
+              <h2 className="text-3xl font-black tracking-tight text-violet-950 sm:text-4xl">
+                Seis piezas para una operación más ordenada
               </h2>
-              <p className="text-base sm:text-lg text-gray-600 mb-8">
-                Diseñado específicamente para restaurantes y bares, Stocky
-                simplifica la gestión diaria de tu negocio.
-              </p>
-              <div className="space-y-4">
-                {benefits.map((benefit, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.1 }}
-                    className="flex items-center gap-3"
-                  >
-                    <div className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0">
-                      <Check className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="text-sm sm:text-base text-gray-700">{benefit}</span>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
+            </div>
 
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="relative"
-            >
-              <Card className="p-4 sm:p-6 md:p-8">
-                <div className="space-y-4 sm:space-y-6">
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-indigo-100 flex items-center justify-center">
-                      <BarChart3 className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600" />
-                    </div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {modules.map((module, index) => (
+                <motion.article
+                  key={module.title}
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.35 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="rounded-2xl border border-violet-200/90 bg-white/80 p-5 shadow-[0_14px_28px_-22px_rgba(124,58,237,0.65)]"
+                >
+                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                    <module.icon className="h-5 w-5" />
                   </div>
-                  <div className="h-px bg-gray-200"></div>
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                      <Users className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
-                    </div>
-                    <div>
-                      <div className="text-xs sm:text-sm text-gray-600">
-                        Gestión de Equipo
-                      </div>
-                      <div className="text-sm sm:text-base font-semibold text-gray-900">
-                        Control completo
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                      <Package className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
-                    </div>
-                    <div>
-                      <div className="text-xs sm:text-sm text-gray-600">Inventario</div>
-                      <div className="text-sm sm:text-base font-semibold text-gray-900">
-                        En tiempo real
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-8 sm:py-12 px-4 sm:px-6 lg:px-8 bg-[#054f55] text-white/70">
-        <div className="container mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-6 sm:mb-8">
-            <div className="col-span-2 md:col-span-1">
-              <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center">
-                  <Store className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-base sm:text-lg font-bold text-white">Stocky</span>
-              </div>
-              <p className="text-xs sm:text-sm">
-                Sistema POS completo para restaurantes y bares
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-3 sm:mb-4 text-sm sm:text-base">Producto</h4>
-              <ul className="space-y-2 text-xs sm:text-sm">
-                <li>
-                  <a
-                    href="#features"
-                    className="hover:text-white transition-colors"
-                  >
-                    Características
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="#benefits"
-                    className="hover:text-white transition-colors"
-                  >
-                    Beneficios
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-3 sm:mb-4 text-sm sm:text-base">Soporte</h4>
-              <ul className="space-y-2 text-xs sm:text-sm">
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    Documentación
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    API
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    Contacto
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-3 sm:mb-4 text-sm sm:text-base">Legal</h4>
-              <ul className="space-y-2 text-xs sm:text-sm">
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    Privacidad
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    Términos
-                  </a>
-                </li>
-              </ul>
+                  <h3 className="text-lg font-bold text-slate-900">{module.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{module.text}</p>
+                </motion.article>
+              ))}
             </div>
           </div>
-          <div className="pt-6 sm:pt-8 border-t border-white/10 text-center text-xs sm:text-sm">
-            <p>© 2025 Stocky. Todos los derechos reservados.</p>
+        </section>
+
+        <section id="process" className="px-4 pb-16 sm:px-6 lg:px-8 lg:pb-24">
+          <div className="mx-auto w-full max-w-7xl rounded-3xl border border-violet-200/90 bg-gradient-to-r from-violet-100/90 to-indigo-100/90 p-6 sm:p-8 lg:p-10">
+            <div className="mb-8 max-w-2xl">
+              <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-violet-600">Proceso</p>
+              <h2 className="text-3xl font-black tracking-tight text-violet-950 sm:text-4xl">Del arranque al control diario en 3 movimientos</h2>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              {process.map((line, index) => (
+                <motion.div
+                  key={line}
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.3 }}
+                  transition={{ delay: index * 0.07 }}
+                  className="rounded-2xl border border-violet-200 bg-white/80 p-5"
+                >
+                  <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-violet-600">Paso {index + 1}</p>
+                  <p className="text-sm leading-relaxed text-slate-700">{line}</p>
+                  <div className="mt-3 inline-flex items-center gap-1 text-violet-700">
+                    <Check className="h-4 w-4" />
+                    <span className="text-xs font-semibold">Listo para ejecutar</span>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="start" className="px-4 pb-16 sm:px-6 lg:px-8 lg:pb-24">
+          <div className="mx-auto flex w-full max-w-7xl flex-col items-start justify-between gap-6 rounded-3xl border border-violet-300/80 bg-violet-950 p-6 sm:p-8 lg:flex-row lg:items-center lg:p-10">
+            <div className="max-w-2xl">
+              <h3 className="text-2xl font-black tracking-tight text-slate-50 sm:text-3xl">Empieza hoy y moderniza la operación de tu negocio</h3>
+              <p className="mt-2 text-sm text-violet-100 sm:text-base">
+                Crea tu cuenta en minutos y gestiona ventas, inventario y reportes desde una sola plataforma.
+              </p>
+            </div>
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+              <Button onClick={() => navigate('/register')} className="h-11 w-full rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 px-6 font-semibold text-slate-50 hover:opacity-90 sm:w-auto">
+                Comenzar ahora
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/terms')} className="h-11 w-full rounded-xl border-violet-300 bg-transparent px-6 font-semibold text-violet-100 hover:bg-violet-900 sm:w-auto">
+                Términos del servicio
+              </Button>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="border-t border-violet-200/70 bg-[#f8f5ff]/95 px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600">
+              <Store className="h-5 w-5 text-slate-50" />
+            </span>
+            <div>
+              <p className="text-sm font-black text-violet-950">Stocky</p>
+              <p className="text-xs text-slate-600">Sistema POS para restaurantes y bares</p>
+            </div>
+          </div>
+          <div className="text-xs text-slate-500">
+            © 2026 Stocky. Todos los derechos reservados.
           </div>
         </div>
       </footer>
