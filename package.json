@@ -31,7 +31,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "test": "node --test \"testing/**/*.test.js\"",
+    "test": "node --test testing/*.test.js",
     "preview": "vite preview",
     "clean": "rm -rf dist node_modules",
     "reinstall": "npm run clean && npm install",

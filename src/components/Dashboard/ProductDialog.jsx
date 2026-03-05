@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { parsePriceInput } from '../../utils/formatters.js';
 
 const _motionLintUsage = motion;
 
@@ -86,7 +87,8 @@ export function ProductDialog({
     if (!formData.category.trim()) {
       newErrors.category = 'La categoría es requerida';
     }
-    if (!formData.price || Number(formData.price) <= 0) {
+    const normalizedPrice = parsePriceInput(formData.price, NaN);
+    if (!formData.price || !Number.isFinite(normalizedPrice) || normalizedPrice <= 0) {
       newErrors.price = 'El precio debe ser mayor a 0';
     }
     if (!formData.stock || Number(formData.stock) < 0) {
@@ -107,8 +109,8 @@ export function ProductDialog({
     try {
       const dataToSave = {
         ...formData,
-        price: Number(formData.price),
-        cost: formData.cost ? Number(formData.cost) : 0,
+        price: parsePriceInput(formData.price, 0),
+        cost: formData.cost ? parsePriceInput(formData.cost, 0) : 0,
         stock: Number(formData.stock),
         minStock: Number(formData.minStock),
         id: product?.id,
