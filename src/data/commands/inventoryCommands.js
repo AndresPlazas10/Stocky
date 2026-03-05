@@ -3,6 +3,7 @@ import { invalidateInventoryCache } from '../adapters/cacheInvalidation.js';
 import { enqueueOutboxMutation } from '../../sync/outboxShadow.js';
 import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
 import { runOutboxTick } from '../../sync/syncBootstrap.js';
+import { parsePriceInput } from '../../utils/formatters.js';
 
 function isMissingAtomicCreateFunction(error) {
   const message = String(error?.message || '').toLowerCase();
@@ -52,6 +53,10 @@ function normalizeNumber(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function normalizePriceAmount(value, fallback = 0) {
+  return parsePriceInput(value, fallback);
+}
+
 async function triggerBackgroundOutboxSync() {
   if (typeof navigator !== 'undefined' && navigator.onLine) {
     runOutboxTick().catch(() => {});
@@ -65,8 +70,8 @@ function buildProductCreateEventPayload(productData = {}, { productId, code }) {
     code: code || buildLocalProductCode(productId),
     name: productData.name,
     category: productData.category || null,
-    purchase_price: normalizeNumber(productData.purchase_price, 0),
-    sale_price: normalizeNumber(productData.sale_price, 0),
+    purchase_price: normalizePriceAmount(productData.purchase_price, 0),
+    sale_price: normalizePriceAmount(productData.sale_price, 0),
     stock: normalizeNumber(productData.stock, 0),
     min_stock: normalizeNumber(productData.min_stock, 0),
     unit: productData.unit || 'unit',
@@ -205,8 +210,14 @@ async function enqueueLocalProductDelete({
 }
 
 export async function createProductWithFallback(productData) {
+  const normalizedProductData = {
+    ...productData,
+    purchase_price: normalizePriceAmount(productData?.purchase_price, 0),
+    sale_price: normalizePriceAmount(productData?.sale_price, 0)
+  };
+
   if (shouldForceProductsLocalFirst()) {
-    const localResult = await enqueueLocalProductCreate(productData);
+    const localResult = await enqueueLocalProductCreate(normalizedProductData);
     if (!localResult?.success) {
       throw new Error(localResult?.error || 'No se pudo guardar el producto localmente');
     }
@@ -216,7 +227,7 @@ export async function createProductWithFallback(productData) {
 
   const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
   if (offlineMode && canQueueLocalProducts()) {
-    const localResult = await enqueueLocalProductCreate(productData);
+    const localResult = await enqueueLocalProductCreate(normalizedProductData);
     if (!localResult?.success) {
       throw new Error(localResult?.error || 'No se pudo guardar el producto localmente');
     }
@@ -227,22 +238,22 @@ export async function createProductWithFallback(productData) {
   let createdProduct = null;
 
   const { error: createError } = await supabaseAdapter.createProductWithGeneratedCodeRpc({
-    p_business_id: productData.business_id,
-    p_name: productData.name,
-    p_category: productData.category,
-    p_purchase_price: productData.purchase_price,
-    p_sale_price: productData.sale_price,
-    p_stock: productData.stock,
-    p_min_stock: productData.min_stock,
-    p_unit: productData.unit,
-    p_supplier_id: productData.supplier_id,
-    p_is_active: productData.is_active,
-    p_manage_stock: productData.manage_stock
+    p_business_id: normalizedProductData.business_id,
+    p_name: normalizedProductData.name,
+    p_category: normalizedProductData.category,
+    p_purchase_price: normalizedProductData.purchase_price,
+    p_sale_price: normalizedProductData.sale_price,
+    p_stock: normalizedProductData.stock,
+    p_min_stock: normalizedProductData.min_stock,
+    p_unit: normalizedProductData.unit,
+    p_supplier_id: normalizedProductData.supplier_id,
+    p_is_active: normalizedProductData.is_active,
+    p_manage_stock: normalizedProductData.manage_stock
   });
 
   if (createError) {
     if (canQueueLocalProducts() && isConnectivityError(createError)) {
-      const localResult = await enqueueLocalProductCreate(productData);
+      const localResult = await enqueueLocalProductCreate(normalizedProductData);
       if (!localResult?.success) {
         throw new Error(localResult?.error || 'No se pudo guardar el producto localmente');
       }
@@ -253,7 +264,7 @@ export async function createProductWithFallback(productData) {
       usedFallback = true;
       const fallbackCode = `PRD-${Date.now().toString().slice(-6)}`;
       const { data, error: retryError } = await supabaseAdapter.insertProduct({
-        ...productData,
+        ...normalizedProductData,
         code: fallbackCode,
         created_at: new Date().toISOString()
       });
@@ -281,19 +292,19 @@ export async function createProductWithFallback(productData) {
   }
 
   await invalidateInventoryCache({
-    businessId: productData.business_id || null,
+    businessId: normalizedProductData.business_id || null,
     productId: createdProduct?.id || null,
-    supplierId: productData?.supplier_id || null
+    supplierId: normalizedProductData?.supplier_id || null
   });
 
   await enqueueOutboxMutation({
-    businessId: productData.business_id,
+    businessId: normalizedProductData.business_id,
     mutationType: 'product.create',
-    payload: buildProductCreateEventPayload(productData, {
+    payload: buildProductCreateEventPayload(normalizedProductData, {
       productId: createdProduct?.id || null,
-      code: createdProduct?.code || productData?.code || null
+      code: createdProduct?.code || normalizedProductData?.code || null
     }),
-    mutationId: buildMutationId('product.create', productData.business_id)
+    mutationId: buildMutationId('product.create', normalizedProductData.business_id)
   });
 
   return {
@@ -304,11 +315,19 @@ export async function createProductWithFallback(productData) {
 }
 
 export async function updateProductById({ productId, businessId = null, payload }) {
+  const normalizedPayload = { ...payload };
+  if (Object.prototype.hasOwnProperty.call(payload || {}, 'purchase_price')) {
+    normalizedPayload.purchase_price = normalizePriceAmount(payload?.purchase_price, 0);
+  }
+  if (Object.prototype.hasOwnProperty.call(payload || {}, 'sale_price')) {
+    normalizedPayload.sale_price = normalizePriceAmount(payload?.sale_price, 0);
+  }
+
   if (shouldForceProductsLocalFirst()) {
     const localResult = await enqueueLocalProductUpdate({
       productId,
       businessId,
-      payload
+      payload: normalizedPayload
     });
     await triggerBackgroundOutboxSync();
     return { ...localResult.data, __localOnly: true };
@@ -319,18 +338,18 @@ export async function updateProductById({ productId, businessId = null, payload 
     const localResult = await enqueueLocalProductUpdate({
       productId,
       businessId,
-      payload
+      payload: normalizedPayload
     });
     return { ...localResult.data, __localOnly: true };
   }
 
-  const { data, error } = await supabaseAdapter.updateProductById(productId, payload);
+  const { data, error } = await supabaseAdapter.updateProductById(productId, normalizedPayload);
   if (error) {
     if (canQueueLocalProducts() && isConnectivityError(error)) {
       const localResult = await enqueueLocalProductUpdate({
         productId,
         businessId,
-        payload
+        payload: normalizedPayload
       });
       return { ...localResult.data, __localOnly: true };
     }
@@ -343,7 +362,7 @@ export async function updateProductById({ productId, businessId = null, payload 
   await invalidateInventoryCache({
     businessId,
     productId,
-    supplierId: payload?.supplier_id || null
+    supplierId: normalizedPayload?.supplier_id || null
   });
 
   await enqueueOutboxMutation({
@@ -351,10 +370,10 @@ export async function updateProductById({ productId, businessId = null, payload 
     mutationType: 'product.update',
     payload: {
       product_id: productId,
-      supplier_id: payload?.supplier_id || null,
-      manage_stock: payload?.manage_stock !== false,
-      is_active: payload?.is_active !== false,
-      update: payload || {}
+      supplier_id: normalizedPayload?.supplier_id || null,
+      manage_stock: normalizedPayload?.manage_stock !== false,
+      is_active: normalizedPayload?.is_active !== false,
+      update: normalizedPayload || {}
     },
     mutationId: buildMutationId('product.update', businessId)
   });

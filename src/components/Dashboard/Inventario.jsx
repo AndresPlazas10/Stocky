@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { formatPrice } from '../../utils/formatters.js';
+import { formatPrice, parsePriceInput } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
@@ -269,6 +269,9 @@ function Inventario({ businessId, userRole = 'admin' }) {
     setSuccess(null);
     
     try {
+      const normalizedSalePrice = parsePriceInput(formData.sale_price, NaN);
+      const normalizedPurchasePrice = parsePriceInput(formData.purchase_price, 0);
+
       // ✅ VALIDACIONES MEJORADAS
       if (!formData.name?.trim()) {
         throw new Error('El nombre del producto es requerido');
@@ -278,16 +281,16 @@ function Inventario({ businessId, userRole = 'admin' }) {
         throw new Error('La categoría del producto es requerida');
       }
 
-      if (!formData.sale_price || parseFloat(formData.sale_price) <= 0) {
+      if (!formData.sale_price || !Number.isFinite(normalizedSalePrice) || normalizedSalePrice <= 0) {
         throw new Error('El precio de venta debe ser mayor a 0');
       }
 
-      if (formData.purchase_price && parseFloat(formData.purchase_price) < 0) {
+      if (formData.purchase_price && normalizedPurchasePrice < 0) {
         throw new Error('El precio de compra no puede ser negativo');
       }
 
       if (formData.sale_price && formData.purchase_price) {
-        if (parseFloat(formData.sale_price) < parseFloat(formData.purchase_price)) {
+        if (normalizedSalePrice < normalizedPurchasePrice) {
           throw new Error('El precio de venta no puede ser menor al precio de compra');
         }
       }
@@ -301,8 +304,8 @@ function Inventario({ businessId, userRole = 'admin' }) {
       const productData = {
         name: formData.name.trim(),
         category: formData.category.trim(),
-        purchase_price: parseFloat(formData.purchase_price) || 0,
-        sale_price: parseFloat(formData.sale_price),
+        purchase_price: normalizedPurchasePrice,
+        sale_price: normalizedSalePrice,
         stock: formData.manage_stock ? (parseInt(formData.stock) || 0) : 0,
         min_stock: formData.manage_stock ? (parseInt(formData.min_stock) || 5) : 0,
         unit: formData.unit || 'unit',
@@ -367,11 +370,13 @@ function Inventario({ businessId, userRole = 'admin' }) {
 
   const handleUpdate = useCallback(async () => {
     try {
+      const normalizedSalePrice = parsePriceInput(formData.sale_price, NaN);
+      const normalizedPurchasePrice = parsePriceInput(formData.purchase_price, 0);
       const productData = {
         name: formData.name.trim(),
         category: formData.category.trim(),
-        purchase_price: parseFloat(formData.purchase_price) || 0,
-        sale_price: parseFloat(formData.sale_price),
+        purchase_price: normalizedPurchasePrice,
+        sale_price: normalizedSalePrice,
         // No se actualiza el stock al editar (se maneja con compras/ventas)
         min_stock: formData.manage_stock ? (parseInt(formData.min_stock) || 5) : 0,
         unit: formData.unit || 'unit',

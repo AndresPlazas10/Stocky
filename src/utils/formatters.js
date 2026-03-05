@@ -62,6 +62,58 @@ export const formatNumber = (value) => {
 };
 
 /**
+ * Convierte entradas de precio comunes en número.
+ * Soporta:
+ * - Miles con punto: "5.000" -> 5000
+ * - Miles con coma: "5,000" -> 5000
+ * - Formato es-CO: "1.500,50" -> 1500.5
+ * - Formato en-US: "1500.50" -> 1500.5
+ * @param {string|number|null|undefined} value
+ * @param {number} fallback
+ * @returns {number}
+ */
+export const parsePriceInput = (value, fallback = 0) => {
+  if (value === null || value === undefined || value === '') return fallback;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
+
+  const raw = String(value)
+    .trim()
+    .replace(/\s/g, '')
+    .replace(/COP/gi, '')
+    .replace(/\$/g, '')
+    .replace(/'/g, '');
+
+  if (!raw) return fallback;
+
+  const hasDot = raw.includes('.');
+  const hasComma = raw.includes(',');
+
+  if (hasDot && hasComma) {
+    const parsed = Number(raw.replace(/\./g, '').replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  if (hasDot) {
+    const dotThousandsPattern = /^\d{1,3}(\.\d{3})+$/;
+    const parsed = dotThousandsPattern.test(raw)
+      ? Number(raw.replace(/\./g, ''))
+      : Number(raw);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  if (hasComma) {
+    const commaThousandsPattern = /^\d{1,3}(,\d{3})+$/;
+    const parsed = commaThousandsPattern.test(raw)
+      ? Number(raw.replace(/,/g, ''))
+      : Number(raw.replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+/**
  * Convierte un string formateado a número
  * Ejemplo: "1'200.000" -> 1200000
  * Ejemplo: "2.000" -> 2000
@@ -69,18 +121,7 @@ export const formatNumber = (value) => {
  * @returns {number} - El valor numérico
  */
 export const parseFormattedNumber = (formattedValue) => {
-  if (!formattedValue) return 0;
-  
-  // Remover apóstrofes, puntos de miles, "COP" y espacios
-  const cleaned = formattedValue
-    .replace(/'/g, '')
-    .replace(/\./g, '')
-    .replace(/,/g, '.')  // Coma decimal a punto
-    .replace(/COP/g, '')
-    .replace(/\s/g, '')
-    .trim();
-  
-  return parseFloat(cleaned) || 0;
+  return parsePriceInput(formattedValue, 0);
 };
 
 /**
