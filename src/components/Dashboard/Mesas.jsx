@@ -498,6 +498,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
   const optimisticTempItemQuantitiesRef = useRef({});
   const pendingOrderItemOpsRef = useRef(0);
   const orderItemWriteQueueRef = useRef({});
+  const catalogWarmupPromiseRef = useRef(null);
 
   // Ref para prevenir que el modal se reabra después de completar una venta
   const justCompletedSaleRef = useRef(false);
@@ -805,13 +806,26 @@ function Mesas({ businessId, userRole = 'admin' }) {
     setClientes([]);
   }, []);
 
+  const ensureCatalogWarmup = useCallback(async () => {
+    if (catalogWarmupPromiseRef.current) {
+      return catalogWarmupPromiseRef.current;
+    }
+
+    catalogWarmupPromiseRef.current = Promise.allSettled([
+      loadProductos(),
+      loadCombos()
+    ]).finally(() => {
+      catalogWarmupPromiseRef.current = null;
+    });
+
+    return catalogWarmupPromiseRef.current;
+  }, [loadProductos, loadCombos]);
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       await Promise.all([
         loadMesas(),
-        loadProductos(),
-        loadCombos(),
         loadClientes()
       ]);
     } catch {
@@ -819,7 +833,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
     } finally {
       setLoading(false);
     }
-  }, [loadMesas, loadProductos, loadCombos, loadClientes]);
+  }, [loadMesas, loadClientes]);
 
   useEffect(() => {
     if (businessId) {
@@ -1727,6 +1741,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
     setSelectedMesa(normalizedMesa);
     setModalOpenIntent(true);
     setShowOrderDetails(true);
+    ensureCatalogWarmup().catch(() => {});
 
     if (normalizedMesa.status === 'occupied' && normalizedMesa.current_order_id) {
       // Pintado inmediato con datos ya presentes en la card y refresh remoto en background.
@@ -1743,7 +1758,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
       setOrderItems([]);
       await createNewOrder(normalizedMesa);
     }
-  }, [loadOrderDetails, createNewOrder, setPendingQuantityUpdatesSafe]);
+  }, [loadOrderDetails, createNewOrder, setPendingQuantityUpdatesSafe, ensureCatalogWarmup]);
 
   // IMPORTANTE: Definir updateOrderTotal PRIMERO (otras funciones dependen de esta)
   const updateOrderTotal = useCallback(async (orderId, itemsSnapshot = orderItems) => {
