@@ -44,6 +44,8 @@ import {
 } from '../../data/queries/authQueries.js';
 import { isAdminRole } from '../../utils/roles.js';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
+import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
+import { useProgressiveList } from '../../hooks/useProgressiveList.js';
 
 const _motionLintUsage = motion;
 
@@ -78,6 +80,18 @@ function Inventario({ businessId, userRole = 'admin' }) {
   const [generatedCode, setGeneratedCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const hasAdminPrivileges = isAdminRole(userRole);
+  const lowMotionMode = useLowMotionMode();
+  const {
+    visibleItems: visibleProductos,
+    hasMore: hasMoreProductos,
+    totalCount: totalProductos,
+    sentinelRef: productosSentinelRef,
+    loadMore: loadMoreProductos
+  } = useProgressiveList(productos, {
+    initialCount: lowMotionMode ? 16 : 24,
+    step: lowMotionMode ? 16 : 24,
+    resetKey: `${productos.length}:${lowMotionMode ? 'low' : 'full'}`
+  });
 
   const syncProductosSnapshot = useCallback((nextProductos) => {
     saveOfflineSnapshot(`inventario.productos:${businessId}`, nextProductos);
@@ -990,12 +1004,12 @@ function Inventario({ businessId, userRole = 'admin' }) {
           <div className="space-y-4">
             {/* Vista de tarjetas */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {productos.map((producto, index) => (
+              {visibleProductos.map((producto, index) => (
                 <motion.div
                   key={producto.id}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={lowMotionMode ? false : { opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.02 }}
+                  transition={lowMotionMode ? { duration: 0 } : { duration: 0.2, delay: index * 0.01 }}
                 >
                   <Card className={`shadow-lg rounded-2xl bg-white border-2 hover:shadow-xl transition-all duration-300 ${
                     (producto.manage_stock !== false && producto.stock <= producto.min_stock)
@@ -1146,6 +1160,22 @@ function Inventario({ businessId, userRole = 'admin' }) {
                 </motion.div>
               ))}
             </div>
+
+            {hasMoreProductos && (
+              <div className="flex flex-col items-center gap-3 py-2">
+                <p className="text-xs text-gray-500">
+                  Mostrando {visibleProductos.length} de {totalProductos} productos
+                </p>
+                <div ref={productosSentinelRef} className="h-2 w-full" aria-hidden="true" />
+                <Button
+                  onClick={loadMoreProductos}
+                  variant="outline"
+                  className="rounded-xl"
+                >
+                  Cargar mas productos
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </motion.div>

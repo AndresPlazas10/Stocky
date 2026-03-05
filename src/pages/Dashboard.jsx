@@ -19,10 +19,19 @@ import { warmupDashboardData } from '../services/dashboardWarmupService.js';
 import { useWarmupStatus } from '../hooks/useWarmupStatus.js';
 import LOCAL_SYNC_CONFIG from '../config/localSync.js';
 import { reconcileTableOrderConsistency } from '../services/tableConsistencyService.js';
+import PerformanceHud from '../components/perf/PerformanceHud.jsx';
 
 const TABLE_CONSISTENCY_RECONCILE_MS = 60000;
 const TABLE_RECONCILE_TOAST_COOLDOWN_MS = 120000;
 const LAST_BUSINESS_ID_STORAGE_KEY = 'stocky.last_business_id';
+const PERF_HUD_STORAGE_KEY = 'stocky.perf_hud';
+
+const isPerfHudInitiallyEnabled = () => {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('perf') === '1') return true;
+  return localStorage.getItem(PERF_HUD_STORAGE_KEY) === '1';
+};
 
 const Home = lazy(() => import('../components/Dashboard/Home.jsx'));
 const Ventas = lazy(() => import('../components/Dashboard/Ventas.jsx'));
@@ -49,6 +58,7 @@ function Dashboard() {
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
   const [activeSection, setActiveSection] = useState('home');
+  const [perfHudEnabled, setPerfHudEnabled] = useState(isPerfHudInitiallyEnabled);
   const [businessLogo, setBusinessLogo] = useState(null);
   const [isBusinessDisabled, setIsBusinessDisabled] = useState(false);
   const lastTableReconcileToastRef = useRef(0);
@@ -260,6 +270,37 @@ function Dashboard() {
     }
   }, [checkAuthAndLoadBusiness]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (perfHudEnabled) {
+      localStorage.setItem(PERF_HUD_STORAGE_KEY, '1');
+      window.__STOCKY_PERF_MODE__ = true;
+      return;
+    }
+
+    localStorage.removeItem(PERF_HUD_STORAGE_KEY);
+    window.__STOCKY_PERF_MODE__ = false;
+  }, [perfHudEnabled]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const onKeyDown = (event) => {
+      if (!event || typeof event.key !== 'string') return;
+      const isShortcut = (event.ctrlKey || event.metaKey)
+        && event.shiftKey
+        && event.key.toLowerCase() === 'p';
+      if (!isShortcut) return;
+      event.preventDefault();
+      setPerfHudEnabled((prev) => !prev);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
+
   const handleSignOut = async () => {
     try {
       // Limpiar el estado local primero
@@ -390,6 +431,11 @@ function Dashboard() {
         type={toastMessage?.type || 'info'}
         message={toastMessage?.text || ''}
         onClose={clearToast}
+      />
+      <PerformanceHud
+        enabled={perfHudEnabled}
+        activeSection={activeSection}
+        onClose={() => setPerfHudEnabled(false)}
       />
     </>
   );

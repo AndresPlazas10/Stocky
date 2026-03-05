@@ -24,6 +24,8 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
+import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
+import { useProgressiveList } from '../../hooks/useProgressiveList.js';
 
 const _motionLintUsage = motion;
 
@@ -40,6 +42,7 @@ function Proveedores({ businessId }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [supplierToDelete, setSupplierToDelete] = useState(null);
   const [supplierTaxColumn, setSupplierTaxColumn] = useState('nit');
+  const lowMotionMode = useLowMotionMode();
 
   // Estado del formulario
   const [formData, setFormData] = useState({
@@ -248,6 +251,18 @@ function Proveedores({ businessId }) {
     );
   }, [proveedores, searchTerm]);
 
+  const {
+    visibleItems: visibleProveedores,
+    hasMore: hasMoreProveedores,
+    totalCount: totalProveedoresFiltrados,
+    sentinelRef: proveedoresSentinelRef,
+    loadMore: loadMoreProveedores
+  } = useProgressiveList(filteredProveedores, {
+    initialCount: lowMotionMode ? 14 : 20,
+    step: lowMotionMode ? 14 : 20,
+    resetKey: `${searchTerm}:${filteredProveedores.length}:${lowMotionMode ? 'low' : 'full'}`
+  });
+
   const successTitle = useMemo(() => {
     const normalized = success.toLowerCase();
     if (normalized.includes('eliminad')) return '✨ Proveedor eliminado';
@@ -379,12 +394,12 @@ function Proveedores({ businessId }) {
             <div className="space-y-4">
               {/* Vista de tarjetas */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {filteredProveedores.map((proveedor, index) => (
+                {visibleProveedores.map((proveedor, index) => (
                   <motion.div
                     key={proveedor.id}
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={lowMotionMode ? false : { opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
+                    transition={lowMotionMode ? { duration: 0 } : { duration: 0.2, delay: index * 0.02 }}
                   >
                     <div className="bg-white rounded-2xl shadow-lg border-2 border-accent-100 hover:border-primary-300 hover:shadow-xl transition-all duration-300">
                       <div className="p-4 sm:p-6">
@@ -513,6 +528,22 @@ function Proveedores({ businessId }) {
                   </motion.div>
                 ))}
               </div>
+
+              {hasMoreProveedores && (
+                <div className="flex flex-col items-center gap-3 py-2">
+                  <p className="text-xs text-gray-500">
+                    Mostrando {visibleProveedores.length} de {totalProveedoresFiltrados} proveedores
+                  </p>
+                  <div ref={proveedoresSentinelRef} className="h-2 w-full" aria-hidden="true" />
+                  <button
+                    type="button"
+                    onClick={loadMoreProveedores}
+                    className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Cargar mas proveedores
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </motion.div>
