@@ -58,6 +58,9 @@ import { printSaleReceipt } from '../../utils/saleReceiptPrint.js';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
 import { invalidateOrderCache } from '../../data/adapters/cacheInvalidation.js';
 import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
+import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
+import { useProgressiveList } from '../../hooks/useProgressiveList.js';
+import { useRafBatchedQueue } from '../../hooks/useRafBatchedQueue.js';
 
 const getPaymentMethodLabel = (method) => {
   if (method === 'cash') return 'Efectivo';
@@ -506,6 +509,19 @@ function Mesas({ businessId, userRole = 'admin' }) {
   // Estado para bloquear completamente el renderizado del modal mientras se procesa la venta
   const [canShowOrderModal, setCanShowOrderModal] = useState(true);
   const isOrderItemsSyncing = pendingOrderItemOps > 0;
+  const lowMotionMode = useLowMotionMode();
+  const enqueueRealtimeUpdate = useRafBatchedQueue();
+  const {
+    visibleItems: visibleMesas,
+    hasMore: hasMoreMesas,
+    totalCount: totalMesas,
+    sentinelRef: mesasSentinelRef,
+    loadMore: loadMoreMesas
+  } = useProgressiveList(mesas, {
+    initialCount: lowMotionMode ? 12 : 20,
+    step: lowMotionMode ? 12 : 20,
+    resetKey: `${mesas.length}:${lowMotionMode ? 'low' : 'full'}`
+  });
 
   const setPendingQuantityUpdatesSafe = useCallback((updater) => {
     const prev = pendingQuantityUpdatesRef.current || {};
@@ -1119,100 +1135,103 @@ function Mesas({ businessId, userRole = 'admin' }) {
           NaN
         );
 
-        setMesas((prev) => prev.map((mesa) => {
-          if (mesa.id !== mesaId) return mesa;
+        enqueueRealtimeUpdate(() => {
+          setMesas((prev) => prev.map((mesa) => {
+            if (mesa.id !== mesaId) return mesa;
 
-          const previousOrderItems = Array.isArray(mesa?.orders?.order_items)
-            ? mesa.orders.order_items
-            : [];
-          const nextOrderItems = shouldProtectFromTransientEmpty
-            ? previousOrderItems
-            : incomingOrderItems;
-          const nextOrderTotal = nextOrderItems.length > 0
-            ? calculateOrderItemsTotal(nextOrderItems)
-            : (
-              Number.isFinite(pendingRemoteTotal)
-                ? pendingRemoteTotal
-                : (
-                  Number.isFinite(incomingOrderTotal)
-                    ? incomingOrderTotal
-                    : toFiniteNumber(mesa?.orders?.total, 0)
-                )
+            const previousOrderItems = Array.isArray(mesa?.orders?.order_items)
+              ? mesa.orders.order_items
+              : [];
+            const nextOrderItems = shouldProtectFromTransientEmpty
+              ? previousOrderItems
+              : incomingOrderItems;
+            const nextOrderTotal = nextOrderItems.length > 0
+              ? calculateOrderItemsTotal(nextOrderItems)
+              : (
+                Number.isFinite(pendingRemoteTotal)
+                  ? pendingRemoteTotal
+                  : (
+                    Number.isFinite(incomingOrderTotal)
+                      ? incomingOrderTotal
+                      : toFiniteNumber(mesa?.orders?.total, 0)
+                  )
+              );
+            const nextOrder = normalizedOrderStatus === 'open'
+              ? {
+                ...updatedOrder,
+                order_items: nextOrderItems,
+                total: nextOrderTotal,
+                local_units: getTotalProductUnits(nextOrderItems)
+              }
+              : resolvedUpdatedOrder;
+
+            return {
+              ...mesa,
+              orders: nextOrder
+            };
+          }));
+
+          setSelectedMesa((prevSelected) => {
+            if (prevSelected?.id !== mesaId) return prevSelected;
+            setOrderItems((prevItems) =>
+              (shouldProtectFromTransientEmpty && prevItems.length > 0)
+                ? prevItems
+                : mergeOrderItemsPreservingPosition(prevItems, incomingOrderItems)
             );
-          const nextOrder = normalizedOrderStatus === 'open'
-            ? {
-              ...updatedOrder,
-              order_items: nextOrderItems,
-              total: nextOrderTotal,
-              local_units: getTotalProductUnits(nextOrderItems)
-            }
-            : resolvedUpdatedOrder;
 
-          return {
-            ...mesa,
-            orders: nextOrder
-          };
-        }));
+            const previousSelectedItems = Array.isArray(prevSelected?.orders?.order_items)
+              ? prevSelected.orders.order_items
+              : [];
+            const nextSelectedItems = shouldProtectFromTransientEmpty
+              ? previousSelectedItems
+              : incomingOrderItems;
+            const nextSelectedTotal = nextSelectedItems.length > 0
+              ? calculateOrderItemsTotal(nextSelectedItems)
+              : (
+                Number.isFinite(pendingRemoteTotal)
+                  ? pendingRemoteTotal
+                  : (
+                    Number.isFinite(incomingOrderTotal)
+                      ? incomingOrderTotal
+                      : toFiniteNumber(prevSelected?.orders?.total, 0)
+                  )
+              );
+            const nextSelectedOrder = normalizedOrderStatus === 'open'
+              ? {
+                ...updatedOrder,
+                order_items: nextSelectedItems,
+                total: nextSelectedTotal,
+                local_units: getTotalProductUnits(nextSelectedItems)
+              }
+              : resolvedUpdatedOrder;
 
-        setSelectedMesa((prevSelected) => {
-          if (prevSelected?.id !== mesaId) return prevSelected;
-          setOrderItems((prevItems) =>
-            (shouldProtectFromTransientEmpty && prevItems.length > 0)
-              ? prevItems
-              : mergeOrderItemsPreservingPosition(prevItems, incomingOrderItems)
-          );
-
-          const previousSelectedItems = Array.isArray(prevSelected?.orders?.order_items)
-            ? prevSelected.orders.order_items
-            : [];
-          const nextSelectedItems = shouldProtectFromTransientEmpty
-            ? previousSelectedItems
-            : incomingOrderItems;
-          const nextSelectedTotal = nextSelectedItems.length > 0
-            ? calculateOrderItemsTotal(nextSelectedItems)
-            : (
-              Number.isFinite(pendingRemoteTotal)
-                ? pendingRemoteTotal
-                : (
-                  Number.isFinite(incomingOrderTotal)
-                    ? incomingOrderTotal
-                    : toFiniteNumber(prevSelected?.orders?.total, 0)
-                )
-            );
-          const nextSelectedOrder = normalizedOrderStatus === 'open'
-            ? {
-              ...updatedOrder,
-              order_items: nextSelectedItems,
-              total: nextSelectedTotal,
-              local_units: getTotalProductUnits(nextSelectedItems)
-            }
-            : resolvedUpdatedOrder;
-
-          return {
-            ...prevSelected,
-            orders: nextSelectedOrder
-          };
+            return {
+              ...prevSelected,
+              orders: nextSelectedOrder
+            };
+          });
         });
       } catch {
         // no-op
       }
     }, 100);
-  }, []);
+  }, [enqueueRealtimeUpdate]);
 
   // 🔥 TIEMPO REAL: Suscripción a cambios en mesas
   useRealtimeSubscription('tables', {
     filter: { business_id: businessId },
     enabled: !!businessId,
-    onInsert: handleTableInsert,
-    onUpdate: handleTableUpdate,
-    onDelete: handleTableDelete
+    onInsert: (newTable) => enqueueRealtimeUpdate(() => handleTableInsert(newTable)),
+    onUpdate: (updatedTable) => enqueueRealtimeUpdate(() => handleTableUpdate(updatedTable)),
+    onDelete: (deletedTable) => enqueueRealtimeUpdate(() => handleTableDelete(deletedTable))
   });
 
   // 🔥 TIEMPO REAL: Suscripción a cambios en órdenes
   useRealtimeSubscription('orders', {
     filter: { business_id: businessId },
     enabled: !!businessId,
-    onUpdate: async (updatedOrder) => {
+    onUpdate: (updatedOrder) => {
+      enqueueRealtimeUpdate(() => {
       // NO procesar actualizaciones si acabamos de completar una venta
       if (justCompletedSaleRef.current) {
         return;
@@ -1314,6 +1333,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
 
       // Los items se sincronizan exclusivamente desde la suscripción de `order_items`
       // para evitar doble fetch en background por cada cambio.
+      });
     }
   });
 
@@ -1392,9 +1412,9 @@ function Mesas({ businessId, userRole = 'admin' }) {
   useRealtimeSubscription('order_items', {
     enabled: !!businessId,
     filter: {}, // RLS se encarga del filtrado por business_id
-    onInsert: (newItem) => handleOrderItemChange(newItem, 'INSERT'),
-    onUpdate: (updatedItem) => handleOrderItemChange(updatedItem, 'UPDATE'),
-    onDelete: (deletedItem) => handleOrderItemChange(deletedItem, 'DELETE')
+    onInsert: (newItem) => enqueueRealtimeUpdate(() => handleOrderItemChange(newItem, 'INSERT')),
+    onUpdate: (updatedItem) => enqueueRealtimeUpdate(() => handleOrderItemChange(updatedItem, 'UPDATE')),
+    onDelete: (deletedItem) => enqueueRealtimeUpdate(() => handleOrderItemChange(deletedItem, 'DELETE'))
   });
 
   useEffect(() => () => {
@@ -3183,9 +3203,34 @@ function Mesas({ businessId, userRole = 'admin' }) {
       .filter((item) =>
         item.name.toLowerCase().includes(search) ||
         item.code.toLowerCase().includes(search)
-      )
-      .slice(0, 8);
+      );
   }, [searchProduct, catalogItems]);
+
+  const {
+    visibleItems: visibleFilteredCatalog,
+    hasMore: hasMoreFilteredCatalog,
+    totalCount: totalFilteredCatalog,
+    sentinelRef: filteredCatalogSentinelRef,
+    loadMore: loadMoreFilteredCatalog
+  } = useProgressiveList(filteredCatalog, {
+    initialCount: lowMotionMode ? 8 : 12,
+    step: lowMotionMode ? 8 : 12,
+    rootMargin: '220px',
+    resetKey: `${searchProduct.trim().toLowerCase()}:${filteredCatalog.length}:${lowMotionMode ? 'low' : 'full'}`
+  });
+
+  const {
+    visibleItems: visibleOrderItems,
+    hasMore: hasMoreOrderItems,
+    totalCount: totalOrderItems,
+    sentinelRef: orderItemsSentinelRef,
+    loadMore: loadMoreOrderItems
+  } = useProgressiveList(orderItems, {
+    initialCount: lowMotionMode ? 10 : 16,
+    step: lowMotionMode ? 8 : 14,
+    rootMargin: '240px',
+    resetKey: `${selectedMesa?.id || 'none'}:${orderItems.length}:${lowMotionMode ? 'low' : 'full'}`
+  });
 
   const orderTotal = useMemo(() => {
     return calculateOrderItemsTotal(orderItems);
@@ -3242,19 +3287,28 @@ function Mesas({ businessId, userRole = 'admin' }) {
     && !cambioPago.isValid
   ), [paymentMethod, amountReceived, cambioPago]);
 
+  const productById = useMemo(() => {
+    const map = new Map();
+    productos.forEach((product) => {
+      const productId = normalizeEntityId(product?.id);
+      if (productId) map.set(productId, product);
+    });
+    return map;
+  }, [productos]);
+
   // Items simples que exceden stock disponible (informativo).
   const insufficientItems = useMemo(() => {
     if (!orderItems || orderItems.length === 0) return [];
     return orderItems
       .filter((item) => !item.combo_id)
       .map((item) => {
-        const prod = productos.find(p => p.id === item.product_id);
+        const prod = productById.get(normalizeEntityId(item?.product_id));
         if (!prod || prod.manage_stock === false) return null;
         return prod ? { ...item, available_stock: prod.stock, product_name: prod.name } : null;
       })
       .filter(Boolean)
       .filter(i => typeof i.available_stock === 'number' && i.quantity > i.available_stock);
-  }, [orderItems, productos]);
+  }, [orderItems, productById]);
 
   // Validación crítica: stock interno requerido por combos.
   const insufficientComboComponents = useMemo(() => {
@@ -3284,7 +3338,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
 
     const shortages = [];
     requiredByProduct.forEach((requiredQty, productId) => {
-      const product = productos.find((p) => p.id === productId);
+      const product = productById.get(normalizeEntityId(productId));
       if (product?.manage_stock === false) return;
       const stock = Number(product?.stock || 0);
       if (stock >= requiredQty) return;
@@ -3298,7 +3352,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
     });
 
     return shortages;
-  }, [orderItems, comboById, productos]);
+  }, [orderItems, comboById, productById]);
 
   const hasInsufficientComboStock = insufficientComboComponents.length > 0;
 
@@ -3474,12 +3528,12 @@ function Mesas({ businessId, userRole = 'admin' }) {
 
           {/* Grid de mesas */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {mesas.map((mesa, index) => (
+            {visibleMesas.map((mesa, index) => (
               <motion.div
                 key={mesa.id}
-                initial={{ opacity: 0, scale: 0.9 }}
+                initial={lowMotionMode ? false : { opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.05 }}
+                transition={lowMotionMode ? { duration: 0 } : { duration: 0.2, delay: index * 0.02 }}
               >
                 <Card
                   className={`relative cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
@@ -3545,6 +3599,22 @@ function Mesas({ businessId, userRole = 'admin' }) {
               </motion.div>
             ))}
           </div>
+
+          {hasMoreMesas && (
+            <div className="flex flex-col items-center gap-3 py-2">
+              <p className="text-xs text-gray-500">
+                Mostrando {visibleMesas.length} de {totalMesas} mesas
+              </p>
+              <div ref={mesasSentinelRef} className="h-2 w-full" aria-hidden="true" />
+              <Button
+                onClick={loadMoreMesas}
+                variant="outline"
+                className="rounded-xl"
+              >
+                Cargar mas mesas
+              </Button>
+            </div>
+          )}
 
           {/* Mensaje si no hay mesas */}
           {mesas.length === 0 && !loading && (
@@ -3630,12 +3700,12 @@ function Mesas({ businessId, userRole = 'admin' }) {
                           exit={{ opacity: 0, y: -10 }}
                           className="mt-2 border-2 border-accent-200 rounded-2xl overflow-hidden max-h-60 overflow-y-auto shadow-lg"
                         >
-                          {filteredCatalog.map((catalogItem, index) => (
+                          {visibleFilteredCatalog.map((catalogItem, index) => (
                             <motion.div
                               key={`${catalogItem.item_type}:${catalogItem.id}`}
-                              initial={{ opacity: 0 }}
+                              initial={lowMotionMode ? false : { opacity: 0 }}
                               animate={{ opacity: 1 }}
-                              transition={{ delay: index * 0.02 }}
+                              transition={lowMotionMode ? { duration: 0 } : { duration: 0.15, delay: index * 0.01 }}
                               onClick={() => {
                                 addCatalogItemToOrder(catalogItem);
                               }}
@@ -3654,6 +3724,19 @@ function Mesas({ businessId, userRole = 'admin' }) {
                               </span>
                             </motion.div>
                           ))}
+                          {hasMoreFilteredCatalog && (
+                            <div className="border-t border-accent-100 p-2.5 bg-white">
+                              <div ref={filteredCatalogSentinelRef} className="h-2 w-full" aria-hidden="true" />
+                              <Button
+                                type="button"
+                                onClick={loadMoreFilteredCatalog}
+                                variant="outline"
+                                className="mt-2 w-full h-9 text-xs"
+                              >
+                                Cargar mas resultados ({visibleFilteredCatalog.length}/{totalFilteredCatalog})
+                              </Button>
+                            </div>
+                          )}
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -3670,73 +3753,91 @@ function Mesas({ businessId, userRole = 'admin' }) {
                         <p className="text-accent-600">No hay items en esta orden</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                        {orderItems.map((item, index) => (
-                          <motion.div
-                            key={getOrderItemRenderKey(item, index)}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: index * 0.05 }}
-                          >
-                            <Card className="border-accent-200 hover:shadow-md transition-shadow">
-                              <CardContent className="pt-4">
-                                <div className="flex flex-col gap-3">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="flex-1 min-w-0">
-                                      <h4 className="font-semibold text-primary-900 text-sm sm:text-base leading-tight">
-                                        {getOrderItemName(item)}
-                                      </h4>
-                                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
-                                        {item.combo_id && (
-                                          <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 font-medium">
-                                            Combo
+                      <>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                          {visibleOrderItems.map((item, index) => (
+                            <motion.div
+                              key={getOrderItemRenderKey(item, index)}
+                              initial={lowMotionMode ? false : { opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={lowMotionMode ? { duration: 0 } : { duration: 0.2, delay: index * 0.02 }}
+                            >
+                              <Card className="border-accent-200 hover:shadow-md transition-shadow">
+                                <CardContent className="pt-4">
+                                  <div className="flex flex-col gap-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="flex-1 min-w-0">
+                                        <h4 className="font-semibold text-primary-900 text-sm sm:text-base leading-tight">
+                                          {getOrderItemName(item)}
+                                        </h4>
+                                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                                          {item.combo_id && (
+                                            <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 font-medium">
+                                              Combo
+                                            </span>
+                                          )}
+                                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium">
+                                            {formatPrice(parseFloat(item.price))} por unidad
                                           </span>
-                                        )}
-                                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium">
-                                          {formatPrice(parseFloat(item.price))} por unidad
-                                        </span>
+                                        </div>
+                                      </div>
+                                      <div className="text-right shrink-0">
+                                        <p className="text-lg font-bold text-primary-900">
+                                          {formatPrice(parseFloat(item.subtotal))}
+                                        </p>
+                                        <p className="text-[11px] text-accent-600">Subtotal</p>
                                       </div>
                                     </div>
-                                    <div className="text-right shrink-0">
-                                      <p className="text-lg font-bold text-primary-900">
-                                        {formatPrice(parseFloat(item.subtotal))}
-                                      </p>
-                                      <p className="text-[11px] text-accent-600">Subtotal</p>
+
+                                    <div className="flex items-center justify-between pt-2 border-t border-accent-100">
+                                      <div className="inline-flex items-center gap-1.5 rounded-xl border border-accent-200 bg-white p-1">
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => updateItemQuantity(item.id, toFiniteNumber(item.quantity, 0) - 1)}
+                                          disabled={isOrderItemsSyncing}
+                                          className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                          -
+                                        </Button>
+                                        <span className="w-10 text-center font-bold text-primary-900">
+                                          {item.quantity}
+                                        </span>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => updateItemQuantity(item.id, toFiniteNumber(item.quantity, 0) + 1)}
+                                          disabled={isOrderItemsSyncing}
+                                          className="h-8 w-8 p-0 border-green-300 text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                          +
+                                        </Button>
+                                      </div>
+
                                     </div>
                                   </div>
-
-                                  <div className="flex items-center justify-between pt-2 border-t border-accent-100">
-                                    <div className="inline-flex items-center gap-1.5 rounded-xl border border-accent-200 bg-white p-1">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => updateItemQuantity(item.id, toFiniteNumber(item.quantity, 0) - 1)}
-                                        disabled={isOrderItemsSyncing}
-                                        className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                      >
-                                        -
-                                      </Button>
-                                      <span className="w-10 text-center font-bold text-primary-900">
-                                        {item.quantity}
-                                      </span>
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => updateItemQuantity(item.id, toFiniteNumber(item.quantity, 0) + 1)}
-                                        disabled={isOrderItemsSyncing}
-                                        className="h-8 w-8 p-0 border-green-300 text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                      >
-                                        +
-                                      </Button>
-                                    </div>
-
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </motion.div>
-                        ))}
-                      </div>
+                                </CardContent>
+                              </Card>
+                            </motion.div>
+                          ))}
+                        </div>
+                        {hasMoreOrderItems && (
+                          <div className="mt-3 flex flex-col items-center gap-2">
+                            <p className="text-xs text-accent-600">
+                              Mostrando {visibleOrderItems.length} de {totalOrderItems} items
+                            </p>
+                            <div ref={orderItemsSentinelRef} className="h-2 w-full" aria-hidden="true" />
+                            <Button
+                              type="button"
+                              onClick={loadMoreOrderItems}
+                              variant="outline"
+                              className="rounded-xl"
+                            >
+                              Cargar mas items
+                            </Button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </CardContent>
