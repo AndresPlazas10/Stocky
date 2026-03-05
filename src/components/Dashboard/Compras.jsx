@@ -28,6 +28,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import Pagination from '../Pagination';
+import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
 import {
   ShoppingBag,
   Plus,
@@ -81,7 +82,7 @@ const formatLoadError = (resourceLabel, errorLike) => {
 function Compras({ businessId }) {
   const [compras, setCompras] = useState([]);
   const [pagePurchases, setPagePurchases] = useState(1);
-  const [limitPurchases] = useState(50);
+  const [limitPurchases] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 768 ? 20 : 30));
   const [totalCountPurchases, setTotalCountPurchases] = useState(0);
   const [currentFiltersPurchases, setCurrentFiltersPurchases] = useState({});
   const [loading, setLoading] = useState(true);
@@ -104,6 +105,7 @@ function Compras({ businessId }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [purchaseToDelete, setPurchaseToDelete] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const lowMotionMode = useLowMotionMode();
 
   const loadCompras = useCallback(async (filters = currentFiltersPurchases, pagination = {}) => {
     const offline = isOfflineMode();
@@ -785,9 +787,9 @@ function Compras({ businessId }) {
             {filteredCompras.map((compra, index) => (
               <motion.div
                 key={compra.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={lowMotionMode ? false : { opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
+                transition={lowMotionMode ? { duration: 0 } : { duration: 0.2, delay: index * 0.02 }}
               >
                 <Card className="shadow-lg rounded-2xl bg-white border-none hover:shadow-xl transition-all duration-300 overflow-hidden">
                   <div className="gradient-primary text-white p-4">

@@ -31,6 +31,9 @@ import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { SaleUpdateAlert } from '../ui/SaleUpdateAlert';
 import Pagination from '../Pagination';
+import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
+import { useProgressiveList } from '../../hooks/useProgressiveList.js';
+import { useRafBatchedQueue } from '../../hooks/useRafBatchedQueue.js';
 import { 
   ShoppingCart, 
   Plus, 
@@ -143,7 +146,7 @@ const getSaleDetailDisplayName = (detail) => (
 function Ventas({ businessId, userRole = 'admin' }) {
   const [ventas, setVentas] = useState([]);
   const [page, setPage] = useState(1);
-  const [limit] = useState(50);
+  const [limit] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 768 ? 20 : 30));
   const [totalCount, setTotalCount] = useState(0);
   const [currentFilters, setCurrentFilters] = useState({});
   const [productos, setProductos] = useState([]);
@@ -169,6 +172,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [searchProduct, setSearchProduct] = useState('');
   const [saleModalPanel, setSaleModalPanel] = useState('catalog');
+  const lowMotionMode = useLowMotionMode();
+  const enqueueRealtimeUpdate = useRafBatchedQueue();
   
   // Modal de facturación
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -399,37 +404,43 @@ function Ventas({ businessId, userRole = 'admin' }) {
     filter: { business_id: businessId },
     enabled: !!businessId,
     onInsert: (newSale) => {
-      const sellerName = typeof newSale?.seller_name === 'string' ? newSale.seller_name.trim() : '';
-      const isAdminSeller = sellerName.toLowerCase() === 'administrador';
+      enqueueRealtimeUpdate(() => {
+        const sellerName = typeof newSale?.seller_name === 'string' ? newSale.seller_name.trim() : '';
+        const isAdminSeller = sellerName.toLowerCase() === 'administrador';
 
-      const saleWithDetails = {
-        ...newSale,
-        employees: isAdminSeller
-          ? { full_name: 'Administrador', role: 'owner' }
-          : { full_name: sellerName || 'Vendedor desconocido', role: 'employee' }
-      };
+        const saleWithDetails = {
+          ...newSale,
+          employees: isAdminSeller
+            ? { full_name: 'Administrador', role: 'owner' }
+            : { full_name: sellerName || 'Vendedor desconocido', role: 'employee' }
+        };
 
-      // Verificar si la venta ya existe antes de agregarla
-      setVentas(prev => {
-        const exists = prev.some(v => v.id === newSale.id);
-        if (exists) {
-          return prev;
-        }
-        return [saleWithDetails, ...prev];
+        // Verificar si la venta ya existe antes de agregarla
+        setVentas(prev => {
+          const exists = prev.some(v => v.id === newSale.id);
+          if (exists) {
+            return prev;
+          }
+          return [saleWithDetails, ...prev];
+        });
+
+        // Incrementar el contador total
+        setTotalCount(prev => prev + 1);
+
+        setSuccess('✨ Nueva venta registrada');
+        setTimeout(() => setSuccess(null), 3000);
       });
-      
-      // Incrementar el contador total
-      setTotalCount(prev => prev + 1);
-      
-      setSuccess('✨ Nueva venta registrada');
-      setTimeout(() => setSuccess(null), 3000);
     },
     onUpdate: (updatedSale) => {
-      setVentas(prev => prev.map(v => v.id === updatedSale.id ? { ...v, ...updatedSale } : v));
+      enqueueRealtimeUpdate(() => {
+        setVentas(prev => prev.map(v => v.id === updatedSale.id ? { ...v, ...updatedSale } : v));
+      });
     },
     onDelete: (deletedSale) => {
-      setVentas(prev => prev.filter(v => v.id !== deletedSale.id));
-      setTotalCount(prev => Math.max(0, prev - 1));
+      enqueueRealtimeUpdate(() => {
+        setVentas(prev => prev.filter(v => v.id !== deletedSale.id));
+        setTotalCount(prev => Math.max(0, prev - 1));
+      });
     }
   });
 
@@ -438,25 +449,29 @@ function Ventas({ businessId, userRole = 'admin' }) {
     filter: { business_id: businessId },
     enabled: !!businessId,
     onUpdate: (updatedProduct) => {
-      setProductos(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-      // Mantener stock disponible del carrito sincronizado con cambios en tiempo real
-      setCart(prevCart => prevCart.map(item =>
-        item.product_id === updatedProduct.id
-          ? {
-              ...item,
-              available_stock: updatedProduct.manage_stock === false ? null : updatedProduct.stock,
-              manage_stock: updatedProduct.manage_stock !== false
-            }
-          : item
-      ));
+      enqueueRealtimeUpdate(() => {
+        setProductos(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+        // Mantener stock disponible del carrito sincronizado con cambios en tiempo real
+        setCart(prevCart => prevCart.map(item =>
+          item.product_id === updatedProduct.id
+            ? {
+                ...item,
+                available_stock: updatedProduct.manage_stock === false ? null : updatedProduct.stock,
+                manage_stock: updatedProduct.manage_stock !== false
+              }
+            : item
+        ));
+      });
     },
     onDelete: (deletedProduct) => {
-      setProductos(prev => prev.filter(p => p.id !== deletedProduct.id));
-      setCart(prevCart => prevCart.map(item =>
-        item.product_id === deletedProduct.id
-          ? { ...item, available_stock: 0 }
-          : item
-      ));
+      enqueueRealtimeUpdate(() => {
+        setProductos(prev => prev.filter(p => p.id !== deletedProduct.id));
+        setCart(prevCart => prevCart.map(item =>
+          item.product_id === deletedProduct.id
+            ? { ...item, available_stock: 0 }
+            : item
+        ));
+      });
     }
   });
 
@@ -922,6 +937,32 @@ function Ventas({ businessId, userRole = 'admin' }) {
       item.code?.toLowerCase().includes(search)
     );
   }, [catalogItems, searchProduct]);
+
+  const {
+    visibleItems: visibleFilteredCatalog,
+    hasMore: hasMoreFilteredCatalog,
+    totalCount: totalFilteredCatalog,
+    sentinelRef: filteredCatalogSentinelRef,
+    loadMore: loadMoreFilteredCatalog
+  } = useProgressiveList(filteredCatalog, {
+    initialCount: lowMotionMode ? 12 : 20,
+    step: lowMotionMode ? 10 : 18,
+    rootMargin: '260px',
+    resetKey: `${searchProduct.trim().toLowerCase()}:${filteredCatalog.length}:${lowMotionMode ? 'low' : 'full'}`
+  });
+
+  const {
+    visibleItems: visibleCartItems,
+    hasMore: hasMoreCartItems,
+    totalCount: totalCartItems,
+    sentinelRef: cartSentinelRef,
+    loadMore: loadMoreCartItems
+  } = useProgressiveList(cart, {
+    initialCount: lowMotionMode ? 10 : 16,
+    step: lowMotionMode ? 8 : 14,
+    rootMargin: '220px',
+    resetKey: `${cart.length}:${lowMotionMode ? 'low' : 'full'}`
+  });
   // Cleanup de timers de mensajes
   useEffect(() => {
     if (success) {
@@ -1225,7 +1266,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                           <p className="text-sm text-gray-500 mt-1">Explora y agrega items al carrito</p>
                         </div>
                         <Badge className="w-fit bg-accent-100 text-accent-700 border border-accent-200">
-                          {filteredCatalog.length} resultados
+                          {totalFilteredCatalog} resultados
                         </Badge>
                       </div>
                       <div className="relative mt-4">
@@ -1240,14 +1281,14 @@ function Ventas({ businessId, userRole = 'admin' }) {
                       </div>
                     </CardHeader>
                     <CardContent className="p-4 sm:p-5">
-                      {filteredCatalog.length === 0 ? (
+                      {totalFilteredCatalog === 0 ? (
                         <div className="text-center py-16 text-gray-500 border border-dashed border-gray-300 rounded-xl bg-gray-50">
                           <AlertCircle className="w-10 h-10 mx-auto mb-3 text-gray-300" />
                           <p className="font-medium">No hay items disponibles</p>
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3 xl:max-h-[56vh] xl:overflow-y-auto xl:pr-1 custom-scrollbar">
-                          {filteredCatalog.map((catalogItem) => (
+                          {visibleFilteredCatalog.map((catalogItem) => (
                             <motion.button
                               key={`${catalogItem.item_type}:${catalogItem.item_id}`}
                               type="button"
@@ -1295,6 +1336,22 @@ function Ventas({ businessId, userRole = 'admin' }) {
                               </div>
                             </motion.button>
                           ))}
+                          {hasMoreFilteredCatalog && (
+                            <div className="sm:col-span-2 2xl:col-span-3 mt-1 flex flex-col items-center gap-2">
+                              <p className="text-xs text-gray-500">
+                                Mostrando {visibleFilteredCatalog.length} de {totalFilteredCatalog}
+                              </p>
+                              <div ref={filteredCatalogSentinelRef} className="h-2 w-full" aria-hidden="true" />
+                              <Button
+                                type="button"
+                                onClick={loadMoreFilteredCatalog}
+                                variant="outline"
+                                className="w-full sm:w-auto rounded-xl"
+                              >
+                                Cargar mas del catalogo
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </CardContent>
@@ -1362,7 +1419,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                               <p className="text-sm mt-1">Selecciona productos para agregar</p>
                             </div>
                           ) : (
-                            cart.map((item) => (
+                            visibleCartItems.map((item) => (
                               <motion.div
                                 key={item.item_key}
                                 initial={{ opacity: 0, x: -14 }}
@@ -1436,6 +1493,22 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                 </Card>
                               </motion.div>
                             ))
+                          )}
+                          {hasMoreCartItems && (
+                            <div className="mt-2 flex flex-col items-center gap-2">
+                              <p className="text-xs text-gray-500">
+                                Mostrando {visibleCartItems.length} de {totalCartItems}
+                              </p>
+                              <div ref={cartSentinelRef} className="h-2 w-full" aria-hidden="true" />
+                              <Button
+                                type="button"
+                                onClick={loadMoreCartItems}
+                                variant="outline"
+                                className="w-full rounded-xl"
+                              >
+                                Cargar mas items del carrito
+                              </Button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1547,9 +1620,9 @@ function Ventas({ businessId, userRole = 'admin' }) {
                 {ventas.map((venta, index) => (
                   <motion.div
                     key={venta.id}
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={lowMotionMode ? false : { opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                    transition={lowMotionMode ? { duration: 0 } : { duration: 0.2, delay: index * 0.02 }}
                   >
                     <Card className="shadow-lg rounded-2xl bg-white border-2 border-accent-100 hover:border-primary-300 hover:shadow-xl transition-all duration-300">
                       <CardContent className="p-4 sm:p-6">
