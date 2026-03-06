@@ -57,7 +57,6 @@ import { getThermalPaperWidthMm, isAutoPrintReceiptEnabled } from '../../utils/p
 import { printSaleReceipt } from '../../utils/saleReceiptPrint.js';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
 import { invalidateOrderCache } from '../../data/adapters/cacheInvalidation.js';
-import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
 import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
 import { useProgressiveList } from '../../hooks/useProgressiveList.js';
 import { useRafBatchedQueue } from '../../hooks/useRafBatchedQueue.js';
@@ -104,15 +103,6 @@ const calculateOrderItemsTotal = (items = []) =>
     return sum + (quantity * price);
   }, 0);
 
-const SHOULD_DEFER_REMOTE_MESAS_RELOAD_AFTER_LOCAL_SAVE = Boolean(
-  LOCAL_SYNC_CONFIG.enabled
-  && LOCAL_SYNC_CONFIG.shadowWritesEnabled
-  && (
-    LOCAL_SYNC_CONFIG.localWrites?.allLocalFirst
-    || LOCAL_SYNC_CONFIG.localWrites?.ordersLocalFirst
-    || LOCAL_SYNC_CONFIG.localWrites?.tablesLocalFirst
-  )
-);
 const MESAS_REMOTE_FALLBACK_POLL_MS = 5000;
 
 const getMesaProductUnits = (mesa, { selectedMesa = null, orderItems = [] } = {}) => {
@@ -1987,16 +1977,11 @@ function Mesas({ businessId, userRole = 'admin' }) {
           tableId: normalizedTableId,
           businessId
         });
-        if (
-          !releaseResult?.__localOnly
-          && !SHOULD_DEFER_REMOTE_MESAS_RELOAD_AFTER_LOCAL_SAVE
-        ) {
+        if (!releaseResult?.__localOnly) {
           await loadMesas();
         }
       } catch {
-        if (!SHOULD_DEFER_REMOTE_MESAS_RELOAD_AFTER_LOCAL_SAVE) {
-          try { await loadMesas(); } catch { /* no-op */ }
-        }
+        try { await loadMesas(); } catch { /* no-op */ }
       }
     });
   }, [businessId, clearClosedMesaCache, loadMesas, setPendingQuantityUpdatesSafe]);
@@ -2172,17 +2157,12 @@ function Mesas({ businessId, userRole = 'admin' }) {
           await persistPendingQuantityUpdates(mesaSnapshot.current_order_id, { refreshItems: false });
           await updateOrderTotal(mesaSnapshot.current_order_id, effectiveOrderItemsSnapshot);
 
-          if (
-            (typeof navigator === 'undefined' || navigator.onLine)
-            && !SHOULD_DEFER_REMOTE_MESAS_RELOAD_AFTER_LOCAL_SAVE
-          ) {
+          if (typeof navigator === 'undefined' || navigator.onLine) {
             loadMesas().catch(() => {});
           }
         } catch {
           // Mantener recuperación silenciosa para evitar alertas intrusivas.
-          if (!SHOULD_DEFER_REMOTE_MESAS_RELOAD_AFTER_LOCAL_SAVE) {
-            try { await loadMesas(); } catch { /* no-op */ }
-          }
+          try { await loadMesas(); } catch { /* no-op */ }
         }
       })();
     } catch {
@@ -2748,26 +2728,15 @@ function Mesas({ businessId, userRole = 'admin' }) {
         tableId: mesaSnapshot.id
       });
       const {
-        saleIds = [],
-        localOnly = false
+        saleIds = []
       } = closeResult || {};
 
-      // En local-first ya quedó encolado; no mantener alerta de "generando".
-      if (localOnly) {
-        setIsGeneratingSplitSales(false);
-        setIsClosingOrder(false);
+      for (const saleId of saleIds) {
+        // best-effort: no bloquear cierre si falla la impresión de alguno
+        await tryAutoPrintReceiptBySaleId(saleId);
       }
 
-      if (!localOnly) {
-        for (const saleId of saleIds) {
-          // best-effort: no bloquear cierre si falla la impresión de alguno
-          await tryAutoPrintReceiptBySaleId(saleId);
-        }
-      }
-
-      if (!localOnly) {
-        loadMesas().catch(() => {});
-      }
+      loadMesas().catch(() => {});
 
       setTimeout(() => {
         justCompletedSaleRef.current = false;
@@ -2857,7 +2826,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
     // Prevent realtime reopens while background processes
     justCompletedSaleRef.current = true;
     setCanShowOrderModal(false);
-    // No bloquear UX con alerta "generando" mientras encola localmente.
+    // No bloquear UX con alerta "generando" durante el cierre.
     setIsClosingOrder(false);
     setSuccessDetails([
       { label: 'Total', value: formatPrice(optimisticSaleTotal) },
@@ -2879,20 +2848,13 @@ function Mesas({ businessId, userRole = 'admin' }) {
           changeBreakdown: paymentSnapshot === 'cash' ? cashChangeData?.breakdown || [] : [],
           orderItems: orderItemsSnapshot
         });
-        const { saleId, localOnly = false } = closeResult || {};
+        const { saleId } = closeResult || {};
 
-        // En local-first ya quedó encolado; no mantener alerta de "generando".
-        if (localOnly) {
-          setIsClosingOrder(false);
-        }
-
-        if (!localOnly && saleId) {
+        if (saleId) {
           await tryAutoPrintReceiptBySaleId(saleId);
         }
 
-        if (!localOnly) {
-          loadMesas().catch(() => {});
-        }
+        loadMesas().catch(() => {});
 
         setTimeout(() => {
           justCompletedSaleRef.current = false;

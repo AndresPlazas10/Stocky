@@ -1,33 +1,11 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
 import { enqueueOutboxMutation } from '../../sync/outboxShadow.js';
 import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
-import { runOutboxTick } from '../../sync/syncBootstrap.js';
 import { invalidateOrderCache } from '../adapters/cacheInvalidation.js';
 
 function buildMutationId(prefix, businessId = null) {
   const nonce = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
   return `${businessId || 'unknown'}:${prefix}:${nonce}`;
-}
-
-function canQueueLocalOrders() {
-  void LOCAL_SYNC_CONFIG;
-  return false;
-}
-
-function shouldForceOrdersLocalFirst() {
-  return false;
-}
-
-function isConnectivityError(errorLike) {
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
-  return (
-    message.includes('failed to fetch')
-    || message.includes('networkerror')
-    || message.includes('network request failed')
-    || message.includes('fetch failed')
-    || message.includes('load failed')
-    || message.includes('network')
-  );
 }
 
 function isMissingTablesUpdatedAtColumnError(errorLike) {
@@ -64,12 +42,6 @@ function isConflictError(errorLike) {
   );
 }
 
-async function triggerBackgroundOutboxSync() {
-  if (typeof navigator !== 'undefined' && navigator.onLine) {
-    runOutboxTick().catch(() => {});
-  }
-}
-
 function normalizeNumber(value, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -104,72 +76,13 @@ async function purgeLocalTableCascadeArtifacts({
   }
 }
 
-function buildLocalTableRow({ businessId, tableNumber }) {
-  const tableId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
-  return {
-    id: tableId,
-    business_id: businessId,
-    table_number: tableNumber,
-    status: 'available',
-    current_order_id: null,
-    created_at: new Date().toISOString()
-  };
-}
-
-async function enqueueLocalTableCreate({
-  businessId,
-  tableNumber
-}) {
-  const table = buildLocalTableRow({ businessId, tableNumber });
-  const queued = await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'table.create',
-    payload: {
-      local_write: true,
-      table_id: table.id,
-      table_number: table.table_number,
-      table
-    },
-    mutationId: buildMutationId('table.create.local', businessId)
-  });
-
-  if (!queued) {
-    throw new Error('No se pudo guardar la mesa localmente');
-  }
-
-  return {
-    ...table,
-    __localOnly: true,
-    pendingSync: true
-  };
-}
-
 export async function createTable({ businessId, tableNumber }) {
-  if (shouldForceOrdersLocalFirst()) {
-    const localResult = await enqueueLocalTableCreate({ businessId, tableNumber });
-    await triggerBackgroundOutboxSync();
-    return localResult;
-  }
-
-  const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (offlineMode && canQueueLocalOrders()) {
-    return enqueueLocalTableCreate({ businessId, tableNumber });
-  }
-
   const { data, error } = await supabaseAdapter.insertTable({
     business_id: businessId,
     table_number: tableNumber,
     status: 'available'
   });
-  if (error) {
-    if (canQueueLocalOrders() && isConnectivityError(error)) {
-      const localResult = await enqueueLocalTableCreate({ businessId, tableNumber });
-      await invalidateOrderCache({ businessId });
-      await triggerBackgroundOutboxSync();
-      return localResult;
-    }
-    throw error;
-  }
+  if (error) throw error;
 
   await enqueueOutboxMutation({
     businessId,
@@ -187,63 +100,7 @@ export async function createTable({ businessId, tableNumber }) {
   };
 }
 
-function buildLocalOrderRow({ businessId, tableId, userId = null }) {
-  return {
-    id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
-    business_id: businessId,
-    table_id: tableId,
-    user_id: userId,
-    status: 'open',
-    total: 0,
-    opened_at: new Date().toISOString()
-  };
-}
-
-async function enqueueLocalOrderCreate({
-  businessId,
-  tableId,
-  userId = null
-}) {
-  const order = buildLocalOrderRow({ businessId, tableId, userId });
-  const queued = await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'order.create',
-    payload: {
-      local_write: true,
-      order_id: order.id,
-      table_id: tableId,
-      user_id: userId,
-      order
-    },
-    mutationId: buildMutationId('order.create.local', businessId)
-  });
-
-  if (!queued) {
-    throw new Error('No se pudo guardar la orden localmente');
-  }
-
-  return {
-    ...order,
-    __localOnly: true,
-    pendingSync: true
-  };
-}
-
 export async function createOrderAndOccupyTable({ businessId, tableId, userId = null }) {
-  if (shouldForceOrdersLocalFirst()) {
-    const localResult = await enqueueLocalOrderCreate({ businessId, tableId, userId });
-    await invalidateOrderCache({ businessId, tableId, orderId: localResult?.id || null });
-    await triggerBackgroundOutboxSync();
-    return localResult;
-  }
-
-  const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (offlineMode && canQueueLocalOrders()) {
-    const localResult = await enqueueLocalOrderCreate({ businessId, tableId, userId });
-    await invalidateOrderCache({ businessId, tableId, orderId: localResult?.id || null });
-    return localResult;
-  }
-
   const { data: newOrder, error: orderError } = await supabaseAdapter.insertOrder({
     business_id: businessId,
     table_id: tableId,
@@ -281,12 +138,6 @@ export async function createOrderAndOccupyTable({ businessId, tableId, userId = 
       }
     }
 
-    if (canQueueLocalOrders() && isConnectivityError(orderError)) {
-      const localResult = await enqueueLocalOrderCreate({ businessId, tableId, userId });
-      await invalidateOrderCache({ businessId, tableId, orderId: localResult?.id || null });
-      await triggerBackgroundOutboxSync();
-      return localResult;
-    }
     throw orderError;
   }
 
@@ -314,71 +165,9 @@ export async function createOrderAndOccupyTable({ businessId, tableId, userId = 
   };
 }
 
-async function enqueueLocalOrderTotalUpdate({
-  orderId,
-  total,
-  businessId = null
-}) {
-  const queued = await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'order.total.update',
-    payload: {
-      local_write: true,
-      order_id: orderId,
-      total: normalizeNumber(total, 0)
-    },
-    mutationId: buildMutationId('order.total.update.local', businessId)
-  });
-
-  if (!queued) {
-    throw new Error('No se pudo guardar el total localmente');
-  }
-
-  return {
-    id: orderId,
-    total: normalizeNumber(total, 0),
-    __localOnly: true,
-    pendingSync: true
-  };
-}
-
 export async function updateOrderTotalById({ orderId, total, businessId = null }) {
-  if (shouldForceOrdersLocalFirst()) {
-    const localResult = await enqueueLocalOrderTotalUpdate({
-      orderId,
-      total,
-      businessId
-    });
-    await invalidateOrderCache({ businessId, orderId });
-    await triggerBackgroundOutboxSync();
-    return localResult;
-  }
-
-  const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (offlineMode && canQueueLocalOrders()) {
-    const localResult = await enqueueLocalOrderTotalUpdate({
-      orderId,
-      total,
-      businessId
-    });
-    await invalidateOrderCache({ businessId, orderId });
-    return localResult;
-  }
-
   const { error } = await supabaseAdapter.updateOrderById(orderId, { total });
-  if (error) {
-    if (canQueueLocalOrders() && isConnectivityError(error)) {
-      const localResult = await enqueueLocalOrderTotalUpdate({
-        orderId,
-        total,
-        businessId
-      });
-      await invalidateOrderCache({ businessId, orderId });
-      await triggerBackgroundOutboxSync();
-      return localResult;
-    }
-    throw error;
-  }
+  if (error) throw error;
 
   await enqueueOutboxMutation({
     businessId,
@@ -398,35 +187,6 @@ export async function updateOrderTotalById({ orderId, total, businessId = null }
   };
 }
 
-async function enqueueLocalBulkQuantityUpdate(
-  pendingEntries = [],
-  { businessId = null, orderId = null } = {}
-) {
-  const queued = await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'order.item.bulk_quantity_update',
-    payload: {
-      local_write: true,
-      order_id: orderId,
-      updates: pendingEntries.map(([itemId, quantity]) => ({
-        item_id: itemId,
-        quantity: Number(quantity || 0)
-      }))
-    },
-    mutationId: buildMutationId('order.item.bulk_quantity_update.local', businessId)
-  });
-
-  if (!queued) {
-    throw new Error('No se pudo guardar la actualización localmente');
-  }
-
-  return {
-    __localOnly: true,
-    pendingSync: true,
-    updatedCount: pendingEntries.length
-  };
-}
-
 export async function persistOrderItemQuantities(
   pendingEntries = [],
   { businessId = null, orderId = null } = {}
@@ -438,33 +198,11 @@ export async function persistOrderItemQuantities(
     };
   }
 
-  if (shouldForceOrdersLocalFirst()) {
-    const localResult = await enqueueLocalBulkQuantityUpdate(pendingEntries, { businessId, orderId });
-    await invalidateOrderCache({ businessId, orderId });
-    await triggerBackgroundOutboxSync();
-    return localResult;
-  }
-
-  const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (offlineMode && canQueueLocalOrders()) {
-    const localResult = await enqueueLocalBulkQuantityUpdate(pendingEntries, { businessId, orderId });
-    await invalidateOrderCache({ businessId, orderId });
-    return localResult;
-  }
-
   const updateResults = await Promise.all(
     pendingEntries.map(([itemId, quantity]) => supabaseAdapter.updateOrderItemById(itemId, { quantity }))
   );
   const failedUpdate = updateResults.find((result) => result.error);
-  if (failedUpdate?.error) {
-    if (canQueueLocalOrders() && isConnectivityError(failedUpdate.error)) {
-      const localResult = await enqueueLocalBulkQuantityUpdate(pendingEntries, { businessId, orderId });
-      await invalidateOrderCache({ businessId, orderId });
-      await triggerBackgroundOutboxSync();
-      return localResult;
-    }
-    throw failedUpdate.error;
-  }
+  if (failedUpdate?.error) throw failedUpdate.error;
 
   await enqueueOutboxMutation({
     businessId,
@@ -486,54 +224,9 @@ export async function persistOrderItemQuantities(
   };
 }
 
-async function enqueueLocalOrderItemDelete(itemId, { businessId = null, orderId = null } = {}) {
-  const queued = await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'order.item.delete',
-    payload: {
-      local_write: true,
-      order_id: orderId,
-      item_id: itemId
-    },
-    mutationId: buildMutationId('order.item.delete.local', businessId)
-  });
-
-  if (!queued) {
-    throw new Error('No se pudo guardar la eliminación localmente');
-  }
-
-  return {
-    id: itemId,
-    __localOnly: true,
-    pendingSync: true
-  };
-}
-
 export async function deleteOrderItemById(itemId, { businessId = null, orderId = null } = {}) {
-  if (shouldForceOrdersLocalFirst()) {
-    const localResult = await enqueueLocalOrderItemDelete(itemId, { businessId, orderId });
-    await invalidateOrderCache({ businessId, orderId });
-    await triggerBackgroundOutboxSync();
-    return localResult;
-  }
-
-  const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (offlineMode && canQueueLocalOrders()) {
-    const localResult = await enqueueLocalOrderItemDelete(itemId, { businessId, orderId });
-    await invalidateOrderCache({ businessId, orderId });
-    return localResult;
-  }
-
   const { error } = await supabaseAdapter.deleteOrderItemById(itemId);
-  if (error) {
-    if (canQueueLocalOrders() && isConnectivityError(error)) {
-      const localResult = await enqueueLocalOrderItemDelete(itemId, { businessId, orderId });
-      await invalidateOrderCache({ businessId, orderId });
-      await triggerBackgroundOutboxSync();
-      return localResult;
-    }
-    throw error;
-  }
+  if (error) throw error;
 
   await enqueueOutboxMutation({
     businessId,
@@ -552,36 +245,6 @@ export async function deleteOrderItemById(itemId, { businessId = null, orderId =
   };
 }
 
-async function enqueueLocalOrderItemQuantityUpdate({
-  itemId,
-  quantity,
-  businessId = null,
-  orderId = null
-}) {
-  const queued = await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'order.item.update_quantity',
-    payload: {
-      local_write: true,
-      order_id: orderId,
-      item_id: itemId,
-      quantity: Number(quantity || 0)
-    },
-    mutationId: buildMutationId('order.item.update_quantity.local', businessId)
-  });
-
-  if (!queued) {
-    throw new Error('No se pudo guardar la cantidad localmente');
-  }
-
-  return {
-    id: itemId,
-    quantity: Number(quantity || 0),
-    __localOnly: true,
-    pendingSync: true
-  };
-}
-
 export async function updateOrderItemQuantityById({
   itemId,
   quantity,
@@ -589,45 +252,10 @@ export async function updateOrderItemQuantityById({
   orderId = null,
   preferLocal = false
 }) {
-  if (shouldForceOrdersLocalFirst() || (preferLocal && canQueueLocalOrders())) {
-    const localResult = await enqueueLocalOrderItemQuantityUpdate({
-      itemId,
-      quantity,
-      businessId,
-      orderId
-    });
-    await invalidateOrderCache({ businessId, orderId });
-    await triggerBackgroundOutboxSync();
-    return localResult;
-  }
-
-  const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (offlineMode && canQueueLocalOrders()) {
-    const localResult = await enqueueLocalOrderItemQuantityUpdate({
-      itemId,
-      quantity,
-      businessId,
-      orderId
-    });
-    await invalidateOrderCache({ businessId, orderId });
-    return localResult;
-  }
+  void preferLocal;
 
   const { error } = await supabaseAdapter.updateOrderItemById(itemId, { quantity });
-  if (error) {
-    if (canQueueLocalOrders() && isConnectivityError(error)) {
-      const localResult = await enqueueLocalOrderItemQuantityUpdate({
-        itemId,
-        quantity,
-        businessId,
-        orderId
-      });
-      await invalidateOrderCache({ businessId, orderId });
-      await triggerBackgroundOutboxSync();
-      return localResult;
-    }
-    throw error;
-  }
+  if (error) throw error;
 
   await enqueueOutboxMutation({
     businessId,
@@ -652,46 +280,6 @@ export async function getOrderItemById({ itemId, selectSql }) {
   const { data, error } = await supabaseAdapter.getOrderItemById(itemId, selectSql);
   if (error) throw error;
   return data || null;
-}
-
-async function enqueueLocalOrderItemInsert({
-  row,
-  businessId = null
-}) {
-  const itemId = row?.id || (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`);
-  const quantity = Number(row?.quantity || 0);
-  const price = Number(row?.price || 0);
-  const payload = {
-    local_write: true,
-    order_id: row?.order_id || null,
-    item_id: itemId,
-    product_id: row?.product_id || null,
-    combo_id: row?.combo_id || null,
-    quantity,
-    price
-  };
-  const queued = await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'order.item.insert',
-    payload,
-    mutationId: buildMutationId('order.item.insert.local', businessId)
-  });
-
-  if (!queued) {
-    throw new Error('No se pudo guardar el item localmente');
-  }
-
-  return {
-    id: itemId,
-    order_id: row?.order_id || null,
-    product_id: row?.product_id || null,
-    combo_id: row?.combo_id || null,
-    quantity,
-    price,
-    subtotal: quantity * price,
-    __localOnly: true,
-    pendingSync: true
-  };
 }
 
 async function mergeDuplicateOrderItemInsert({
@@ -758,28 +346,10 @@ export async function insertOrderItem({
   businessId = null,
   preferLocal = false
 }) {
-  if (shouldForceOrdersLocalFirst() || (preferLocal && canQueueLocalOrders())) {
-    const localResult = await enqueueLocalOrderItemInsert({ row, businessId });
-    await invalidateOrderCache({ businessId, orderId: row?.order_id || null });
-    await triggerBackgroundOutboxSync();
-    return localResult;
-  }
-
-  const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (offlineMode && canQueueLocalOrders()) {
-    const localResult = await enqueueLocalOrderItemInsert({ row, businessId });
-    await invalidateOrderCache({ businessId, orderId: row?.order_id || null });
-    return localResult;
-  }
+  void preferLocal;
 
   const { data, error } = await supabaseAdapter.insertOrderItem(row, selectSql);
   if (error) {
-    if (canQueueLocalOrders() && isConnectivityError(error)) {
-      const localResult = await enqueueLocalOrderItemInsert({ row, businessId });
-      await invalidateOrderCache({ businessId, orderId: row?.order_id || null });
-      await triggerBackgroundOutboxSync();
-      return localResult;
-    }
     if (isConflictError(error)) {
       const mergedResult = await mergeDuplicateOrderItemInsert({
         row,
@@ -815,53 +385,7 @@ export async function insertOrderItem({
   };
 }
 
-async function enqueueLocalDeleteOrderAndReleaseTable({ orderId, tableId, businessId = null }) {
-  const queued = await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'order.delete_and_release_table',
-    payload: {
-      local_write: true,
-      order_id: orderId,
-      table_id: tableId
-    },
-    mutationId: buildMutationId('order.delete_and_release_table.local', businessId)
-  });
-
-  if (!queued) {
-    throw new Error('No se pudo guardar el cierre localmente');
-  }
-
-  return {
-    order_id: orderId,
-    table_id: tableId,
-    __localOnly: true,
-    pendingSync: true
-  };
-}
-
 export async function deleteOrderAndReleaseTable({ orderId, tableId, businessId = null }) {
-  if (shouldForceOrdersLocalFirst()) {
-    const localResult = await enqueueLocalDeleteOrderAndReleaseTable({
-      orderId,
-      tableId,
-      businessId
-    });
-    await invalidateOrderCache({ businessId, orderId, tableId, releaseMesaSnapshot: true });
-    await triggerBackgroundOutboxSync();
-    return localResult;
-  }
-
-  const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (offlineMode && canQueueLocalOrders()) {
-    const localResult = await enqueueLocalDeleteOrderAndReleaseTable({
-      orderId,
-      tableId,
-      businessId
-    });
-    await invalidateOrderCache({ businessId, orderId, tableId, releaseMesaSnapshot: true });
-    return localResult;
-  }
-
   const { error: releaseTableError } = businessId
     ? await supabaseAdapter.updateTableByBusinessAndId({
       businessId,
@@ -876,33 +400,11 @@ export async function deleteOrderAndReleaseTable({ orderId, tableId, businessId 
       status: 'available'
     });
   if (releaseTableError && !isMissingTablesUpdatedAtColumnError(releaseTableError)) {
-    if (canQueueLocalOrders() && isConnectivityError(releaseTableError)) {
-      const localResult = await enqueueLocalDeleteOrderAndReleaseTable({
-        orderId,
-        tableId,
-        businessId
-      });
-      await invalidateOrderCache({ businessId, orderId, tableId, releaseMesaSnapshot: true });
-      await triggerBackgroundOutboxSync();
-      return localResult;
-    }
     throw releaseTableError;
   }
 
   const { error: deleteOrderError } = await supabaseAdapter.deleteOrderById(orderId);
-  if (deleteOrderError) {
-    if (canQueueLocalOrders() && isConnectivityError(deleteOrderError)) {
-      const localResult = await enqueueLocalDeleteOrderAndReleaseTable({
-        orderId,
-        tableId,
-        businessId
-      });
-      await invalidateOrderCache({ businessId, orderId, tableId, releaseMesaSnapshot: true });
-      await triggerBackgroundOutboxSync();
-      return localResult;
-    }
-    throw deleteOrderError;
-  }
+  if (deleteOrderError) throw deleteOrderError;
 
   await enqueueOutboxMutation({
     businessId,
@@ -922,54 +424,8 @@ export async function deleteOrderAndReleaseTable({ orderId, tableId, businessId 
   };
 }
 
-async function enqueueLocalTableDeleteCascade(tableId, { businessId = null } = {}) {
-  const queued = await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'table.delete_cascade_orders',
-    payload: {
-      local_write: true,
-      table_id: tableId
-    },
-    mutationId: buildMutationId('table.delete_cascade_orders.local', businessId)
-  });
-
-  if (!queued) {
-    throw new Error('No se pudo guardar la eliminación localmente');
-  }
-
-  return {
-    table_id: tableId,
-    __localOnly: true,
-    pendingSync: true
-  };
-}
-
 export async function deleteTableCascadeOrders(tableId, { businessId = null } = {}) {
   const associatedOrderIds = await getAssociatedOrderIdsForTable({ businessId, tableId });
-
-  if (shouldForceOrdersLocalFirst()) {
-    await purgeLocalTableCascadeArtifacts({
-      businessId,
-      tableId,
-      orderIds: associatedOrderIds
-    });
-    const localResult = await enqueueLocalTableDeleteCascade(tableId, { businessId });
-    await invalidateOrderCache({ businessId, tableId, releaseMesaSnapshot: true });
-    await triggerBackgroundOutboxSync();
-    return localResult;
-  }
-
-  const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (offlineMode && canQueueLocalOrders()) {
-    await purgeLocalTableCascadeArtifacts({
-      businessId,
-      tableId,
-      orderIds: associatedOrderIds
-    });
-    const localResult = await enqueueLocalTableDeleteCascade(tableId, { businessId });
-    await invalidateOrderCache({ businessId, tableId, releaseMesaSnapshot: true });
-    return localResult;
-  }
 
   const { error: releaseTableError } = businessId
     ? await supabaseAdapter.updateTableByBusinessAndId({
@@ -985,37 +441,13 @@ export async function deleteTableCascadeOrders(tableId, { businessId = null } = 
       status: 'available'
     });
   if (releaseTableError && !isMissingTablesUpdatedAtColumnError(releaseTableError)) {
-    if (canQueueLocalOrders() && isConnectivityError(releaseTableError)) {
-      await purgeLocalTableCascadeArtifacts({
-        businessId,
-        tableId,
-        orderIds: associatedOrderIds
-      });
-      const localResult = await enqueueLocalTableDeleteCascade(tableId, { businessId });
-      await invalidateOrderCache({ businessId, tableId, releaseMesaSnapshot: true });
-      await triggerBackgroundOutboxSync();
-      return localResult;
-    }
     throw releaseTableError;
   }
 
   const { error: ordersError } = businessId
     ? await supabaseAdapter.deleteOrdersByBusinessAndTableId({ businessId, tableId })
     : await supabaseAdapter.deleteOrdersByTableId(tableId);
-  if (ordersError) {
-    if (canQueueLocalOrders() && isConnectivityError(ordersError)) {
-      await purgeLocalTableCascadeArtifacts({
-        businessId,
-        tableId,
-        orderIds: associatedOrderIds
-      });
-      const localResult = await enqueueLocalTableDeleteCascade(tableId, { businessId });
-      await invalidateOrderCache({ businessId, tableId, releaseMesaSnapshot: true });
-      await triggerBackgroundOutboxSync();
-      return localResult;
-    }
-    throw ordersError;
-  }
+  if (ordersError) throw ordersError;
 
   const { error: tableError } = businessId
     ? await supabaseAdapter.deleteTableByBusinessAndId({ businessId, tableId })

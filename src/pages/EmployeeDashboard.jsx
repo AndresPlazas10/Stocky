@@ -10,7 +10,6 @@ import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
 import Ventas from '../components/Dashboard/Ventas.jsx';
 import Inventario from '../components/Dashboard/Inventario.jsx';
 import Mesas from '../components/Dashboard/Mesas.jsx';
-import { warmupDashboardData } from '../services/dashboardWarmupService.js';
 import { useWarmupStatus } from '../hooks/useWarmupStatus.js';
 import { WarmupStatusBadge } from '../components/WarmupStatusBadge.jsx';
 import { 
@@ -41,24 +40,6 @@ function EmployeeDashboard() {
   useEffect(() => {
     checkEmployeeAuth();
   }, []);
-
-  useEffect(() => {
-    if (!business?.id) return;
-    warmupDashboardData(business.id).catch(() => {});
-  }, [business?.id]);
-
-  useEffect(() => {
-    if (!business?.id || typeof window === 'undefined') return undefined;
-
-    const handleOnline = () => {
-      warmupDashboardData(business.id, { force: true }).catch(() => {});
-    };
-
-    window.addEventListener('online', handleOnline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-    };
-  }, [business?.id]);
 
   const checkEmployeeAuth = async () => {
     try {

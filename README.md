@@ -81,7 +81,8 @@ Minimo requerido para arrancar:
 
 Opcionales comunes:
 
-- Email: `VITE_EMAILJS_*`, `VITE_RESEND_*`, `VITE_TEST_EMAIL`
+- Email cliente: `VITE_EMAILJS_*`, `VITE_RESEND_FROM_EMAIL`, `VITE_RESEND_ENABLED`, `VITE_TEST_EMAIL`
+- Email servidor: `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (en entorno serverless, no en cliente)
 - App URL: `VITE_APP_URL`
 - Flags `VITE_LOCAL_SYNC_*` y `VITE_FF_LOCAL_*` se mantienen por compatibilidad, pero en runtime están desactivadas por rollback online-only.
 

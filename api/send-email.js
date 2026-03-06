@@ -4,6 +4,43 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const APP_ORIGIN = process.env.VITE_APP_URL;
+
+function normalizeOrigin(value) {
+  try {
+    const parsed = new URL(String(value || '').trim());
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+function resolveAllowedOrigin(req) {
+  const configuredOrigin = normalizeOrigin(APP_ORIGIN);
+  const requestOrigin = normalizeOrigin(req?.headers?.origin);
+  if (!requestOrigin) return configuredOrigin;
+
+  const isLocalDevOrigin = (
+    requestOrigin === 'http://localhost:5173'
+    || requestOrigin === 'http://127.0.0.1:5173'
+  );
+
+  if (requestOrigin === configuredOrigin || isLocalDevOrigin) {
+    return requestOrigin;
+  }
+
+  return configuredOrigin;
+}
+
+function applyCors(req, res) {
+  const allowedOrigin = resolveAllowedOrigin(req);
+  if (allowedOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'OPTIONS,POST');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+}
 
 function getBearerToken(req) {
   const header = req.headers.authorization || req.headers.Authorization;
@@ -56,10 +93,7 @@ function escapeHtml(value) {
 }
 
 export default async function handler(req, res) {
-  // CORS mínimo para clientes web autenticados.
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'OPTIONS,POST');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  applyCors(req, res);
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
