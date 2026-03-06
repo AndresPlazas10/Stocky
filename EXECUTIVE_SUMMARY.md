@@ -130,7 +130,7 @@ Script automatizado:
 ### Configuración
 - [x] Variables de entorno en Vercel
 - [x] `.env` en .gitignore
-- [ ] ⚠️ Validar VITE_RESEND_API_KEY
+- [ ] ⚠️ Validar RESEND_API_KEY
 - [ ] ⚠️ Verificar VITE_FROM_EMAIL
 
 ### Código Limpio

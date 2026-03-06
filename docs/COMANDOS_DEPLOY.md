@@ -94,7 +94,7 @@ git push origin main
    ```
    VITE_SUPABASE_URL = tu_url_supabase
    VITE_SUPABASE_ANON_KEY = tu_anon_key
-   VITE_RESEND_API_KEY = tu_resend_key (opcional)
+   RESEND_API_KEY = tu_resend_key (opcional)
    VITE_APP_URL = https://tu-app.vercel.app
    ```
 
@@ -399,7 +399,7 @@ VITE_TEST_EMAIL=tu-email-pruebas@gmail.com
 VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
 VITE_SUPABASE_ANON_KEY=tu_anon_key_produccion
 VITE_APP_URL=https://tu-app.vercel.app
-VITE_RESEND_API_KEY=re_tu_api_key
+RESEND_API_KEY=re_tu_api_key
 ```
 
 **⚠️ NUNCA** incluir:

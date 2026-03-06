@@ -57,7 +57,7 @@ Las siguientes credenciales en `.env.production` están **comprometidas** y debe
 #### **Resend (Si aplica)**
 1. Ve a https://resend.com/api-keys
 2. Revoca la key expuesta
-3. Genera nueva `VITE_RESEND_API_KEY`
+3. Genera nueva `RESEND_API_KEY`
 
 ### 3. **Actualizar Vercel (Producción)**
 ```bash

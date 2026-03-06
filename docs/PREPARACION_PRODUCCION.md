@@ -96,7 +96,7 @@ src/components/layout/
 ```env
 VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
 VITE_SUPABASE_ANON_KEY=tu_anon_key
-VITE_RESEND_API_KEY=re_tu_api_key (opcional)
+RESEND_API_KEY=re_tu_api_key (opcional)
 VITE_TEST_EMAIL=tu-email-pruebas@gmail.com (solo dev)
 ```
 
@@ -104,7 +104,7 @@ VITE_TEST_EMAIL=tu-email-pruebas@gmail.com (solo dev)
 ```env
 VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
 VITE_SUPABASE_ANON_KEY=tu_anon_key_produccion
-VITE_RESEND_API_KEY=re_tu_api_key_produccion
+RESEND_API_KEY=re_tu_api_key_produccion
 VITE_APP_URL=https://tu-app.vercel.app
 ```
 
@@ -288,7 +288,7 @@ Agregar:
 ```
 VITE_SUPABASE_URL = https://tu-proyecto.supabase.co
 VITE_SUPABASE_ANON_KEY = tu_anon_key_produccion
-VITE_RESEND_API_KEY = re_tu_api_key (opcional)
+RESEND_API_KEY = re_tu_api_key (opcional)
 VITE_APP_URL = https://tu-app.vercel.app
 ```
 

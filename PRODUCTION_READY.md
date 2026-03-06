@@ -164,7 +164,7 @@ VITE_EMAILJS_TEMPLATE_ID_INVOICE=template_xxxxx
 VITE_EMAILJS_PUBLIC_KEY=tu-public-key
 
 # Resend (Fallback - Opcional)
-VITE_RESEND_API_KEY=re_xxxxx
+RESEND_API_KEY=re_xxxxx
 VITE_RESEND_FROM_EMAIL=noreply@tudominio.com
 
 # Test Email (Solo para desarrollo - NO necesario en producción)

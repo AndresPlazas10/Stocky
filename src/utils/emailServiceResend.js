@@ -20,7 +20,7 @@
  * 1. Regístrate en https://resend.com
  * 2. Obtén API Key
  * 3. Configura en .env.local:
- *    VITE_RESEND_API_KEY=re_xxxxx
+ *    RESEND_API_KEY=re_xxxxx
  *    VITE_RESEND_FROM_EMAIL=onboarding@resend.dev
  * 
  * Ver guía completa: RESEND_SETUP.md
@@ -269,8 +269,12 @@ export const isResendConfigured = (env = import.meta.env || {}) => {
   const providerHint = String(env.VITE_EMAIL_PROVIDER || 'auto').trim().toLowerCase();
   if (providerHint === 'emailjs') return false;
 
-  const hasApiKey = !!String(env.VITE_RESEND_API_KEY || '').trim();
+  const explicitDisable = String(env.VITE_RESEND_ENABLED || '').trim().toLowerCase();
+  if (explicitDisable === 'false' || explicitDisable === '0') return false;
+
+  // No dependemos de API key en frontend para evitar exponer secretos.
+  // La validación definitiva ocurre en /api/send-email con variables server-side.
   const hasFromEmail = !!String(env.VITE_RESEND_FROM_EMAIL || env.VITE_FROM_EMAIL || '').trim();
 
-  return hasApiKey && hasFromEmail;
+  return hasFromEmail;
 };
