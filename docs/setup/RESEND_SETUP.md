@@ -28,7 +28,7 @@ Abre `/Users/andres_plazas/Desktop/Stocky/.env.local` y pega tu API Key:
 
 ```env
 # Pega tu API Key aquí (la que copiaste arriba)
-VITE_RESEND_API_KEY=re_tu_api_key_aqui
+RESEND_API_KEY=re_tu_api_key_aqui
 
 # Usar email de Resend (no requiere verificar dominio)
 VITE_RESEND_FROM_EMAIL=onboarding@resend.dev
@@ -36,7 +36,7 @@ VITE_RESEND_FROM_EMAIL=onboarding@resend.dev
 
 **Ejemplo:**
 ```env
-VITE_RESEND_API_KEY=re_123abc456def789ghi
+RESEND_API_KEY=re_123abc456def789ghi
 VITE_RESEND_FROM_EMAIL=onboarding@resend.dev
 ```
 
@@ -74,7 +74,7 @@ VITE_RESEND_FROM_EMAIL=onboarding@resend.dev
 
    | Key | Value | Environment |
    |-----|-------|-------------|
-   | `VITE_RESEND_API_KEY` | `re_tu_api_key_aqui` | Production |
+   | `RESEND_API_KEY` | `re_tu_api_key_aqui` | Production |
    | `VITE_RESEND_FROM_EMAIL` | `onboarding@resend.dev` | Production |
 
 4. **Redeploy** (opcional):
@@ -135,7 +135,7 @@ Value: v=DMARC1; p=none; rua=mailto:tu-email@gmail.com
 
 - [ ] Cuenta de Resend creada
 - [ ] API Key copiada y guardada
-- [ ] `VITE_RESEND_API_KEY` configurada en `.env.local`
+- [ ] `RESEND_API_KEY` configurada en `.env.local`
 - [ ] `VITE_RESEND_FROM_EMAIL` configurada
 - [ ] Servidor reiniciado (`npm run dev`)
 - [ ] Email de prueba enviado y recibido
@@ -149,7 +149,7 @@ Value: v=DMARC1; p=none; rua=mailto:tu-email@gmail.com
 ### Error: "Missing API Key"
 
 **Solución:**
-1. Verifica que `VITE_RESEND_API_KEY` esté en `.env.local`
+1. Verifica que `RESEND_API_KEY` esté en `.env.local`
 2. Reinicia el servidor: `npm run dev`
 3. La API Key debe empezar con `re_`
 

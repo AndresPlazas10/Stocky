@@ -91,7 +91,7 @@ Las variables de entorno de Vercel **NO están configuradas**:
 
 **Variables del CLIENTE** (navegador):
 ```env
-VITE_RESEND_API_KEY=          # ← Vacío en .env.local
+RESEND_API_KEY=          # ← Vacío en .env.local
 VITE_RESEND_FROM_EMAIL=onboarding@resend.dev
 ```
 
@@ -277,7 +277,7 @@ EmailJS funciona **TANTO en desarrollo COMO en producción**. Las variables `VIT
 cat .env.local | grep RESEND
 
 # Debe mostrar:
-# VITE_RESEND_API_KEY=re_tu_key_aqui
+# RESEND_API_KEY=re_tu_key_aqui
 # VITE_RESEND_FROM_EMAIL=onboarding@resend.dev
 ```
 
@@ -404,7 +404,7 @@ RESEND_API_KEY=re_tu_key_secreta
 **INCORRECTO:**
 ```env
 # ❌ NUNCA expongas API Keys privadas con VITE_
-VITE_RESEND_API_KEY=re_tu_key_secreta
+RESEND_API_KEY=re_tu_key_secreta
 # ↑ Se expone al navegador (INSEGURO)
 ```
 

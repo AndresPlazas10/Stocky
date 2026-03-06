@@ -405,7 +405,7 @@ auth: {
 
 - [x] `.env` no committedd (en .gitignore)
 - [x] Variables de entorno en Vercel configuradas
-- [ ] ⚠️ Validar VITE_RESEND_API_KEY en producción
+- [ ] ⚠️ Validar RESEND_API_KEY en producción
 - [ ] ⚠️ Verificar VITE_FROM_EMAIL configurado
 - [x] Supabase URL y ANON_KEY correctos
 

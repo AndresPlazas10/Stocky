@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout.jsx';
 import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
 import PricingAnnouncementModal from '../components/PricingAnnouncementModal.jsx';
@@ -15,14 +15,9 @@ import {
   updateBusinessLogo
 } from '../data/commands/businessCommands.js';
 import { signOutGlobalSession } from '../data/commands/authCommands.js';
-import { warmupDashboardData } from '../services/dashboardWarmupService.js';
 import { useWarmupStatus } from '../hooks/useWarmupStatus.js';
-import LOCAL_SYNC_CONFIG from '../config/localSync.js';
-import { reconcileTableOrderConsistency } from '../services/tableConsistencyService.js';
 import PerformanceHud from '../components/perf/PerformanceHud.jsx';
 
-const TABLE_CONSISTENCY_RECONCILE_MS = 60000;
-const TABLE_RECONCILE_TOAST_COOLDOWN_MS = 120000;
 const LAST_BUSINESS_ID_STORAGE_KEY = 'stocky.last_business_id';
 const PERF_HUD_STORAGE_KEY = 'stocky.perf_hud';
 
@@ -61,7 +56,6 @@ function Dashboard() {
   const [perfHudEnabled, setPerfHudEnabled] = useState(isPerfHudInitiallyEnabled);
   const [businessLogo, setBusinessLogo] = useState(null);
   const [isBusinessDisabled, setIsBusinessDisabled] = useState(false);
-  const lastTableReconcileToastRef = useRef(0);
   const warmupStatus = useWarmupStatus(business?.id);
   const { message: toastMessage, showWarning, clear: clearToast } = useToast(1000);
 
@@ -71,58 +65,6 @@ function Dashboard() {
       setBusinessLogo(business.logo_url || null);
     }
   }, [business?.id, business?.logo_url]);
-
-  useEffect(() => {
-    if (!business?.id) return;
-    warmupDashboardData(business.id).catch(() => {});
-  }, [business?.id]);
-
-  useEffect(() => {
-    if (!business?.id || typeof window === 'undefined') return undefined;
-
-    const handleOnline = () => {
-      warmupDashboardData(business.id, { force: true }).catch(() => {});
-    };
-
-    window.addEventListener('online', handleOnline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-    };
-  }, [business?.id]);
-
-  const runTableConsistencyReconcile = useCallback(async ({ source = 'manual' } = {}) => {
-    if (!business?.id) return null;
-    const result = await reconcileTableOrderConsistency({
-      businessId: business.id,
-      source,
-      dryRun: false,
-      maxFixes: 25
-    });
-    return result;
-  }, [business?.id]);
-
-  useEffect(() => {
-    if (!business?.id || !LOCAL_SYNC_CONFIG.enabled) return undefined;
-
-    const runBackgroundReconcile = () => {
-      runTableConsistencyReconcile({ source: 'scheduler' })
-        .then((result) => {
-          if (!result || result.reason === 'clean' || result.reason === 'offline') return;
-          if (Number(result.appliedFixes || 0) > 0) {
-            const now = Date.now();
-            if (now - lastTableReconcileToastRef.current >= TABLE_RECONCILE_TOAST_COOLDOWN_MS) {
-              showWarning(`Auto-reconciliación aplicada: ${result.appliedFixes} ajustes en mesas.`);
-              lastTableReconcileToastRef.current = now;
-            }
-          }
-        })
-        .catch(() => {});
-    };
-
-    runBackgroundReconcile();
-    const timer = setInterval(runBackgroundReconcile, TABLE_CONSISTENCY_RECONCILE_MS);
-    return () => clearInterval(timer);
-  }, [business?.id, runTableConsistencyReconcile, showWarning]);
 
   const checkAuthAndLoadBusiness = useCallback(async () => {
     try {

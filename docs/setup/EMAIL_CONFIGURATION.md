@@ -81,7 +81,7 @@ Resend es ideal para aplicaciones modernas, con excelente deliverability.
 3. Obtén tu API Key
 4. Añade a `.env.local`:
 ```env
-VITE_RESEND_API_KEY=re_xxxxxxxxxxxxx
+RESEND_API_KEY=re_xxxxxxxxxxxxx
 VITE_RESEND_FROM_EMAIL=noreply@tudominio.com
 ```
 
@@ -200,7 +200,7 @@ VITE_EMAILJS_PUBLIC_KEY=xxxxxxxxxxxxxxx
 VITE_TEST_EMAIL=tu-email-testing@gmail.com
 
 # SMTP Personalizado (opcional pero recomendado)
-VITE_RESEND_API_KEY=re_xxxxxxxxxxxxx
+RESEND_API_KEY=re_xxxxxxxxxxxxx
 VITE_RESEND_FROM_EMAIL=noreply@tudominio.com
 ```
 

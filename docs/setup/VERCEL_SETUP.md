@@ -26,7 +26,7 @@ Esta guía te ayudará a configurar las variables de entorno necesarias para que
 
 1. En el campo **Name**, escribe:
    ```
-   VITE_RESEND_API_KEY
+   RESEND_API_KEY
    ```
 
 2. En el campo **Value**, pega tu API key:
@@ -124,7 +124,7 @@ Vercel detectará el push y redesplegarà automáticamente.
 En **Settings** → **Environment Variables** deberías ver:
 
 ```
-VITE_RESEND_API_KEY          Production, Preview    •••••••z9f
+RESEND_API_KEY          Production, Preview    •••••••z9f
 VITE_RESEND_FROM_EMAIL       Production, Preview    noreply@stocky.com
 VITE_TEST_EMAIL             Preview                andres.plazas@example.com (opcional)
 ```
@@ -171,7 +171,7 @@ VITE_EMAILJS_TEMPLATE_ID=template_mkz4rb4
 ### Variables de Resend (nuevas):
 
 ```
-VITE_RESEND_API_KEY=re_RBm8gZw1_Lspv5VqCYzFNGkANzmnTfz9f
+RESEND_API_KEY=re_RBm8gZw1_Lspv5VqCYzFNGkANzmnTfz9f
 VITE_RESEND_FROM_EMAIL=noreply@stocky.com
 ```
 
@@ -181,10 +181,10 @@ VITE_RESEND_FROM_EMAIL=noreply@stocky.com
 
 ### ❌ Error: "Missing API key"
 
-**Causa:** Variable `VITE_RESEND_API_KEY` no configurada o mal escrita
+**Causa:** Variable `RESEND_API_KEY` no configurada o mal escrita
 
 **Solución:**
-1. Verifica el nombre exacto: `VITE_RESEND_API_KEY` (con guiones bajos)
+1. Verifica el nombre exacto: `RESEND_API_KEY` (con guiones bajos)
 2. Verifica que esté en el ambiente **Production**
 3. Redesplega después de agregarla
 
@@ -289,7 +289,7 @@ tags: [
 
 Antes de considerar completo:
 
-- [ ] Variables agregadas en Vercel (VITE_RESEND_API_KEY, VITE_RESEND_FROM_EMAIL)
+- [ ] Variables agregadas en Vercel (RESEND_API_KEY, VITE_RESEND_FROM_EMAIL)
 - [ ] Redespliegue exitoso (sin errores)
 - [ ] Email de prueba enviado y recibido en producción
 - [ ] Dashboard de Resend muestra "Delivered"
