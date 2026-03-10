@@ -229,8 +229,8 @@ export default async function handler(req, res) {
       sound: 'default',
       priority: 'high',
       channelId: 'stocky-default',
-      title: 'Empleado conectado',
-      body: `${employeeName} inició sesión en ${businessName}.`,
+      title: 'Empleado conectado 💚',
+      body: `${employeeName} inició sesion en ${businessName}`,
       data: {
         type: 'employee_login',
         business_id: businessId,
