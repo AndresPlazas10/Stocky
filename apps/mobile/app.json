@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Stocky Mobile",
+    "slug": "stocky-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/logoStocky.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/logoStocky.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.stocky.mobile"
+    },
+    "android": {
+      "package": "com.stocky.mobile",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/logoStocky.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/logoStocky.png"
+      },
+      "notification": {
+        "icon": "./assets/logoStocky.png",
+        "color": "#0AC946"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-notifications",
+      "./plugins/withFirebaseAppInit"
+    ],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "4d8a80f4-cd3a-4750-8fc9-b8f7be0444d4"
+      }
+    },
+    "owner": "andresplazas"
+  }
+}
