@@ -1,0 +1,343 @@
+{
+  "generated_at": "2026-03-09T21:37:43.469Z",
+  "status": "PASS",
+  "checks": [
+    {
+      "id": "publication_exists",
+      "description": "La publicacion supabase_realtime existe",
+      "status": "PASS",
+      "severity": "critical",
+      "details": "supabase_realtime encontrada"
+    },
+    {
+      "id": "required_tables_in_publication",
+      "description": "Todas las tablas criticas estan en la publicacion realtime",
+      "status": "PASS",
+      "severity": "critical",
+      "details": "Todas las tablas requeridas estan publicadas",
+      "meta": {
+        "missing_tables": [],
+        "checked_tables": [
+          "combos",
+          "employees",
+          "order_items",
+          "orders",
+          "products",
+          "purchases",
+          "sale_details",
+          "sales",
+          "tables"
+        ]
+      }
+    },
+    {
+      "id": "can_access_business_function",
+      "description": "Existe la funcion public.can_access_business",
+      "status": "PASS",
+      "severity": "critical",
+      "details": "Funcion encontrada"
+    },
+    {
+      "id": "rls_relational_tables",
+      "description": "RLS habilitado para tablas relacionales de realtime",
+      "status": "PASS",
+      "severity": "critical",
+      "details": "RLS habilitado en order_items y sale_details"
+    },
+    {
+      "id": "relational_policies_present",
+      "description": "Existen politicas activas para order_items y sale_details",
+      "status": "PASS",
+      "severity": "high",
+      "details": "Politicas presentes para tablas relacionales"
+    },
+    {
+      "id": "replica_identity_full",
+      "description": "Replica identity FULL en tablas relacionales de realtime",
+      "status": "PASS",
+      "severity": "high",
+      "details": "Replica identity FULL validado en order_items y sale_details"
+    }
+  ],
+  "failed_count": 0,
+  "total_checks": 6,
+  "snapshot": {
+    "generated_at": "2026-03-09T21:37:43.453424+00:00",
+    "publication_exists": true,
+    "required_tables": [
+      {
+        "tablename": "combos",
+        "in_publication": true
+      },
+      {
+        "tablename": "employees",
+        "in_publication": true
+      },
+      {
+        "tablename": "order_items",
+        "in_publication": true
+      },
+      {
+        "tablename": "orders",
+        "in_publication": true
+      },
+      {
+        "tablename": "products",
+        "in_publication": true
+      },
+      {
+        "tablename": "purchases",
+        "in_publication": true
+      },
+      {
+        "tablename": "sale_details",
+        "in_publication": true
+      },
+      {
+        "tablename": "sales",
+        "in_publication": true
+      },
+      {
+        "tablename": "tables",
+        "in_publication": true
+      }
+    ],
+    "rls": [
+      {
+        "table_name": "order_items",
+        "rls_enabled": true,
+        "rls_forced": false
+      },
+      {
+        "table_name": "sale_details",
+        "rls_enabled": true,
+        "rls_forced": false
+      }
+    ],
+    "policies": [
+      {
+        "tablename": "employees",
+        "policyname": "employees_delete_policy",
+        "cmd": "DELETE",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "is_business_owner(business_id, auth.uid())",
+        "with_check": null
+      },
+      {
+        "tablename": "employees",
+        "policyname": "employees_insert_policy",
+        "cmd": "INSERT",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": null,
+        "with_check": "is_business_owner(business_id, auth.uid())"
+      },
+      {
+        "tablename": "employees",
+        "policyname": "employees_select_policy",
+        "cmd": "SELECT",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "((user_id = ( SELECT auth.uid() AS uid)) OR (EXISTS ( SELECT 1\n   FROM businesses b\n  WHERE ((b.id = employees.business_id) AND (b.created_by = ( SELECT auth.uid() AS uid))))))",
+        "with_check": null
+      },
+      {
+        "tablename": "employees",
+        "policyname": "employees_update_policy",
+        "cmd": "UPDATE",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "is_business_owner(business_id, auth.uid())",
+        "with_check": "is_business_owner(business_id, auth.uid())"
+      },
+      {
+        "tablename": "order_items",
+        "policyname": "order_items_delete",
+        "cmd": "DELETE",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "(order_id IN ( SELECT orders.id\n   FROM orders\n  WHERE (orders.business_id IN ( SELECT get_user_business_ids() AS get_user_business_ids))))",
+        "with_check": null
+      },
+      {
+        "tablename": "order_items",
+        "policyname": "order_items_delete_policy",
+        "cmd": "DELETE",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "(order_id IN ( SELECT orders.id\n   FROM orders\n  WHERE (orders.business_id IN ( SELECT get_user_business_ids.business_id\n           FROM get_user_business_ids() get_user_business_ids(business_id)))))",
+        "with_check": null
+      },
+      {
+        "tablename": "order_items",
+        "policyname": "order_items_insert",
+        "cmd": "INSERT",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": null,
+        "with_check": "(order_id IN ( SELECT orders.id\n   FROM orders\n  WHERE (orders.business_id IN ( SELECT get_user_business_ids() AS get_user_business_ids))))"
+      },
+      {
+        "tablename": "order_items",
+        "policyname": "order_items_insert_policy",
+        "cmd": "INSERT",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": null,
+        "with_check": "(order_id IN ( SELECT orders.id\n   FROM orders\n  WHERE (orders.business_id IN ( SELECT get_user_business_ids.business_id\n           FROM get_user_business_ids() get_user_business_ids(business_id)))))"
+      },
+      {
+        "tablename": "order_items",
+        "policyname": "order_items_realtime_access_policy",
+        "cmd": "ALL",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "(EXISTS ( SELECT 1\n   FROM orders o\n  WHERE ((o.id = order_items.order_id) AND can_access_business(o.business_id))))",
+        "with_check": "(EXISTS ( SELECT 1\n   FROM orders o\n  WHERE ((o.id = order_items.order_id) AND can_access_business(o.business_id))))"
+      },
+      {
+        "tablename": "order_items",
+        "policyname": "order_items_select",
+        "cmd": "SELECT",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "(order_id IN ( SELECT orders.id\n   FROM orders\n  WHERE (orders.business_id IN ( SELECT get_user_business_ids() AS get_user_business_ids))))",
+        "with_check": null
+      },
+      {
+        "tablename": "order_items",
+        "policyname": "order_items_select_policy",
+        "cmd": "SELECT",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "(order_id IN ( SELECT orders.id\n   FROM orders\n  WHERE (orders.business_id IN ( SELECT get_user_business_ids.business_id\n           FROM get_user_business_ids() get_user_business_ids(business_id)))))",
+        "with_check": null
+      },
+      {
+        "tablename": "order_items",
+        "policyname": "order_items_update",
+        "cmd": "UPDATE",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "(order_id IN ( SELECT orders.id\n   FROM orders\n  WHERE (orders.business_id IN ( SELECT get_user_business_ids() AS get_user_business_ids))))",
+        "with_check": "(order_id IN ( SELECT orders.id\n   FROM orders\n  WHERE (orders.business_id IN ( SELECT get_user_business_ids() AS get_user_business_ids))))"
+      },
+      {
+        "tablename": "order_items",
+        "policyname": "order_items_update_policy",
+        "cmd": "UPDATE",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "(order_id IN ( SELECT orders.id\n   FROM orders\n  WHERE (orders.business_id IN ( SELECT get_user_business_ids.business_id\n           FROM get_user_business_ids() get_user_business_ids(business_id)))))",
+        "with_check": "(order_id IN ( SELECT orders.id\n   FROM orders\n  WHERE (orders.business_id IN ( SELECT get_user_business_ids.business_id\n           FROM get_user_business_ids() get_user_business_ids(business_id)))))"
+      },
+      {
+        "tablename": "purchases",
+        "policyname": "purchases_access_policy",
+        "cmd": "ALL",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "can_access_business(business_id)",
+        "with_check": "can_access_business(business_id)"
+      },
+      {
+        "tablename": "sale_details",
+        "policyname": "sale_details_access_policy",
+        "cmd": "ALL",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "(sale_id IN ( SELECT sales.id\n   FROM sales\n  WHERE ((sales.user_id = auth.uid()) OR (sales.business_id IN ( SELECT businesses.id\n           FROM businesses\n          WHERE (businesses.created_by = auth.uid()))) OR (sales.business_id IN ( SELECT employees.business_id\n           FROM employees\n          WHERE ((employees.user_id = auth.uid()) AND (employees.role = ANY (ARRAY['admin'::text, 'employee'::text, 'cashier'::text])) AND (employees.is_active = true)))))))",
+        "with_check": "(sale_id IN ( SELECT sales.id\n   FROM sales\n  WHERE ((sales.user_id = auth.uid()) OR (sales.business_id IN ( SELECT businesses.id\n           FROM businesses\n          WHERE (businesses.created_by = auth.uid()))) OR (sales.business_id IN ( SELECT employees.business_id\n           FROM employees\n          WHERE ((employees.user_id = auth.uid()) AND (employees.is_active = true)))))))"
+      },
+      {
+        "tablename": "sale_details",
+        "policyname": "sale_details_delete_policy",
+        "cmd": "DELETE",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "(sale_id IN ( SELECT sales.id\n   FROM sales\n  WHERE (sales.business_id IN ( SELECT get_user_business_ids.business_id\n           FROM get_user_business_ids() get_user_business_ids(business_id)))))",
+        "with_check": null
+      },
+      {
+        "tablename": "sale_details",
+        "policyname": "sale_details_insert_policy",
+        "cmd": "INSERT",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": null,
+        "with_check": "(sale_id IN ( SELECT sales.id\n   FROM sales\n  WHERE (sales.business_id IN ( SELECT get_user_business_ids.business_id\n           FROM get_user_business_ids() get_user_business_ids(business_id)))))"
+      },
+      {
+        "tablename": "sale_details",
+        "policyname": "sale_details_realtime_access_policy",
+        "cmd": "ALL",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "(EXISTS ( SELECT 1\n   FROM sales s\n  WHERE ((s.id = sale_details.sale_id) AND can_access_business(s.business_id))))",
+        "with_check": "(EXISTS ( SELECT 1\n   FROM sales s\n  WHERE ((s.id = sale_details.sale_id) AND can_access_business(s.business_id))))"
+      },
+      {
+        "tablename": "sale_details",
+        "policyname": "sale_details_select_policy",
+        "cmd": "SELECT",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "(sale_id IN ( SELECT sales.id\n   FROM sales\n  WHERE (sales.business_id IN ( SELECT get_user_business_ids.business_id\n           FROM get_user_business_ids() get_user_business_ids(business_id)))))",
+        "with_check": null
+      },
+      {
+        "tablename": "sale_details",
+        "policyname": "sale_details_update_policy",
+        "cmd": "UPDATE",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "(sale_id IN ( SELECT sales.id\n   FROM sales\n  WHERE (sales.business_id IN ( SELECT get_user_business_ids.business_id\n           FROM get_user_business_ids() get_user_business_ids(business_id)))))",
+        "with_check": "(sale_id IN ( SELECT sales.id\n   FROM sales\n  WHERE (sales.business_id IN ( SELECT get_user_business_ids.business_id\n           FROM get_user_business_ids() get_user_business_ids(business_id)))))"
+      },
+      {
+        "tablename": "sales",
+        "policyname": "sales_access_policy",
+        "cmd": "ALL",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "can_access_business(business_id)",
+        "with_check": "can_access_business(business_id)"
+      }
+    ],
+    "replica_identity": [
+      {
+        "table_name": "order_items",
+        "replica_identity_code": "f",
+        "replica_identity": "FULL"
+      },
+      {
+        "table_name": "sale_details",
+        "replica_identity_code": "f",
+        "replica_identity": "FULL"
+      }
+    ],
+    "can_access_business_exists": true
+  }
+}

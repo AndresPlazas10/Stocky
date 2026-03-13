@@ -1,0 +1,759 @@
+{
+  "generated_at": "2026-03-09T21:48:59.805Z",
+  "status": "PASS",
+  "scope": "web+mobile+db-smoke",
+  "assumptions": {
+    "business_id": "2d29e1c7-0532-4694-9b4e-995545f25725",
+    "outsider_validation_enabled": false,
+    "mutation_client": "owner_session",
+    "note": "Mobile usa modelo mixto (polling + locks), no solo canales realtime."
+  },
+  "channels": {
+    "total": 18,
+    "subscribed": 18,
+    "failed": 0,
+    "details": [
+      {
+        "actor": "owner",
+        "table": "tables",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+      },
+      {
+        "actor": "owner",
+        "table": "orders",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+      },
+      {
+        "actor": "owner",
+        "table": "order_items",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": null
+      },
+      {
+        "actor": "owner",
+        "table": "sales",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+      },
+      {
+        "actor": "owner",
+        "table": "purchases",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+      },
+      {
+        "actor": "owner",
+        "table": "products",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+      },
+      {
+        "actor": "owner",
+        "table": "employees",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+      },
+      {
+        "actor": "owner",
+        "table": "combos",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+      },
+      {
+        "actor": "owner",
+        "table": "sale_details",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": null
+      },
+      {
+        "actor": "employee",
+        "table": "tables",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+      },
+      {
+        "actor": "employee",
+        "table": "orders",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+      },
+      {
+        "actor": "employee",
+        "table": "order_items",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": null
+      },
+      {
+        "actor": "employee",
+        "table": "sales",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+      },
+      {
+        "actor": "employee",
+        "table": "purchases",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+      },
+      {
+        "actor": "employee",
+        "table": "products",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+      },
+      {
+        "actor": "employee",
+        "table": "employees",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+      },
+      {
+        "actor": "employee",
+        "table": "combos",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+      },
+      {
+        "actor": "employee",
+        "table": "sale_details",
+        "subscribed": true,
+        "status": "SUBSCRIBED",
+        "error": null,
+        "filter": null
+      }
+    ]
+  },
+  "latency_summary": {
+    "samples": 48,
+    "p50_ms": 85,
+    "p95_ms": 166
+  },
+  "scenario_results": [
+    {
+      "scenario": "tables_crud",
+      "status": "PASS",
+      "failures": [],
+      "assertions": [
+        {
+          "table": "tables",
+          "event": "INSERT",
+          "record_id": "8efd696f-8585-4e53-af07-054ddcbebd2b",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "tables",
+          "event": "UPDATE",
+          "record_id": "8efd696f-8585-4e53-af07-054ddcbebd2b",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "tables",
+          "event": "DELETE",
+          "record_id": "8efd696f-8585-4e53-af07-054ddcbebd2b",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        }
+      ],
+      "latencies_ms": [
+        15,
+        9,
+        102,
+        129,
+        125,
+        121
+      ],
+      "skipped": false,
+      "skip_reason": null
+    },
+    {
+      "scenario": "products_crud",
+      "status": "PASS",
+      "failures": [],
+      "assertions": [
+        {
+          "table": "products",
+          "event": "INSERT",
+          "record_id": "e7b4bf51-6c1d-4eff-afe1-2447451fb518",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "products",
+          "event": "UPDATE",
+          "record_id": "e7b4bf51-6c1d-4eff-afe1-2447451fb518",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "products",
+          "event": "DELETE",
+          "record_id": "e7b4bf51-6c1d-4eff-afe1-2447451fb518",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        }
+      ],
+      "latencies_ms": [
+        166,
+        165,
+        133,
+        163,
+        60,
+        60
+      ],
+      "skipped": false,
+      "skip_reason": null
+    },
+    {
+      "scenario": "orders_and_order_items",
+      "status": "PASS",
+      "failures": [],
+      "assertions": [
+        {
+          "table": "orders",
+          "event": "INSERT",
+          "record_id": "06abe522-5498-4295-a37c-87282960d5c2",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "order_items",
+          "event": "INSERT",
+          "record_id": "e0ff94fa-3b40-4e8f-b9a8-4dc9d9c02118",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "order_items",
+          "event": "UPDATE",
+          "record_id": "e0ff94fa-3b40-4e8f-b9a8-4dc9d9c02118",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "orders",
+          "event": "UPDATE",
+          "record_id": "06abe522-5498-4295-a37c-87282960d5c2",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "order_items",
+          "event": "DELETE",
+          "record_id": "e0ff94fa-3b40-4e8f-b9a8-4dc9d9c02118",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        }
+      ],
+      "latencies_ms": [
+        117,
+        118,
+        59,
+        51,
+        98,
+        99,
+        58,
+        52,
+        26,
+        19
+      ],
+      "skipped": false,
+      "skip_reason": null
+    },
+    {
+      "scenario": "sales_and_sale_details",
+      "status": "PASS",
+      "failures": [],
+      "assertions": [
+        {
+          "table": "sales",
+          "event": "INSERT",
+          "record_id": "4a112db0-6b2a-4ff3-baf2-4514d7571fe1",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "sale_details",
+          "event": "INSERT",
+          "record_id": "4b38126b-a647-4ecf-8df1-0d6793cb930b",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "sales",
+          "event": "UPDATE",
+          "record_id": "4a112db0-6b2a-4ff3-baf2-4514d7571fe1",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "sale_details",
+          "event": "UPDATE",
+          "record_id": "4b38126b-a647-4ecf-8df1-0d6793cb930b",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "sale_details",
+          "event": "DELETE",
+          "record_id": "4b38126b-a647-4ecf-8df1-0d6793cb930b",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "sales",
+          "event": "DELETE",
+          "record_id": "4a112db0-6b2a-4ff3-baf2-4514d7571fe1",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        }
+      ],
+      "latencies_ms": [
+        58,
+        49,
+        92,
+        85,
+        56,
+        55,
+        171,
+        170,
+        113,
+        113,
+        98,
+        80
+      ],
+      "skipped": false,
+      "skip_reason": null
+    },
+    {
+      "scenario": "combos_crud",
+      "status": "PASS",
+      "failures": [],
+      "assertions": [
+        {
+          "table": "combos",
+          "event": "INSERT",
+          "record_id": "d3700f69-90ea-4d49-89ae-582e54adbec3",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "combos",
+          "event": "UPDATE",
+          "record_id": "d3700f69-90ea-4d49-89ae-582e54adbec3",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "combos",
+          "event": "DELETE",
+          "record_id": "d3700f69-90ea-4d49-89ae-582e54adbec3",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        }
+      ],
+      "latencies_ms": [
+        126,
+        126,
+        11,
+        16,
+        124,
+        103
+      ],
+      "skipped": false,
+      "skip_reason": null
+    },
+    {
+      "scenario": "purchases_crud",
+      "status": "PASS",
+      "failures": [],
+      "assertions": [
+        {
+          "table": "purchases",
+          "event": "INSERT",
+          "record_id": "b5d2e084-e7bf-4b78-8d30-ba8f75cc4814",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "purchases",
+          "event": "UPDATE",
+          "record_id": "b5d2e084-e7bf-4b78-8d30-ba8f75cc4814",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        },
+        {
+          "table": "purchases",
+          "event": "DELETE",
+          "record_id": "b5d2e084-e7bf-4b78-8d30-ba8f75cc4814",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        }
+      ],
+      "latencies_ms": [
+        44,
+        33,
+        97,
+        97,
+        65,
+        65
+      ],
+      "skipped": false,
+      "skip_reason": null
+    },
+    {
+      "scenario": "employees_probe",
+      "status": "PASS",
+      "failures": [],
+      "assertions": [
+        {
+          "table": "employees",
+          "event": "UPDATE",
+          "record_id": "6b033b47-68e5-4232-be59-22134a5c0c11",
+          "owner_ok": true,
+          "employee_ok": true,
+          "outsider_received": false
+        }
+      ],
+      "latencies_ms": [
+        50,
+        57
+      ],
+      "skipped": false,
+      "skip_reason": null
+    }
+  ],
+  "table_matrix": [
+    {
+      "table": "tables",
+      "status": "PASS",
+      "assertions_total": 3,
+      "assertions_passed": 3,
+      "channel_subscriptions": [
+        {
+          "actor": "owner",
+          "table": "tables",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+        },
+        {
+          "actor": "employee",
+          "table": "tables",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+        }
+      ],
+      "latencies": {
+        "samples": 6,
+        "p50_ms": 102,
+        "p95_ms": 129
+      },
+      "failures": []
+    },
+    {
+      "table": "orders",
+      "status": "PASS",
+      "assertions_total": 2,
+      "assertions_passed": 2,
+      "channel_subscriptions": [
+        {
+          "actor": "owner",
+          "table": "orders",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+        },
+        {
+          "actor": "employee",
+          "table": "orders",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+        }
+      ],
+      "latencies": {
+        "samples": 10,
+        "p50_ms": 58,
+        "p95_ms": 118
+      },
+      "failures": []
+    },
+    {
+      "table": "order_items",
+      "status": "PASS",
+      "assertions_total": 3,
+      "assertions_passed": 3,
+      "channel_subscriptions": [
+        {
+          "actor": "owner",
+          "table": "order_items",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": null
+        },
+        {
+          "actor": "employee",
+          "table": "order_items",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": null
+        }
+      ],
+      "latencies": {
+        "samples": 10,
+        "p50_ms": 58,
+        "p95_ms": 118
+      },
+      "failures": []
+    },
+    {
+      "table": "sales",
+      "status": "PASS",
+      "assertions_total": 3,
+      "assertions_passed": 3,
+      "channel_subscriptions": [
+        {
+          "actor": "owner",
+          "table": "sales",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+        },
+        {
+          "actor": "employee",
+          "table": "sales",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+        }
+      ],
+      "latencies": {
+        "samples": 12,
+        "p50_ms": 85,
+        "p95_ms": 171
+      },
+      "failures": []
+    },
+    {
+      "table": "purchases",
+      "status": "PASS",
+      "assertions_total": 3,
+      "assertions_passed": 3,
+      "channel_subscriptions": [
+        {
+          "actor": "owner",
+          "table": "purchases",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+        },
+        {
+          "actor": "employee",
+          "table": "purchases",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+        }
+      ],
+      "latencies": {
+        "samples": 6,
+        "p50_ms": 65,
+        "p95_ms": 97
+      },
+      "failures": []
+    },
+    {
+      "table": "products",
+      "status": "PASS",
+      "assertions_total": 3,
+      "assertions_passed": 3,
+      "channel_subscriptions": [
+        {
+          "actor": "owner",
+          "table": "products",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+        },
+        {
+          "actor": "employee",
+          "table": "products",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+        }
+      ],
+      "latencies": {
+        "samples": 6,
+        "p50_ms": 133,
+        "p95_ms": 166
+      },
+      "failures": []
+    },
+    {
+      "table": "employees",
+      "status": "PASS",
+      "assertions_total": 1,
+      "assertions_passed": 1,
+      "channel_subscriptions": [
+        {
+          "actor": "owner",
+          "table": "employees",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+        },
+        {
+          "actor": "employee",
+          "table": "employees",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+        }
+      ],
+      "latencies": {
+        "samples": 2,
+        "p50_ms": 50,
+        "p95_ms": 57
+      },
+      "failures": []
+    },
+    {
+      "table": "combos",
+      "status": "PASS",
+      "assertions_total": 3,
+      "assertions_passed": 3,
+      "channel_subscriptions": [
+        {
+          "actor": "owner",
+          "table": "combos",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+        },
+        {
+          "actor": "employee",
+          "table": "combos",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": "business_id=eq.2d29e1c7-0532-4694-9b4e-995545f25725"
+        }
+      ],
+      "latencies": {
+        "samples": 6,
+        "p50_ms": 103,
+        "p95_ms": 126
+      },
+      "failures": []
+    },
+    {
+      "table": "sale_details",
+      "status": "PASS",
+      "assertions_total": 3,
+      "assertions_passed": 3,
+      "channel_subscriptions": [
+        {
+          "actor": "owner",
+          "table": "sale_details",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": null
+        },
+        {
+          "actor": "employee",
+          "table": "sale_details",
+          "subscribed": true,
+          "status": "SUBSCRIBED",
+          "error": null,
+          "filter": null
+        }
+      ],
+      "latencies": {
+        "samples": 12,
+        "p50_ms": 85,
+        "p95_ms": 171
+      },
+      "failures": []
+    }
+  ],
+  "findings": []
+}
