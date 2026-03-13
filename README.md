@@ -69,6 +69,9 @@ npm run dev
 - `npm run test`: pruebas (`node --test testing/**/*.test.js`).
 - `npm run check`: lint + build.
 - `npm run predeploy`: lint + test + build.
+- `npm run audit:perf:baseline`: genera baseline p95 de operaciones clave.
+- `npm run audit:perf:budget`: valida regresiones contra `testing/perf/perf-budget.json`.
+- `npm run audit:perf:ci`: ejecuta baseline actual + gate de presupuesto.
 
 ## Variables de entorno
 

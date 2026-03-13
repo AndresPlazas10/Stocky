@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SaleErrorAlert } from '@/components/ui/SaleErrorAlert';
 
-import { Store, User, Lock, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { User, Lock, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import logoStocky from '../assets/logoStocky.png';
 
 const _motionLintUsage = motion;
 
@@ -44,7 +45,7 @@ function Login() {
       }
 
       // Generar el email basado en el username (igual que en el registro)
-      const { user } = await signInWithUsernamePassword({
+      const { user, session } = await signInWithUsernamePassword({
         username,
         password
       });
@@ -97,8 +98,8 @@ function Login() {
       >
         <Card className="bg-white/90 backdrop-blur-xl border-2 border-white/50 shadow-2xl">
           <CardHeader className="space-y-3 pb-6">
-            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-              <Store className="w-8 h-8 text-white" />
+            <div className="mx-auto w-16 h-16 rounded-2xl border border-indigo-200 bg-white flex items-center justify-center shadow-lg">
+              <img src={logoStocky} alt="Stocky" className="w-12 h-12 object-contain" />
             </div>
             <CardTitle className="text-3xl font-bold text-center bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
               Iniciar Sesión

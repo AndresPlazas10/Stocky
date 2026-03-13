@@ -14,6 +14,7 @@ const Register = lazy(() => import('./pages/Register.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const EmployeeAccess = lazy(() => import('./pages/EmployeeAccess.jsx'));
 const EmployeeDashboard = lazy(() => import('./pages/EmployeeDashboard.jsx'));
+const DownloadPage = lazy(() => import('./pages/Download.jsx'));
 
 // Componente de carga
 const PageLoader = () => (
@@ -95,6 +96,7 @@ function App() {
           <Route path='/' element={<Home />} />
           <Route path='/login' element={<Login />} />
           <Route path='/register' element={<Register />} />
+          <Route path='/descargar' element={<DownloadPage />} />
           <Route path='/dashboard' element={<Dashboard />} />
           <Route path='/employee-access' element={<EmployeeAccess />} />
           <Route path='/employee-dashboard' element={<EmployeeDashboard />} />

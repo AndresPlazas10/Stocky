@@ -4,7 +4,7 @@ import { SyncStyleAlert } from './SyncStyleAlert.jsx';
 export function SaleUpdateAlert({
   isVisible,
   onClose,
-  title = 'Actualizacion aplicada',
+  title = 'Actualización aplicada',
   message = '',
   details = []
 }) {

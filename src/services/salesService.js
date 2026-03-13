@@ -35,7 +35,16 @@ const SALES_LIST_MINIMAL_COLUMNS = `
 `;
 
 const SALES_RPC_NOT_AVAILABLE = 'SALES_RPC_NOT_AVAILABLE';
-let salesRpcDisabled = false;
+function shouldDisableSalesRpc() {
+  if (typeof window === 'undefined') return false;
+  const rawFlag = String(import.meta?.env?.VITE_DISABLE_SALES_RPC || '').trim().toLowerCase();
+  if (rawFlag === 'true' || rawFlag === '1' || rawFlag === 'yes') return true;
+  if (rawFlag === 'false' || rawFlag === '0' || rawFlag === 'no') return false;
+  const host = String(window.location?.hostname || '').trim();
+  return host === 'localhost' || host === '127.0.0.1';
+}
+
+let salesRpcDisabled = shouldDisableSalesRpc();
 
 function buildSalesListCacheKey({ businessId, filters = {}, pagination = {} }) {
   return [

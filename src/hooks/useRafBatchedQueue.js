@@ -2,7 +2,8 @@ import { startTransition, useCallback, useEffect, useRef } from 'react';
 
 const MAX_QUEUE_BEFORE_SYNC_FLUSH = 120;
 
-export function useRafBatchedQueue() {
+export function useRafBatchedQueue(options = {}) {
+  const { useTransition = true } = options;
   const queueRef = useRef([]);
   const frameRef = useRef(null);
 
@@ -12,7 +13,7 @@ export function useRafBatchedQueue() {
 
     queueRef.current = [];
 
-    startTransition(() => {
+    const runTasks = () => {
       queuedTasks.forEach((task) => {
         if (typeof task !== 'function') return;
         try {
@@ -21,8 +22,15 @@ export function useRafBatchedQueue() {
           // no-op: evita romper el resto del batch por un handler puntual.
         }
       });
-    });
-  }, []);
+    };
+
+    if (useTransition && typeof startTransition === 'function') {
+      startTransition(runTasks);
+      return;
+    }
+
+    runTasks();
+  }, [useTransition]);
 
   const enqueue = useCallback((task) => {
     if (typeof task !== 'function') return;

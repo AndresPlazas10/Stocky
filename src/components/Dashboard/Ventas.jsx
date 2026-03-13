@@ -1151,6 +1151,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       {/* Mensajes */}
       <AnimatePresence>
         <SaleUpdateAlert
+          key="sale-submit-loading"
           isVisible={isSubmitting}
           onClose={() => {}}
           title="Generando venta..."
@@ -1158,6 +1159,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
           duration={600000}
         />
         <SaleSuccessAlert 
+          key="sale-success"
           isVisible={success && alertType === 'success'}
           onClose={() => setSuccess(false)}
           title={successTitle}
@@ -1165,6 +1167,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
           duration={6000}
         />
         <SaleErrorAlert 
+          key="sale-error"
           isVisible={success && alertType === 'error'}
           onClose={() => setSuccess(false)}
           title={successTitle}

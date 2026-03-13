@@ -513,6 +513,14 @@ export const supabaseAdapter = {
     return supabase.rpc('reconcile_tables_orders_consistency', payload);
   },
 
+  async openCloseTableTransactionRpc({ tableId, action, userId }) {
+    return supabase.rpc('open_close_table_transaction', {
+      p_table_id: tableId,
+      p_action: action,
+      p_user_id: userId
+    });
+  },
+
   async getFilteredSalesLegacy({
     businessId,
     fromDateIso = null,
