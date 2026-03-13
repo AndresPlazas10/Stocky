@@ -11,18 +11,26 @@ export default function WhatsNewModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState(0);
   const totalSteps = 3;
+  const storageKey = 'stocky_whatsnew_dismissed_v1';
   const downloadUrl = useMemo(() => {
     const raw = String(import.meta.env?.VITE_APK_URL || '').trim();
     return raw || '/apk/stocky-latest.apk';
   }, []);
 
   useEffect(() => {
-    setIsOpen(true);
-    setStep(0);
+    if (typeof window === 'undefined') return;
+    const dismissed = window.localStorage.getItem(storageKey) === '1';
+    if (!dismissed) {
+      setIsOpen(true);
+      setStep(0);
+    }
   }, []);
 
   const closeModal = () => {
     setIsOpen(false);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(storageKey, '1');
+    }
   };
 
   const handleDownload = () => {
@@ -33,6 +41,9 @@ export default function WhatsNewModal() {
       window.open(downloadUrl, '_blank', 'noopener');
     }
     setIsOpen(false);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(storageKey, '1');
+    }
   };
 
   const goNext = () => {
