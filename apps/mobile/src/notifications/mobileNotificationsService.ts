@@ -22,6 +22,9 @@ type NotifyAdminEmployeeLoginResult =
 type NotifyAdminSaleRegisteredResult =
   | { ok: true; status: number; data: any }
   | { ok: false; status: number | null; message: string };
+type NotifyAdminLowStockResult =
+  | { ok: true; status: number; data: any }
+  | { ok: false; status: number | null; message: string };
 
 function createInstallationId() {
   return `stocky-mobile-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
@@ -196,6 +199,29 @@ export async function deactivatePushTokenForUser(userId: string): Promise<void> 
     })
     .eq('user_id', normalizedUserId)
     .eq('installation_id', installationId);
+}
+
+export async function deactivateOtherPushTokensForUser(
+  userId: string,
+  installationId: string,
+): Promise<void> {
+  const normalizedUserId = String(userId || '').trim();
+  const normalizedInstallationId = String(installationId || '').trim();
+  if (!normalizedUserId || !normalizedInstallationId) return;
+
+  const client = getSupabaseClient();
+  const nowIso = new Date().toISOString();
+
+  await client
+    .from('mobile_push_tokens')
+    .update({
+      is_active: false,
+      updated_at: nowIso,
+    })
+    .eq('user_id', normalizedUserId)
+    .eq('platform', Platform.OS)
+    .neq('installation_id', normalizedInstallationId)
+    .eq('is_active', true);
 }
 
 async function notifyAdminEmployeeLoginViaRoute({
@@ -382,5 +408,101 @@ export async function notifyAdminSaleRegistered({
     accessToken: normalizedToken,
     businessId: normalizedBusinessId,
     saleTotal: normalizedSaleTotal,
+  });
+}
+
+async function notifyAdminLowStockViaRoute({
+  route,
+  accessToken,
+  businessId,
+  productIds,
+}: {
+  route: '/api/v2/notify-low-stock' | '/api/notify-low-stock';
+  accessToken: string;
+  businessId: string;
+  productIds: string[];
+}): Promise<NotifyAdminLowStockResult> {
+  try {
+    const response = await fetch(`${EXPO_CONFIG.apiBaseUrl}${route}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+        'X-Stocky-Client': 'mobile',
+        'X-Stocky-Client-Version': EXPO_CONFIG.clientVersion,
+      },
+      body: JSON.stringify({
+        business_id: businessId,
+        product_ids: productIds,
+      }),
+    });
+
+    const raw = await response.text();
+    let payload: any = null;
+    try {
+      payload = raw ? JSON.parse(raw) : null;
+    } catch {
+      payload = { error: raw || 'Unexpected response' };
+    }
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        message: String(payload?.error || payload?.message || `Request failed (${response.status})`),
+      };
+    }
+
+    return { ok: true, status: response.status, data: payload };
+  } catch (error) {
+    const errorMessage = error instanceof Error
+      ? error.message
+      : String((error as any)?.message || error || 'Network error');
+    const targetUrl = `${EXPO_CONFIG.apiBaseUrl}${route}`;
+    return {
+      ok: false,
+      status: null,
+      message: `${errorMessage} (url: ${targetUrl})`,
+    };
+  }
+}
+
+export async function notifyAdminLowStock({
+  accessToken,
+  businessId,
+  productIds,
+}: {
+  accessToken: string;
+  businessId: string;
+  productIds: string[];
+}): Promise<NotifyAdminLowStockResult> {
+  const normalizedToken = String(accessToken || '').trim();
+  const normalizedBusinessId = String(businessId || '').trim();
+  const normalizedProductIds = Array.isArray(productIds)
+    ? productIds.map((id) => String(id || '').trim()).filter(Boolean)
+    : [];
+  if (!normalizedToken || !normalizedBusinessId || normalizedProductIds.length === 0) {
+    return {
+      ok: false,
+      status: null,
+      message: 'Missing access token, business id, or product ids',
+    };
+  }
+
+  const first = await notifyAdminLowStockViaRoute({
+    route: '/api/v2/notify-low-stock',
+    accessToken: normalizedToken,
+    businessId: normalizedBusinessId,
+    productIds: normalizedProductIds,
+  });
+
+  if (first.ok) return first;
+  if (first.status !== 404) return first;
+
+  return notifyAdminLowStockViaRoute({
+    route: '/api/notify-low-stock',
+    accessToken: normalizedToken,
+    businessId: normalizedBusinessId,
+    productIds: normalizedProductIds,
   });
 }

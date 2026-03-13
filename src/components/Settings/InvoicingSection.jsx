@@ -16,8 +16,8 @@ export default function InvoicingSection({ businessName = 'Tu negocio' }) {
             <FileText className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold">Facturacion electronica</h2>
-            <p className="text-white/80">Gestion externa al runtime de Stocky</p>
+            <h2 className="text-xl font-bold">Facturación electrónica</h2>
+            <p className="text-white/80">Gestión externa al runtime de Stocky</p>
           </div>
         </div>
       </div>
@@ -28,14 +28,14 @@ export default function InvoicingSection({ businessName = 'Tu negocio' }) {
           <div className="text-sm text-blue-900">
             <p className="font-semibold">Estado actual del producto</p>
             <p className="mt-1">
-              Stocky no emite facturas electronicas DIAN desde el runtime de la app.
-              {` ${businessName}`} debe gestionar su facturacion oficial directamente en su proveedor autorizado.
+              Stocky no emite facturas electrónicas DIAN desde el runtime de la app.
+              {` ${businessName}`} debe gestionar su facturación oficial directamente en su proveedor autorizado.
             </p>
           </div>
         </div>
 
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900">
-          Los comprobantes generados en Stocky son informativos y no reemplazan la factura electronica oficial.
+          Los comprobantes generados en Stocky son informativos y no reemplazan la factura electrónica oficial.
         </div>
 
         <a

@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '../lib/supabase';
-import { notifyAdminSaleRegistered } from '../notifications/mobileNotificationsService';
+import { notifyAdminLowStock, notifyAdminSaleRegistered } from '../notifications/mobileNotificationsService';
 import {
   listCatalogItems,
   type ListCatalogItemsOptions,
@@ -90,6 +90,10 @@ function normalizeReference(value: unknown): string | null {
   const lower = normalized.toLowerCase();
   if (lower === 'null' || lower === 'undefined') return null;
   return normalized;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function isFunctionUnavailableError(errorLike: any, functionName: string) {
@@ -212,7 +216,7 @@ async function resolveSellerContext(businessId: string) {
   } = await client.auth.getUser();
 
   if (userError) throw userError;
-  if (!user?.id) throw new Error('Sesion no valida');
+  if (!user?.id) throw new Error('Sesión no válida');
   const cacheKey = `${normalizedBusinessId}::${normalizeText(user.id)}`;
 
   const cached = sellerContextCacheByKey.get(cacheKey);
@@ -546,15 +550,46 @@ export async function listRecentVentas(
 
 export async function listVentaDetails(saleId: string): Promise<VentaDetailRecord[]> {
   const client = getSupabaseClient();
+  const pageSize = 200;
+  const maxAttempts = 5;
 
-  const full = await client
-    .from('sale_details')
-    .select('id,sale_id,quantity,unit_price,subtotal,product_id,combo_id,products(name,code),combos(nombre)')
-    .eq('sale_id', saleId)
-    .order('id', { ascending: true });
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    let from = 0;
+    let hasMore = true;
+    const rows: any[] = [];
 
-  if (full.error) throw full.error;
-  return (Array.isArray(full.data) ? full.data : []).map(normalizeVentaDetailRecord);
+    try {
+      while (hasMore) {
+        const to = from + pageSize - 1;
+        const batch = await client
+          .from('sale_details')
+          .select('id,sale_id,quantity,unit_price,subtotal,product_id,combo_id,products(name,code),combos(nombre)')
+          .eq('sale_id', saleId)
+          .order('id', { ascending: true })
+          .range(from, to);
+
+        if (batch.error) throw batch.error;
+
+        const data = Array.isArray(batch.data) ? batch.data : [];
+        rows.push(...data);
+        if (data.length < pageSize) {
+          hasMore = false;
+        } else {
+          from += pageSize;
+        }
+      }
+
+      return rows.map(normalizeVentaDetailRecord);
+    } catch (err) {
+      if (attempt >= maxAttempts) {
+        throw err;
+      }
+      const backoffMs = Math.min(1600, 200 * 2 ** (attempt - 1));
+      await sleep(backoffMs);
+    }
+  }
+
+  return [];
 }
 
 export async function createVenta({
@@ -660,6 +695,17 @@ export async function createVenta({
         accessToken,
         businessId,
         saleTotal: resolvedTotal,
+      });
+    }
+
+    const lowStockProductIds = Array.from(
+      new Set(itemsForRpc.map((item) => normalizeReference(item.product_id)).filter(Boolean)),
+    );
+    if (accessToken && lowStockProductIds.length > 0) {
+      void notifyAdminLowStock({
+        accessToken,
+        businessId,
+        productIds: lowStockProductIds as string[],
       });
     }
   }

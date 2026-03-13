@@ -251,7 +251,7 @@ export default async function handler(req, res) {
       priority: 'high',
       channelId: 'stocky-default',
       title: 'Nueva venta registrada',
-      body: `Se registró una nueva venta por ${totalLabel}.`,
+      body: `Se registró una nueva venta por ${totalLabel} 🔥.`,
       data: {
         type: 'sale_registered',
         business_id: businessId,

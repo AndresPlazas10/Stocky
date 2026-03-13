@@ -6,6 +6,7 @@
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { isAdminRole } from '../utils/roles.js';
 import { enqueueOutboxMutation } from '../sync/outboxShadow.js';
+import { notifyAdminSaleRegisteredWeb } from './webNotificationsService.js';
 
 function buildIdempotencyKey({ action, businessId, orderId, tableId }) {
   const normalizedAction = String(action || '').trim().toLowerCase();
@@ -251,6 +252,21 @@ function normalizeCashBreakdownEntries(changeBreakdown) {
       return { denomination, count };
     })
     .filter(Boolean);
+}
+
+async function maybeNotifyAdminSale({ businessId, saleTotal }) {
+  try {
+    const sessionResult = await supabaseAdapter.getCurrentSession();
+    const accessToken = sessionResult?.data?.session?.access_token || null;
+    if (!accessToken) return;
+    await notifyAdminSaleRegisteredWeb({
+      accessToken,
+      businessId,
+      saleTotal,
+    });
+  } catch {
+    // no-op: no bloquear cierre de venta por notificaciones
+  }
 }
 
 function computeChangeFromBreakdown(changeBreakdown = []) {
@@ -587,6 +603,8 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     }
   });
 
+  void maybeNotifyAdminSale({ businessId, saleTotal: totalSold });
+
   return { totalSold, saleIds };
 }
 
@@ -756,6 +774,8 @@ export async function closeOrderSingle(
       amount_received: normalizedAmountReceived
     }
   });
+
+  void maybeNotifyAdminSale({ businessId, saleTotal });
 
   return { saleTotal, saleId: resolvedSaleId };
 }

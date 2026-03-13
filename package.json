@@ -28,6 +28,7 @@
     "npm": ">=9.0.0"
   },
   "scripts": {
+    "start": "vite",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
@@ -36,6 +37,15 @@
     "clean": "rm -rf dist node_modules",
     "reinstall": "npm run clean && npm install",
     "analyze": "vite build --mode analyze",
+    "audit:realtime:map": "node scripts/realtime-audit/generate-realtime-map.mjs",
+    "audit:realtime:db": "node scripts/realtime-audit/run-db-contract-check.mjs",
+    "audit:realtime:smoke": "node scripts/realtime-audit/run-realtime-smoke.mjs",
+    "audit:realtime:report": "node scripts/realtime-audit/build-audit-report.mjs",
+    "audit:realtime": "node scripts/realtime-audit/run-all.mjs",
+    "audit:perf:baseline": "node scripts/perf/run-week1-baseline.mjs",
+    "audit:perf:budget": "node scripts/perf/check-week1-budget.mjs",
+    "audit:perf:pr-diff": "node scripts/perf/build-pr-budget-diff.mjs",
+    "audit:perf:ci": "node scripts/perf/run-week1-baseline.mjs --out-json testing/perf/perf-current.json --out-md docs/perf/PERF_CURRENT.md && node scripts/perf/check-week1-budget.mjs --current testing/perf/perf-current.json --budget testing/perf/perf-budget.json",
     "check": "npm run lint && npm run build",
     "predeploy": "npm run lint && npm run test && npm run build",
     "check:production": "./check-production.sh"

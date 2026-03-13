@@ -5,8 +5,10 @@ import {
   getBusinessById,
   getEmployeeByUserId
 } from '../data/queries/authQueries.js';
+import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { signOutGlobalSession } from '../data/commands/authCommands.js';
 import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
+import WhatsNewModal from '../components/Modals/WhatsNewModal.jsx';
 import Ventas from '../components/Dashboard/Ventas.jsx';
 import Inventario from '../components/Dashboard/Inventario.jsx';
 import Mesas from '../components/Dashboard/Mesas.jsx';
@@ -23,6 +25,7 @@ import {
   Menu,
   X
 } from 'lucide-react';
+import { notifyAdminEmployeeLoginWeb } from '../services/webNotificationsService.js';
 // import Facturas from '../components/Dashboard/Facturas.jsx'; // DESHABILITADO
 
 const _motionLintUsage = motion;
@@ -110,6 +113,52 @@ function EmployeeDashboard() {
         username: employeeData.username
       });
       setBusiness(businessData);
+
+      if (user.id) {
+        const notifyKey = `stocky.employee-login:${user.id}:${String(user.last_sign_in_at || '')}`;
+        if (typeof window !== 'undefined') {
+          const storedValue = window.sessionStorage?.getItem(notifyKey) || '';
+          const isSent = storedValue === 'sent';
+          const pendingMatch = storedValue.match(/^pending:(\d+)$/);
+          const pendingAt = pendingMatch ? Number(pendingMatch[1]) : null;
+          const pendingFresh = Number.isFinite(pendingAt) && Date.now() - pendingAt < 30000;
+
+          if (!isSent && !pendingFresh) {
+            const resolveAccessToken = async () => {
+              for (let attempt = 0; attempt < 3; attempt += 1) {
+                const sessionResult = await supabaseAdapter.getCurrentSession();
+                const token = sessionResult?.data?.session?.access_token || null;
+                if (token) return token;
+                await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+              }
+              return null;
+            };
+
+            const accessToken = await resolveAccessToken();
+            if (accessToken) {
+              window.sessionStorage?.setItem(notifyKey, `pending:${Date.now()}`);
+              const employeeName = (
+                user?.user_metadata?.full_name
+                || user?.user_metadata?.name
+                || user?.user_metadata?.username
+                || user?.email?.split('@')[0]
+                || employeeData.full_name
+                || 'Empleado'
+              );
+              const result = await notifyAdminEmployeeLoginWeb({
+                accessToken,
+                businessId: employeeData.business_id,
+                employeeName,
+              });
+              if (result?.ok && typeof window !== 'undefined') {
+                window.sessionStorage?.setItem(notifyKey, 'sent');
+              } else if (typeof window !== 'undefined') {
+                window.sessionStorage?.removeItem(notifyKey);
+              }
+            }
+          }
+        }
+      }
       
       // � VERIFICAR SI EL NEGOCIO ESTÁ DESHABILITADO (PRIORIDAD MÁXIMA)
       if (businessData.is_active === false) {
@@ -246,6 +295,7 @@ function EmployeeDashboard() {
 
   return (
     <>
+      {activeSection === 'home' ? <WhatsNewModal /> : null}
       <div className="flex h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 overflow-hidden">
       {/* Sidebar */}
       <motion.aside

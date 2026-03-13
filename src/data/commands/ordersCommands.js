@@ -3,6 +3,8 @@ import { enqueueOutboxMutation } from '../../sync/outboxShadow.js';
 import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
 import { invalidateOrderCache } from '../adapters/cacheInvalidation.js';
 
+let openCloseRpcCompatibility = 'unknown';
+
 function buildMutationId(prefix, businessId = null) {
   const nonce = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
   return `${businessId || 'unknown'}:${prefix}:${nonce}`;
@@ -12,6 +14,15 @@ function isMissingTablesUpdatedAtColumnError(errorLike) {
   const message = String(errorLike?.message || errorLike || '').toLowerCase();
   return (
     message.includes('column "updated_at"')
+    && message.includes('relation "tables"')
+    && message.includes('does not exist')
+  );
+}
+
+function isMissingTablesOpenedAtColumnError(errorLike) {
+  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+  return (
+    message.includes('column "opened_at"')
     && message.includes('relation "tables"')
     && message.includes('does not exist')
   );
@@ -42,9 +53,37 @@ function isConflictError(errorLike) {
   );
 }
 
+function isOpenCloseRpcMissingError(errorLike) {
+  const code = String(errorLike?.code || '').toLowerCase();
+  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+  return (
+    code === '42883'
+    || (
+      message.includes('open_close_table_transaction')
+      && (
+        message.includes('does not exist')
+        || message.includes('could not find the function')
+        || message.includes('function public.open_close_table_transaction')
+      )
+    )
+  );
+}
+
 function normalizeNumber(value, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+async function resolveActorUserId(userId = null) {
+  const normalizedUserId = String(userId || '').trim();
+  if (normalizedUserId) return normalizedUserId;
+  try {
+    const { data } = await supabaseAdapter.getCurrentUser();
+    const resolved = String(data?.user?.id || '').trim();
+    return resolved || null;
+  } catch {
+    return null;
+  }
 }
 
 async function getAssociatedOrderIdsForTable({ businessId, tableId }) {
@@ -101,10 +140,63 @@ export async function createTable({ businessId, tableNumber }) {
 }
 
 export async function createOrderAndOccupyTable({ businessId, tableId, userId = null }) {
+  const actorUserId = await resolveActorUserId(userId);
+
+  if (openCloseRpcCompatibility !== 'unsupported' && actorUserId) {
+    const { data: rpcData, error: rpcError } = await supabaseAdapter.openCloseTableTransactionRpc({
+      tableId,
+      action: 'open',
+      userId: actorUserId
+    });
+
+    if (!rpcError) {
+      openCloseRpcCompatibility = 'supported';
+      const rpcRow = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+      const orderId = String(rpcRow?.current_order_id || '').trim();
+      if (!orderId) {
+        throw new Error('open_close_table_transaction no devolvió current_order_id');
+      }
+
+      await enqueueOutboxMutation({
+        businessId,
+        mutationType: 'order.create',
+        payload: {
+          order_id: orderId,
+          table_id: tableId,
+          user_id: actorUserId
+        },
+        mutationId: buildMutationId('order.create', businessId)
+      });
+      await invalidateOrderCache({ businessId, tableId, orderId });
+
+      return {
+        id: orderId,
+        business_id: String(rpcRow?.business_id || businessId || '').trim() || businessId,
+        table_id: tableId,
+        user_id: actorUserId,
+        status: 'open',
+        total: 0,
+        opened_at: rpcRow?.opened_at || null,
+        __localOnly: false,
+        __rpc: true
+      };
+    }
+
+    if (
+      isOpenCloseRpcMissingError(rpcError)
+      || isMissingTablesUpdatedAtColumnError(rpcError)
+      || isMissingTablesOpenedAtColumnError(rpcError)
+    ) {
+      openCloseRpcCompatibility = 'unsupported';
+    } else {
+      throw rpcError;
+    }
+  }
+
   const { data: newOrder, error: orderError } = await supabaseAdapter.insertOrder({
     business_id: businessId,
     table_id: tableId,
-    user_id: userId,
+    user_id: actorUserId,
     status: 'open',
     total: 0
   });
@@ -124,7 +216,11 @@ export async function createOrderAndOccupyTable({ businessId, tableId, userId = 
             current_order_id: recoveredOrder.id,
             status: 'occupied'
           });
-          if (recoverTableError && !isMissingTablesUpdatedAtColumnError(recoverTableError)) {
+          if (
+            recoverTableError
+            && !isMissingTablesUpdatedAtColumnError(recoverTableError)
+            && !isMissingTablesOpenedAtColumnError(recoverTableError)
+          ) {
             throw recoverTableError;
           }
 
@@ -145,7 +241,11 @@ export async function createOrderAndOccupyTable({ businessId, tableId, userId = 
     current_order_id: newOrder.id,
     status: 'occupied'
   });
-  if (updateError && !isMissingTablesUpdatedAtColumnError(updateError)) throw updateError;
+  if (
+    updateError
+    && !isMissingTablesUpdatedAtColumnError(updateError)
+    && !isMissingTablesOpenedAtColumnError(updateError)
+  ) throw updateError;
 
   await enqueueOutboxMutation({
     businessId,
@@ -153,7 +253,7 @@ export async function createOrderAndOccupyTable({ businessId, tableId, userId = 
     payload: {
       order_id: newOrder?.id || null,
       table_id: tableId,
-      user_id: userId
+      user_id: actorUserId
     },
     mutationId: buildMutationId('order.create', businessId)
   });
@@ -385,22 +485,57 @@ export async function insertOrderItem({
   };
 }
 
-export async function deleteOrderAndReleaseTable({ orderId, tableId, businessId = null }) {
-  const { error: releaseTableError } = businessId
-    ? await supabaseAdapter.updateTableByBusinessAndId({
-      businessId,
+export async function deleteOrderAndReleaseTable({
+  orderId,
+  tableId,
+  businessId = null,
+  userId = null
+}) {
+  let releasedViaRpc = false;
+  const actorUserId = await resolveActorUserId(userId);
+
+  if (openCloseRpcCompatibility !== 'unsupported' && actorUserId) {
+    const { error: rpcError } = await supabaseAdapter.openCloseTableTransactionRpc({
       tableId,
-      payload: {
+      action: 'close',
+      userId: actorUserId
+    });
+
+    if (!rpcError) {
+      openCloseRpcCompatibility = 'supported';
+      releasedViaRpc = true;
+    } else if (
+      isOpenCloseRpcMissingError(rpcError)
+      || isMissingTablesUpdatedAtColumnError(rpcError)
+      || isMissingTablesOpenedAtColumnError(rpcError)
+    ) {
+      openCloseRpcCompatibility = 'unsupported';
+    } else {
+      throw rpcError;
+    }
+  }
+
+  if (!releasedViaRpc) {
+    const { error: releaseTableError } = businessId
+      ? await supabaseAdapter.updateTableByBusinessAndId({
+        businessId,
+        tableId,
+        payload: {
+          current_order_id: null,
+          status: 'available'
+        }
+      })
+      : await supabaseAdapter.updateTableById(tableId, {
         current_order_id: null,
         status: 'available'
-      }
-    })
-    : await supabaseAdapter.updateTableById(tableId, {
-      current_order_id: null,
-      status: 'available'
-    });
-  if (releaseTableError && !isMissingTablesUpdatedAtColumnError(releaseTableError)) {
-    throw releaseTableError;
+      });
+    if (
+      releaseTableError
+      && !isMissingTablesUpdatedAtColumnError(releaseTableError)
+      && !isMissingTablesOpenedAtColumnError(releaseTableError)
+    ) {
+      throw releaseTableError;
+    }
   }
 
   const { error: deleteOrderError } = await supabaseAdapter.deleteOrderById(orderId);
@@ -440,7 +575,11 @@ export async function deleteTableCascadeOrders(tableId, { businessId = null } = 
       current_order_id: null,
       status: 'available'
     });
-  if (releaseTableError && !isMissingTablesUpdatedAtColumnError(releaseTableError)) {
+  if (
+    releaseTableError
+    && !isMissingTablesUpdatedAtColumnError(releaseTableError)
+    && !isMissingTablesOpenedAtColumnError(releaseTableError)
+  ) {
     throw releaseTableError;
   }
 

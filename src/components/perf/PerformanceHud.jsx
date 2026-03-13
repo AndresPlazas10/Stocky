@@ -113,7 +113,7 @@ export default function PerformanceHud({
   const handleResetBenchmark = useCallback(() => {
     setSessionStartedAt(Date.now());
     setSnapshots([]);
-    setExportStatus('Sesion reiniciada');
+    setExportStatus('Sesión reiniciada');
   }, []);
 
   const handleCopyBenchmark = useCallback(async () => {

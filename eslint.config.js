@@ -54,4 +54,15 @@ export default defineConfig([
       },
     },
   },
+  {
+    files: ['apps/mobile/babel.config.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+      parserOptions: {
+        sourceType: 'script',
+      },
+    },
+  },
 ])

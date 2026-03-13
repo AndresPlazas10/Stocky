@@ -16,9 +16,9 @@ import {
   Menu,
   X,
   Upload,
-  Building2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import logoStocky from '../../assets/logoStocky.png';
 
 // eslint helper: `no-unused-vars` no detecta consistentemente `<motion.* />` en esta config.
 const _motionLintUsage = motion;
@@ -94,8 +94,8 @@ export const Sidebar = React.memo(function Sidebar({ activeSection, onSectionCha
                 />
               </div>
             ) : (
-              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
-                <Building2 className="w-10 h-10 text-white" />
+              <div className="w-20 h-20 rounded-3xl border border-primary/20 bg-white flex items-center justify-center shadow-lg">
+                <img src={logoStocky} alt="Stocky" className="w-12 h-12 object-contain" />
               </div>
             )}
             

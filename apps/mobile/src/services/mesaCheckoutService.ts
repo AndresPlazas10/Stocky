@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '../lib/supabase';
-import { notifyAdminSaleRegistered } from '../notifications/mobileNotificationsService';
+import { notifyAdminLowStock, notifyAdminSaleRegistered } from '../notifications/mobileNotificationsService';
 import type { MesaOrderItem } from './mesaOrderService';
 
 export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'mixed';
@@ -156,7 +156,7 @@ async function getUserAndSellerName(businessId: string) {
   } = await client.auth.getUser();
 
   if (userError) throw userError;
-  if (!user?.id) throw new Error('No se pudo obtener la sesion activa.');
+  if (!user?.id) throw new Error('No se pudo obtener la sesión activa.');
 
   const cacheKey = `${businessId}:${user.id}`;
   const now = Date.now();
@@ -515,6 +515,17 @@ export async function closeOrderSingle({
         saleTotal,
       });
     }
+
+    const lowStockProductIds = Array.from(
+      new Set(normalizedItems.map((item) => normalizeReference(item.product_id)).filter(Boolean)),
+    );
+    if (accessToken && lowStockProductIds.length > 0) {
+      void notifyAdminLowStock({
+        accessToken,
+        businessId,
+        productIds: lowStockProductIds as string[],
+      });
+    }
   }
 
   return {
@@ -607,6 +618,20 @@ export async function closeOrderAsSplit({
             accessToken,
             businessId,
             saleTotal: totalSold,
+          });
+        }
+        const lowStockProductIds = Array.from(
+          new Set(
+            normalizedSubAccounts
+              .flatMap((sub) => sub.items.map((item) => normalizeReference(item.product_id)))
+              .filter(Boolean),
+          ),
+        );
+        if (accessToken && lowStockProductIds.length > 0) {
+          void notifyAdminLowStock({
+            accessToken,
+            businessId,
+            productIds: lowStockProductIds as string[],
           });
         }
       }
@@ -704,6 +729,20 @@ export async function closeOrderAsSplit({
         accessToken,
         businessId,
         saleTotal: totalSold,
+      });
+    }
+    const lowStockProductIds = Array.from(
+      new Set(
+        normalizedSubAccounts
+          .flatMap((sub) => sub.items.map((item) => normalizeReference(item.product_id)))
+          .filter(Boolean),
+      ),
+    );
+    if (accessToken && lowStockProductIds.length > 0) {
+      void notifyAdminLowStock({
+        accessToken,
+        businessId,
+        productIds: lowStockProductIds as string[],
       });
     }
   }
