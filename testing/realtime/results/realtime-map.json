@@ -1,0 +1,730 @@
+{
+  "generated_at": "2026-03-09T21:37:42.760Z",
+  "scope": "web+mobile",
+  "description": "Mapa automatico de suscripciones realtime y modulos mobile con sincronizacion por fallback.",
+  "summary": {
+    "total_channels": 28,
+    "total_mobile_fallback_modules": 0,
+    "web_channels": 28,
+    "mobile_channels": 0,
+    "tables_covered": 9,
+    "by_table": [
+      {
+        "table": "combos",
+        "total_channels": 2,
+        "consumers": [
+          "src/components/Dashboard/Mesas.jsx",
+          "src/components/Dashboard/Ventas.jsx"
+        ],
+        "events": [
+          "DELETE",
+          "INSERT",
+          "UPDATE"
+        ]
+      },
+      {
+        "table": "employees",
+        "total_channels": 1,
+        "consumers": [
+          "src/components/Dashboard/Empleados.jsx"
+        ],
+        "events": [
+          "DELETE",
+          "INSERT",
+          "UPDATE"
+        ]
+      },
+      {
+        "table": "order_items",
+        "total_channels": 1,
+        "consumers": [
+          "src/components/Dashboard/Mesas.jsx"
+        ],
+        "events": [
+          "DELETE",
+          "INSERT",
+          "UPDATE"
+        ]
+      },
+      {
+        "table": "orders",
+        "total_channels": 1,
+        "consumers": [
+          "src/components/Dashboard/Mesas.jsx"
+        ],
+        "events": [
+          "UPDATE"
+        ]
+      },
+      {
+        "table": "products",
+        "total_channels": 4,
+        "consumers": [
+          "src/components/Dashboard/Compras.jsx",
+          "src/components/Dashboard/Inventario.jsx",
+          "src/components/Dashboard/Ventas.jsx",
+          "src/hooks/useNotifications.js"
+        ],
+        "events": [
+          "DELETE",
+          "INSERT",
+          "UPDATE"
+        ]
+      },
+      {
+        "table": "purchases",
+        "total_channels": 2,
+        "consumers": [
+          "src/components/Dashboard/Compras.jsx",
+          "src/hooks/useNotifications.js"
+        ],
+        "events": [
+          "DELETE",
+          "INSERT",
+          "UPDATE"
+        ]
+      },
+      {
+        "table": "sales",
+        "total_channels": 2,
+        "consumers": [
+          "src/components/Dashboard/Ventas.jsx",
+          "src/hooks/useNotifications.js"
+        ],
+        "events": [
+          "DELETE",
+          "INSERT",
+          "UPDATE"
+        ]
+      },
+      {
+        "table": "tables",
+        "total_channels": 1,
+        "consumers": [
+          "src/components/Dashboard/Mesas.jsx"
+        ],
+        "events": [
+          "DELETE",
+          "INSERT",
+          "UPDATE"
+        ]
+      },
+      {
+        "table": "unknown",
+        "total_channels": 14,
+        "consumers": [
+          "apps/mobile/src/features/combos/CombosPanel.tsx",
+          "apps/mobile/src/features/compras/ComprasPanel.tsx",
+          "apps/mobile/src/features/empleados/EmpleadosPanel.tsx",
+          "apps/mobile/src/features/inventario/InventarioPanel.tsx",
+          "apps/mobile/src/features/mesas/MesasPanel.tsx",
+          "apps/mobile/src/features/proveedores/ProveedoresPanel.tsx",
+          "apps/mobile/src/features/ventas/VentasPanel.tsx",
+          "apps/mobile/src/screens/dashboard/DashboardContext.tsx",
+          "src/data/adapters/localAdapter.js",
+          "src/data/adapters/supabaseAdapter.js",
+          "src/hooks/optimized.js",
+          "src/hooks/useRealtime.js"
+        ],
+        "events": [
+          "DELETE",
+          "INSERT",
+          "UNKNOWN",
+          "UPDATE"
+        ]
+      }
+    ]
+  },
+  "channels": [
+    {
+      "kind": "hook",
+      "source": "useRealtimeSubscription",
+      "table": "combos",
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "filter": "{ business_id: businessId",
+      "consumer": "src/components/Dashboard/Mesas.jsx",
+      "domain": "mesas",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [
+        "polling:setInterval"
+      ],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "hook",
+      "source": "useRealtimeSubscription",
+      "table": "combos",
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "filter": "{ business_id: businessId",
+      "consumer": "src/components/Dashboard/Ventas.jsx",
+      "domain": "ventas",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "hook",
+      "source": "useRealtimeSubscription",
+      "table": "employees",
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "filter": "{ business_id: businessId",
+      "consumer": "src/components/Dashboard/Empleados.jsx",
+      "domain": "empleados",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin"
+      ],
+      "fallback_modes": [
+        "reconnect:onReconnect"
+      ],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "hook",
+      "source": "useRealtimeSubscription",
+      "table": "order_items",
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "filter": "{",
+      "consumer": "src/components/Dashboard/Mesas.jsx",
+      "domain": "mesas",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [
+        "polling:setInterval"
+      ],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "hook",
+      "source": "useRealtimeSubscription",
+      "table": "orders",
+      "events": [
+        "UPDATE"
+      ],
+      "filter": "{ business_id: businessId",
+      "consumer": "src/components/Dashboard/Mesas.jsx",
+      "domain": "mesas",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [
+        "polling:setInterval"
+      ],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "hook",
+      "source": "useRealtimeSubscription",
+      "table": "products",
+      "events": [
+        "INSERT",
+        "UPDATE"
+      ],
+      "filter": "{ business_id: businessId",
+      "consumer": "src/components/Dashboard/Compras.jsx",
+      "domain": "compras",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "hook",
+      "source": "useRealtimeSubscription",
+      "table": "products",
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "filter": "{ business_id: businessId",
+      "consumer": "src/components/Dashboard/Inventario.jsx",
+      "domain": "inventario",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "hook",
+      "source": "useRealtimeSubscription",
+      "table": "products",
+      "events": [
+        "UPDATE",
+        "DELETE"
+      ],
+      "filter": "{ business_id: businessId",
+      "consumer": "src/components/Dashboard/Ventas.jsx",
+      "domain": "ventas",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "direct",
+      "source": "subscribeToPostgresChanges",
+      "table": "products",
+      "events": [
+        "UPDATE"
+      ],
+      "filter": "`business_id=eq.${businessId",
+      "consumer": "src/hooks/useNotifications.js",
+      "domain": "notificaciones",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "hook",
+      "source": "useRealtimeSubscription",
+      "table": "purchases",
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "filter": "{ business_id: businessId",
+      "consumer": "src/components/Dashboard/Compras.jsx",
+      "domain": "compras",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "direct",
+      "source": "subscribeToPostgresChanges",
+      "table": "purchases",
+      "events": [
+        "INSERT"
+      ],
+      "filter": "`business_id=eq.${businessId",
+      "consumer": "src/hooks/useNotifications.js",
+      "domain": "notificaciones",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "hook",
+      "source": "useRealtimeSubscription",
+      "table": "sales",
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "filter": "{ business_id: businessId",
+      "consumer": "src/components/Dashboard/Ventas.jsx",
+      "domain": "ventas",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "direct",
+      "source": "subscribeToPostgresChanges",
+      "table": "sales",
+      "events": [
+        "INSERT"
+      ],
+      "filter": "`business_id=eq.${businessId",
+      "consumer": "src/hooks/useNotifications.js",
+      "domain": "notificaciones",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "hook",
+      "source": "useRealtimeSubscription",
+      "table": "tables",
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "filter": "{ business_id: businessId",
+      "consumer": "src/components/Dashboard/Mesas.jsx",
+      "domain": "mesas",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [
+        "polling:setInterval"
+      ],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "direct",
+      "source": "supabase.channel",
+      "table": null,
+      "events": [
+        "UNKNOWN"
+      ],
+      "filter": null,
+      "consumer": "apps/mobile/src/features/combos/CombosPanel.tsx",
+      "domain": "combos",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [
+        "polling:setInterval",
+        "manualRefresh:handler"
+      ],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "direct",
+      "source": "supabase.channel",
+      "table": null,
+      "events": [
+        "UNKNOWN"
+      ],
+      "filter": null,
+      "consumer": "apps/mobile/src/features/compras/ComprasPanel.tsx",
+      "domain": "compras",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [
+        "polling:setInterval",
+        "manualRefresh:handler"
+      ],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "direct",
+      "source": "supabase.channel",
+      "table": null,
+      "events": [
+        "UNKNOWN"
+      ],
+      "filter": null,
+      "consumer": "apps/mobile/src/features/empleados/EmpleadosPanel.tsx",
+      "domain": "empleados",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin"
+      ],
+      "fallback_modes": [
+        "polling:setInterval",
+        "manualRefresh:handler"
+      ],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "direct",
+      "source": "supabase.channel",
+      "table": null,
+      "events": [
+        "UNKNOWN"
+      ],
+      "filter": null,
+      "consumer": "apps/mobile/src/features/inventario/InventarioPanel.tsx",
+      "domain": "inventario",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [
+        "polling:setInterval",
+        "manualRefresh:handler"
+      ],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "direct",
+      "source": "supabase.channel",
+      "table": null,
+      "events": [
+        "UNKNOWN"
+      ],
+      "filter": null,
+      "consumer": "apps/mobile/src/features/mesas/MesasPanel.tsx",
+      "domain": "mesas",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [
+        "polling:setInterval",
+        "manualRefresh:handler"
+      ],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "direct",
+      "source": "supabase.channel",
+      "table": null,
+      "events": [
+        "UNKNOWN"
+      ],
+      "filter": null,
+      "consumer": "apps/mobile/src/features/proveedores/ProveedoresPanel.tsx",
+      "domain": "proveedores",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [
+        "polling:setInterval",
+        "manualRefresh:handler"
+      ],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "direct",
+      "source": "supabase.channel",
+      "table": null,
+      "events": [
+        "UNKNOWN"
+      ],
+      "filter": null,
+      "consumer": "apps/mobile/src/features/ventas/VentasPanel.tsx",
+      "domain": "ventas",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [
+        "polling:setInterval",
+        "refresh:onFocus",
+        "manualRefresh:handler"
+      ],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "direct",
+      "source": "supabase.channel",
+      "table": null,
+      "events": [
+        "UNKNOWN"
+      ],
+      "filter": null,
+      "consumer": "apps/mobile/src/screens/dashboard/DashboardContext.tsx",
+      "domain": "general",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [
+        "polling:setInterval",
+        "manualRefresh:handler"
+      ],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "direct",
+      "source": "subscribeToPostgresChanges",
+      "table": null,
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "filter": null,
+      "consumer": "src/data/adapters/localAdapter.js",
+      "domain": "general",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "direct",
+      "source": "subscribeToPostgresChanges",
+      "table": null,
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "filter": null,
+      "consumer": "src/data/adapters/supabaseAdapter.js",
+      "domain": "general",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "direct",
+      "source": "supabase.channel",
+      "table": null,
+      "events": [
+        "UNKNOWN"
+      ],
+      "filter": null,
+      "consumer": "src/data/adapters/supabaseAdapter.js",
+      "domain": "general",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "direct",
+      "source": "subscribeToPostgresChanges",
+      "table": null,
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "filter": "filterString || undefined",
+      "consumer": "src/hooks/optimized.js",
+      "domain": "general",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "hook",
+      "source": "useRealtimeSubscription",
+      "table": null,
+      "events": [],
+      "filter": null,
+      "consumer": "src/hooks/useRealtime.js",
+      "domain": "general",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [],
+      "transport": "supabase_realtime"
+    },
+    {
+      "kind": "direct",
+      "source": "subscribeToPostgresChanges",
+      "table": null,
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "filter": "filterString || undefined",
+      "consumer": "src/hooks/useRealtime.js",
+      "domain": "general",
+      "platform": "web",
+      "expected_roles": [
+        "owner",
+        "admin",
+        "employee"
+      ],
+      "fallback_modes": [],
+      "transport": "supabase_realtime"
+    }
+  ],
+  "mobile_non_realtime_modules": []
+}

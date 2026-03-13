@@ -39,3 +39,6 @@ dist-ssr
 *.bak
 .vercel
 .env*.local
+
+# APK artifacts
+/public/apk/*.apk

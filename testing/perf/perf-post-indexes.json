@@ -1,0 +1,576 @@
+{
+  "generated_at": "2026-03-09T19:17:48.123Z",
+  "scope": "week1_mobile_speed_baseline",
+  "environment": {
+    "business_id": "2d29e1c7-0532-4694-9b4e-995545f25725",
+    "owner_email": "admin@stockly-app.com",
+    "employee_email": "andresplazas@stockly-app.com",
+    "runs": 15,
+    "warmup": 2
+  },
+  "operations": [
+    {
+      "name": "resolve_business_context_owner",
+      "status": "PASS",
+      "skip_reason": null,
+      "samples_ms": [
+        391.055542,
+        398.378791,
+        442.080834,
+        420.451292,
+        377.918458,
+        390.893417,
+        470.774541,
+        471.3645,
+        402.762667,
+        404.978917,
+        394.30075,
+        406.907834,
+        465.849208,
+        399.051625,
+        392.278833
+      ],
+      "stats": {
+        "samples": 15,
+        "avg_ms": 415.2698139333333,
+        "min_ms": 377.918458,
+        "p50_ms": 402.762667,
+        "p95_ms": 471.3645,
+        "p99_ms": 471.3645,
+        "max_ms": 471.3645
+      }
+    },
+    {
+      "name": "resolve_business_context_employee",
+      "status": "PASS",
+      "skip_reason": null,
+      "samples_ms": [
+        434.151875,
+        407.801125,
+        419.497292,
+        367.759583,
+        445.287917,
+        405.093875,
+        385.8955,
+        395.560458,
+        400.132,
+        406.018,
+        393.618959,
+        400.442333,
+        382.352125,
+        425.624,
+        411.255958
+      ],
+      "stats": {
+        "samples": 15,
+        "avg_ms": 405.36606666666665,
+        "min_ms": 367.759583,
+        "p50_ms": 405.093875,
+        "p95_ms": 445.287917,
+        "p99_ms": 445.287917,
+        "max_ms": 445.287917
+      }
+    },
+    {
+      "name": "mesas_initial_load",
+      "status": "PASS",
+      "skip_reason": null,
+      "samples_ms": [
+        495.473625,
+        494.164208,
+        485.046584,
+        454.067292,
+        471.022458,
+        460.024708,
+        490.105125,
+        481.052709,
+        460.356292,
+        503.338167,
+        488.515083,
+        487.621458,
+        489.710042,
+        474.149,
+        472.803208
+      ],
+      "stats": {
+        "samples": 15,
+        "avg_ms": 480.49666393333337,
+        "min_ms": 454.067292,
+        "p50_ms": 485.046584,
+        "p95_ms": 503.338167,
+        "p99_ms": 503.338167,
+        "max_ms": 503.338167
+      }
+    },
+    {
+      "name": "mesa_open_order_load",
+      "status": "PASS",
+      "skip_reason": null,
+      "samples_ms": [
+        306.475958,
+        364.435958,
+        371.113834,
+        453.606292,
+        310.103667,
+        314.45125,
+        346.747375,
+        354.83625,
+        327.529834,
+        329.557416,
+        309.710209,
+        350.481458,
+        348.32075,
+        310.747333,
+        316.616
+      ],
+      "stats": {
+        "samples": 15,
+        "avg_ms": 340.9822389333333,
+        "min_ms": 306.475958,
+        "p50_ms": 329.557416,
+        "p95_ms": 453.606292,
+        "p99_ms": 453.606292,
+        "max_ms": 453.606292
+      }
+    },
+    {
+      "name": "ventas_initial_load",
+      "status": "PASS",
+      "skip_reason": null,
+      "samples_ms": [
+        520.504042,
+        523.358166,
+        535.558208,
+        810.426333,
+        530.619333,
+        514.731333,
+        566.457,
+        474.485208,
+        497.557375,
+        501.122334,
+        513.775458,
+        720.162166,
+        533.856875,
+        555.390333,
+        502.985542
+      ],
+      "stats": {
+        "samples": 15,
+        "avg_ms": 553.3993137333332,
+        "min_ms": 474.485208,
+        "p50_ms": 523.358166,
+        "p95_ms": 810.426333,
+        "p99_ms": 810.426333,
+        "max_ms": 810.426333
+      }
+    },
+    {
+      "name": "compras_initial_load",
+      "status": "PASS",
+      "skip_reason": null,
+      "samples_ms": [
+        466.073,
+        492.385791,
+        545.192084,
+        480.503458,
+        523.244167,
+        482.19775,
+        464.995541,
+        606.846416,
+        693.986959,
+        459.145375,
+        482.701375,
+        783.164959,
+        1008.324167,
+        574.760125,
+        470.844
+      ],
+      "stats": {
+        "samples": 15,
+        "avg_ms": 568.9576777999998,
+        "min_ms": 459.145375,
+        "p50_ms": 492.385791,
+        "p95_ms": 1008.324167,
+        "p99_ms": 1008.324167,
+        "max_ms": 1008.324167
+      }
+    },
+    {
+      "name": "inventario_initial_load",
+      "status": "PASS",
+      "skip_reason": null,
+      "samples_ms": [
+        305.935041,
+        301.439708,
+        293.276042,
+        329.605209,
+        317.799916,
+        329.88025,
+        322.730458,
+        498.197292,
+        310.4665,
+        299.183834,
+        294.880167,
+        306.90475,
+        292.79925,
+        316.760667,
+        325.22725
+      ],
+      "stats": {
+        "samples": 15,
+        "avg_ms": 323.0057556,
+        "min_ms": 292.79925,
+        "p50_ms": 310.4665,
+        "p95_ms": 498.197292,
+        "p99_ms": 498.197292,
+        "max_ms": 498.197292
+      }
+    },
+    {
+      "name": "empleados_load",
+      "status": "PASS",
+      "skip_reason": null,
+      "samples_ms": [
+        203.310584,
+        157.291958,
+        150.608583,
+        146.718875,
+        148.687167,
+        152.73125,
+        176.245041,
+        177.940458,
+        177.62125,
+        197.578209,
+        192.290834,
+        176.931791,
+        154.498541,
+        146.605125,
+        152.661208
+      ],
+      "stats": {
+        "samples": 15,
+        "avg_ms": 167.44805826666664,
+        "min_ms": 146.605125,
+        "p50_ms": 157.291958,
+        "p95_ms": 203.310584,
+        "p99_ms": 203.310584,
+        "max_ms": 203.310584
+      }
+    }
+  ],
+  "query_stats": [
+    {
+      "query": "ventas.sales_recent_with_cash_meta",
+      "calls": 17,
+      "rows_total": 510,
+      "payload_kb_total": 163.54,
+      "samples": 17,
+      "avg_ms": 219.06235788235298,
+      "min_ms": 150.789583,
+      "p50_ms": 166.200542,
+      "p95_ms": 623.770042,
+      "p99_ms": 623.770042,
+      "max_ms": 623.770042
+    },
+    {
+      "query": "compras.suppliers_all",
+      "calls": 17,
+      "rows_total": 51,
+      "payload_kb_total": 4.8,
+      "samples": 17,
+      "avg_ms": 185.41208094117647,
+      "min_ms": 145.186375,
+      "p50_ms": 154.387458,
+      "p95_ms": 512.751083,
+      "p99_ms": 512.751083,
+      "max_ms": 512.751083
+    },
+    {
+      "query": "compras.suppliers_by_ids",
+      "calls": 17,
+      "rows_total": 17,
+      "payload_kb_total": 1.63,
+      "samples": 17,
+      "avg_ms": 194.39995829411765,
+      "min_ms": 138.665542,
+      "p50_ms": 171.461792,
+      "p95_ms": 460.872458,
+      "p99_ms": 460.872458,
+      "max_ms": 460.872458
+    },
+    {
+      "query": "inventario.products_full",
+      "calls": 17,
+      "rows_total": 85,
+      "payload_kb_total": 30.12,
+      "samples": 17,
+      "avg_ms": 166.47752464705877,
+      "min_ms": 145.654084,
+      "p50_ms": 156.150459,
+      "p95_ms": 329.29475,
+      "p99_ms": 329.29475,
+      "max_ms": 329.29475
+    },
+    {
+      "query": "empleados.list_management",
+      "calls": 17,
+      "rows_total": 68,
+      "payload_kb_total": 18.53,
+      "samples": 17,
+      "avg_ms": 176.2463604117647,
+      "min_ms": 146.544375,
+      "p50_ms": 170.437709,
+      "p95_ms": 315.059959,
+      "p99_ms": 315.059959,
+      "max_ms": 315.059959
+    },
+    {
+      "query": "context.tables_count_by_business",
+      "calls": 34,
+      "rows_total": 0,
+      "payload_kb_total": 0.13,
+      "samples": 34,
+      "avg_ms": 249.0593247352941,
+      "min_ms": 221.849833,
+      "p50_ms": 243.814583,
+      "p95_ms": 308.151416,
+      "p99_ms": 315.330417,
+      "max_ms": 315.330417
+    },
+    {
+      "query": "mesa_open.find_open_order",
+      "calls": 17,
+      "rows_total": 17,
+      "payload_kb_total": 1.74,
+      "samples": 17,
+      "avg_ms": 177.02663729411762,
+      "min_ms": 142.328458,
+      "p50_ms": 170.841917,
+      "p95_ms": 293.469416,
+      "p99_ms": 293.469416,
+      "max_ms": 293.469416
+    },
+    {
+      "query": "mesas.catalog_products",
+      "calls": 17,
+      "rows_total": 85,
+      "payload_kb_total": 11.77,
+      "samples": 17,
+      "avg_ms": 169.2768553529412,
+      "min_ms": 145.58625,
+      "p50_ms": 163.39175,
+      "p95_ms": 279.848959,
+      "p99_ms": 279.848959,
+      "max_ms": 279.848959
+    },
+    {
+      "query": "mesas.active_edit_locks",
+      "calls": 17,
+      "rows_total": 0,
+      "payload_kb_total": 0.03,
+      "samples": 17,
+      "avg_ms": 162.44349282352937,
+      "min_ms": 143.883583,
+      "p50_ms": 156.760625,
+      "p95_ms": 264.1815,
+      "p99_ms": 264.1815,
+      "max_ms": 264.1815
+    },
+    {
+      "query": "ventas.catalog_combos",
+      "calls": 17,
+      "rows_total": 51,
+      "payload_kb_total": 5.26,
+      "samples": 17,
+      "avg_ms": 171.4371176470588,
+      "min_ms": 140.230125,
+      "p50_ms": 164.782,
+      "p95_ms": 263.243292,
+      "p99_ms": 263.243292,
+      "max_ms": 263.243292
+    },
+    {
+      "query": "compras.purchases_recent",
+      "calls": 17,
+      "rows_total": 85,
+      "payload_kb_total": 24.25,
+      "samples": 17,
+      "avg_ms": 173.07226723529416,
+      "min_ms": 142.120875,
+      "p50_ms": 164.130542,
+      "p95_ms": 262.192708,
+      "p99_ms": 262.192708,
+      "max_ms": 262.192708
+    },
+    {
+      "query": "mesas.tables_summary_rpc",
+      "calls": 17,
+      "rows_total": 170,
+      "payload_kb_total": 39.3,
+      "samples": 17,
+      "avg_ms": 165.6234804117647,
+      "min_ms": 143.302458,
+      "p50_ms": 161.6405,
+      "p95_ms": 247.752667,
+      "p99_ms": 247.752667,
+      "max_ms": 247.752667
+    },
+    {
+      "query": "ventas.catalog_products",
+      "calls": 17,
+      "rows_total": 85,
+      "payload_kb_total": 11.77,
+      "samples": 17,
+      "avg_ms": 173.54824976470587,
+      "min_ms": 152.052375,
+      "p50_ms": 162.539208,
+      "p95_ms": 233.935833,
+      "p99_ms": 233.935833,
+      "max_ms": 233.935833
+    },
+    {
+      "query": "mesas.catalog_combos",
+      "calls": 17,
+      "rows_total": 51,
+      "payload_kb_total": 24.47,
+      "samples": 17,
+      "avg_ms": 158.99878929411764,
+      "min_ms": 143.310791,
+      "p50_ms": 154.763125,
+      "p95_ms": 225.632666,
+      "p99_ms": 225.632666,
+      "max_ms": 225.632666
+    },
+    {
+      "query": "context.resolve_mobile_business_context_rpc",
+      "calls": 34,
+      "rows_total": 34,
+      "payload_kb_total": 5,
+      "samples": 34,
+      "avg_ms": 173.3001432352941,
+      "min_ms": 139.583916,
+      "p50_ms": 157.308708,
+      "p95_ms": 214.121834,
+      "p99_ms": 542.605333,
+      "max_ms": 542.605333
+    },
+    {
+      "query": "ventas.first_sale_day",
+      "calls": 17,
+      "rows_total": 17,
+      "payload_kb_total": 0.81,
+      "samples": 17,
+      "avg_ms": 168.35736276470587,
+      "min_ms": 143.764375,
+      "p50_ms": 158.66,
+      "p95_ms": 204.497542,
+      "p99_ms": 204.497542,
+      "max_ms": 204.497542
+    },
+    {
+      "query": "mesa_open.order_items_with_code",
+      "calls": 17,
+      "rows_total": 0,
+      "payload_kb_total": 0.03,
+      "samples": 17,
+      "avg_ms": 166.99369123529414,
+      "min_ms": 143.473875,
+      "p50_ms": 160.0865,
+      "p95_ms": 201.041458,
+      "p99_ms": 201.041458,
+      "max_ms": 201.041458
+    },
+    {
+      "query": "inventario.suppliers_by_ids",
+      "calls": 17,
+      "rows_total": 34,
+      "payload_kb_total": 3.2,
+      "samples": 17,
+      "avg_ms": 156.86118870588237,
+      "min_ms": 141.946583,
+      "p50_ms": 155.546875,
+      "p95_ms": 185.743042,
+      "p99_ms": 185.743042,
+      "max_ms": 185.743042
+    },
+    {
+      "query": "compras.products_active",
+      "calls": 17,
+      "rows_total": 85,
+      "payload_kb_total": 14.71,
+      "samples": 17,
+      "avg_ms": 156.21151464705883,
+      "min_ms": 143.622417,
+      "p50_ms": 155.499625,
+      "p95_ms": 170.554625,
+      "p99_ms": 170.554625,
+      "max_ms": 170.554625
+    }
+  ],
+  "top_bottlenecks": [
+    {
+      "type": "operation",
+      "name": "compras_initial_load",
+      "p95_ms": 1008.324167,
+      "avg_ms": 568.9576777999998
+    },
+    {
+      "type": "operation",
+      "name": "ventas_initial_load",
+      "p95_ms": 810.426333,
+      "avg_ms": 553.3993137333332
+    },
+    {
+      "type": "query",
+      "name": "ventas.sales_recent_with_cash_meta",
+      "p95_ms": 623.770042,
+      "avg_ms": 219.06235788235298
+    },
+    {
+      "type": "query",
+      "name": "compras.suppliers_all",
+      "p95_ms": 512.751083,
+      "avg_ms": 185.41208094117647
+    },
+    {
+      "type": "operation",
+      "name": "mesas_initial_load",
+      "p95_ms": 503.338167,
+      "avg_ms": 480.49666393333337
+    },
+    {
+      "type": "operation",
+      "name": "inventario_initial_load",
+      "p95_ms": 498.197292,
+      "avg_ms": 323.0057556
+    },
+    {
+      "type": "operation",
+      "name": "resolve_business_context_owner",
+      "p95_ms": 471.3645,
+      "avg_ms": 415.2698139333333
+    },
+    {
+      "type": "query",
+      "name": "compras.suppliers_by_ids",
+      "p95_ms": 460.872458,
+      "avg_ms": 194.39995829411765
+    },
+    {
+      "type": "operation",
+      "name": "mesa_open_order_load",
+      "p95_ms": 453.606292,
+      "avg_ms": 340.9822389333333
+    },
+    {
+      "type": "operation",
+      "name": "resolve_business_context_employee",
+      "p95_ms": 445.287917,
+      "avg_ms": 405.36606666666665
+    }
+  ],
+  "recommendations": [
+    "Reducir joins/mapeos N+1 en compras/inventario consolidando proveedores en RPC enriquecido por pantalla.",
+    "Separar carga inicial de ventas en “first paint” (sales list) y “background” (catalogo/first day) para bajar TTI."
+  ]
+}
