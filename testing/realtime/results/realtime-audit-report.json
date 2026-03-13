@@ -1,0 +1,32 @@
+{
+  "generated_at": "2026-03-09T21:37:43.544Z",
+  "scope": "web+mobile+supabase",
+  "artifacts": {
+    "realtime_map": "testing/realtime/results/realtime-map.json",
+    "realtime_db_check": "testing/realtime/results/realtime-db-check.json",
+    "realtime_smoke_report": "testing/realtime/results/realtime-smoke-report.json"
+  },
+  "statuses": {
+    "map_scan": "PASS",
+    "db_check": "PASS",
+    "smoke": "PASS"
+  },
+  "release_gate": {
+    "status": "PASS",
+    "gates": [
+      {
+        "id": "db_contract_pass",
+        "label": "DB contract realtime",
+        "status": "PASS",
+        "severity": "critical"
+      },
+      {
+        "id": "smoke_multiclient_pass",
+        "label": "Smoke multi-cliente",
+        "status": "PASS",
+        "severity": "critical"
+      }
+    ]
+  },
+  "findings": []
+}
