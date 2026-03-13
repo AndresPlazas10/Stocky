@@ -8,7 +8,6 @@ import {
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { signOutGlobalSession } from '../data/commands/authCommands.js';
 import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
-import WhatsNewModal from '../components/Modals/WhatsNewModal.jsx';
 import Ventas from '../components/Dashboard/Ventas.jsx';
 import Inventario from '../components/Dashboard/Inventario.jsx';
 import Mesas from '../components/Dashboard/Mesas.jsx';
@@ -295,7 +294,6 @@ function EmployeeDashboard() {
 
   return (
     <>
-      {activeSection === 'home' ? <WhatsNewModal /> : null}
       <div className="flex h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 overflow-hidden">
       {/* Sidebar */}
       <motion.aside

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 const _motionLintUsage = motion;
 
 function DownloadPage() {
-  const apkUrl = String(import.meta.env?.VITE_APK_URL || '').trim() || '/apk/stocky-latest.apk';
+  const apkUrl = String(import.meta.env?.VITE_APK_URL || '').trim();
   const apkVersion = String(import.meta.env?.VITE_APK_VERSION || '').trim();
 
   return (
@@ -22,40 +22,40 @@ function DownloadPage() {
           >
             <div className="inline-flex items-center gap-2 self-start rounded-full border border-violet-300/70 bg-violet-100/70 px-3 py-1.5 text-xs font-semibold text-violet-700">
               <Smartphone className="h-3.5 w-3.5" />
-              Descarga directa APK
+              Descarga temporalmente pausada
             </div>
 
             <div className="space-y-3">
               <h1 className="text-3xl font-black tracking-tight text-violet-950 sm:text-4xl">
-                Instala Stocky en Android
+                La app móvil está en pausa
               </h1>
               <p className="text-base text-slate-700 sm:text-lg">
-                Descarga el APK oficial y úsalo incluso con conexión limitada.
-                {apkVersion ? ` Versión ${apkVersion}.` : ''}
+                Estamos terminando ajustes para asegurar una versión estable.
+                {apkVersion ? ` Última versión publicada: ${apkVersion}.` : ''}
               </p>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button
                 size="lg"
-                onClick={() => window.open(apkUrl, '_blank', 'noopener')}
-                className="h-12 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 font-semibold text-slate-50 hover:opacity-90"
+                disabled
+                className="h-12 cursor-not-allowed rounded-xl bg-slate-300 px-6 font-semibold text-slate-600"
               >
                 <Download className="mr-2 h-4 w-4" />
-                Descargar APK
+                Descarga no disponible
               </Button>
               <div className="flex items-center gap-2 text-sm text-slate-600">
                 <ShieldCheck className="h-4 w-4 text-violet-600" />
-                Instalador seguro y verificado
+                Publicación en revisión
               </div>
             </div>
 
             <div className="rounded-2xl border border-violet-200/70 bg-violet-50/70 p-4 text-sm text-slate-700">
-              Pasos rápidos en Android:
+              Próximos pasos:
               <ul className="mt-2 space-y-1">
-                <li>1. Descarga el APK en tu celular.</li>
-                <li>2. Abre el archivo y acepta “Instalar apps desconocidas”.</li>
-                <li>3. Finaliza la instalación y abre Stocky.</li>
+                <li>1. Estamos afinando la versión final.</li>
+                <li>2. Avisaremos desde la web cuando esté lista.</li>
+                <li>3. El botón de descarga se habilitará automáticamente.</li>
               </ul>
             </div>
 
