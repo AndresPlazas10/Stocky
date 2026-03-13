@@ -17,6 +17,7 @@
     },
     "android": {
       "package": "com.stocky.mobile",
+      "versionCode": 2,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
