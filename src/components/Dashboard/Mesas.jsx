@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { closeOrderAsSplit, closeOrderSingle } from '../../services/ordersService.js';
 import { fetchComboCatalog } from '../../services/combosService.js';
@@ -60,6 +60,7 @@ import { invalidateOrderCache } from '../../data/adapters/cacheInvalidation.js';
 import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
 import { useProgressiveList } from '../../hooks/useProgressiveList.js';
 import { useRafBatchedQueue } from '../../hooks/useRafBatchedQueue.js';
+import { supabase } from '../../supabase/Client.jsx';
 
 const getPaymentMethodLabel = (method) => {
   if (method === 'cash') return 'Efectivo';
@@ -104,6 +105,34 @@ const calculateOrderItemsTotal = (items = []) =>
   }, 0);
 
 const MESAS_REMOTE_FALLBACK_POLL_MS = 5000;
+const MESA_LOCK_TTL_SECONDS = 45;
+const MESA_LOCK_HEARTBEAT_MS = 20000;
+
+const normalizeDisplayName = (value, fallback = 'Usuario') => {
+  const normalized = String(value || '').trim();
+  return normalized || fallback;
+};
+
+const isDuplicateKeyError = (errorLike) => {
+  const code = String(errorLike?.code || '').trim();
+  if (code === '23505') return true;
+  const message = String(errorLike?.message || '').toLowerCase();
+  return message.includes('duplicate key');
+};
+
+const isMissingTableEditLocksRelationError = (errorLike) => {
+  const message = String(errorLike?.message || '').toLowerCase();
+  return message.includes('table_edit_locks') && message.includes('does not exist');
+};
+
+const isMissingTableEditLocksColumnError = (errorLike, columnName) => {
+  const message = String(errorLike?.message || '').toLowerCase();
+  return (
+    message.includes('column')
+    && message.includes(`"${String(columnName || '').toLowerCase()}"`)
+    && message.includes('table_edit_locks')
+  );
+};
 
 const getMesaProductUnits = (mesa, { selectedMesa = null, orderItems = [] } = {}) => {
   if (selectedMesa?.id && mesa?.id === selectedMesa.id && Array.isArray(orderItems) && orderItems.length > 0) {
@@ -124,6 +153,120 @@ const getMesaProductUnits = (mesa, { selectedMesa = null, orderItems = [] } = {}
 
   return Number.isFinite(localUnits) ? localUnits : 0;
 };
+
+const MesasGrid = memo(function MesasGrid({
+  visibleMesas,
+  totalMesas,
+  hasMoreMesas,
+  mesasSentinelRef,
+  loadMoreMesas,
+  isEmployee,
+  onOpenTable,
+  onDeleteTable,
+  selectedMesaId = null,
+  selectedMesaUnits = null,
+  lowMotionMode = false
+}) {
+  return (
+    <>
+      {/* Grid de mesas */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {visibleMesas.map((mesa, index) => {
+          const shouldUseSelectedUnits = selectedMesaId && mesa.id === selectedMesaId && selectedMesaUnits !== null;
+          const units = shouldUseSelectedUnits ? selectedMesaUnits : getMesaProductUnits(mesa);
+
+          return (
+            <motion.div
+              key={mesa.id}
+              initial={lowMotionMode ? false : { opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={lowMotionMode ? { duration: 0 } : { duration: 0.2, delay: index * 0.02 }}
+            >
+              <Card
+                className={`relative cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
+                  mesa.status === 'occupied'
+                    ? 'border-yellow-400 bg-yellow-50/30'
+                    : 'border-green-400 bg-green-50/30'
+                }`}
+                onClick={() => onOpenTable(mesa)}
+              >
+                <CardContent className="pt-6 text-center">
+                  {/* Botón eliminar (solo si está disponible y no es empleado) */}
+                  {mesa.status === 'available' && !isEmployee && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteTable(mesa.id);
+                      }}
+                      className="absolute top-2 right-2 h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600 rounded-lg"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+
+                  {/* Icono de estado */}
+                  <div className="mb-4 flex justify-center">
+                    <div className={`w-20 h-20 rounded-2xl flex items-center justify-center ${
+                      mesa.status === 'occupied'
+                        ? 'bg-yellow-100 text-yellow-600'
+                        : 'bg-green-100 text-green-600'
+                    }`}>
+                      <Layers className="w-10 h-10" />
+                    </div>
+                  </div>
+
+                  {/* Número de mesa */}
+                  <h3 className="text-2xl font-bold text-primary-900 mb-2">
+                    Mesa {mesa.table_number}
+                  </h3>
+
+                  {/* Estado */}
+                  <Badge
+                    variant={mesa.status === 'occupied' ? 'warning' : 'success'}
+                    className="mb-3 text-sm font-semibold"
+                  >
+                    {mesa.status === 'occupied' ? '🔴 Ocupada' : '🟢 Disponible'}
+                  </Badge>
+
+                  {/* Información de la orden si está ocupada */}
+                  {mesa.status === 'occupied' && mesa.orders && (
+                    <div className="mt-4 pt-4 border-t border-accent-200">
+                      <p className="text-lg font-bold text-primary-900">
+                        {formatPrice(parseFloat(mesa.orders.total || 0))}
+                      </p>
+                      <p className="text-sm text-primary-600">
+                        {units} productos
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {hasMoreMesas && (
+        <div className="flex flex-col items-center gap-3 py-2">
+          <p className="text-xs text-gray-500">
+            Mostrando {visibleMesas.length} de {totalMesas} mesas
+          </p>
+          <div ref={mesasSentinelRef} className="h-2 w-full" aria-hidden="true" />
+          <Button
+            onClick={loadMoreMesas}
+            variant="outline"
+            className="rounded-xl"
+          >
+            Cargar mas mesas
+          </Button>
+        </div>
+      )}
+
+    </>
+  );
+});
 
 const getOrderItemRenderKey = (item, index = 0) => {
   const comboId = normalizeEntityId(item?.combo_id);
@@ -434,6 +577,8 @@ function Mesas({ businessId, userRole = 'admin' }) {
   const MODAL_REOPEN_GUARD_MS = 600;
   const canManageTables = isAdminRole(userRole);
   const [mesas, setMesas] = useState([]);
+  const mesasLengthRef = useRef(0);
+  const hasLoadedOnceRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -492,6 +637,13 @@ function Mesas({ businessId, userRole = 'admin' }) {
   const pendingOrderItemOpsRef = useRef(0);
   const orderItemWriteQueueRef = useRef({});
   const catalogWarmupPromiseRef = useRef(null);
+  const mesasSnapshotTimerRef = useRef(null);
+  const mesaSyncBroadcastChannelRef = useRef(null);
+  const mesaSyncBroadcastReadyRef = useRef(false);
+  const mesaSyncClientIdRef = useRef(`web-mesas-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const activeMesaBroadcastRef = useRef(null);
+  const heldMesaLockRef = useRef(null);
+  const mesaLockHeartbeatTimerRef = useRef(null);
 
   // Ref para prevenir que el modal se reabra después de completar una venta
   const justCompletedSaleRef = useRef(false);
@@ -500,7 +652,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
   const [canShowOrderModal, setCanShowOrderModal] = useState(true);
   const isOrderItemsSyncing = pendingOrderItemOps > 0;
   const lowMotionMode = useLowMotionMode();
-  const enqueueRealtimeUpdate = useRafBatchedQueue();
+  const enqueueRealtimeUpdate = useRafBatchedQueue({ useTransition: false });
   const {
     visibleItems: visibleMesas,
     hasMore: hasMoreMesas,
@@ -520,6 +672,317 @@ function Mesas({ businessId, userRole = 'admin' }) {
     pendingQuantityUpdatesRef.current = normalizedNext;
     setPendingQuantityUpdates(normalizedNext);
   }, []);
+
+
+  const sendMesaSyncBroadcast = useCallback((event, payload) => {
+    const channel = mesaSyncBroadcastChannelRef.current;
+    if (!channel) return;
+
+    const message = { type: 'broadcast', event, payload };
+    const canHttpSend = typeof channel?.httpSend === 'function';
+    const isReady = mesaSyncBroadcastReadyRef.current === true;
+
+    if (!isReady && canHttpSend) {
+      void channel.httpSend(message);
+      return;
+    }
+
+    const sendResult = channel.send(message);
+    if (sendResult && typeof sendResult.then === 'function') {
+      void sendResult.catch(() => {
+        if (canHttpSend) {
+          return channel.httpSend(message);
+        }
+        return undefined;
+      });
+    }
+  }, []);
+
+  const publishMesaLockBroadcast = useCallback(({
+    tableId,
+    locked,
+    mode = 'optimistic',
+    lockToken = null
+  }) => {
+    const normalizedBusinessId = String(businessId || '').trim();
+    const normalizedTableId = String(tableId || '').trim();
+    if (!normalizedBusinessId || !normalizedTableId) return;
+
+    const resolvedUserId = normalizeEntityId(currentUser?.id)
+      || `web-${mesaSyncClientIdRef.current}`;
+    const lockTtlMs = 45_000;
+    const lockExpiresAt = locked
+      ? new Date(Date.now() + lockTtlMs).toISOString()
+      : null;
+
+    sendMesaSyncBroadcast('mesa_lock_changed', {
+      sender_user_id: resolvedUserId,
+      sender_client_id: mesaSyncClientIdRef.current,
+      mesa_id: normalizedTableId,
+      business_id: normalizedBusinessId,
+      locked: Boolean(locked),
+      mode,
+      lock_owner_user_id: locked ? resolvedUserId : null,
+      lock_token: lockToken,
+      lock_expires_at: lockExpiresAt,
+      lock_ttl_ms: locked ? lockTtlMs : null,
+      emitted_at: Date.now()
+    });
+
+  }, [businessId, currentUser?.id, sendMesaSyncBroadcast]);
+
+  const resolveWebUserId = useCallback(() => (
+    normalizeEntityId(currentUser?.id) || `web-${mesaSyncClientIdRef.current}`
+  ), [currentUser?.id]);
+
+  const resolveWebUserName = useCallback(() => (
+    normalizeDisplayName(currentUser?.email || currentUser?.name || 'Admin', 'Admin')
+  ), [currentUser?.email, currentUser?.name]);
+
+  const selectMesaEditLockByTableId = useCallback(async ({ businessId: targetBusinessId, tableId }) => {
+    const normalizedBusinessId = String(targetBusinessId || '').trim();
+    const normalizedTableId = String(tableId || '').trim();
+    if (!normalizedBusinessId || !normalizedTableId) return null;
+
+    const result = await supabase
+      .from('table_edit_locks')
+      .select('table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at')
+      .eq('business_id', normalizedBusinessId)
+      .eq('table_id', normalizedTableId)
+      .maybeSingle();
+
+    if (result.error) {
+      if (isMissingTableEditLocksRelationError(result.error)) return null;
+      if (isMissingTableEditLocksColumnError(result.error, 'lock_token')) {
+        const fallback = await supabase
+          .from('table_edit_locks')
+          .select('table_id,business_id,lock_owner_user_id,lock_owner_name,lock_expires_at,updated_at')
+          .eq('business_id', normalizedBusinessId)
+          .eq('table_id', normalizedTableId)
+          .maybeSingle();
+        if (fallback.error) return null;
+        return fallback.data || null;
+      }
+      return null;
+    }
+
+    return result.data || null;
+  }, []);
+
+  const acquireMesaEditLockWeb = useCallback(async ({
+    targetBusinessId,
+    tableId,
+    lockToken
+  }) => {
+    const normalizedBusinessId = String(targetBusinessId || '').trim();
+    const normalizedTableId = String(tableId || '').trim();
+    const resolvedUserId = resolveWebUserId();
+    const resolvedUserName = resolveWebUserName();
+    if (!normalizedBusinessId || !normalizedTableId || !resolvedUserId) {
+      return { ok: false, unsupported: false, lock: null, lockToken: null };
+    }
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const lockExpiresAt = new Date(now.getTime() + MESA_LOCK_TTL_SECONDS * 1000).toISOString();
+    const normalizedLockToken = String(lockToken || '').trim() || null;
+
+    const cleanupExpired = await supabase
+      .from('table_edit_locks')
+      .delete()
+      .eq('business_id', normalizedBusinessId)
+      .eq('table_id', normalizedTableId)
+      .lte('lock_expires_at', nowIso);
+
+    if (cleanupExpired.error) {
+      if (isMissingTableEditLocksRelationError(cleanupExpired.error)) {
+        return { ok: true, unsupported: true, lock: null, lockToken: null };
+      }
+      if (!isMissingTableEditLocksColumnError(cleanupExpired.error, 'lock_expires_at')) {
+        return { ok: false, unsupported: false, lock: null, lockToken: null };
+      }
+    }
+
+    const payloadWithToken = {
+      business_id: normalizedBusinessId,
+      table_id: normalizedTableId,
+      lock_owner_user_id: resolvedUserId,
+      lock_owner_name: resolvedUserName,
+      lock_token: normalizedLockToken,
+      lock_expires_at: lockExpiresAt,
+      updated_at: nowIso
+    };
+
+    const payloadNoToken = {
+      business_id: normalizedBusinessId,
+      table_id: normalizedTableId,
+      lock_owner_user_id: resolvedUserId,
+      lock_owner_name: resolvedUserName,
+      lock_expires_at: lockExpiresAt,
+      updated_at: nowIso
+    };
+
+    const insertWithToken = await supabase
+      .from('table_edit_locks')
+      .insert([payloadWithToken])
+      .select('table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at')
+      .maybeSingle();
+
+    if (!insertWithToken.error && insertWithToken.data) {
+      return { ok: true, unsupported: false, lock: insertWithToken.data, lockToken: normalizedLockToken };
+    }
+
+    if (insertWithToken.error) {
+      if (isMissingTableEditLocksRelationError(insertWithToken.error)) {
+        return { ok: true, unsupported: true, lock: null, lockToken: null };
+      }
+      if (isMissingTableEditLocksColumnError(insertWithToken.error, 'lock_token')) {
+        const fallbackInsert = await supabase
+          .from('table_edit_locks')
+          .insert([payloadNoToken])
+          .select('table_id,business_id,lock_owner_user_id,lock_owner_name,lock_expires_at,updated_at')
+          .maybeSingle();
+        if (!fallbackInsert.error && fallbackInsert.data) {
+          return { ok: true, unsupported: false, lock: fallbackInsert.data, lockToken: null };
+        }
+      } else if (!isDuplicateKeyError(insertWithToken.error)) {
+        return { ok: false, unsupported: false, lock: null, lockToken: null };
+      }
+    }
+
+    const existing = await selectMesaEditLockByTableId({
+      businessId: normalizedBusinessId,
+      tableId: normalizedTableId
+    });
+
+    if (existing && String(existing.lock_owner_user_id || '').trim() !== resolvedUserId) {
+      return { ok: false, unsupported: false, lock: existing, lockToken: null };
+    }
+
+    const updatePayload = normalizedLockToken ? payloadWithToken : payloadNoToken;
+    const updateAttempt = await supabase
+      .from('table_edit_locks')
+      .update(updatePayload)
+      .eq('business_id', normalizedBusinessId)
+      .eq('table_id', normalizedTableId)
+      .eq('lock_owner_user_id', resolvedUserId)
+      .select('table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at')
+      .maybeSingle();
+
+    if (!updateAttempt.error && updateAttempt.data) {
+      return { ok: true, unsupported: false, lock: updateAttempt.data, lockToken: normalizedLockToken };
+    }
+
+    return { ok: false, unsupported: false, lock: existing || null, lockToken: null };
+  }, [resolveWebUserId, resolveWebUserName, selectMesaEditLockByTableId]);
+
+  const refreshMesaEditLockHeartbeatWeb = useCallback(async ({
+    targetBusinessId,
+    tableId,
+    lockToken
+  }) => {
+    const normalizedBusinessId = String(targetBusinessId || '').trim();
+    const normalizedTableId = String(tableId || '').trim();
+    const resolvedUserId = resolveWebUserId();
+    const resolvedUserName = resolveWebUserName();
+    if (!normalizedBusinessId || !normalizedTableId || !resolvedUserId) {
+      return { ok: false, unsupported: false, lock: null, lost: true };
+    }
+
+    const now = new Date();
+    const payload = {
+      lock_owner_name: resolvedUserName,
+      lock_expires_at: new Date(now.getTime() + MESA_LOCK_TTL_SECONDS * 1000).toISOString(),
+      updated_at: now.toISOString(),
+      ...(lockToken ? { lock_token: String(lockToken || '').trim() } : {})
+    };
+
+    let query = supabase
+      .from('table_edit_locks')
+      .update(payload)
+      .eq('business_id', normalizedBusinessId)
+      .eq('table_id', normalizedTableId)
+      .eq('lock_owner_user_id', resolvedUserId);
+
+    if (lockToken) {
+      query = query.eq('lock_token', String(lockToken || '').trim());
+    }
+
+    const updateAttempt = await query
+      .select('table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at')
+      .maybeSingle();
+
+    if (!updateAttempt.error && updateAttempt.data) {
+      return { ok: true, unsupported: false, lock: updateAttempt.data, lost: false };
+    }
+
+    if (updateAttempt.error && isMissingTableEditLocksRelationError(updateAttempt.error)) {
+      return { ok: true, unsupported: true, lock: null, lost: false };
+    }
+
+    if (updateAttempt.error && isMissingTableEditLocksColumnError(updateAttempt.error, 'lock_token')) {
+      const fallback = await supabase
+        .from('table_edit_locks')
+        .update({
+          lock_owner_name: resolvedUserName,
+          lock_expires_at: payload.lock_expires_at,
+          updated_at: payload.updated_at
+        })
+        .eq('business_id', normalizedBusinessId)
+        .eq('table_id', normalizedTableId)
+        .eq('lock_owner_user_id', resolvedUserId)
+        .select('table_id,business_id,lock_owner_user_id,lock_owner_name,lock_expires_at,updated_at')
+        .maybeSingle();
+      if (!fallback.error && fallback.data) {
+        return { ok: true, unsupported: false, lock: fallback.data, lost: false };
+      }
+    }
+
+    const existing = await selectMesaEditLockByTableId({
+      businessId: normalizedBusinessId,
+      tableId: normalizedTableId
+    });
+
+    if (existing && String(existing.lock_owner_user_id || '').trim() !== resolvedUserId) {
+      return { ok: false, unsupported: false, lock: existing, lost: true };
+    }
+
+    return { ok: false, unsupported: false, lock: existing || null, lost: true };
+  }, [resolveWebUserId, resolveWebUserName, selectMesaEditLockByTableId]);
+
+  const releaseMesaEditLockWeb = useCallback(async ({
+    targetBusinessId,
+    tableId,
+    lockToken
+  }) => {
+    const normalizedBusinessId = String(targetBusinessId || '').trim();
+    const normalizedTableId = String(tableId || '').trim();
+    const resolvedUserId = resolveWebUserId();
+    if (!normalizedBusinessId || !normalizedTableId || !resolvedUserId) return;
+
+    let query = supabase
+      .from('table_edit_locks')
+      .delete()
+      .eq('business_id', normalizedBusinessId)
+      .eq('table_id', normalizedTableId)
+      .eq('lock_owner_user_id', resolvedUserId);
+
+    if (lockToken) {
+      query = query.eq('lock_token', String(lockToken || '').trim());
+    }
+
+    const result = await query;
+    if (!result.error) return;
+    if (isMissingTableEditLocksRelationError(result.error)) return;
+    if (isMissingTableEditLocksColumnError(result.error, 'lock_token')) {
+      await supabase
+        .from('table_edit_locks')
+        .delete()
+        .eq('business_id', normalizedBusinessId)
+        .eq('table_id', normalizedTableId)
+        .eq('lock_owner_user_id', resolvedUserId);
+    }
+  }, [resolveWebUserId]);
 
   const markOrderItemOpStarted = useCallback(() => {
     pendingOrderItemOpsRef.current += 1;
@@ -569,6 +1032,87 @@ function Mesas({ businessId, userRole = 'admin' }) {
   useEffect(() => {
     selectedMesaRef.current = selectedMesa || null;
   }, [selectedMesa]);
+
+  useEffect(() => {
+    mesasLengthRef.current = Array.isArray(mesas) ? mesas.length : 0;
+  }, [mesas]);
+
+  useEffect(() => {
+    if (showOrderDetails) return;
+    const active = activeMesaBroadcastRef.current;
+    const held = heldMesaLockRef.current;
+    if (!active?.tableId && !held?.tableId) return;
+    if (active?.tableId) {
+      publishMesaLockBroadcast({
+        tableId: active.tableId,
+        locked: false,
+        mode: 'confirmed',
+        lockToken: active.lockToken || null
+      });
+    }
+    if (held?.tableId && held?.businessId) {
+      void releaseMesaEditLockWeb({
+        targetBusinessId: held.businessId,
+        tableId: held.tableId,
+        lockToken: held.lockToken || null
+      });
+    }
+    activeMesaBroadcastRef.current = null;
+    heldMesaLockRef.current = null;
+  }, [publishMesaLockBroadcast, releaseMesaEditLockWeb, showOrderDetails]);
+
+  useEffect(() => () => {
+    const active = activeMesaBroadcastRef.current;
+    const held = heldMesaLockRef.current;
+    if (!active?.tableId && !held?.tableId) return;
+    if (active?.tableId) {
+      publishMesaLockBroadcast({
+        tableId: active.tableId,
+        locked: false,
+        mode: 'confirmed',
+        lockToken: active.lockToken || null
+      });
+    }
+    if (held?.tableId && held?.businessId) {
+      void releaseMesaEditLockWeb({
+        targetBusinessId: held.businessId,
+        tableId: held.tableId,
+        lockToken: held.lockToken || null
+      });
+    }
+    activeMesaBroadcastRef.current = null;
+    heldMesaLockRef.current = null;
+  }, [publishMesaLockBroadcast, releaseMesaEditLockWeb]);
+
+  useEffect(() => {
+    if (!showOrderDetails) return undefined;
+    if (mesaLockHeartbeatTimerRef.current) {
+      clearInterval(mesaLockHeartbeatTimerRef.current);
+      mesaLockHeartbeatTimerRef.current = null;
+    }
+
+    mesaLockHeartbeatTimerRef.current = setInterval(() => {
+      const held = heldMesaLockRef.current;
+      if (!held?.businessId || !held?.tableId) return;
+      void refreshMesaEditLockHeartbeatWeb({
+        targetBusinessId: held.businessId,
+        tableId: held.tableId,
+        lockToken: held.lockToken || null
+      }).then((result) => {
+        if (!result || result.unsupported) return;
+        if (!result.ok && result.lost) {
+          heldMesaLockRef.current = null;
+        }
+      });
+    }, MESA_LOCK_HEARTBEAT_MS);
+
+    return () => {
+      if (mesaLockHeartbeatTimerRef.current) {
+        clearInterval(mesaLockHeartbeatTimerRef.current);
+        mesaLockHeartbeatTimerRef.current = null;
+      }
+    };
+  }, [refreshMesaEditLockHeartbeatWeb, showOrderDetails]);
 
   useEffect(() => {
     if (!canManageTables && showAddForm) {
@@ -829,7 +1373,10 @@ function Mesas({ businessId, userRole = 'admin' }) {
 
   const loadData = useCallback(async () => {
     try {
-      setLoading(true);
+      const shouldShowLoading = mesasLengthRef.current === 0 && !hasLoadedOnceRef.current;
+      if (shouldShowLoading) {
+        setLoading(true);
+      }
       await Promise.all([
         loadMesas(),
         loadClientes()
@@ -837,6 +1384,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
     } catch {
       setError('⚠️ No se pudo cargar la información de las mesas. Por favor, intenta recargar la página.');
     } finally {
+      hasLoadedOnceRef.current = true;
       setLoading(false);
     }
   }, [loadMesas, loadClientes]);
@@ -848,6 +1396,24 @@ function Mesas({ businessId, userRole = 'admin' }) {
       checkIfEmployee();
     }
   }, [businessId, loadData, getCurrentUser, checkIfEmployee]);
+
+  useEffect(() => {
+    if (!businessId) return undefined;
+
+    const channel = supabase.channel(`mobile-mesas-sync:${businessId}`);
+    channel.subscribe((status) => {
+      mesaSyncBroadcastReadyRef.current = status === 'SUBSCRIBED';
+    });
+    mesaSyncBroadcastChannelRef.current = channel;
+
+    return () => {
+      mesaSyncBroadcastReadyRef.current = false;
+      if (mesaSyncBroadcastChannelRef.current) {
+        supabase.removeChannel(mesaSyncBroadcastChannelRef.current);
+        mesaSyncBroadcastChannelRef.current = null;
+      }
+    };
+  }, [businessId]);
 
   useEffect(() => {
     if (!businessId) return undefined;
@@ -876,9 +1442,40 @@ function Mesas({ businessId, userRole = 'admin' }) {
   }, [businessId, loadMesas]);
 
   useEffect(() => {
-    if (!businessId || !Array.isArray(mesas)) return;
-    const normalizedForSnapshot = mesas.map(normalizeTableRecord).sort(compareTableIdentifiers);
-    saveOfflineSnapshot(`mesas.list:${businessId}`, normalizedForSnapshot);
+    if (!businessId || !Array.isArray(mesas)) return undefined;
+
+    const runSnapshotSave = () => {
+      const normalizedForSnapshot = mesas.map(normalizeTableRecord).sort(compareTableIdentifiers);
+      saveOfflineSnapshot(`mesas.list:${businessId}`, normalizedForSnapshot);
+    };
+
+    if (mesasSnapshotTimerRef.current) {
+      const { type, id } = mesasSnapshotTimerRef.current;
+      if (type === 'idle' && typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(id);
+      } else {
+        clearTimeout(id);
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      const idleId = window.requestIdleCallback(runSnapshotSave, { timeout: 800 });
+      mesasSnapshotTimerRef.current = { type: 'idle', id: idleId };
+    } else {
+      const timeoutId = setTimeout(runSnapshotSave, 200);
+      mesasSnapshotTimerRef.current = { type: 'timeout', id: timeoutId };
+    }
+
+    return () => {
+      if (!mesasSnapshotTimerRef.current) return;
+      const { type, id } = mesasSnapshotTimerRef.current;
+      if (type === 'idle' && typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(id);
+      } else {
+        clearTimeout(id);
+      }
+      mesasSnapshotTimerRef.current = null;
+    };
   }, [businessId, mesas]);
 
   // Callbacks memoizados para Realtime
@@ -1044,6 +1641,10 @@ function Mesas({ businessId, userRole = 'admin' }) {
   const scheduleOrderRealtimeRefresh = useCallback((orderId, mesaId) => {
     if (!orderId || !mesaId) return;
     if (justCompletedSaleRef.current) return;
+    if (normalizeEntityId(selectedMesaRef.current?.current_order_id) === normalizeEntityId(orderId)
+      && orderItemsDirtyRef.current) {
+      return;
+    }
 
     const timers = orderRealtimeRefreshTimersRef.current;
     if (timers[orderId]) {
@@ -1238,54 +1839,64 @@ function Mesas({ businessId, userRole = 'admin' }) {
       );
       let affectedMesaId = null;
 
-      // Actualizar la mesa correspondiente en el estado global
-      setMesas((prev) => prev.map((mesa) => {
-        if (normalizeEntityId(mesa?.current_order_id) !== normalizedOrderId) return mesa;
-        affectedMesaId = mesa.id;
+      const isSelectedOrder = normalizeEntityId(selectedMesaRef.current?.current_order_id) === normalizedOrderId;
+      const isEditingSelectedOrder = (
+        isSelectedOrder
+        && orderItemsDirtyRef.current
+        && normalizedOrderStatus === 'open'
+      );
 
-        const previousOrderItems = Array.isArray(mesa?.orders?.order_items)
-          ? mesa.orders.order_items
-          : [];
-        const stableOpenTotal = previousOrderItems.length > 0
-          ? calculateOrderItemsTotal(previousOrderItems)
-          : (
-            Number.isFinite(pendingRemoteTotal)
-              ? pendingRemoteTotal
-              : (
-                Number.isFinite(incomingOrderTotal)
-                  ? incomingOrderTotal
-                  : toFiniteNumber(mesa?.orders?.total, 0)
-              )
-          );
-        const nextOrder = normalizedOrderStatus === 'open'
-          ? {
-            ...(mesa.orders || {}),
-            ...updatedOrder,
-            order_items: previousOrderItems,
-            total: stableOpenTotal,
-            local_units: previousOrderItems.length > 0
-              ? getTotalProductUnits(previousOrderItems)
-              : toFiniteNumber(mesa?.orders?.local_units, 0)
+      if (!isEditingSelectedOrder) {
+        // Actualizar la mesa correspondiente en el estado global
+        setMesas((prev) => prev.map((mesa) => {
+          if (normalizeEntityId(mesa?.current_order_id) !== normalizedOrderId) return mesa;
+          affectedMesaId = mesa.id;
+
+          const previousOrderItems = Array.isArray(mesa?.orders?.order_items)
+            ? mesa.orders.order_items
+            : [];
+          const stableOpenTotal = previousOrderItems.length > 0
+            ? calculateOrderItemsTotal(previousOrderItems)
+            : (
+              Number.isFinite(pendingRemoteTotal)
+                ? pendingRemoteTotal
+                : (
+                  Number.isFinite(incomingOrderTotal)
+                    ? incomingOrderTotal
+                    : toFiniteNumber(mesa?.orders?.total, 0)
+                )
+            );
+          const nextOrder = normalizedOrderStatus === 'open'
+            ? {
+              ...(mesa.orders || {}),
+              ...updatedOrder,
+              order_items: previousOrderItems,
+              total: stableOpenTotal,
+              local_units: previousOrderItems.length > 0
+                ? getTotalProductUnits(previousOrderItems)
+                : toFiniteNumber(mesa?.orders?.local_units, 0)
+            }
+            : { ...(mesa.orders || {}), ...updatedOrder };
+          const nextMesa = {
+            ...mesa,
+            orders: nextOrder
+          };
+
+          if (normalizedOrderStatus === 'closed') {
+            return normalizeTableRecord({
+              ...nextMesa,
+              current_order_id: null,
+              status: 'available'
+            });
           }
-          : { ...(mesa.orders || {}), ...updatedOrder };
-        const nextMesa = {
-          ...mesa,
-          orders: nextOrder
-        };
-
-        if (normalizedOrderStatus === 'closed') {
-          return normalizeTableRecord({
-            ...nextMesa,
-            current_order_id: null,
-            status: 'available'
-          });
-        }
-        return normalizeTableRecord(nextMesa);
-      }));
+          return normalizeTableRecord(nextMesa);
+        }));
+      }
 
       setSelectedMesa((prevSelected) => {
         if (normalizeEntityId(prevSelected?.current_order_id) !== normalizedOrderId) return prevSelected;
         if (normalizedOrderStatus !== 'open') return prevSelected;
+        if (isEditingSelectedOrder) return prevSelected;
 
         const previousSelectedItems = Array.isArray(prevSelected?.orders?.order_items)
           ? prevSelected.orders.order_items
@@ -1316,7 +1927,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
         };
       });
 
-      if (normalizedOrderStatus === 'open' && affectedMesaId) {
+      if (normalizedOrderStatus === 'open' && affectedMesaId && !isEditingSelectedOrder) {
         // Producción: refuerza consistencia cuando llegan eventos fuera de orden o parciales.
         scheduleOrderRealtimeRefresh(normalizedOrderId, affectedMesaId);
       }
@@ -1327,6 +1938,8 @@ function Mesas({ businessId, userRole = 'admin' }) {
     }
   });
 
+  // 🔥 TIEMPO REAL: Suscripción a cambios en locks de edición (solo diagnóstico)
+
   // 🔥 TIEMPO REAL: Suscripción a cambios en items de orden (NIVEL NEGOCIO)
   // Callback para manejar cambios en order_items
   const handleOrderItemChange = useCallback((item, eventType = 'UPDATE') => {
@@ -1334,37 +1947,43 @@ function Mesas({ businessId, userRole = 'admin' }) {
     if (!orderId) return;
     if (justCompletedSaleRef.current) return;
 
+    const isSelectedOrder = normalizeEntityId(selectedMesaRef.current?.current_order_id) === orderId;
+    const isEditingSelectedOrder = isSelectedOrder && orderItemsDirtyRef.current;
     let mesaAfectadaId = null;
 
-    setMesas((prevMesas) => {
-      const mesaAfectada = prevMesas.find((mesa) => normalizeEntityId(mesa?.current_order_id) === orderId);
-      if (!mesaAfectada) return prevMesas;
+    if (!isEditingSelectedOrder) {
+      setMesas((prevMesas) => {
+        const mesaAfectada = prevMesas.find((mesa) => normalizeEntityId(mesa?.current_order_id) === orderId);
+        if (!mesaAfectada) return prevMesas;
 
-      mesaAfectadaId = mesaAfectada.id;
-      const previousOrderItems = Array.isArray(mesaAfectada?.orders?.order_items)
-        ? mesaAfectada.orders.order_items
-        : [];
-      const nextOrderItems = applyRealtimeOrderItemChange(previousOrderItems, item, eventType);
-      const nextOrderTotal = calculateOrderItemsTotal(nextOrderItems);
-      const nextLocalUnits = getTotalProductUnits(nextOrderItems);
+        mesaAfectadaId = mesaAfectada.id;
+        const previousOrderItems = Array.isArray(mesaAfectada?.orders?.order_items)
+          ? mesaAfectada.orders.order_items
+          : [];
+        const nextOrderItems = applyRealtimeOrderItemChange(previousOrderItems, item, eventType);
+        const nextOrderTotal = calculateOrderItemsTotal(nextOrderItems);
+        const nextLocalUnits = getTotalProductUnits(nextOrderItems);
 
-      return prevMesas.map((mesa) => (
-        mesa.id === mesaAfectada.id
-          ? {
-            ...mesa,
-            orders: {
-              ...(mesa.orders || {}),
-              id: normalizeEntityId(mesa?.orders?.id) || orderId,
-              order_items: nextOrderItems,
-              total: nextOrderTotal,
-              local_units: nextLocalUnits
+        return prevMesas.map((mesa) => (
+          mesa.id === mesaAfectada.id
+            ? {
+              ...mesa,
+              orders: {
+                ...(mesa.orders || {}),
+                id: normalizeEntityId(mesa?.orders?.id) || orderId,
+                order_items: nextOrderItems,
+                total: nextOrderTotal,
+                local_units: nextLocalUnits
+              }
             }
-          }
-          : mesa
-      ));
-    });
+            : mesa
+        ));
+      });
+    } else if (isSelectedOrder) {
+      mesaAfectadaId = selectedMesaRef.current?.id || null;
+    }
 
-    if (normalizeEntityId(selectedMesaRef.current?.current_order_id) === orderId) {
+    if (isSelectedOrder && !isEditingSelectedOrder) {
       setOrderItems((prevItems) => {
         const nextItems = applyRealtimeOrderItemChange(prevItems, item, eventType);
         orderItemsRef.current = nextItems;
@@ -1391,7 +2010,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
       });
     }
 
-    if (mesaAfectadaId) {
+    if (mesaAfectadaId && !isEditingSelectedOrder) {
       // Reconciliación en background para blindar consistencia si llega evento parcial.
       scheduleOrderRealtimeRefresh(orderId, mesaAfectadaId);
     }
@@ -1747,6 +2366,43 @@ function Mesas({ businessId, userRole = 'admin' }) {
       ? normalizedMesa.orders.order_items
       : [];
 
+    if (normalizedMesa?.id && businessId) {
+      const nextMesaId = normalizeEntityId(normalizedMesa.id);
+      if (nextMesaId) {
+        const previousActive = activeMesaBroadcastRef.current;
+        if (previousActive?.tableId && previousActive.tableId !== nextMesaId) {
+          publishMesaLockBroadcast({
+            tableId: previousActive.tableId,
+            locked: false,
+            mode: 'rollback',
+            lockToken: previousActive.lockToken || null
+          });
+        }
+        const lockToken = `broadcast-${mesaSyncClientIdRef.current}-${Date.now()}`;
+        publishMesaLockBroadcast({
+          tableId: nextMesaId,
+          locked: true,
+          mode: 'optimistic',
+          lockToken
+        });
+        activeMesaBroadcastRef.current = { tableId: nextMesaId, lockToken };
+        heldMesaLockRef.current = { businessId, tableId: nextMesaId, lockToken };
+        void acquireMesaEditLockWeb({
+          targetBusinessId: businessId,
+          tableId: nextMesaId,
+          lockToken
+        }).then((result) => {
+          if (result?.ok && !result?.unsupported) {
+            heldMesaLockRef.current = {
+              businessId,
+              tableId: nextMesaId,
+              lockToken: result.lockToken || lockToken
+            };
+          }
+        });
+      }
+    }
+
     // Actualizar estado local inmediatamente para UI responsive
     setSelectedMesa(normalizedMesa);
     setModalOpenIntent(true);
@@ -1768,10 +2424,18 @@ function Mesas({ businessId, userRole = 'admin' }) {
       setOrderItems([]);
       await createNewOrder(normalizedMesa);
     }
-  }, [loadOrderDetails, createNewOrder, setPendingQuantityUpdatesSafe, ensureCatalogWarmup]);
+  }, [
+    businessId,
+    acquireMesaEditLockWeb,
+    createNewOrder,
+    ensureCatalogWarmup,
+    loadOrderDetails,
+    publishMesaLockBroadcast,
+    setPendingQuantityUpdatesSafe
+  ]);
 
   // IMPORTANTE: Definir updateOrderTotal PRIMERO (otras funciones dependen de esta)
-  const updateOrderTotal = useCallback(async (orderId, itemsSnapshot = orderItems) => {
+  const updateOrderTotal = useCallback(async (orderId, itemsSnapshot = orderItems, options = {}) => {
     try {
       const normalizedOrderId = normalizeEntityId(orderId);
       if (!normalizedOrderId) return;
@@ -1785,14 +2449,18 @@ function Mesas({ businessId, userRole = 'admin' }) {
       const alreadySynced = Number.isFinite(previousTotal) && Math.abs(previousTotal - total) < 0.0001;
       if (alreadySynced && !hasPendingRemoteSync) return;
 
-      // Actualizar estado local primero (instantáneo)
-      setMesas(prevMesas => 
-        prevMesas.map(mesa => 
-          normalizeEntityId(mesa?.current_order_id) === normalizedOrderId
-            ? { ...mesa, orders: { ...mesa.orders, total } }
-            : mesa
-        )
-      );
+      const { skipMesaState = false } = options || {};
+
+      // Evitar re-render masivo de mesas mientras se edita la orden (modal abierto).
+      if (!skipMesaState) {
+        setMesas(prevMesas =>
+          prevMesas.map(mesa =>
+            normalizeEntityId(mesa?.current_order_id) === normalizedOrderId
+              ? { ...mesa, orders: { ...mesa.orders, total } }
+              : mesa
+          )
+        );
+      }
 
       // Serializar escrituras por orden para evitar desorden por latencia en producción.
       const writeQueueByOrderId = orderTotalSyncQueueRef.current;
@@ -1975,7 +2643,8 @@ function Mesas({ businessId, userRole = 'admin' }) {
         const releaseResult = await deleteOrderAndReleaseTable({
           orderId: normalizedOrderId,
           tableId: normalizedTableId,
-          businessId
+          businessId,
+          userId: currentUser?.id || null
         });
         if (!releaseResult?.__localOnly) {
           await loadMesas();
@@ -1984,7 +2653,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
         try { await loadMesas(); } catch { /* no-op */ }
       }
     });
-  }, [businessId, clearClosedMesaCache, loadMesas, setPendingQuantityUpdatesSafe]);
+  }, [businessId, clearClosedMesaCache, currentUser?.id, loadMesas, setPendingQuantityUpdatesSafe]);
 
   const removeItem = useCallback(async (itemId) => {
     if (pendingOrderItemOpsRef.current > 0) {
@@ -2012,7 +2681,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
       });
       delete optimisticTempItemQuantitiesRef.current[itemId];
 
-      updateOrderTotal(selectedMesa.current_order_id, nextOrderItems).catch(() => {});
+      updateOrderTotal(selectedMesa.current_order_id, nextOrderItems, { skipMesaState: true }).catch(() => {});
     } catch {
       setError('❌ No se pudo eliminar el producto. Por favor, intenta de nuevo.');
       // Revertir solo los items si se puede consultar remoto.
@@ -2155,7 +2824,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
       (async () => {
         try {
           await persistPendingQuantityUpdates(mesaSnapshot.current_order_id, { refreshItems: false });
-          await updateOrderTotal(mesaSnapshot.current_order_id, effectiveOrderItemsSnapshot);
+          await updateOrderTotal(mesaSnapshot.current_order_id, effectiveOrderItemsSnapshot, { skipMesaState: true });
 
           if (typeof navigator === 'undefined' || navigator.onLine) {
             loadMesas().catch(() => {});
@@ -2446,7 +3115,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
 
       // Actualizar el total de forma optimista
       if (orderItemsChanged) {
-        updateOrderTotal(selectedMesa.current_order_id, nextOrderItems).catch(() => {});
+        updateOrderTotal(selectedMesa.current_order_id, nextOrderItems, { skipMesaState: true }).catch(() => {});
       }
       setSearchProduct('');
       setQuantityToAdd(1); // Resetear cantidad
@@ -2575,7 +3244,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
           });
         }
 
-        await updateOrderTotal(mesaSnapshot.current_order_id, effectiveItemsSnapshot);
+        await updateOrderTotal(mesaSnapshot.current_order_id, effectiveItemsSnapshot, { skipMesaState: true });
       } catch {
         // Rollback: recargar mesas para sincronizar estado
         try { await loadMesas(); } catch { /* no-op */ }
@@ -2583,6 +3252,29 @@ function Mesas({ businessId, userRole = 'admin' }) {
     };
 
     if (mesaSnapshot && effectiveItemsSnapshot.length > 0) {
+      const localOrderTotal = calculateOrderItemsTotal(effectiveItemsSnapshot);
+      const localUnits = getTotalProductUnits(effectiveItemsSnapshot);
+
+      // Actualizar una sola vez la tarjeta de la mesa al cerrar el modal.
+      setMesas(prevMesas =>
+        prevMesas.map(m =>
+          m.id === mesaSnapshot.id
+            ? {
+              ...m,
+              status: 'occupied',
+              current_order_id: mesaSnapshot.current_order_id,
+              orders: {
+                ...(m.orders || {}),
+                id: mesaSnapshot.current_order_id,
+                total: localOrderTotal,
+                local_units: localUnits,
+                order_items: effectiveItemsSnapshot
+              }
+            }
+            : m
+        )
+      );
+
       setSuccessTitle('✨ Mesa Actualizada');
       setSuccessDetails([
         { label: 'Mesa', value: `#${mesaSnapshot.table_number}` },
@@ -3198,42 +3890,6 @@ function Mesas({ businessId, userRole = 'admin' }) {
     return calculateOrderItemsTotal(orderItems);
   }, [orderItems]);
 
-  useEffect(() => {
-    if (!selectedMesa?.id) return;
-    if (!selectedMesa?.current_order_id) return;
-
-    const selectedOrderId = String(selectedMesa.current_order_id);
-    const scopedOrderItems = Array.isArray(orderItems)
-      ? orderItems.filter((item) => {
-        const itemOrderId = String(item?.order_id || '').trim();
-        if (!itemOrderId) return true;
-        return itemOrderId === selectedOrderId;
-      })
-      : [];
-
-    const localUnits = getTotalProductUnits(scopedOrderItems);
-    const localTotal = calculateOrderItemsTotal(scopedOrderItems);
-
-    setMesas((prevMesas) => prevMesas.map((mesa) => {
-      if (mesa.id !== selectedMesa.id) return mesa;
-
-      const currentOrderItems = Array.isArray(mesa?.orders?.order_items) ? mesa.orders.order_items : [];
-      const shouldReplaceOrderItems = scopedOrderItems.length > 0 || currentOrderItems.length === 0;
-      const forceEmptyFromLocalEdits = orderItemsDirtyRef.current && scopedOrderItems.length === 0;
-
-      return {
-        ...mesa,
-        orders: {
-          ...(mesa.orders || {}),
-          id: mesa?.orders?.id || selectedMesa.current_order_id || null,
-          total: Number.isFinite(localTotal) ? localTotal : Number(mesa?.orders?.total || 0),
-          local_units: localUnits,
-          ...((shouldReplaceOrderItems || forceEmptyFromLocalEdits) ? { order_items: scopedOrderItems } : {})
-        }
-      };
-    }));
-  }, [selectedMesa, orderItems]);
-
   const cambioPago = useMemo(() => {
     if (paymentMethod !== 'cash') return null;
     if (amountReceived === '' || amountReceived === null) {
@@ -3381,6 +4037,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
           <AnimatePresence>
             {/* Alerta de procesamiento de ventas divididas */}
             <SaleUpdateAlert
+              key="split-sales-loading"
               isVisible={isGeneratingSplitSales}
               onClose={() => {}}
               title="Generando ventas..."
@@ -3390,6 +4047,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
 
             {/* Alerta de procesamiento para cierre normal (sin división) */}
             <SaleUpdateAlert
+              key="order-close-loading"
               isVisible={isClosingOrder && !isGeneratingSplitSales}
               onClose={() => {}}
               title="Generando venta..."
@@ -3399,6 +4057,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
 
             {/* Alerta de éxito - verde */}
             <SaleSuccessAlert 
+              key="sale-success"
               isVisible={success && alertType === 'success'}
               onClose={() => setSuccess(false)}
               title={successTitle}
@@ -3408,6 +4067,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
             
             {/* Alerta de actualización de mesa con icono de check */}
             <SaleSuccessAlert 
+              key="table-update-success"
               isVisible={success && alertType === 'update'}
               onClose={() => setSuccess(false)}
               title={successTitle}
@@ -3417,6 +4077,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
             
             {/* Alerta de error - rojo */}
             <SaleErrorAlert 
+              key="sale-error"
               isVisible={!!error}
               onClose={() => setError(null)}
               title="❌ Error"
@@ -3488,95 +4149,21 @@ function Mesas({ businessId, userRole = 'admin' }) {
             )}
           </AnimatePresence>
 
-          {/* Grid de mesas */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {visibleMesas.map((mesa, index) => (
-              <motion.div
-                key={mesa.id}
-                initial={lowMotionMode ? false : { opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={lowMotionMode ? { duration: 0 } : { duration: 0.2, delay: index * 0.02 }}
-              >
-                <Card
-                  className={`relative cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
-                    mesa.status === 'occupied' 
-                      ? 'border-yellow-400 bg-yellow-50/30' 
-                      : 'border-green-400 bg-green-50/30'
-                  }`}
-                  onClick={() => handleOpenTable(mesa)}
-                >
-                  <CardContent className="pt-6 text-center">
-                    {/* Botón eliminar (solo si está disponible y no es empleado) */}
-                    {mesa.status === 'available' && !isEmployee && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteTable(mesa.id);
-                        }}
-                        className="absolute top-2 right-2 h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600 rounded-lg"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
-
-                    {/* Icono de estado */}
-                    <div className="mb-4 flex justify-center">
-                      <div className={`w-20 h-20 rounded-2xl flex items-center justify-center ${
-                        mesa.status === 'occupied' 
-                          ? 'bg-yellow-100 text-yellow-600' 
-                          : 'bg-green-100 text-green-600'
-                      }`}>
-                        <Layers className="w-10 h-10" />
-                      </div>
-                    </div>
-
-                    {/* Número de mesa */}
-                    <h3 className="text-2xl font-bold text-primary-900 mb-2">
-                      Mesa {mesa.table_number}
-                    </h3>
-
-                    {/* Estado */}
-                    <Badge 
-                      variant={mesa.status === 'occupied' ? 'warning' : 'success'}
-                      className="mb-3 text-sm font-semibold"
-                    >
-                      {mesa.status === 'occupied' ? '🔴 Ocupada' : '🟢 Disponible'}
-                    </Badge>
-
-                    {/* Información de la orden si está ocupada */}
-                    {mesa.status === 'occupied' && mesa.orders && (
-                      <div className="mt-4 pt-4 border-t border-accent-200">
-                        <p className="text-lg font-bold text-primary-900">
-                          {formatPrice(parseFloat(mesa.orders.total || 0))}
-                        </p>
-                        <p className="text-sm text-primary-600">
-                          {getMesaProductUnits(mesa, { selectedMesa, orderItems })} productos
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-
-          {hasMoreMesas && (
-            <div className="flex flex-col items-center gap-3 py-2">
-              <p className="text-xs text-gray-500">
-                Mostrando {visibleMesas.length} de {totalMesas} mesas
-              </p>
-              <div ref={mesasSentinelRef} className="h-2 w-full" aria-hidden="true" />
-              <Button
-                onClick={loadMoreMesas}
-                variant="outline"
-                className="rounded-xl"
-              >
-                Cargar mas mesas
-              </Button>
-            </div>
-          )}
+          <MesasGrid
+            visibleMesas={visibleMesas}
+            totalMesas={totalMesas}
+            hasMoreMesas={hasMoreMesas}
+            mesasSentinelRef={mesasSentinelRef}
+            loadMoreMesas={loadMoreMesas}
+            isEmployee={isEmployee}
+            onOpenTable={handleOpenTable}
+            onDeleteTable={handleDeleteTable}
+            selectedMesaId={modalOpenIntent && showOrderDetails ? null : (selectedMesa?.id || null)}
+            selectedMesaUnits={modalOpenIntent && showOrderDetails
+              ? null
+              : (selectedMesa?.id ? getTotalProductUnits(orderItems) : null)}
+            lowMotionMode={lowMotionMode}
+          />
 
           {/* Mensaje si no hay mesas */}
           {mesas.length === 0 && !loading && (

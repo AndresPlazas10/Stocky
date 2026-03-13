@@ -3,8 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { signOutSession } from '../data/commands/authCommands.js';
 import { Button } from '@/components/ui/button';
+import WhatsNewModal from '../components/Modals/WhatsNewModal.jsx';
 import {
-  Store,
   Menu,
   X,
   ArrowRight,
@@ -17,6 +17,7 @@ import {
   Clock3,
   Check
 } from 'lucide-react';
+import logoStocky from '../assets/logoStocky.png';
 
 const _motionLintUsage = motion;
 
@@ -68,6 +69,16 @@ const process = [
 function Home() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileAppUrl = String(import.meta.env?.VITE_APK_URL || '').trim()
+    || '/apk/stocky-latest.apk';
+
+  const handleDownloadClick = () => {
+    if (mobileAppUrl.startsWith('/')) {
+      window.location.href = mobileAppUrl;
+      return;
+    }
+    window.open(mobileAppUrl, '_blank', 'noopener');
+  };
 
   useEffect(() => {
     const signOut = async () => {
@@ -82,13 +93,14 @@ function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#f8f5ff] via-[#f2edff] to-[#ebe4ff] text-slate-900">
+      <WhatsNewModal />
       <div className="pointer-events-none fixed inset-0 -z-0 bg-[radial-gradient(circle_at_15%_10%,rgba(139,92,246,0.25),transparent_34%),radial-gradient(circle_at_85%_5%,rgba(99,102,241,0.2),transparent_32%),radial-gradient(circle_at_50%_95%,rgba(168,85,247,0.18),transparent_40%)]" />
 
       <header className="sticky top-0 z-50 border-b border-violet-200/60 bg-[#f8f5ff]/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <button onClick={() => navigate('/')} className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-violet-100/70">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600">
-              <Store className="h-5 w-5 text-slate-50" />
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-violet-200/70 bg-white shadow-sm">
+              <img src={logoStocky} alt="Stocky" className="h-7 w-7 object-contain" />
             </span>
             <span className="text-lg font-black tracking-tight text-violet-950">Stocky</span>
           </button>
@@ -100,6 +112,13 @@ function Home() {
           </nav>
 
           <div className="hidden items-center gap-2 md:flex">
+            <Button
+              variant="outline"
+              onClick={handleDownloadClick}
+              className="border-violet-300 font-semibold text-violet-700 hover:bg-violet-50"
+            >
+              Descargar móvil
+            </Button>
             <Button variant="ghost" onClick={() => navigate('/login')} className="font-semibold text-slate-700">
               Iniciar sesión
             </Button>
@@ -108,13 +127,22 @@ function Home() {
             </Button>
           </div>
 
-          <button
-            className="rounded-lg p-2 text-slate-700 hover:bg-violet-100 md:hidden"
-            onClick={() => setMobileMenuOpen((prev) => !prev)}
-            aria-label="Abrir menú"
-          >
-            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          <div className="flex items-center gap-2 md:hidden">
+            <Button
+              variant="outline"
+              onClick={handleDownloadClick}
+              className="h-9 border-violet-300 px-3 text-xs font-semibold text-violet-700 hover:bg-violet-50"
+            >
+              Descargar Android
+            </Button>
+            <button
+              className="rounded-lg p-2 text-slate-700 hover:bg-violet-100"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label="Abrir menú"
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
 
         <AnimatePresence>
@@ -130,6 +158,13 @@ function Home() {
                 <a href="#process" onClick={() => setMobileMenuOpen(false)} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-violet-100">Proceso</a>
                 <a href="#start" onClick={() => setMobileMenuOpen(false)} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-violet-100">Empezar</a>
                 <div className="mt-2 grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleDownloadClick}
+                    className="border-violet-300"
+                  >
+                    Descargar
+                  </Button>
                   <Button variant="outline" onClick={() => navigate('/login')} className="border-violet-300">Entrar</Button>
                   <Button onClick={() => navigate('/register')} className="bg-gradient-to-r from-violet-600 to-indigo-600 text-slate-50 hover:opacity-90">Registro</Button>
                 </div>
@@ -279,8 +314,8 @@ function Home() {
       <footer className="border-t border-violet-200/70 bg-[#f8f5ff]/95 px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600">
-              <Store className="h-5 w-5 text-slate-50" />
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-violet-200/70 bg-white shadow-sm">
+              <img src={logoStocky} alt="Stocky" className="h-7 w-7 object-contain" />
             </span>
             <div>
               <p className="text-sm font-black text-violet-950">Stocky</p>

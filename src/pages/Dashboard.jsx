@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout.jsx';
 import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
 import PricingAnnouncementModal from '../components/PricingAnnouncementModal.jsx';
+import WhatsNewModal from '../components/Modals/WhatsNewModal.jsx';
 import { AsyncStateWrapper } from '../ui/system/async-state/index.js';
 import { ModernToast } from '../components/ui/modern-alert.jsx';
 import { useToast } from '../hooks/useToast.js';
@@ -339,7 +340,7 @@ function Dashboard() {
           onRetry={checkAuthAndLoadBusiness}
           skeletonType="dashboard"
           emptyTitle="Preparando tu negocio"
-          emptyDescription="Estamos cargando tu configuracion y permisos."
+          emptyDescription="Estamos cargando tu configuración y permisos."
         />
       </div>
     );
@@ -348,6 +349,7 @@ function Dashboard() {
   return (
     <>
       <PricingAnnouncementModal />
+      {activeSection === 'home' ? <WhatsNewModal /> : null}
       
       <DashboardLayout
         userName={business?.owner_name || 'Usuario'}

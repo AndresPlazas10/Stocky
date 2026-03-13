@@ -94,6 +94,17 @@ function isMissingOpenCloseTableRpcError(errorLike) {
   return code === 'pgrst202' || code === '42883' || missingFunction;
 }
 
+function isMissingOpenedAtOnTablesError(errorLike) {
+  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+  return (
+    message.includes('column')
+    && message.includes('"opened_at"')
+    && message.includes('relation')
+    && message.includes('"tables"')
+    && message.includes('does not exist')
+  );
+}
+
 async function userCanAccessBusiness(admin, userId, businessId) {
   const [{ data: owner }, { data: employee }] = await Promise.all([
     admin
@@ -141,7 +152,7 @@ async function runLegacyOpenCloseTable({
 
   if (action === 'open') {
     if (!nextOrderId) {
-      const { data: createdOrder, error: createOrderError } = await admin
+      const createWithOpenedAt = await admin
         .from('orders')
         .insert([{
           business_id: tableRow.business_id,
@@ -154,10 +165,28 @@ async function runLegacyOpenCloseTable({
         .select('id')
         .single();
 
+      let createdOrder = createWithOpenedAt.data;
+      let createOrderError = createWithOpenedAt.error;
+      if (createOrderError && String(createOrderError?.message || '').toLowerCase().includes('"opened_at"')) {
+        const createWithoutOpenedAt = await admin
+          .from('orders')
+          .insert([{
+            business_id: tableRow.business_id,
+            table_id: tableId,
+            user_id: userId,
+            status: 'open',
+            total: 0
+          }])
+          .select('id')
+          .single();
+        createdOrder = createWithoutOpenedAt.data;
+        createOrderError = createWithoutOpenedAt.error;
+      }
+
       if (createOrderError) throw createOrderError;
       nextOrderId = createdOrder?.id || null;
     } else {
-      const { error: reopenOrderError } = await admin
+      const reopenWithOpenedAt = await admin
         .from('orders')
         .update({
           status: 'open',
@@ -169,8 +198,23 @@ async function runLegacyOpenCloseTable({
         .eq('id', nextOrderId)
         .eq('business_id', tableRow.business_id);
 
+      let reopenOrderError = reopenWithOpenedAt.error;
+      if (reopenOrderError && String(reopenOrderError?.message || '').toLowerCase().includes('"opened_at"')) {
+        const reopenWithoutOpenedAt = await admin
+          .from('orders')
+          .update({
+            status: 'open',
+            table_id: tableId,
+            business_id: tableRow.business_id,
+            closed_at: null
+          })
+          .eq('id', nextOrderId)
+          .eq('business_id', tableRow.business_id);
+        reopenOrderError = reopenWithoutOpenedAt.error;
+      }
+
       if (reopenOrderError) {
-        const { data: createdOrder, error: createOrderError } = await admin
+        const createWithOpenedAt = await admin
           .from('orders')
           .insert([{
             business_id: tableRow.business_id,
@@ -182,6 +226,25 @@ async function runLegacyOpenCloseTable({
           }])
           .select('id')
           .single();
+
+        let createdOrder = createWithOpenedAt.data;
+        let createOrderError = createWithOpenedAt.error;
+        if (createOrderError && String(createOrderError?.message || '').toLowerCase().includes('"opened_at"')) {
+          const createWithoutOpenedAt = await admin
+            .from('orders')
+            .insert([{
+              business_id: tableRow.business_id,
+              table_id: tableId,
+              user_id: userId,
+              status: 'open',
+              total: 0
+            }])
+            .select('id')
+            .single();
+          createdOrder = createWithoutOpenedAt.data;
+          createOrderError = createWithoutOpenedAt.error;
+        }
+
         if (createOrderError) throw createOrderError;
         nextOrderId = createdOrder?.id || null;
       }
@@ -283,7 +346,7 @@ export default async function handler(req, res) {
 
     let updated = null;
     if (error) {
-      if (!isMissingOpenCloseTableRpcError(error)) {
+    if (!isMissingOpenCloseTableRpcError(error) && !isMissingOpenedAtOnTablesError(error)) {
         throw error;
       }
 
