@@ -4,10 +4,10 @@
     "slug": "stocky-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logoStocky.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/logoStocky.png",
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -21,15 +21,15 @@
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/logoStocky.png",
+        "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/logoStocky.png"
-      },
-      "notification": {
-        "icon": "./assets/logoStocky.png",
-        "color": "#0AC946"
+        "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
+    },
+    "notification": {
+      "icon": "./assets/android-icon-monochrome.png",
+      "color": "#0AC946"
     },
     "plugins": [
       "expo-notifications",
