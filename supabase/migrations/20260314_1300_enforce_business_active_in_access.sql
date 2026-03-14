@@ -52,6 +52,8 @@ REVOKE ALL ON FUNCTION public.can_access_business(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.can_access_business(uuid) TO authenticated;
 
 -- Helper overload used by some RPCs to validate actor explicitly.
+DROP FUNCTION IF EXISTS public.can_access_business(uuid, uuid);
+
 CREATE OR REPLACE FUNCTION public.can_access_business(
   p_actor uuid,
   p_business_id uuid
