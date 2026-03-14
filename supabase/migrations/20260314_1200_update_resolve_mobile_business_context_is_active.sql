@@ -1,5 +1,7 @@
 BEGIN;
 
+DROP FUNCTION IF EXISTS public.resolve_mobile_business_context(uuid, uuid);
+
 CREATE OR REPLACE FUNCTION public.resolve_mobile_business_context(
   p_user_id uuid,
   p_preferred_business_id uuid DEFAULT NULL
