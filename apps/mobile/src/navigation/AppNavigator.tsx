@@ -24,6 +24,7 @@ import { useDashboardContext } from '../screens/dashboard/DashboardContext';
 import { DashboardSectionScreen } from '../screens/dashboard/DashboardSectionScreen';
 import { isSectionEnabled } from '../config/features';
 import { OfflineScreen } from '../ui/OfflineScreen';
+import { BusinessDisabledScreen } from '../ui/BusinessDisabledScreen';
 
 const Drawer = createDrawerNavigator<RootDrawerParamList>();
 const DRAWER_WIDTH = 244;
@@ -154,7 +155,7 @@ function ScreenBySection({ sectionId }: { sectionId: SectionId }) {
 }
 
 export function AppNavigator() {
-  const { businessContext, loadingBusiness } = useDashboardContext();
+  const { businessContext, loadingBusiness, signOut } = useDashboardContext();
   const netInfo = useNetInfo();
   const source = businessContext?.source || 'owner';
   const allowedSectionIds = useMemo<SectionId[]>(() => {
@@ -166,6 +167,16 @@ export function AppNavigator() {
     [allowedSectionIds],
   );
   const isOffline = netInfo.isInternetReachable === false || netInfo.isConnected === false;
+  const isBusinessInactive = businessContext?.isActive === false;
+
+  if (isBusinessInactive) {
+    return (
+      <BusinessDisabledScreen
+        businessName={businessContext?.businessName || null}
+        onSignOut={signOut}
+      />
+    );
+  }
 
   return (
     <View style={styles.appShell}>

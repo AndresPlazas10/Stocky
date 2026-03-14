@@ -23,6 +23,7 @@ export type BusinessContext = {
   businessId: string;
   businessName: string | null;
   source: 'owner' | 'employee';
+  isActive: boolean;
 };
 
 export type MesaEditLock = {
@@ -56,6 +57,7 @@ type BusinessCandidate = {
   businessName: string | null;
   source: 'owner' | 'employee';
   createdAt: string | null;
+  isActive: boolean;
 };
 
 const LAST_BUSINESS_ID_STORAGE_KEY = 'stocky.mobile.last_business_id';
@@ -141,6 +143,7 @@ function normalizeBusinessContextCandidate(candidate: BusinessCandidate | null):
     businessId: candidate.businessId,
     businessName: candidate.businessName,
     source: candidate.source,
+    isActive: candidate.isActive !== false,
   };
 }
 
@@ -151,7 +154,7 @@ async function resolveRememberedBusinessCandidate(
 ): Promise<BusinessCandidate | null> {
   const ownerResult = await client
     .from('businesses')
-    .select('id,name,created_at')
+    .select('id,name,created_at,is_active')
     .eq('id', rememberedBusinessId)
     .eq('created_by', userId)
     .limit(1)
@@ -165,6 +168,7 @@ async function resolveRememberedBusinessCandidate(
       businessName: ownerResult.data.name || null,
       source: 'owner',
       createdAt: ownerResult.data.created_at || null,
+      isActive: ownerResult.data.is_active !== false,
     };
   }
 
@@ -181,7 +185,7 @@ async function resolveRememberedBusinessCandidate(
   if (employeeResult.data?.business_id) {
     const businessResult = await client
       .from('businesses')
-      .select('id,name,created_at')
+      .select('id,name,created_at,is_active')
       .eq('id', rememberedBusinessId)
       .limit(1)
       .maybeSingle();
@@ -193,6 +197,7 @@ async function resolveRememberedBusinessCandidate(
       businessName: businessResult.data?.name || null,
       source: 'employee',
       createdAt: employeeResult.data.created_at || businessResult.data?.created_at || null,
+      isActive: businessResult.data?.is_active !== false,
     };
   }
 
@@ -666,6 +671,7 @@ export async function resolveBusinessContext(
           businessName: rpcRow.business_name ?? null,
           source: String(rpcRow.source || '').trim().toLowerCase() === 'employee' ? 'employee' : 'owner',
           createdAt: rpcRow.created_at ?? null,
+          isActive: rpcRow.is_active !== false,
         } : null);
 
         if (candidate?.businessId) {
@@ -699,7 +705,7 @@ export async function resolveBusinessContext(
 
     const latestOwnedBusinessResult = await client
       .from('businesses')
-      .select('id,name,created_at')
+      .select('id,name,created_at,is_active')
       .eq('created_by', normalizedUserId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -714,6 +720,7 @@ export async function resolveBusinessContext(
         businessName: latestOwnedBusiness.name || null,
         source: 'owner',
         createdAt: latestOwnedBusiness.created_at || null,
+        isActive: latestOwnedBusiness.is_active !== false,
       });
       if (normalizedOwned?.businessId) {
         await AsyncStorage.setItem(LAST_BUSINESS_ID_STORAGE_KEY, normalizedOwned.businessId);
@@ -739,7 +746,7 @@ export async function resolveBusinessContext(
       if (latestEmployeeBusinessId) {
         const latestEmployeeBusinessResult = await client
           .from('businesses')
-          .select('id,name,created_at')
+          .select('id,name,created_at,is_active')
           .eq('id', latestEmployeeBusinessId)
           .limit(1)
           .maybeSingle();
@@ -751,6 +758,7 @@ export async function resolveBusinessContext(
           businessName: latestEmployeeBusinessResult.data?.name || null,
           source: 'employee',
           createdAt: latestEmployeeRow.created_at || latestEmployeeBusinessResult.data?.created_at || null,
+          isActive: latestEmployeeBusinessResult.data?.is_active !== false,
         };
       }
     }
