@@ -12,12 +12,16 @@ export default function WhatsNewModal() {
   const [step, setStep] = useState(0);
   const totalSteps = 3;
   const storageKey = 'stocky_whatsnew_dismissed_v1';
+  const isEnabled = String(import.meta.env?.VITE_WHATS_NEW_ENABLED || '')
+    .trim()
+    .toLowerCase() === 'true';
   const downloadUrl = useMemo(() => {
     const raw = String(import.meta.env?.VITE_APK_URL || '').trim();
     return raw || '/apk/stocky-latest.apk';
   }, []);
 
   useEffect(() => {
+    if (!isEnabled) return;
     if (typeof window === 'undefined') return;
     const dismissed = window.localStorage.getItem(storageKey) === '1';
     if (!dismissed) {
@@ -66,6 +70,10 @@ export default function WhatsNewModal() {
       ))}
     </div>
   );
+
+  if (!isEnabled) {
+    return null;
+  }
 
   return (
     <AnimatePresence>
