@@ -25,6 +25,7 @@ import { DashboardSectionScreen } from '../screens/dashboard/DashboardSectionScr
 import { isSectionEnabled } from '../config/features';
 import { OfflineScreen } from '../ui/OfflineScreen';
 import { BusinessDisabledScreen } from '../ui/BusinessDisabledScreen';
+import { UpdateAvailableModal } from '../ui/UpdateAvailableModal';
 import { logSecurityEvent } from '../services/securityAuditService';
 
 const Drawer = createDrawerNavigator<RootDrawerParamList>();
@@ -156,7 +157,7 @@ function ScreenBySection({ sectionId }: { sectionId: SectionId }) {
 }
 
 export function AppNavigator() {
-  const { session, businessContext, loadingBusiness, signOut } = useDashboardContext();
+  const { session, businessContext, loadingBusiness, signOut, updateNotice } = useDashboardContext();
   const netInfo = useNetInfo();
   const source = businessContext?.source || 'owner';
   const allowedSectionIds = useMemo<SectionId[]>(() => {
@@ -187,16 +188,12 @@ export function AppNavigator() {
     });
   }, [businessContext?.businessId, isBusinessInactive, session.user.id, source]);
 
-  if (isBusinessInactive) {
-    return (
-      <BusinessDisabledScreen
-        businessName={businessContext?.businessName || null}
-        onSignOut={signOut}
-      />
-    );
-  }
-
-  return (
+  const content = isBusinessInactive ? (
+    <BusinessDisabledScreen
+      businessName={businessContext?.businessName || null}
+      onSignOut={signOut}
+    />
+  ) : (
     <View style={styles.appShell}>
       <NavigationContainer>
         <Drawer.Navigator
@@ -221,9 +218,19 @@ export function AppNavigator() {
       {isOffline ? <OfflineScreen /> : null}
     </View>
   );
+
+  return (
+    <View style={styles.rootShell}>
+      {content}
+      {updateNotice ? <UpdateAvailableModal notice={updateNotice} /> : null}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
+  rootShell: {
+    flex: 1,
+  },
   appShell: {
     flex: 1,
   },
