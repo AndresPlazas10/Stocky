@@ -1,12 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../../lib/supabase';
+import { EXPO_CONFIG } from '../../config/env';
 import {
   clearResolvedBusinessContextCache,
   resolveBusinessContext,
   type BusinessContext,
 } from '../../services/mesasService';
 import { deactivatePushTokenForUser } from '../../notifications/mobileNotificationsService';
+import { fetchAppUpdateNotice, type AppUpdateNotice } from '../../services/appUpdateService';
 import { clearSensitiveStorage } from '../../utils/storageCleanup';
 import { logSecurityEvent } from '../../services/securityAuditService';
 
@@ -15,6 +17,7 @@ type DashboardContextValue = {
   businessContext: BusinessContext | null;
   loadingBusiness: boolean;
   businessError: string | null;
+  updateNotice: AppUpdateNotice | null;
   refreshBusinessContext: () => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -25,7 +28,9 @@ export function DashboardProvider({ session, children }: PropsWithChildren<{ ses
   const [businessContext, setBusinessContext] = useState<BusinessContext | null>(null);
   const [loadingBusiness, setLoadingBusiness] = useState(true);
   const [businessError, setBusinessError] = useState<string | null>(null);
+  const [updateNotice, setUpdateNotice] = useState<AppUpdateNotice | null>(null);
   const contextRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const updateCheckedRef = useRef(false);
 
   const refreshBusinessContext = useCallback(async (options?: { silent?: boolean; forceRefresh?: boolean }) => {
     const silent = options?.silent === true;
@@ -53,6 +58,23 @@ export function DashboardProvider({ session, children }: PropsWithChildren<{ ses
       void clearSensitiveStorage();
     }
   }, [businessContext?.isActive]);
+
+  useEffect(() => {
+    if (updateCheckedRef.current) return;
+    updateCheckedRef.current = true;
+    let cancelled = false;
+
+    const run = async () => {
+      const notice = await fetchAppUpdateNotice('android', EXPO_CONFIG.clientVersion);
+      if (!cancelled) setUpdateNotice(notice);
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,9 +154,10 @@ export function DashboardProvider({ session, children }: PropsWithChildren<{ ses
     businessContext,
     loadingBusiness,
     businessError,
+    updateNotice,
     refreshBusinessContext,
     signOut,
-  }), [session, businessContext, loadingBusiness, businessError]);
+  }), [session, businessContext, loadingBusiness, businessError, updateNotice]);
 
   return (
     <DashboardContext.Provider value={value}>
