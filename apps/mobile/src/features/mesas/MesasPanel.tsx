@@ -829,6 +829,12 @@ export function MesasPanel({ session, businessContext }: Props) {
     const senderClientId = String(payload?.sender_client_id || '').trim();
     if (senderClientId && senderClientId === String(realtimeClientInstanceIdRef.current || '').trim()) return;
 
+    const activeBusinessId = String(context?.businessId || '').trim();
+    const payloadBusinessId = String(payload?.business_id || '').trim();
+    if (activeBusinessId && (!payloadBusinessId || payloadBusinessId !== activeBusinessId)) {
+      return;
+    }
+
     const mesaId = String(payload?.mesa_id || '').trim();
     if (!mesaId) return;
 
@@ -850,17 +856,22 @@ export function MesasPanel({ session, businessContext }: Props) {
     const ownerUserId = String(payload?.lock_owner_user_id || payload?.sender_user_id || '').trim();
     if (!ownerUserId) return;
 
-    const businessId = String(payload?.business_id || '').trim();
+    const resolvedBusinessId = activeBusinessId || String(payload?.business_id || '').trim();
     const lockToken = String(payload?.lock_token || '').trim() || null;
     const rawExpiresAt = String(payload?.lock_expires_at || '').trim();
-    const lockTtlMs = Math.max(15_000, Number(payload?.lock_ttl_ms || 45_000));
-    const lockExpiresAt = rawExpiresAt || new Date(Date.now() + lockTtlMs).toISOString();
+    const lockTtlMs = Math.min(120_000, Math.max(15_000, Number(payload?.lock_ttl_ms || 45_000)));
+    const nowMs = Date.now();
+    const parsedExpiresAt = rawExpiresAt ? Date.parse(rawExpiresAt) : Number.NaN;
+    const safeExpiresAtMs = Number.isFinite(parsedExpiresAt)
+      ? Math.min(parsedExpiresAt, nowMs + lockTtlMs)
+      : nowMs + lockTtlMs;
+    const lockExpiresAt = new Date(safeExpiresAtMs).toISOString();
 
     setMesaLocksByTableId((prev) => ({
       ...prev,
       [mesaId]: {
         table_id: mesaId,
-        business_id: businessId || String(prev[mesaId]?.business_id || '').trim(),
+        business_id: resolvedBusinessId || String(prev[mesaId]?.business_id || '').trim(),
         lock_owner_user_id: ownerUserId,
         lock_owner_name: 'Alguien',
         lock_token: lockToken,
@@ -868,7 +879,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         updated_at: new Date().toISOString(),
       },
     }));
-  }, []);
+  }, [context?.businessId]);
 
   const sendMesaSyncBroadcast = useCallback((event: string, payload: Record<string, any>) => {
     const channel = mesasSyncBroadcastChannelRef.current;
@@ -1380,6 +1391,12 @@ export function MesasPanel({ session, businessContext }: Props) {
     const mesaId = String(payload?.mesa_id || '').trim();
     if (!mesaId) return;
 
+    const activeBusinessId = String(context?.businessId || '').trim();
+    const payloadBusinessId = String(payload?.business_id || '').trim();
+    if (activeBusinessId && (!payloadBusinessId || payloadBusinessId !== activeBusinessId)) {
+      return;
+    }
+
     applyRealtimeMesaLockHint(payload);
 
     applyRealtimeTableEvent({
@@ -1415,7 +1432,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         },
       });
     }
-  }, [applyRealtimeMesaLockHint, applyRealtimeOrderEvent, applyRealtimeTableEvent]);
+  }, [applyRealtimeMesaLockHint, applyRealtimeOrderEvent, applyRealtimeTableEvent, context?.businessId]);
 
   const publishMesaStateBroadcast = useCallback((
     mesa: MesaRecord,
@@ -1543,7 +1560,7 @@ export function MesasPanel({ session, businessContext }: Props) {
       });
 
     const syncChannel = client
-      .channel(`mobile-mesas-sync:${businessId}`)
+      .channel(`private:mobile-mesas-sync:${businessId}`)
       .on('broadcast', { event: 'mesa_lock_changed' }, ({ payload }) => {
         if (cancelled) return;
         applyRealtimeMesaLockBroadcast(payload);

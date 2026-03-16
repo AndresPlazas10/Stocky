@@ -18,6 +18,7 @@ import {
 import { signOutGlobalSession } from '../data/commands/authCommands.js';
 import { useWarmupStatus } from '../hooks/useWarmupStatus.js';
 import PerformanceHud from '../components/perf/PerformanceHud.jsx';
+import { logSecurityEvent } from '../services/securityAuditService.js';
 
 const LAST_BUSINESS_ID_STORAGE_KEY = 'stocky.last_business_id';
 const PERF_HUD_STORAGE_KEY = 'stocky.perf_hud';
@@ -190,6 +191,15 @@ function Dashboard() {
 
       // � VERIFICAR SI EL NEGOCIO ESTÁ DESHABILITADO (PRIORIDAD MÁXIMA)
       if (finalBusiness.is_active === false) {
+        try {
+          await logSecurityEvent({
+            businessId: finalBusiness.id,
+            action: 'business_inactive_blocked',
+            metadata: { source: 'web', role: 'owner' }
+          });
+        } catch {
+          // no-op: no bloquear flujo por auditoria
+        }
         setIsBusinessDisabled(true);
         setLoading(false);
         return; // Detener ejecución y mostrar modal bloqueante
@@ -246,6 +256,12 @@ function Dashboard() {
 
   const handleSignOut = async () => {
     try {
+      await logSecurityEvent({
+        businessId: business?.id,
+        action: 'sign_out',
+        metadata: { source: 'web', role: 'owner' }
+      });
+
       // Limpiar el estado local primero
       localStorage.clear();
       sessionStorage.clear();
