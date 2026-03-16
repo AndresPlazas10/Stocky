@@ -11,7 +11,7 @@
       },
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://stocky-mocha.vercel.app",
-        "EXPO_PUBLIC_MOBILE_VERSION": "0.1.0-dev",
+        "EXPO_PUBLIC_MOBILE_VERSION": "0.1.1",
         "EXPO_PUBLIC_SUPABASE_URL": "https://wngjyrkqxblnhxliakqj.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InduZ2p5cmtxeGJsbmh4bGlha3FqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3MjQ3NDEsImV4cCI6MjA3ODMwMDc0MX0.u8ZcugaNYFnl_j0Acex8GQTFoDcUeRJibiL0aOe7yW0",
         "EXPO_PUBLIC_FEATURE_HOME": "true",
@@ -32,7 +32,7 @@
       },
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://stocky-mocha.vercel.app",
-        "EXPO_PUBLIC_MOBILE_VERSION": "0.1.0-dev",
+        "EXPO_PUBLIC_MOBILE_VERSION": "0.1.1",
         "EXPO_PUBLIC_SUPABASE_URL": "https://wngjyrkqxblnhxliakqj.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InduZ2p5cmtxeGJsbmh4bGlha3FqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3MjQ3NDEsImV4cCI6MjA3ODMwMDc0MX0.u8ZcugaNYFnl_j0Acex8GQTFoDcUeRJibiL0aOe7yW0",
         "EXPO_PUBLIC_FEATURE_HOME": "true",

@@ -1,7 +1,8 @@
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { StockyButton } from './StockyButton';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const paymentQr = require('../../assets/QR.jpeg');
 
@@ -11,11 +12,16 @@ type BusinessDisabledScreenProps = {
 };
 
 export function BusinessDisabledScreen({ businessName, onSignOut }: BusinessDisabledScreenProps) {
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const name = businessName || 'tu negocio';
+  const cardMaxHeight = Math.min(height - insets.top - insets.bottom - 24, 720);
+  const contentBottom = Math.max(20, insets.bottom + 12);
+  const qrSize = Math.min(Math.round(width * 0.55), 210);
 
   return (
     <View style={styles.overlay}>
-      <View style={styles.card}>
+      <View style={[styles.card, { height: cardMaxHeight }]}>
         <LinearGradient colors={['#B91C1C', '#7F1D1D']} style={styles.header}>
           <View style={styles.headerIconWrap}>
             <Ionicons name="lock-closed" size={32} color="#FFFFFF" />
@@ -24,7 +30,12 @@ export function BusinessDisabledScreen({ businessName, onSignOut }: BusinessDisa
           <Text style={styles.headerSubtitle}>{name}</Text>
         </LinearGradient>
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[styles.content, { paddingBottom: contentBottom }]}
+          showsVerticalScrollIndicator={false}
+          contentInsetAdjustmentBehavior="never"
+        >
           <View style={styles.alertBox}>
             <Ionicons name="warning-outline" size={18} color="#B91C1C" style={styles.alertIcon} />
             <View style={styles.alertCopy}>
@@ -52,7 +63,7 @@ export function BusinessDisabledScreen({ businessName, onSignOut }: BusinessDisa
                 <Text style={styles.qrHint}>
                   Escanea el QR desde tu app de banco preferida para pagar.
                 </Text>
-                <Image source={paymentQr} style={styles.qrImage} resizeMode="contain" />
+                <Image source={paymentQr} style={[styles.qrImage, { height: qrSize }]} resizeMode="contain" />
               </View>
             </View>
             <View style={styles.warningBox}>
@@ -72,7 +83,9 @@ export function BusinessDisabledScreen({ businessName, onSignOut }: BusinessDisa
             </Text>
           </View>
 
-          <StockyButton label="Cerrar sesión" variant="danger" onPress={onSignOut} />
+          <StockyButton variant="primary" onPress={onSignOut}>
+            Cerrar sesión
+          </StockyButton>
         </ScrollView>
       </View>
     </View>
@@ -101,7 +114,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingVertical: 18,
+    paddingVertical: 16,
     alignItems: 'center',
     gap: 6,
   },
@@ -122,9 +135,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255,255,255,0.85)',
   },
+  scroll: {
+    flex: 1,
+  },
   content: {
     padding: 16,
     gap: 14,
+    paddingBottom: 20,
   },
   alertBox: {
     flexDirection: 'row',
@@ -206,7 +223,6 @@ const styles = StyleSheet.create({
   },
   qrImage: {
     width: '100%',
-    height: 200,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E5E7EB',
