@@ -107,10 +107,16 @@ const calculateOrderItemsTotal = (items = []) =>
 const MESAS_REMOTE_FALLBACK_POLL_MS = 5000;
 const MESA_LOCK_TTL_SECONDS = 45;
 const MESA_LOCK_HEARTBEAT_MS = 20000;
+const MESA_IN_USE_MESSAGE = 'Alguien esta usando esta mesa.';
 
 const normalizeDisplayName = (value, fallback = 'Usuario') => {
   const normalized = String(value || '').trim();
   return normalized || fallback;
+};
+
+const isMesaLockExpired = (lock) => {
+  const expiresAtMs = Date.parse(String(lock?.lock_expires_at || '').trim());
+  return Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now();
 };
 
 const isDuplicateKeyError = (errorLike) => {
@@ -165,7 +171,8 @@ const MesasGrid = memo(function MesasGrid({
   onDeleteTable,
   selectedMesaId = null,
   selectedMesaUnits = null,
-  lowMotionMode = false
+  lowMotionMode = false,
+  getMesaLockState = null
 }) {
   return (
     <>
@@ -174,6 +181,9 @@ const MesasGrid = memo(function MesasGrid({
         {visibleMesas.map((mesa, index) => {
           const shouldUseSelectedUnits = selectedMesaId && mesa.id === selectedMesaId && selectedMesaUnits !== null;
           const units = shouldUseSelectedUnits ? selectedMesaUnits : getMesaProductUnits(mesa);
+          const lockState = typeof getMesaLockState === 'function' ? getMesaLockState(mesa.id) : null;
+          const lockedByOther = Boolean(lockState?.lockedByOther);
+          const isOccupied = mesa.status === 'occupied';
 
           return (
             <motion.div
@@ -183,10 +193,16 @@ const MesasGrid = memo(function MesasGrid({
               transition={lowMotionMode ? { duration: 0 } : { duration: 0.2, delay: index * 0.02 }}
             >
               <Card
-                className={`relative cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
-                  mesa.status === 'occupied'
-                    ? 'border-yellow-400 bg-yellow-50/30'
-                    : 'border-green-400 bg-green-50/30'
+                className={`relative transition-all duration-300 ${
+                  lockedByOther ? 'cursor-not-allowed' : 'cursor-pointer hover:shadow-xl hover:-translate-y-1'
+                } ${
+                  lockedByOther
+                    ? 'border-red-400 bg-red-50/40'
+                    : (
+                      isOccupied
+                        ? 'border-yellow-400 bg-yellow-50/30'
+                        : 'border-green-400 bg-green-50/30'
+                    )
                 }`}
                 onClick={() => onOpenTable(mesa)}
               >
@@ -209,9 +225,13 @@ const MesasGrid = memo(function MesasGrid({
                   {/* Icono de estado */}
                   <div className="mb-4 flex justify-center">
                     <div className={`w-20 h-20 rounded-2xl flex items-center justify-center ${
-                      mesa.status === 'occupied'
-                        ? 'bg-yellow-100 text-yellow-600'
-                        : 'bg-green-100 text-green-600'
+                      lockedByOther
+                        ? 'bg-red-100 text-red-600'
+                        : (
+                          isOccupied
+                            ? 'bg-yellow-100 text-yellow-600'
+                            : 'bg-green-100 text-green-600'
+                        )
                     }`}>
                       <Layers className="w-10 h-10" />
                     </div>
@@ -224,14 +244,14 @@ const MesasGrid = memo(function MesasGrid({
 
                   {/* Estado */}
                   <Badge
-                    variant={mesa.status === 'occupied' ? 'warning' : 'success'}
+                    variant={lockedByOther ? 'destructive' : (isOccupied ? 'warning' : 'success')}
                     className="mb-3 text-sm font-semibold"
                   >
-                    {mesa.status === 'occupied' ? '🔴 Ocupada' : '🟢 Disponible'}
+                    {lockedByOther ? '🔒 En uso' : (isOccupied ? '🔴 Ocupada' : '🟢 Disponible')}
                   </Badge>
 
                   {/* Información de la orden si está ocupada */}
-                  {mesa.status === 'occupied' && mesa.orders && (
+                  {isOccupied && mesa.orders && !lockedByOther && (
                     <div className="mt-4 pt-4 border-t border-accent-200">
                       <p className="text-lg font-bold text-primary-900">
                         {formatPrice(parseFloat(mesa.orders.total || 0))}
@@ -241,6 +261,14 @@ const MesasGrid = memo(function MesasGrid({
                       </p>
                     </div>
                   )}
+
+                  {lockedByOther ? (
+                    <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-white/85 backdrop-blur-sm">
+                      <div className="max-w-[85%] rounded-lg border border-red-200 bg-red-100/90 px-3 py-2 text-sm font-semibold text-red-700 shadow-sm">
+                        {MESA_IN_USE_MESSAGE}
+                      </div>
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
             </motion.div>
@@ -577,6 +605,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
   const MODAL_REOPEN_GUARD_MS = 600;
   const canManageTables = isAdminRole(userRole);
   const [mesas, setMesas] = useState([]);
+  const [mesaLocksByTableId, setMesaLocksByTableId] = useState({});
   const mesasLengthRef = useRef(0);
   const hasLoadedOnceRef = useRef(false);
   const [loading, setLoading] = useState(true);
@@ -738,6 +767,181 @@ function Mesas({ businessId, userRole = 'admin' }) {
   const resolveWebUserName = useCallback(() => (
     normalizeDisplayName(currentUser?.email || currentUser?.name || 'Admin', 'Admin')
   ), [currentUser?.email, currentUser?.name]);
+
+  const normalizeMesaLockRow = useCallback((row) => {
+    if (!row || typeof row !== 'object') return null;
+    const tableId = String(row?.table_id || '').trim();
+    if (!tableId) return null;
+    const normalizedBusinessId = String(row?.business_id || '').trim();
+    const lockOwnerName = normalizeDisplayName(row?.lock_owner_name || 'Alguien', 'Alguien');
+    const normalized = {
+      ...row,
+      table_id: tableId,
+      business_id: normalizedBusinessId,
+      lock_owner_user_id: String(row?.lock_owner_user_id || '').trim(),
+      lock_owner_name: lockOwnerName,
+      lock_token: row?.lock_token ? String(row.lock_token).trim() : null,
+      lock_expires_at: row?.lock_expires_at || null,
+      updated_at: row?.updated_at || new Date().toISOString()
+    };
+    return normalized;
+  }, []);
+
+  const applyMesaLocks = useCallback((locks = []) => {
+    const next = {};
+    const nowMs = Date.now();
+    (Array.isArray(locks) ? locks : []).forEach((lock) => {
+      const normalized = normalizeMesaLockRow(lock);
+      if (!normalized?.table_id) return;
+      const expiresAtMs = Date.parse(String(normalized.lock_expires_at || '').trim());
+      if (Number.isFinite(expiresAtMs) && expiresAtMs <= nowMs) return;
+      next[normalized.table_id] = normalized;
+    });
+    setMesaLocksByTableId(next);
+  }, [normalizeMesaLockRow]);
+
+  const refreshMesaLocks = useCallback(async (targetBusinessId) => {
+    const normalizedBusinessId = String(targetBusinessId || '').trim();
+    if (!normalizedBusinessId) {
+      setMesaLocksByTableId({});
+      return;
+    }
+
+    const baseSelect = 'table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at';
+    const fallbackSelect = 'table_id,business_id,lock_owner_user_id,lock_owner_name,lock_expires_at,updated_at';
+
+    let result = await supabase
+      .from('table_edit_locks')
+      .select(baseSelect)
+      .eq('business_id', normalizedBusinessId);
+
+    if (result.error) {
+      if (isMissingTableEditLocksRelationError(result.error)) {
+        setMesaLocksByTableId({});
+        return;
+      }
+      if (isMissingTableEditLocksColumnError(result.error, 'lock_token')) {
+        result = await supabase
+          .from('table_edit_locks')
+          .select(fallbackSelect)
+          .eq('business_id', normalizedBusinessId);
+      } else {
+        return;
+      }
+    }
+
+    if (result?.error) return;
+    applyMesaLocks(result?.data || []);
+  }, [applyMesaLocks]);
+
+  const applyRealtimeMesaLockRow = useCallback((row, eventType = 'UPDATE') => {
+    const normalized = normalizeMesaLockRow(row);
+    const tableId = normalized?.table_id;
+    if (!tableId) return;
+
+    if (eventType === 'DELETE' || isMesaLockExpired(normalized)) {
+      setMesaLocksByTableId((prev) => {
+        if (!prev[tableId]) return prev;
+        const next = { ...prev };
+        delete next[tableId];
+        return next;
+      });
+      return;
+    }
+
+    setMesaLocksByTableId((prev) => ({
+      ...prev,
+      [tableId]: normalized
+    }));
+  }, [normalizeMesaLockRow]);
+
+  const applyRealtimeMesaLockBroadcast = useCallback((payload) => {
+    const senderClientId = String(payload?.sender_client_id || '').trim();
+    if (senderClientId && senderClientId === String(mesaSyncClientIdRef.current || '').trim()) return;
+
+    const normalizedBusinessId = String(businessId || '').trim();
+    const payloadBusinessId = String(payload?.business_id || '').trim();
+    if (normalizedBusinessId && (!payloadBusinessId || payloadBusinessId !== normalizedBusinessId)) {
+      return;
+    }
+
+    const mesaId = String(payload?.mesa_id || '').trim();
+    if (!mesaId) return;
+
+    const locked = (
+      payload?.locked === true
+      || String(payload?.locked || '').trim().toLowerCase() === 'true'
+    );
+
+    if (!locked) {
+      setMesaLocksByTableId((prev) => {
+        if (!prev[mesaId]) return prev;
+        const next = { ...prev };
+        delete next[mesaId];
+        return next;
+      });
+      return;
+    }
+
+    const ownerUserId = String(payload?.lock_owner_user_id || payload?.sender_user_id || '').trim();
+    if (!ownerUserId) return;
+
+    const resolvedBusinessId = normalizedBusinessId || String(payload?.business_id || '').trim();
+    const lockToken = String(payload?.lock_token || '').trim() || null;
+    const rawExpiresAt = String(payload?.lock_expires_at || '').trim();
+    const lockTtlMs = Math.min(120_000, Math.max(15_000, Number(payload?.lock_ttl_ms || 45_000)));
+    const nowMs = Date.now();
+    const parsedExpiresAt = rawExpiresAt ? Date.parse(rawExpiresAt) : Number.NaN;
+    const safeExpiresAtMs = Number.isFinite(parsedExpiresAt)
+      ? Math.min(parsedExpiresAt, nowMs + lockTtlMs)
+      : nowMs + lockTtlMs;
+    const lockExpiresAt = new Date(safeExpiresAtMs).toISOString();
+
+    setMesaLocksByTableId((prev) => ({
+      ...prev,
+      [mesaId]: {
+        table_id: mesaId,
+        business_id: resolvedBusinessId || String(prev[mesaId]?.business_id || '').trim(),
+        lock_owner_user_id: ownerUserId,
+        lock_owner_name: 'Alguien',
+        lock_token: lockToken,
+        lock_expires_at: lockExpiresAt,
+        updated_at: new Date().toISOString()
+      }
+    }));
+  }, [businessId, applyRealtimeMesaLockBroadcast]);
+
+  const getMesaLockState = useCallback((mesaId) => {
+    const normalizedMesaId = String(mesaId || '').trim();
+    if (!normalizedMesaId) return { lockedByOther: false, lockOwnerName: null };
+    const mesaLock = mesaLocksByTableId[normalizedMesaId];
+    if (!mesaLock || isMesaLockExpired(mesaLock)) {
+      return { lockedByOther: false, lockOwnerName: null };
+    }
+
+    const lockOwnerId = String(mesaLock?.lock_owner_user_id || '').trim();
+    const lockToken = String(mesaLock?.lock_token || '').trim();
+    const resolvedUserId = resolveWebUserId();
+    const heldLock = heldMesaLockRef.current;
+    const isLocalHeldLock = Boolean(
+      heldLock
+      && String(heldLock.tableId || '').trim() === normalizedMesaId
+      && String(heldLock.businessId || '').trim() === String(businessId || '').trim()
+    );
+    const heldLockToken = isLocalHeldLock ? String(heldLock?.lockToken || '').trim() : '';
+    const isOwnedByCurrentUser = Boolean(lockOwnerId && lockOwnerId === resolvedUserId);
+    const isSameClientLock = Boolean(lockToken && heldLockToken && lockToken === heldLockToken);
+    const lockedByOther = Boolean(
+      lockOwnerId
+        ? !isOwnedByCurrentUser
+        : (lockToken ? !isSameClientLock : true)
+    );
+
+    return {
+      lockedByOther,
+      lockOwnerName: normalizeDisplayName(mesaLock?.lock_owner_name || 'Alguien', 'Alguien')
+    };
+  }, [businessId, mesaLocksByTableId, resolveWebUserId]);
 
   const selectMesaEditLockByTableId = useCallback(async ({ businessId: targetBusinessId, tableId }) => {
     const normalizedBusinessId = String(targetBusinessId || '').trim();
@@ -1174,7 +1378,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
       // Si hay error, asumimos que NO es empleado (es admin)
       setIsEmployee(false);
     }
-  }, [businessId]);
+  }, [businessId, applyRealtimeMesaLockBroadcast]);
 
   const loadMesas = useCallback(async () => {
     const offline = isOfflineMode();
@@ -1398,9 +1602,21 @@ function Mesas({ businessId, userRole = 'admin' }) {
   }, [businessId, loadData, getCurrentUser, checkIfEmployee]);
 
   useEffect(() => {
+    if (!businessId) {
+      setMesaLocksByTableId({});
+      return;
+    }
+    refreshMesaLocks(businessId);
+  }, [businessId, refreshMesaLocks]);
+
+  useEffect(() => {
     if (!businessId) return undefined;
 
-    const channel = supabase.channel(`mobile-mesas-sync:${businessId}`);
+    const channel = supabase
+      .channel(`private:mobile-mesas-sync:${businessId}`)
+      .on('broadcast', { event: 'mesa_lock_changed' }, ({ payload }) => {
+        applyRealtimeMesaLockBroadcast(payload);
+      });
     channel.subscribe((status) => {
       mesaSyncBroadcastReadyRef.current = status === 'SUBSCRIBED';
     });
@@ -1815,6 +2031,16 @@ function Mesas({ businessId, userRole = 'admin' }) {
     onInsert: (newTable) => enqueueRealtimeUpdate(() => handleTableInsert(newTable)),
     onUpdate: (updatedTable) => enqueueRealtimeUpdate(() => handleTableUpdate(updatedTable)),
     onDelete: (deletedTable) => enqueueRealtimeUpdate(() => handleTableDelete(deletedTable))
+  });
+
+  // 🔥 TIEMPO REAL: Suscripción a cambios en locks de edición
+  useRealtimeSubscription('table_edit_locks', {
+    filter: { business_id: businessId },
+    enabled: !!businessId,
+    onInsert: (newLock) => enqueueRealtimeUpdate(() => applyRealtimeMesaLockRow(newLock, 'INSERT')),
+    onUpdate: (updatedLock) => enqueueRealtimeUpdate(() => applyRealtimeMesaLockRow(updatedLock, 'UPDATE')),
+    onDelete: (deletedLock) => enqueueRealtimeUpdate(() => applyRealtimeMesaLockRow(deletedLock, 'DELETE')),
+    onReconnect: () => refreshMesaLocks(businessId)
   });
 
   // 🔥 TIEMPO REAL: Suscripción a cambios en órdenes
@@ -2366,6 +2592,12 @@ function Mesas({ businessId, userRole = 'admin' }) {
       ? normalizedMesa.orders.order_items
       : [];
 
+    const lockState = getMesaLockState(normalizedMesa?.id);
+    if (lockState?.lockedByOther) {
+      setError(MESA_IN_USE_MESSAGE);
+      return;
+    }
+
     if (normalizedMesa?.id && businessId) {
       const nextMesaId = normalizeEntityId(normalizedMesa.id);
       if (nextMesaId) {
@@ -2429,6 +2661,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
     acquireMesaEditLockWeb,
     createNewOrder,
     ensureCatalogWarmup,
+    getMesaLockState,
     loadOrderDetails,
     publishMesaLockBroadcast,
     setPendingQuantityUpdatesSafe
@@ -4163,6 +4396,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
               ? null
               : (selectedMesa?.id ? getTotalProductUnits(orderItems) : null)}
             lowMotionMode={lowMotionMode}
+            getMesaLockState={getMesaLockState}
           />
 
           {/* Mensaje si no hay mesas */}

@@ -7,6 +7,8 @@ import {
   type BusinessContext,
 } from '../../services/mesasService';
 import { deactivatePushTokenForUser } from '../../notifications/mobileNotificationsService';
+import { clearSensitiveStorage } from '../../utils/storageCleanup';
+import { logSecurityEvent } from '../../services/securityAuditService';
 
 type DashboardContextValue = {
   session: Session;
@@ -45,6 +47,12 @@ export function DashboardProvider({ session, children }: PropsWithChildren<{ ses
   useEffect(() => {
     void refreshBusinessContext();
   }, [refreshBusinessContext]);
+
+  useEffect(() => {
+    if (businessContext?.isActive === false) {
+      void clearSensitiveStorage();
+    }
+  }, [businessContext?.isActive]);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,7 +110,14 @@ export function DashboardProvider({ session, children }: PropsWithChildren<{ ses
   }, [refreshBusinessContext, session.user.id]);
 
   const signOut = async () => {
+    await logSecurityEvent({
+      businessId: businessContext?.businessId || null,
+      userId: session.user.id,
+      action: 'sign_out',
+      metadata: { source: 'mobile' },
+    });
     clearResolvedBusinessContextCache(session.user.id);
+    await clearSensitiveStorage();
     const client = getSupabaseClient();
     try {
       await deactivatePushTokenForUser(session.user.id);
