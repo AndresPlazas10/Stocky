@@ -12,13 +12,24 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error(errorMsg);
 }
 
+const resolveAuthStorage = () => {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    return window.sessionStorage || window.localStorage;
+  } catch {
+    return undefined;
+  }
+};
+
+const authStorage = resolveAuthStorage();
+
 // Cliente optimizado con configuración de producción
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storage: window.localStorage,
+    storage: authStorage,
     storageKey: 'supabase.auth.token',
     flowType: 'pkce' // PKCE es más seguro
   },

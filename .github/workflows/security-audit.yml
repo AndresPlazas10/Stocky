@@ -1,0 +1,40 @@
+name: Security Audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'
+
+jobs:
+  audit-web:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      - name: Install
+        run: npm ci
+      - name: NPM Audit (critical)
+        run: npm audit --audit-level=critical
+
+  audit-mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: apps/mobile/package-lock.json
+      - name: Install
+        run: npm ci
+        working-directory: apps/mobile
+      - name: NPM Audit (critical)
+        run: npm audit --audit-level=critical
+        working-directory: apps/mobile

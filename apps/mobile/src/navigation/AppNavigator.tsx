@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import {
   createDrawerNavigator,
@@ -25,6 +25,7 @@ import { DashboardSectionScreen } from '../screens/dashboard/DashboardSectionScr
 import { isSectionEnabled } from '../config/features';
 import { OfflineScreen } from '../ui/OfflineScreen';
 import { BusinessDisabledScreen } from '../ui/BusinessDisabledScreen';
+import { logSecurityEvent } from '../services/securityAuditService';
 
 const Drawer = createDrawerNavigator<RootDrawerParamList>();
 const DRAWER_WIDTH = 244;
@@ -155,7 +156,7 @@ function ScreenBySection({ sectionId }: { sectionId: SectionId }) {
 }
 
 export function AppNavigator() {
-  const { businessContext, loadingBusiness, signOut } = useDashboardContext();
+  const { session, businessContext, loadingBusiness, signOut } = useDashboardContext();
   const netInfo = useNetInfo();
   const source = businessContext?.source || 'owner';
   const allowedSectionIds = useMemo<SectionId[]>(() => {
@@ -168,6 +169,23 @@ export function AppNavigator() {
   );
   const isOffline = netInfo.isInternetReachable === false || netInfo.isConnected === false;
   const isBusinessInactive = businessContext?.isActive === false;
+  const lastBlockedBusinessIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isBusinessInactive) {
+      lastBlockedBusinessIdRef.current = null;
+      return;
+    }
+    const businessId = businessContext?.businessId || null;
+    if (businessId && lastBlockedBusinessIdRef.current === businessId) return;
+    lastBlockedBusinessIdRef.current = businessId || 'unknown';
+    void logSecurityEvent({
+      businessId,
+      userId: session.user.id,
+      action: 'business_inactive_blocked',
+      metadata: { source: 'mobile', role: source },
+    });
+  }, [businessContext?.businessId, isBusinessInactive, session.user.id, source]);
 
   if (isBusinessInactive) {
     return (

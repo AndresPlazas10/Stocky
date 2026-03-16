@@ -26,6 +26,7 @@ import {
   X
 } from 'lucide-react';
 import { notifyAdminEmployeeLoginWeb } from '../services/webNotificationsService.js';
+import { logSecurityEvent } from '../services/securityAuditService.js';
 // import Facturas from '../components/Dashboard/Facturas.jsx'; // DESHABILITADO
 
 const _motionLintUsage = motion;
@@ -162,6 +163,15 @@ function EmployeeDashboard() {
       
       // � VERIFICAR SI EL NEGOCIO ESTÁ DESHABILITADO (PRIORIDAD MÁXIMA)
       if (businessData.is_active === false) {
+        try {
+          await logSecurityEvent({
+            businessId: businessData.id,
+            action: 'business_inactive_blocked',
+            metadata: { source: 'web', role: 'employee' }
+          });
+        } catch {
+          // no-op: no bloquear flujo por auditoria
+        }
         setIsBusinessDisabled(true);
         setLoading(false);
         return; // Detener ejecución y mostrar modal bloqueante
@@ -178,6 +188,12 @@ function EmployeeDashboard() {
 
   const handleSignOut = async () => {
     try {
+      await logSecurityEvent({
+        businessId: business?.id,
+        action: 'sign_out',
+        metadata: { source: 'web', role: 'employee' }
+      });
+
       // Limpiar el estado local primero
       localStorage.clear();
       sessionStorage.clear();

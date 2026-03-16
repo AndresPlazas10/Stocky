@@ -50,7 +50,8 @@ export function useRealtimeSubscription(table, options = {}) {
     onReconnect,
     filter = {},
     enabled = true,
-    retryOnError = true
+    retryOnError = true,
+    requireBusinessId = true
   } = options;
 
   const handlersRef = useRef({ onInsert, onUpdate, onDelete });
@@ -68,6 +69,14 @@ export function useRealtimeSubscription(table, options = {}) {
       parsedFilter = JSON.parse(filterKey || '{}') || {};
     } catch {
       parsedFilter = {};
+    }
+
+    const hasBusinessId = isFilterValuePresent(parsedFilter?.business_id);
+    if (requireBusinessId && !hasBusinessId) {
+      logger.error('[realtime] missing business_id filter, subscription blocked', {
+        table
+      });
+      return;
     }
 
     const businessId = toChannelSegment(parsedFilter?.business_id, 'global');
