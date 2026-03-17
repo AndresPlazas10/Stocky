@@ -44,6 +44,7 @@ export type VentaCartItem = {
   combo_id: string | null;
   name: string;
   code: string | null;
+  manage_stock?: boolean;
   quantity: number;
   unit_price: number;
   subtotal: number;
@@ -688,9 +689,9 @@ export async function createVenta({
 
   invalidateVentasHistoryCache(businessId);
 
-  if (saleId && isEmployee) {
+  if (saleId) {
     const accessToken = await resolveAccessToken();
-    if (accessToken) {
+    if (accessToken && isEmployee) {
       void notifyAdminSaleRegistered({
         accessToken,
         businessId,
@@ -699,7 +700,12 @@ export async function createVenta({
     }
 
     const lowStockProductIds = Array.from(
-      new Set(itemsForRpc.map((item) => normalizeReference(item.product_id)).filter(Boolean)),
+      new Set(
+        (Array.isArray(cartItems) ? cartItems : [])
+          .filter((item) => item?.manage_stock !== false)
+          .map((item) => normalizeReference(item?.product_id))
+          .filter(Boolean),
+      ),
     );
     if (accessToken && lowStockProductIds.length > 0) {
       void notifyAdminLowStock({
