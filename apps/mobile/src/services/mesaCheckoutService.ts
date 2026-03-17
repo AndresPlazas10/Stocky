@@ -506,9 +506,9 @@ export async function closeOrderSingle({
     changeBreakdown,
   });
 
-  if (resolvedSaleId && isEmployee && saleTotal > 0) {
+  if (resolvedSaleId && saleTotal > 0) {
     const accessToken = await resolveAccessToken();
-    if (accessToken) {
+    if (accessToken && isEmployee) {
       void notifyAdminSaleRegistered({
         accessToken,
         businessId,
@@ -611,9 +611,9 @@ export async function closeOrderAsSplit({
         ? atomicAttempt.row.sale_ids.map((saleId: unknown) => normalizeText(saleId)).filter(Boolean)
         : [];
 
-      if (isEmployee && totalSold > 0) {
+      if (totalSold > 0) {
         const accessToken = await resolveAccessToken();
-        if (accessToken) {
+        if (accessToken && isEmployee) {
           void notifyAdminSaleRegistered({
             accessToken,
             businessId,
@@ -722,9 +722,9 @@ export async function closeOrderAsSplit({
     throw new Error('No se pudieron generar ventas en el cierre dividido.');
   }
 
-  if (isEmployee) {
+  if (totalSold > 0) {
     const accessToken = await resolveAccessToken();
-    if (accessToken) {
+    if (accessToken && isEmployee) {
       void notifyAdminSaleRegistered({
         accessToken,
         businessId,

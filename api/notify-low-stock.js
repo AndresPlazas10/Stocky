@@ -9,6 +9,7 @@ const APP_ORIGIN = process.env.VITE_APP_URL;
 const EXPO_PUSH_ENDPOINT = 'https://exp.host/--/api/v2/push/send';
 const EXPO_PUSH_CHUNK_SIZE = 100;
 const LOW_STOCK_THRESHOLD = 10;
+const DEFAULT_MIN_STOCK = 5;
 const LOW_STOCK_LIMIT = 5;
 
 function normalizeOrigin(value) {
@@ -62,6 +63,12 @@ function normalizeText(value, fallback = '') {
 function normalizeIdArray(value) {
   if (!Array.isArray(value)) return [];
   return Array.from(new Set(value.map((item) => normalizeText(item)).filter(Boolean)));
+}
+
+function resolveMinStock(value) {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) return parsed;
+  return DEFAULT_MIN_STOCK;
 }
 
 function chunkArray(values, chunkSize) {
@@ -167,21 +174,6 @@ export default async function handler(req, res) {
     const user = await getUserFromToken(token);
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { fetch });
 
-    const employeeResult = await admin
-      .from('employees')
-      .select('id,user_id,is_active')
-      .eq('business_id', businessId)
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .limit(1)
-      .maybeSingle();
-
-    if (employeeResult.error) throw employeeResult.error;
-    if (!employeeResult.data?.id) {
-      res.status(403).json({ error: 'Forbidden: only active employees can notify this event' });
-      return;
-    }
-
     const businessResult = await admin
       .from('businesses')
       .select('id,created_by')
@@ -201,23 +193,53 @@ export default async function handler(req, res) {
       return;
     }
 
+    const isOwner = adminUserId === user.id;
+    if (!isOwner) {
+      const employeeResult = await admin
+        .from('employees')
+        .select('id,user_id,is_active')
+        .eq('business_id', businessId)
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (employeeResult.error) throw employeeResult.error;
+      if (!employeeResult.data?.id) {
+        res.status(403).json({ error: 'Forbidden: user has no access to notify this event' });
+        return;
+      }
+    }
+
     let lowStockQuery = admin
       .from('products')
-      .select('id,name,stock')
+      .select('id,name,stock,min_stock,manage_stock')
       .eq('business_id', businessId)
-      .eq('is_active', true)
-      .lt('stock', LOW_STOCK_THRESHOLD)
-      .order('stock', { ascending: true })
-      .limit(LOW_STOCK_LIMIT);
+      .eq('is_active', true);
 
     if (productIds.length > 0) {
       lowStockQuery = lowStockQuery.in('id', productIds);
+    } else {
+      lowStockQuery = lowStockQuery
+        .lt('stock', LOW_STOCK_THRESHOLD)
+        .order('stock', { ascending: true })
+        .limit(LOW_STOCK_LIMIT);
     }
 
     const lowStockResult = await lowStockQuery;
     if (lowStockResult.error) throw lowStockResult.error;
 
-    const lowStockProducts = Array.isArray(lowStockResult.data) ? lowStockResult.data : [];
+    const rawProducts = Array.isArray(lowStockResult.data) ? lowStockResult.data : [];
+    const lowStockProducts = rawProducts
+      .filter((product) => {
+        if (product?.manage_stock === false) return false;
+        const stockValue = Number(product?.stock);
+        if (!Number.isFinite(stockValue)) return false;
+        const minStockValue = resolveMinStock(product?.min_stock);
+        return stockValue <= minStockValue;
+      })
+      .sort((a, b) => Number(a.stock || 0) - Number(b.stock || 0))
+      .slice(0, LOW_STOCK_LIMIT);
     if (lowStockProducts.length === 0) {
       res.status(200).json({
         ok: true,
