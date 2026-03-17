@@ -1,7 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout.jsx';
 import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
-import PricingAnnouncementModal from '../components/PricingAnnouncementModal.jsx';
 import WhatsNewModal from '../components/Modals/WhatsNewModal.jsx';
 import { AsyncStateWrapper } from '../ui/system/async-state/index.js';
 import { ModernToast } from '../components/ui/modern-alert.jsx';
@@ -364,7 +363,6 @@ function Dashboard() {
 
   return (
     <>
-      <PricingAnnouncementModal />
       {activeSection === 'home' ? <WhatsNewModal /> : null}
       
       <DashboardLayout

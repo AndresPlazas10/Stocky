@@ -1,5 +1,6 @@
 import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
 import { supabaseAdapter } from './supabaseAdapter.js';
+import { readCacheGet, readCacheSet } from './readCacheStore.js';
 
 function buildCacheKey(parts = []) {
   return parts
@@ -34,31 +35,43 @@ function shouldUseCriticalInventoryReadCache() {
   return navigator.onLine === false;
 }
 
-function shouldUseCriticalPurchasesReadCache() {
-  // Para compras (catálogo y stock), evitar lecturas stale en online.
-  // En offline usamos cache como fallback.
-  if (typeof navigator === 'undefined') return false;
-  return navigator.onLine === false;
-}
-
-function shouldUseCriticalSuppliersReadCache() {
-  // Para proveedores, evitar ver listas stale justo después de crear/editar/eliminar.
-  if (typeof navigator === 'undefined') return false;
-  return navigator.onLine === false;
-}
-
 function shouldUseCriticalInvoicesReadCache() {
   // Para facturas y stock de facturación, priorizar consistencia en online.
   if (typeof navigator === 'undefined') return false;
   return navigator.onLine === false;
 }
 
+function shouldUseCatalogCache() {
+  if (!LOCAL_SYNC_CONFIG.catalogCacheEnabled) return false;
+  if (typeof navigator === 'undefined') return true;
+  if (navigator.onLine === false) return true;
+  return true;
+}
+
 async function readThroughCache({
   cacheKey: _cacheKey,
   enabled: _enabled,
-  fetcher
+  fetcher,
+  ttlMs = LOCAL_SYNC_CONFIG.localReadCacheTtlMs
 }) {
-  return fetcher();
+  const cacheKey = buildCacheKey([_cacheKey]);
+  const enabled = Boolean(_enabled);
+
+  if (!enabled || !cacheKey) {
+    return fetcher();
+  }
+
+  const cached = readCacheGet(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const result = await fetcher();
+  if (!result?.error) {
+    readCacheSet(cacheKey, result, ttlMs);
+  }
+
+  return result;
 }
 
 export const readAdapter = {
@@ -93,7 +106,7 @@ export const readAdapter = {
   async getActiveProductsForSale(businessId) {
     return readThroughCache({
       cacheKey: buildCacheKey(['products', 'sales', businessId, 'active']),
-      enabled: LOCAL_SYNC_CONFIG.localReads.products || LOCAL_SYNC_CONFIG.localReads.sales,
+      enabled: shouldUseCatalogCache(),
       fetcher: () => supabaseAdapter.getActiveProductsForSale(businessId)
     });
   },
@@ -309,7 +322,7 @@ export const readAdapter = {
   async getSuppliersByBusiness(businessId) {
     return readThroughCache({
       cacheKey: buildCacheKey(['suppliers', businessId, 'list']),
-      enabled: shouldUseCriticalSuppliersReadCache(),
+      enabled: shouldUseCatalogCache(),
       fetcher: () => supabaseAdapter.getSuppliersByBusiness(businessId)
     });
   },
@@ -317,7 +330,7 @@ export const readAdapter = {
   async getSuppliersByBusinessWithSelect(businessId, selectSql) {
     return readThroughCache({
       cacheKey: buildCacheKey(['suppliers', businessId, 'detailed', selectSql]),
-      enabled: shouldUseCriticalSuppliersReadCache(),
+      enabled: shouldUseCatalogCache(),
       fetcher: () => supabaseAdapter.getSuppliersByBusinessWithSelect(businessId, selectSql)
     });
   },
@@ -325,7 +338,7 @@ export const readAdapter = {
   async getSupplierById(supplierId) {
     return readThroughCache({
       cacheKey: buildCacheKey(['supplier', supplierId]),
-      enabled: shouldUseCriticalSuppliersReadCache(),
+      enabled: shouldUseCatalogCache(),
       fetcher: () => supabaseAdapter.getSupplierById(supplierId)
     });
   },
@@ -333,7 +346,7 @@ export const readAdapter = {
   async getProductsForPurchase(businessId) {
     return readThroughCache({
       cacheKey: buildCacheKey(['products', 'purchases', businessId, 'active']),
-      enabled: shouldUseCriticalPurchasesReadCache(),
+      enabled: shouldUseCatalogCache(),
       fetcher: () => supabaseAdapter.getProductsForPurchase(businessId)
     });
   },
@@ -382,7 +395,7 @@ export const readAdapter = {
   async getProductsForOrdersByBusiness(businessId) {
     return readThroughCache({
       cacheKey: buildCacheKey(['products', 'orders', businessId, 'active']),
-      enabled: LOCAL_SYNC_CONFIG.localReads.products || LOCAL_SYNC_CONFIG.localReads.orders,
+      enabled: shouldUseCatalogCache(),
       fetcher: () => supabaseAdapter.getProductsForOrdersByBusiness(businessId)
     });
   },
@@ -390,7 +403,7 @@ export const readAdapter = {
   async getCombosByBusinessWithItems({ businessId, onlyActive = false }) {
     return readThroughCache({
       cacheKey: buildCacheKey(['combos', businessId, onlyActive ? 'active' : 'all', 'with_items']),
-      enabled: LOCAL_SYNC_CONFIG.localReads.orders || LOCAL_SYNC_CONFIG.localReads.products,
+      enabled: shouldUseCatalogCache(),
       fetcher: () => supabaseAdapter.getCombosByBusinessWithItems({ businessId, onlyActive })
     });
   },
@@ -446,7 +459,7 @@ export const readAdapter = {
   async getSuppliersByBusinessOrdered(businessId) {
     return readThroughCache({
       cacheKey: buildCacheKey(['suppliers', businessId, 'ordered']),
-      enabled: shouldUseCriticalSuppliersReadCache(),
+      enabled: shouldUseCatalogCache(),
       fetcher: () => supabaseAdapter.getSuppliersByBusinessOrdered(businessId)
     });
   },
