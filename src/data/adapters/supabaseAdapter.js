@@ -2,6 +2,9 @@ import { supabase } from '../../supabase/Client';
 import { logger } from '../../utils/logger.js';
 
 const AUTH_STORAGE_KEY = 'supabase.auth.token';
+const INVENTORY_PRODUCT_COLUMNS = 'id, business_id, code, name, category, purchase_price, sale_price, stock, min_stock, unit, supplier_id, is_active, manage_stock, created_at';
+const INVENTORY_PRODUCT_SUPPLIER_SELECT = 'supplier:suppliers(id, business_name, contact_name)';
+const SLOW_QUERY_THRESHOLD_MS = 800;
 
 function parseJson(value, fallback = null) {
   if (!value) return fallback;
@@ -472,9 +475,11 @@ export const supabaseAdapter = {
     to = 49,
     countMode = 'exact'
   }) {
+    const startedAt = Date.now();
+    const selectOptions = countMode ? { count: countMode } : undefined;
     let query = supabase
       .from(tableName)
-      .select(selectSql, { count: countMode })
+      .select(selectSql, selectOptions)
       .order(orderBy?.column || 'created_at', {
         ascending: Boolean(orderBy?.ascending)
       })
@@ -486,7 +491,20 @@ export const supabaseAdapter = {
       }
     });
 
-    return query;
+    const result = await query;
+    const durationMs = Date.now() - startedAt;
+    if (durationMs > SLOW_QUERY_THRESHOLD_MS) {
+      logger.warn('[perf] slow paginated query', {
+        tableName,
+        durationMs,
+        from,
+        to,
+        orderBy,
+        filters
+      });
+    }
+
+    return result;
   },
 
   async getSalesEnrichedRpc(payload) {
@@ -1267,12 +1285,24 @@ export const supabaseAdapter = {
   async getProductsWithSupplierByBusiness(businessId) {
     return supabase
       .from('products')
-      .select(`
-        *,
-        supplier:suppliers(id, business_name, contact_name)
-      `)
+      .select(`${INVENTORY_PRODUCT_COLUMNS}, ${INVENTORY_PRODUCT_SUPPLIER_SELECT}`)
       .eq('business_id', businessId)
       .order('created_at', { ascending: false });
+  },
+
+  async getProductsWithSupplierByBusinessPaginated({
+    businessId,
+    limit = 120,
+    offset = 0,
+    includeCount = false
+  }) {
+    const to = Math.max(0, offset + limit - 1);
+    return supabase
+      .from('products')
+      .select(`${INVENTORY_PRODUCT_COLUMNS}, ${INVENTORY_PRODUCT_SUPPLIER_SELECT}`, includeCount ? { count: 'exact' } : {})
+      .eq('business_id', businessId)
+      .order('created_at', { ascending: false })
+      .range(offset, to);
   },
 
   async getSuppliersByBusinessOrdered(businessId) {

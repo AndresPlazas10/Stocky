@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatPrice, parsePriceInput } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
@@ -33,7 +33,7 @@ import {
   updateProductById
 } from '../../data/commands/inventoryCommands.js';
 import {
-  getInventoryProductsByBusiness,
+  getInventoryProductsPage,
   getSupplierById,
   getSuppliersByBusiness
 } from '../../data/queries/inventoryQueries.js';
@@ -48,6 +48,7 @@ import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
 import { useProgressiveList } from '../../hooks/useProgressiveList.js';
 
 const _motionLintUsage = motion;
+const INVENTORY_PAGE_SIZE = 120;
 
 function Inventario({ businessId, userRole = 'admin' }) {
   const [productos, setProductos] = useState([]);
@@ -57,6 +58,10 @@ function Inventario({ businessId, userRole = 'admin' }) {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [isEmployee, setIsEmployee] = useState(false); // Nuevo estado para verificar si es empleado
+  const [page, setPage] = useState(1);
+  const [hasMoreProductosRemote, setHasMoreProductosRemote] = useState(true);
+  const [loadingMoreProductos, setLoadingMoreProductos] = useState(false);
+  const loadMoreProductosRef = useRef(null);
   
   // Estados para modales de confirmación
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -84,14 +89,25 @@ function Inventario({ businessId, userRole = 'admin' }) {
   const {
     visibleItems: visibleProductos,
     hasMore: hasMoreProductos,
+    hasMoreExternal: hasMoreProductosExternal,
     totalCount: totalProductos,
     sentinelRef: productosSentinelRef,
     loadMore: loadMoreProductos
   } = useProgressiveList(productos, {
     initialCount: lowMotionMode ? 16 : 24,
     step: lowMotionMode ? 16 : 24,
-    resetKey: `${productos.length}:${lowMotionMode ? 'low' : 'full'}`
+    resetKey: `${businessId}:${lowMotionMode ? 'low' : 'full'}`,
+    preserveOnGrow: true,
+    canLoadMore: hasMoreProductosRemote,
+    onLoadMore: () => {
+      if (loadMoreProductosRef.current) {
+        loadMoreProductosRef.current();
+      }
+    },
+    loading: loadingMoreProductos
   });
+
+  const canLoadMoreProductos = hasMoreProductos || hasMoreProductosExternal;
 
   const syncProductosSnapshot = useCallback((nextProductos) => {
     saveOfflineSnapshot(`inventario.productos:${businessId}`, nextProductos);
@@ -107,41 +123,63 @@ function Inventario({ businessId, userRole = 'admin' }) {
   }, [syncProductosSnapshot]);
 
   // Memoizar funciones de carga
-  const loadProductos = useCallback(async () => {
+  const loadProductos = useCallback(async ({ nextPage = 1, append = false } = {}) => {
     const offline = isOfflineMode();
     const offlineSnapshotKey = `inventario.productos:${businessId}`;
     const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
 
     if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
       setProductos(offlineSnapshot);
+      setHasMoreProductosRemote(false);
+      setPage(1);
     }
 
     try {
-      setLoading(true);
-      const data = await getInventoryProductsByBusiness(businessId);
+      if (append) {
+        setLoadingMoreProductos(true);
+      } else {
+        setLoading(true);
+      }
+      const offset = (nextPage - 1) * INVENTORY_PAGE_SIZE;
+      const data = await getInventoryProductsPage({
+        businessId,
+        limit: INVENTORY_PAGE_SIZE,
+        offset
+      });
       const normalizedData = Array.isArray(data) ? data : [];
       const hasLocalData = normalizedData.length > 0;
 
       if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
         setProductos(offlineSnapshot);
+        setHasMoreProductosRemote(false);
+        setPage(1);
         return;
       }
 
-      setProductos(normalizedData);
-      if (!offline || hasLocalData) {
-        saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
-      }
+      setProductosWithSnapshot((prev) => (append ? [...prev, ...normalizedData] : normalizedData));
+      setHasMoreProductosRemote(normalizedData.length === INVENTORY_PAGE_SIZE);
+      setPage(nextPage);
     } catch {
       if (offline) {
         const cached = readOfflineSnapshot(offlineSnapshotKey, []);
         setProductos(Array.isArray(cached) ? cached : []);
+        setHasMoreProductosRemote(false);
+        setPage(1);
       } else {
         setError('❌ Error al cargar el inventario');
       }
     } finally {
       setLoading(false);
+      setLoadingMoreProductos(false);
     }
   }, [businessId]);
+
+  useEffect(() => {
+    loadMoreProductosRef.current = () => {
+      if (loadingMoreProductos || !hasMoreProductosRemote) return;
+      loadProductos({ nextPage: page + 1, append: true });
+    };
+  }, [hasMoreProductosRemote, loadProductos, loadingMoreProductos, page]);
 
   const loadProveedores = useCallback(async () => {
     const offline = isOfflineMode();
@@ -227,6 +265,10 @@ function Inventario({ businessId, userRole = 'admin' }) {
   useRealtimeSubscription('products', {
     filter: { business_id: businessId },
     enabled: !!businessId,
+    debounceMs: 150,
+    pollingIntervalMs: 30000,
+    pollingMode: 'onError',
+    onPoll: () => loadProductos({ nextPage: 1, append: false }),
     onInsert: async (newProduct) => {
       // Cargar supplier data
       let productWithSupplier = newProduct;
@@ -1161,7 +1203,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
               ))}
             </div>
 
-            {hasMoreProductos && (
+            {canLoadMoreProductos && (
               <div className="flex flex-col items-center gap-3 py-2">
                 <p className="text-xs text-gray-500">
                   Mostrando {visibleProductos.length} de {totalProductos} productos
@@ -1171,8 +1213,9 @@ function Inventario({ businessId, userRole = 'admin' }) {
                   onClick={loadMoreProductos}
                   variant="outline"
                   className="rounded-xl"
+                  disabled={loadingMoreProductos}
                 >
-                  Cargar mas productos
+                  {loadingMoreProductos ? 'Cargando productos...' : 'Cargar mas productos'}
                 </Button>
               </div>
             )}

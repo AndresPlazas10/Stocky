@@ -7,6 +7,7 @@ import {
   updateBusinessProfile
 } from '../../data/commands/businessCommands.js';
 import { signOutSession } from '../../data/commands/authCommands.js';
+import { supabase } from '../../supabase/Client.jsx';
 import {
   Settings,
   User,
@@ -39,6 +40,8 @@ function Configuracion({ user, business, onBusinessUpdate }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [editingBusiness, setEditingBusiness] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [printerPaperWidth, setPrinterPaperWidth] = useState(() => getThermalPaperWidthMm());
   const [autoPrintReceipt, setAutoPrintReceipt] = useState(() => isAutoPrintReceiptEnabled());
   
@@ -119,6 +122,34 @@ function Configuracion({ user, business, onBusinessUpdate }) {
       setError('❌ No se pudo cerrar la sesión correctamente');
     }
   }, []);
+
+  const handleDeleteAccount = useCallback(async () => {
+    if (deletingAccount) return;
+    setDeletingAccount(true);
+    setError('');
+    let deleted = false;
+    try {
+      const { error: deleteError } = await supabase.functions.invoke('delete-account', { body: {} });
+      if (deleteError) throw deleteError;
+      deleted = true;
+    } catch (err) {
+      setError(err?.message || '❌ No se pudo eliminar la cuenta.');
+    }
+
+    if (deleted) {
+      try {
+        await signOutSession();
+      } catch {
+        // no-op: la cuenta ya fue eliminada
+      }
+      window.location.href = '/';
+    }
+
+    setDeletingAccount(false);
+    if (deleted) {
+      setShowDeleteAccountModal(false);
+    }
+  }, [deletingAccount]);
 
   const handlePrinterWidthChange = useCallback((e) => {
     const nextWidth = Number(e.target.value);
@@ -238,6 +269,14 @@ function Configuracion({ user, business, onBusinessUpdate }) {
             >
               <LogOut className="w-5 h-5" />
               Cerrar Sesión
+            </button>
+
+            <button
+              onClick={() => setShowDeleteAccountModal(true)}
+              className="mt-3 flex items-center gap-2 px-6 py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl font-semibold transition-all duration-300 hover:shadow-md"
+            >
+              <AlertTriangle className="w-5 h-5" />
+              Eliminar cuenta
             </button>
           </div>
         </motion.div>
@@ -533,6 +572,60 @@ function Configuracion({ user, business, onBusinessUpdate }) {
             />
           </motion.div>
         )}
+
+        <AnimatePresence>
+          {showDeleteAccountModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex items-center justify-center p-3"
+              onClick={() => !deletingAccount && setShowDeleteAccountModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 12 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 12 }}
+                className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="bg-gradient-to-r from-rose-100 to-red-100 p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/60">
+                      <AlertTriangle className="h-5 w-5 text-rose-700" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-rose-900">Eliminar cuenta</h3>
+                      <p className="text-sm text-rose-800">Esta acción es permanente</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-5 space-y-3 text-sm text-rose-900">
+                  <p>
+                    Al eliminar tu cuenta se revocará tu acceso y los negocios asociados quedarán suspendidos.
+                  </p>
+                  <p>Si estás seguro, confirma para continuar.</p>
+                </div>
+                <div className="flex gap-3 p-5 pt-0">
+                  <button
+                    className="flex-1 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700"
+                    onClick={() => setShowDeleteAccountModal(false)}
+                    disabled={deletingAccount}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    className="flex-1 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                    onClick={handleDeleteAccount}
+                    disabled={deletingAccount}
+                  >
+                    {deletingAccount ? 'Eliminando...' : 'Eliminar'}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

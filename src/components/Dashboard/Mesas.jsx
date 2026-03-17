@@ -909,7 +909,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
         updated_at: new Date().toISOString()
       }
     }));
-  }, [businessId, applyRealtimeMesaLockBroadcast]);
+  }, [businessId]);
 
   const getMesaLockState = useCallback((mesaId) => {
     const normalizedMesaId = String(mesaId || '').trim();

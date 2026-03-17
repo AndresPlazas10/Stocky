@@ -13,6 +13,7 @@ export const LOCAL_SYNC_CONFIG = {
   outboxMaxRetries: 5,
   outboxRateWindowSize: 100,
   outboxRateWindowMinutes: 15,
+  catalogCacheEnabled: true,
   localReadCacheTtlMs: 30000,
   localWrites: {
     allLocalFirst: false,

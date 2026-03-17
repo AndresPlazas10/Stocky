@@ -3,7 +3,6 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { Loader2, AlertCircle, X } from 'lucide-react';
-import PricingAnnouncementModal from './components/PricingAnnouncementModal';
 import OfflineBanner from './components/OfflineBanner.jsx';
 import { isBraveBrowser } from './utils/braveDetection';
 
@@ -15,6 +14,8 @@ const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const EmployeeAccess = lazy(() => import('./pages/EmployeeAccess.jsx'));
 const EmployeeDashboard = lazy(() => import('./pages/EmployeeDashboard.jsx'));
 const DownloadPage = lazy(() => import('./pages/Download.jsx'));
+const Terms = lazy(() => import('./pages/Terms.jsx'));
+const Privacy = lazy(() => import('./pages/Privacy.jsx'));
 
 // Componente de carga
 const PageLoader = () => (
@@ -97,6 +98,8 @@ function App() {
           <Route path='/login' element={<Login />} />
           <Route path='/register' element={<Register />} />
           <Route path='/descargar' element={<DownloadPage />} />
+          <Route path='/terms' element={<Terms />} />
+          <Route path='/privacy' element={<Privacy />} />
           <Route path='/dashboard' element={<Dashboard />} />
           <Route path='/employee-access' element={<EmployeeAccess />} />
           <Route path='/employee-dashboard' element={<EmployeeDashboard />} />
@@ -112,4 +115,4 @@ function App() {
   );
 }
 
-    export default App;
+export default App;

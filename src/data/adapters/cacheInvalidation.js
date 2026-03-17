@@ -1,3 +1,5 @@
+import { readCacheInvalidateMatching } from './readCacheStore.js';
+
 function nonEmpty(value) {
   const normalized = String(value || '').trim();
   return normalized || null;
@@ -13,7 +15,11 @@ function forceMesaSnapshotAsAvailable({
 
 async function invalidateLocalReadCachePrefixes(prefixes = []) {
   const filtered = [...new Set((prefixes || []).map(nonEmpty).filter(Boolean))];
-  return filtered.length > 0 ? 0 : 0;
+  if (filtered.length === 0) return 0;
+
+  return readCacheInvalidateMatching((key) => (
+    filtered.some((prefix) => key.startsWith(prefix))
+  ));
 }
 
 export async function invalidateSaleCache({
@@ -117,6 +123,21 @@ export async function invalidateInventoryCache({
     bid ? `suppliers:${bid}:` : null,
     pid ? `product:${pid}:` : null,
     spid ? `supplier:${spid}` : null
+  ];
+
+  return invalidateLocalReadCachePrefixes(prefixes);
+}
+
+export async function invalidateComboCache({
+  businessId,
+  comboId = null
+} = {}) {
+  const bid = nonEmpty(businessId);
+  const cid = nonEmpty(comboId);
+
+  const prefixes = [
+    bid ? `combos:${bid}:` : null,
+    cid ? `combo:${cid}` : null
   ];
 
   return invalidateLocalReadCachePrefixes(prefixes);

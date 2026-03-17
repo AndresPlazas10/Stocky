@@ -48,18 +48,27 @@ export function useRealtimeSubscription(table, options = {}) {
     onUpdate,
     onDelete,
     onReconnect,
+    onPoll,
     filter = {},
     enabled = true,
     retryOnError = true,
-    requireBusinessId = true
+    requireBusinessId = true,
+    debounceMs = 0,
+    pollingIntervalMs = 0,
+    pollingMode = 'onError'
   } = options;
 
   const handlersRef = useRef({ onInsert, onUpdate, onDelete });
+  const pollRef = useRef(onPoll);
   const filterKey = useMemo(() => JSON.stringify(filter || {}), [filter]);
 
   useEffect(() => {
     handlersRef.current = { onInsert, onUpdate, onDelete };
   }, [onInsert, onUpdate, onDelete]);
+
+  useEffect(() => {
+    pollRef.current = onPoll;
+  }, [onPoll]);
 
   useEffect(() => {
     if (!enabled || !table) return;
@@ -87,6 +96,10 @@ export function useRealtimeSubscription(table, options = {}) {
     let activeChannel = null;
     let retryTimer = null;
     let retryAttempts = 0;
+    let flushTimer = null;
+    let pollingTimer = null;
+    let pollingActive = pollingMode === 'always';
+    const pendingPayloads = [];
 
     const shouldLogRetry = (attempt) => (
       attempt === 1
@@ -99,6 +112,30 @@ export function useRealtimeSubscription(table, options = {}) {
       if (!retryTimer) return;
       clearTimeout(retryTimer);
       retryTimer = null;
+    };
+
+    const clearFlushTimer = () => {
+      if (!flushTimer) return;
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    };
+
+    const stopPolling = () => {
+      if (!pollingTimer) return;
+      clearInterval(pollingTimer);
+      pollingTimer = null;
+      pollingActive = false;
+    };
+
+    const startPolling = () => {
+      if (!pollingIntervalMs || pollingTimer || typeof pollRef.current !== 'function') return;
+      pollingTimer = setInterval(() => {
+        const handler = pollRef.current;
+        if (typeof handler === 'function') {
+          handler();
+        }
+      }, pollingIntervalMs);
+      pollingActive = true;
     };
 
     const removeActiveChannel = () => {
@@ -130,6 +167,43 @@ export function useRealtimeSubscription(table, options = {}) {
       }, delayMs);
     };
 
+    const handlePayload = (payload) => {
+      const handlers = handlersRef.current || {};
+
+      switch (payload.eventType) {
+        case 'INSERT':
+          if (handlers.onInsert) handlers.onInsert(payload.new);
+          break;
+        case 'UPDATE':
+          if (handlers.onUpdate) handlers.onUpdate(payload.new, payload.old);
+          break;
+        case 'DELETE': {
+          const deletedRow = payload.old || payload.new || null;
+          if (handlers.onDelete && deletedRow) handlers.onDelete(deletedRow);
+          break;
+        }
+      }
+    };
+
+    const flushPayloads = () => {
+      clearFlushTimer();
+      if (pendingPayloads.length === 0) return;
+      const batch = pendingPayloads.splice(0, pendingPayloads.length);
+      batch.forEach(handlePayload);
+    };
+
+    const enqueuePayload = (payload) => {
+      if (!debounceMs || debounceMs <= 0) {
+        handlePayload(payload);
+        return;
+      }
+
+      pendingPayloads.push(payload);
+      if (!flushTimer) {
+        flushTimer = setTimeout(flushPayloads, debounceMs);
+      }
+    };
+
     const subscribe = () => {
       if (disposed) return;
 
@@ -141,22 +215,7 @@ export function useRealtimeSubscription(table, options = {}) {
         table,
         filter: filterString || undefined,
         callback: (payload) => {
-          const handlers = handlersRef.current || {};
-
-          switch (payload.eventType) {
-            case 'INSERT':
-              if (handlers.onInsert) handlers.onInsert(payload.new);
-              break;
-            case 'UPDATE':
-              if (handlers.onUpdate) handlers.onUpdate(payload.new, payload.old);
-              break;
-            case 'DELETE': {
-              // En DELETE, según REPLICA IDENTITY, Supabase puede enviar old/new parcial.
-              const deletedRow = payload.old || payload.new || null;
-              if (handlers.onDelete && deletedRow) handlers.onDelete(deletedRow);
-              break;
-            }
-          }
+          enqueuePayload(payload);
         },
         onStatusChange: (status, error, channel) => {
           if (disposed || channel !== activeChannel) return;
@@ -172,24 +231,36 @@ export function useRealtimeSubscription(table, options = {}) {
               }
             }
             retryAttempts = 0;
+            if (pollingMode === 'onError' && pollingActive) {
+              stopPolling();
+            }
             return;
           }
 
           if (!retryOnError) return;
           if (!RETRYABLE_STATUSES.has(status)) return;
+          if (pollingMode === 'onError' && !pollingActive) {
+            startPolling();
+          }
           scheduleRetry({ status, channelName, error });
         }
       });
     };
+
+    if (pollingMode === 'always') {
+      startPolling();
+    }
 
     subscribe();
 
     return () => {
       disposed = true;
       clearRetryTimer();
+      clearFlushTimer();
+      stopPolling();
       removeActiveChannel();
     };
-  }, [table, enabled, filterKey, retryOnError, onReconnect]);
+  }, [table, enabled, filterKey, retryOnError, onReconnect, debounceMs, pollingIntervalMs, pollingMode]);
 }
 
 /**
