@@ -41,7 +41,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
-    "babel-preset-expo": "~54.0.10",
+    "babel-preset-expo": "~55.0.11",
     "react-native-svg-transformer": "^1.5.0",
     "typescript": "~5.9.2"
   },
