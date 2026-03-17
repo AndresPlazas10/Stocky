@@ -6,7 +6,7 @@ import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import {
   getBusinessUsernameById,
-  getEmployeesForManagement,
+  getEmployeesForManagementPage,
   isEmployeeUsernameTaken
 } from '../../data/queries/employeesQueries.js';
 import {
@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 
 const _motionLintUsage = motion;
+const EMPLOYEE_PAGE_SIZE = 50;
 
 function isOwnerRole(role) {
   const normalized = String(role || '').trim().toLowerCase();
@@ -43,6 +44,9 @@ function Empleados({ businessId }) {
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [generatedCode, setGeneratedCode] = useState(null);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMoreEmployees, setHasMoreEmployees] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   
   // Estados para modal de confirmación
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -56,30 +60,52 @@ function Empleados({ businessId }) {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const loadEmpleados = useCallback(async () => {
+  const loadEmpleados = useCallback(async ({ nextPage = 1, append = false } = {}) => {
     try {
-      setLoading(true);
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
 
-      const employees = await getEmployeesForManagement(businessId);
+      const offset = (nextPage - 1) * EMPLOYEE_PAGE_SIZE;
+      const { employees, hasMore } = await getEmployeesForManagementPage({
+        businessId,
+        limit: EMPLOYEE_PAGE_SIZE,
+        offset
+      });
       // Ocultar propietario en la UI de empleados.
-      setEmpleados((employees || []).filter((employee) => !isOwnerRole(employee?.role)));
+      const normalized = (employees || []).filter((employee) => !isOwnerRole(employee?.role));
+      setEmpleados((prev) => (append ? [...prev, ...normalized] : normalized));
+      setPage(nextPage);
+      setHasMoreEmployees(Boolean(hasMore));
     } catch {
       // Error al cargar empleados
       setError('❌ Error al cargar la lista de empleados');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [businessId]);
 
+  const loadMoreEmployees = useCallback(() => {
+    if (loadingMore || !hasMoreEmployees || searchTerm.trim()) return;
+    loadEmpleados({ nextPage: page + 1, append: true });
+  }, [hasMoreEmployees, loadingMore, loadEmpleados, page, searchTerm]);
+
   useEffect(() => {
     if (businessId) {
-      loadEmpleados();
+      loadEmpleados({ nextPage: 1, append: false });
     }
   }, [businessId, loadEmpleados]);
 
   useRealtimeSubscription('employees', {
     filter: { business_id: businessId },
     enabled: !!businessId,
+    debounceMs: 200,
+    pollingIntervalMs: 45000,
+    pollingMode: 'onError',
+    onPoll: () => loadEmpleados({ nextPage: 1, append: false }),
     onReconnect: () => {
       loadEmpleados().catch(() => {});
     },
@@ -520,6 +546,26 @@ function Empleados({ businessId }) {
                   })}
                 </tbody>
               </table>
+            </div>
+            <div className="border-t border-gray-100 px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-gray-500">
+                Mostrando {filteredEmpleados.length} de {empleados.length} empleados
+              </p>
+              <button
+                type="button"
+                onClick={loadMoreEmployees}
+                disabled={!hasMoreEmployees || loadingMore || Boolean(searchTerm.trim())}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {loadingMore ? (
+                  <>
+                    <Clock className="w-4 h-4 animate-spin" />
+                    Cargando...
+                  </>
+                ) : (
+                  <>Cargar más empleados</>
+                )}
+              </button>
             </div>
           </AsyncStateWrapper>
         </div>

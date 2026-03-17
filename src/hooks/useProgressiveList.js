@@ -6,16 +6,35 @@ export function useProgressiveList(
     initialCount = 20,
     step = 20,
     rootMargin = '320px',
-    resetKey = ''
+    resetKey = '',
+    preserveOnGrow = false,
+    onLoadMore,
+    canLoadMore = false,
+    loading = false
   } = {}
 ) {
   const safeItems = useMemo(() => (Array.isArray(items) ? items : []), [items]);
   const sentinelRef = useRef(null);
   const [visibleCount, setVisibleCount] = useState(initialCount);
+  const prevLengthRef = useRef(safeItems.length);
+  const prevResetKeyRef = useRef(resetKey);
 
   useEffect(() => {
-    setVisibleCount(initialCount);
-  }, [initialCount, resetKey, safeItems.length]);
+    const prevLength = prevLengthRef.current;
+    const prevResetKey = prevResetKeyRef.current;
+    const resetKeyChanged = prevResetKey !== resetKey;
+    const lengthChanged = safeItems.length !== prevLength;
+    const shouldReset = resetKeyChanged
+      || (!preserveOnGrow && lengthChanged)
+      || (preserveOnGrow && safeItems.length < prevLength);
+
+    if (shouldReset) {
+      setVisibleCount(initialCount);
+    }
+
+    prevLengthRef.current = safeItems.length;
+    prevResetKeyRef.current = resetKey;
+  }, [initialCount, resetKey, safeItems.length, preserveOnGrow]);
 
   const hasMore = visibleCount < safeItems.length;
 
@@ -25,11 +44,18 @@ export function useProgressiveList(
   );
 
   const loadMore = useCallback(() => {
-    setVisibleCount((prev) => Math.min(prev + step, safeItems.length));
-  }, [safeItems.length, step]);
+    if (hasMore) {
+      setVisibleCount((prev) => Math.min(prev + step, safeItems.length));
+      return;
+    }
+
+    if (canLoadMore && typeof onLoadMore === 'function' && !loading) {
+      onLoadMore();
+    }
+  }, [canLoadMore, hasMore, loading, onLoadMore, safeItems.length, step]);
 
   useEffect(() => {
-    if (!hasMore) return undefined;
+    if (!hasMore && !canLoadMore) return undefined;
     if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') return undefined;
 
     const target = sentinelRef.current;
@@ -51,13 +77,14 @@ export function useProgressiveList(
 
     observer.observe(target);
     return () => observer.disconnect();
-  }, [hasMore, loadMore, rootMargin]);
+  }, [canLoadMore, hasMore, loadMore, rootMargin]);
 
   return {
     visibleItems,
     visibleCount,
     totalCount: safeItems.length,
     hasMore,
+    hasMoreExternal: canLoadMore,
     sentinelRef,
     loadMore
   };

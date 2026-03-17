@@ -112,13 +112,6 @@ function Home() {
           </nav>
 
           <div className="hidden items-center gap-2 md:flex">
-            <Button
-              variant="outline"
-              onClick={handleDownloadClick}
-              className="border-violet-300 font-semibold text-violet-700 hover:bg-violet-50"
-            >
-              Descargar móvil
-            </Button>
             <Button variant="ghost" onClick={() => navigate('/login')} className="font-semibold text-slate-700">
               Iniciar sesión
             </Button>
@@ -131,9 +124,9 @@ function Home() {
             <Button
               variant="outline"
               onClick={handleDownloadClick}
-              className="h-9 border-violet-300 px-3 text-xs font-semibold text-violet-700 hover:bg-violet-50"
+              className="h-9 border-violet-300 px-2 text-[11px] font-semibold text-violet-700 hover:bg-violet-50"
             >
-              Descargar Android
+              Descargar para tu teléfono
             </Button>
             <button
               className="rounded-lg p-2 text-slate-700 hover:bg-violet-100"
@@ -158,13 +151,6 @@ function Home() {
                 <a href="#process" onClick={() => setMobileMenuOpen(false)} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-violet-100">Proceso</a>
                 <a href="#start" onClick={() => setMobileMenuOpen(false)} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-violet-100">Empezar</a>
                 <div className="mt-2 grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={handleDownloadClick}
-                    className="border-violet-300"
-                  >
-                    Descargar
-                  </Button>
                   <Button variant="outline" onClick={() => navigate('/login')} className="border-violet-300">Entrar</Button>
                   <Button onClick={() => navigate('/register')} className="bg-gradient-to-r from-violet-600 to-indigo-600 text-slate-50 hover:opacity-90">Registro</Button>
                 </div>
@@ -321,6 +307,10 @@ function Home() {
               <p className="text-sm font-black text-violet-950">Stocky</p>
               <p className="text-xs text-slate-600">Sistema POS para restaurantes y bares</p>
             </div>
+          </div>
+          <div className="flex items-center gap-4 text-xs text-slate-600">
+            <a href="/terms" className="font-semibold text-slate-600 hover:text-violet-700">Términos</a>
+            <a href="/privacy" className="font-semibold text-slate-600 hover:text-violet-700">Privacidad</a>
           </div>
           <div className="text-xs text-slate-500">
             © 2026 Stocky. Todos los derechos reservados.

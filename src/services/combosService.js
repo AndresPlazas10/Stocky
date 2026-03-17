@@ -1,5 +1,6 @@
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { readAdapter } from '../data/adapters/localAdapter.js';
+import { invalidateComboCache } from '../data/adapters/cacheInvalidation.js';
 
 export const COMBO_STATUS = {
   ACTIVE: 'active',
@@ -132,6 +133,8 @@ export async function createCombo(businessId, payload) {
     throw new Error(itemsError.message || 'No se pudieron guardar los productos del combo');
   }
 
+  await invalidateComboCache({ businessId, comboId: createdCombo.id });
+
   return createdCombo.id;
 }
 
@@ -173,6 +176,8 @@ export async function updateCombo(comboId, businessId, payload) {
   if (insertItemsError) {
     throw new Error(insertItemsError.message || 'No se pudieron guardar los productos del combo');
   }
+
+  await invalidateComboCache({ businessId, comboId });
 }
 
 export async function setComboStatus(comboId, businessId, status) {
@@ -193,6 +198,8 @@ export async function setComboStatus(comboId, businessId, status) {
   if (error) {
     throw new Error(error.message || 'No se pudo actualizar el estado del combo');
   }
+
+  await invalidateComboCache({ businessId, comboId });
 }
 
 export async function deleteCombo(comboId, businessId) {
@@ -215,4 +222,6 @@ export async function deleteCombo(comboId, businessId) {
   if (!data?.id) {
     throw new Error('El combo no existe o no tienes permisos para eliminarlo');
   }
+
+  await invalidateComboCache({ businessId, comboId });
 }

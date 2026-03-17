@@ -37,3 +37,31 @@ export async function getBusinessUsernameById(businessId) {
   if (error) throw error;
   return data?.username || null;
 }
+
+export async function getEmployeesForManagementPage({
+  businessId,
+  limit = 50,
+  offset = 0
+}) {
+  const { data, error } = await supabaseAdapter.getPaginatedTableRows({
+    tableName: 'employees',
+    selectSql: EMPLOYEE_LIST_COLUMNS,
+    filters: { business_id: businessId },
+    orderBy: { column: 'created_at', ascending: false },
+    from: offset,
+    to: offset + limit - 1,
+    countMode: null
+  });
+  if (error) throw error;
+
+  const normalized = (data || []).map((employee) => ({
+    ...employee,
+    is_active: employee?.is_active !== false,
+    status: employee?.is_active !== false ? 'active' : 'inactive'
+  }));
+
+  return {
+    employees: normalized,
+    hasMore: (data || []).length === limit
+  };
+}

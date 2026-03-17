@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
-import { getSuppliersForManagement } from '../../data/queries/suppliersQueries.js';
+import { getSuppliersForManagementPage } from '../../data/queries/suppliersQueries.js';
 import {
   deleteSupplierById,
   saveSupplierWithTaxFallback
@@ -28,6 +28,7 @@ import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
 import { useProgressiveList } from '../../hooks/useProgressiveList.js';
 
 const _motionLintUsage = motion;
+const SUPPLIERS_PAGE_SIZE = 50;
 
 function Proveedores({ businessId }) {
   const [proveedores, setProveedores] = useState([]);
@@ -42,6 +43,9 @@ function Proveedores({ businessId }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [supplierToDelete, setSupplierToDelete] = useState(null);
   const [supplierTaxColumn, setSupplierTaxColumn] = useState('nit');
+  const [page, setPage] = useState(1);
+  const [hasMoreSuppliers, setHasMoreSuppliers] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const lowMotionMode = useLowMotionMode();
 
   // Estado del formulario
@@ -56,20 +60,29 @@ function Proveedores({ businessId }) {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const loadProveedores = useCallback(async () => {
+  const loadProveedores = useCallback(async ({ nextPage = 1, append = false } = {}) => {
     const offline = isOfflineMode();
     const offlineSnapshotKey = `proveedores.list:${businessId}`;
     const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
 
     if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
       setProveedores(offlineSnapshot);
+      setHasMoreSuppliers(false);
+      setPage(1);
     }
 
     try {
-      setLoading(true);
-      const { suppliers, taxColumn } = await getSuppliersForManagement({
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+      const offset = (nextPage - 1) * SUPPLIERS_PAGE_SIZE;
+      const { suppliers, taxColumn, hasMore } = await getSuppliersForManagementPage({
         businessId,
-        preferredTaxColumn: supplierTaxColumn
+        preferredTaxColumn: supplierTaxColumn,
+        limit: SUPPLIERS_PAGE_SIZE,
+        offset
       });
 
       if (taxColumn !== supplierTaxColumn) setSupplierTaxColumn(taxColumn);
@@ -78,30 +91,45 @@ function Proveedores({ businessId }) {
 
       if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
         setProveedores(offlineSnapshot);
+        setHasMoreSuppliers(false);
+        setPage(1);
         return;
       }
 
-      setProveedores(normalizedSuppliers);
-      if (!offline || hasLocalData) {
-        saveOfflineSnapshot(offlineSnapshotKey, normalizedSuppliers);
-      }
+      setProveedores((prev) => {
+        const nextSuppliers = append ? [...prev, ...normalizedSuppliers] : normalizedSuppliers;
+        if (!offline || hasLocalData) {
+          saveOfflineSnapshot(offlineSnapshotKey, nextSuppliers);
+        }
+        return nextSuppliers;
+      });
+      setHasMoreSuppliers(Boolean(hasMore));
+      setPage(nextPage);
     } catch (error) {
       if (offline) {
         const cached = readOfflineSnapshot(offlineSnapshotKey, []);
         setProveedores(Array.isArray(cached) ? cached : []);
+        setHasMoreSuppliers(false);
+        setPage(1);
       } else {
         setError(`❌ Error al cargar los proveedores: ${error?.message || 'Error desconocido'}`);
       }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [businessId, supplierTaxColumn]);
 
   useEffect(() => {
     if (businessId) {
-      loadProveedores();
+      loadProveedores({ nextPage: 1, append: false });
     }
   }, [businessId, loadProveedores]);
+
+  const fetchMoreSuppliers = useCallback(() => {
+    if (loadingMore || !hasMoreSuppliers) return;
+    loadProveedores({ nextPage: page + 1, append: true });
+  }, [hasMoreSuppliers, loadingMore, loadProveedores, page]);
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
@@ -251,16 +279,23 @@ function Proveedores({ businessId }) {
     );
   }, [proveedores, searchTerm]);
 
+  const canLoadMoreSuppliers = hasMoreSuppliers && !searchTerm.trim();
+
   const {
     visibleItems: visibleProveedores,
     hasMore: hasMoreProveedores,
+    hasMoreExternal: hasMoreProveedoresRemote,
     totalCount: totalProveedoresFiltrados,
     sentinelRef: proveedoresSentinelRef,
     loadMore: loadMoreProveedores
   } = useProgressiveList(filteredProveedores, {
     initialCount: lowMotionMode ? 14 : 20,
     step: lowMotionMode ? 14 : 20,
-    resetKey: `${searchTerm}:${filteredProveedores.length}:${lowMotionMode ? 'low' : 'full'}`
+    resetKey: `${businessId}:${searchTerm}:${lowMotionMode ? 'low' : 'full'}`,
+    preserveOnGrow: true,
+    canLoadMore: canLoadMoreSuppliers,
+    onLoadMore: fetchMoreSuppliers,
+    loading: loadingMore
   });
 
   const successTitle = useMemo(() => {
@@ -529,7 +564,7 @@ function Proveedores({ businessId }) {
                 ))}
               </div>
 
-              {hasMoreProveedores && (
+              {(hasMoreProveedores || (hasMoreProveedoresRemote && canLoadMoreSuppliers)) && (
                 <div className="flex flex-col items-center gap-3 py-2">
                   <p className="text-xs text-gray-500">
                     Mostrando {visibleProveedores.length} de {totalProveedoresFiltrados} proveedores
@@ -538,9 +573,10 @@ function Proveedores({ businessId }) {
                   <button
                     type="button"
                     onClick={loadMoreProveedores}
+                    disabled={loadingMore}
                     className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                   >
-                    Cargar mas proveedores
+                    {loadingMore ? 'Cargando proveedores...' : 'Cargar mas proveedores'}
                   </button>
                 </div>
               )}
