@@ -6,6 +6,10 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/legal/:path*",
+      "destination": "/legal/:path*"
+    },
+    {
       "source": "/:path((?!api|assets).*)",
       "destination": "/index.html"
     }
