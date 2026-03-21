@@ -15,7 +15,7 @@
     "@react-native-community/netinfo": "^11.4.1",
     "@react-navigation/drawer": "^7.9.4",
     "@react-navigation/native": "^7.1.33",
-    "@supabase/supabase-js": "^2.98.0",
+    "@supabase/supabase-js": "^2.99.2",
     "expo": "~54.0.0",
     "expo-blur": "~15.0.8",
     "expo-dev-client": "~6.0.20",
