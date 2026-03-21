@@ -5,10 +5,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { updateConfiguracionBusinessProfile } from '../../domain/configuracion/commands';
 import { listConfiguracionByBusinessId } from '../../domain/configuracion/queries';
 import type { ConfiguracionSnapshot } from '../../domain/configuracion/contracts';
+import { deleteCurrentAccount } from '../../services/accountService';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
 import { StockyModal } from '../../ui/StockyModal';
 import { StockyProcessingOverlay } from '../../ui/StockyProcessingOverlay';
 import { StockyStatusToast } from '../../ui/StockyStatusToast';
+
+const TERMS_URL = 'https://www.stockypos.app/legal/terms.html';
+const PRIVACY_URL = 'https://www.stockypos.app/legal/privacy.html';
+const DELETE_ACCOUNT_URL = 'https://www.stockypos.app/legal/delete-account.html';
 
 type Props = {
   businessId: string | null;
@@ -122,6 +127,8 @@ export function ConfiguracionPanel({
   const [error, setError] = useState<string | null>(null);
   const [, setSuccess] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [paperWidth, setPaperWidth] = useState<'80mm' | '58mm'>('80mm');
   const [autoPrintOnSale, setAutoPrintOnSale] = useState(false);
   const [showBusinessEditModal, setShowBusinessEditModal] = useState(false);
@@ -134,10 +141,10 @@ export function ConfiguracionPanel({
     phone: '',
     address: '',
   });
-  const isProcessingAction = savingBusiness || signingOut;
+  const isProcessingAction = savingBusiness || signingOut || deletingAccount;
   const processingLabel = signingOut
     ? 'Cerrando sesión...'
-    : (savingBusiness ? 'Guardando configuración...' : 'Procesando...');
+    : (deletingAccount ? 'Eliminando cuenta...' : (savingBusiness ? 'Guardando configuración...' : 'Procesando...'));
 
   const loadSnapshot = useCallback(async () => {
     setLoading(true);
@@ -171,11 +178,61 @@ export function ConfiguracionPanel({
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (deletingAccount) return;
+    setDeletingAccount(true);
+    setError(null);
+    let deleted = false;
+    try {
+      await deleteCurrentAccount();
+      deleted = true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar la cuenta.');
+    }
+
+    if (deleted) {
+      try {
+        await onSignOut();
+      } catch {
+        // no-op: la cuenta ya fue eliminada
+      }
+    }
+
+    setDeletingAccount(false);
+    if (deleted) {
+      setShowDeleteAccountModal(false);
+    }
+  };
+
   const handleOpenSiigo = async () => {
     try {
       await Linking.openURL('https://www.siigo.com/');
     } catch {
       setError('No se pudo abrir el enlace de Siigo.');
+    }
+  };
+
+  const handleOpenTerms = async () => {
+    try {
+      await Linking.openURL(TERMS_URL);
+    } catch {
+      setError('No se pudo abrir los términos del servicio.');
+    }
+  };
+
+  const handleOpenPrivacy = async () => {
+    try {
+      await Linking.openURL(PRIVACY_URL);
+    } catch {
+      setError('No se pudo abrir la política de privacidad.');
+    }
+  };
+
+  const handleOpenDeleteAccountInfo = async () => {
+    try {
+      await Linking.openURL(DELETE_ACCOUNT_URL);
+    } catch {
+      setError('No se pudo abrir la información de eliminación de cuenta.');
     }
   };
 
@@ -297,6 +354,15 @@ export function ConfiguracionPanel({
             <Ionicons name="log-out-outline" size={24} color="#B91C1C" />
             <Text style={styles.signOutText}>{signingOut ? 'Cerrando...' : 'Cerrar Sesión'}</Text>
           </Pressable>
+
+          <Pressable
+            style={[styles.deleteAccountButton, deletingAccount && styles.disabled]}
+            onPress={() => setShowDeleteAccountModal(true)}
+            disabled={deletingAccount}
+          >
+            <Ionicons name="trash-outline" size={22} color="#DC2626" />
+            <Text style={styles.deleteAccountText}>Eliminar cuenta</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -406,12 +472,59 @@ export function ConfiguracionPanel({
         </View>
       </View>
 
+      <View style={styles.legalCard}>
+        <View style={styles.legalHeader}>
+          <View style={styles.legalHeaderIcon}>
+            <Ionicons name="shield-checkmark-outline" size={24} color="#D1D5DB" />
+          </View>
+          <View style={styles.legalHeaderTextWrap}>
+            <Text style={styles.legalHeaderTitle}>Información legal</Text>
+            <Text style={styles.legalHeaderSubtitle}>Políticas y términos vigentes</Text>
+          </View>
+        </View>
+        <View style={styles.legalBody}>
+          <Pressable style={styles.legalButton} onPress={handleOpenTerms}>
+            <View style={styles.legalButtonIcon}>
+              <Ionicons name="document-text-outline" size={20} color="#2563EB" />
+            </View>
+            <View style={styles.legalButtonTextWrap}>
+              <Text style={styles.legalButtonTitle}>Términos del servicio</Text>
+              <Text style={styles.legalButtonSubtitle}>Lee las condiciones de uso de Stocky</Text>
+            </View>
+            <Ionicons name="open-outline" size={18} color="#2563EB" />
+          </Pressable>
+
+          <Pressable style={styles.legalButton} onPress={handleOpenPrivacy}>
+            <View style={styles.legalButtonIcon}>
+              <Ionicons name="lock-closed-outline" size={20} color="#0F766E" />
+            </View>
+            <View style={styles.legalButtonTextWrap}>
+              <Text style={styles.legalButtonTitle}>Política de privacidad</Text>
+              <Text style={styles.legalButtonSubtitle}>Cómo protegemos la información</Text>
+            </View>
+            <Ionicons name="open-outline" size={18} color="#0F766E" />
+          </Pressable>
+
+          <Pressable style={styles.legalButton} onPress={handleOpenDeleteAccountInfo}>
+            <View style={styles.legalButtonIcon}>
+              <Ionicons name="trash-outline" size={20} color="#DC2626" />
+            </View>
+            <View style={styles.legalButtonTextWrap}>
+              <Text style={styles.legalButtonTitle}>Eliminar cuenta</Text>
+              <Text style={styles.legalButtonSubtitle}>Opciones para solicitar la eliminación de datos</Text>
+            </View>
+            <Ionicons name="open-outline" size={18} color="#DC2626" />
+          </Pressable>
+        </View>
+      </View>
+
       <StockyModal
         visible={showBusinessEditModal}
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={16}
         modalAnimationType="none"
+        bodyFlex
         sheetStyle={styles.businessEditSheet}
         onClose={closeBusinessEditModal}
         headerSlot={(
@@ -514,6 +627,64 @@ export function ConfiguracionPanel({
               multiline
             />
           </View>
+        </View>
+      </StockyModal>
+      <StockyModal
+        visible={showDeleteAccountModal}
+        layout="centered"
+        backdropVariant="blur"
+        centeredOffsetY={16}
+        modalAnimationType="none"
+        sheetStyle={styles.deleteAccountSheet}
+        onClose={() => {
+          if (deletingAccount) return;
+          setShowDeleteAccountModal(false);
+        }}
+        headerSlot={(
+          <LinearGradient
+            colors={['#FEE2E2', '#FECACA']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.deleteAccountHeader}
+          >
+            <View style={styles.deleteAccountHeaderIcon}>
+              <Ionicons name="alert-circle-outline" size={22} color="#B91C1C" />
+            </View>
+            <View>
+              <Text style={styles.deleteAccountTitle}>Eliminar cuenta</Text>
+              <Text style={styles.deleteAccountSubtitle}>Esta acción es permanente</Text>
+            </View>
+          </LinearGradient>
+        )}
+        footerStyle={styles.deleteAccountFooter}
+        footer={(
+          <View style={styles.deleteAccountFooterRow}>
+            <Pressable
+              style={[styles.deleteAccountCancel, deletingAccount && styles.disabled]}
+              onPress={() => setShowDeleteAccountModal(false)}
+              disabled={deletingAccount}
+            >
+              <Text style={styles.deleteAccountCancelText}>Cancelar</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.deleteAccountConfirm, deletingAccount && styles.disabled]}
+              onPress={handleDeleteAccount}
+              disabled={deletingAccount}
+            >
+              <Text style={styles.deleteAccountConfirmText}>
+                {deletingAccount ? 'Eliminando...' : 'Eliminar'}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+      >
+        <View style={styles.deleteAccountBody}>
+          <Text style={styles.deleteAccountBodyText}>
+            Al eliminar tu cuenta se revocará tu acceso y los negocios asociados quedarán suspendidos.
+          </Text>
+          <Text style={styles.deleteAccountBodyText}>
+            Si estás seguro, confirma para continuar.
+          </Text>
         </View>
       </StockyModal>
       <StockyProcessingOverlay visible={isProcessingAction} label={processingLabel} />
@@ -681,6 +852,22 @@ const styles = StyleSheet.create({
   },
   signOutText: {
     color: '#B91C1C',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  deleteAccountButton: {
+    minHeight: 50,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    backgroundColor: '#FFF1F2',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  deleteAccountText: {
+    color: '#DC2626',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -861,6 +1048,85 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  legalCard: {
+    borderRadius: STOCKY_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: STOCKY_COLORS.borderSoft,
+    backgroundColor: STOCKY_COLORS.surface,
+    overflow: 'hidden',
+    shadowColor: '#003B46',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  legalHeader: {
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  legalHeaderIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legalHeaderTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  legalHeaderTitle: {
+    color: '#E2E8F0',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  legalHeaderSubtitle: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  legalBody: {
+    padding: 12,
+    gap: 10,
+  },
+  legalButton: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  legalButtonIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legalButtonTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  legalButtonTitle: {
+    color: '#0F172A',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  legalButtonSubtitle: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '500',
+  },
   businessEditSheet: {
     maxWidth: 760,
     maxHeight: '90%',
@@ -1008,6 +1274,79 @@ const styles = StyleSheet.create({
   },
   businessEditCol: {
     flex: 1,
+  },
+  deleteAccountSheet: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  deleteAccountHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  deleteAccountHeaderIcon: {
+    height: 40,
+    width: 40,
+    borderRadius: 14,
+    backgroundColor: 'rgba(220, 38, 38, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteAccountTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#7F1D1D',
+  },
+  deleteAccountSubtitle: {
+    fontSize: 12,
+    color: '#7F1D1D',
+  },
+  deleteAccountBody: {
+    padding: 16,
+    gap: 10,
+  },
+  deleteAccountBodyText: {
+    fontSize: 12.5,
+    color: '#7F1D1D',
+    lineHeight: 18,
+  },
+  deleteAccountFooter: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  deleteAccountFooterRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  deleteAccountCancel: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteAccountCancelText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  deleteAccountConfirm: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: '#DC2626',
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteAccountConfirmText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   footerText: {
     color: STOCKY_COLORS.textMuted,

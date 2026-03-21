@@ -311,6 +311,7 @@ function Home() {
           <div className="flex items-center gap-4 text-xs text-slate-600">
             <a href="/terms" className="font-semibold text-slate-600 hover:text-violet-700">Términos</a>
             <a href="/privacy" className="font-semibold text-slate-600 hover:text-violet-700">Privacidad</a>
+            <a href="/legal/delete-account.html" className="font-semibold text-slate-600 hover:text-violet-700">Eliminar cuenta</a>
           </div>
           <div className="text-xs text-slate-500">
             © 2026 Stocky. Todos los derechos reservados.

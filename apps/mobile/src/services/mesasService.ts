@@ -655,12 +655,12 @@ export async function resolveBusinessContext(
 
   const resolver = (async (): Promise<BusinessContext | null> => {
     const client = getSupabaseClient();
-    const rememberedBusinessId = normalizeReference(await AsyncStorage.getItem(LAST_BUSINESS_ID_STORAGE_KEY));
+    let preferredBusinessId = normalizeReference(await AsyncStorage.getItem(LAST_BUSINESS_ID_STORAGE_KEY));
 
     if (businessContextRpcCompatibility !== 'unsupported') {
       const rpc = await client.rpc('resolve_mobile_business_context', {
         p_user_id: normalizedUserId,
-        p_preferred_business_id: rememberedBusinessId,
+        p_preferred_business_id: preferredBusinessId,
       });
 
       if (!rpc.error) {
@@ -679,10 +679,11 @@ export async function resolveBusinessContext(
           return candidate;
         }
 
-        if (rememberedBusinessId) {
+        if (preferredBusinessId) {
           await AsyncStorage.removeItem(LAST_BUSINESS_ID_STORAGE_KEY);
+          preferredBusinessId = null;
         }
-        return null;
+        // No devolver null todavía: permitir fallback manual.
       }
 
       if (isMissingResolveMobileBusinessContextRpcError(rpc.error)) {
@@ -690,11 +691,11 @@ export async function resolveBusinessContext(
       }
     }
 
-    if (rememberedBusinessId) {
+    if (preferredBusinessId) {
       const rememberedCandidate = await resolveRememberedBusinessCandidate(
         client,
         normalizedUserId,
-        rememberedBusinessId,
+        preferredBusinessId,
       );
       const rememberedContext = normalizeBusinessContextCandidate(rememberedCandidate);
       if (rememberedContext?.businessId) {

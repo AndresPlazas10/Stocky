@@ -22,6 +22,7 @@ import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
 import { StockyModal } from '../../ui/StockyModal';
 import { StockyProcessingOverlay } from '../../ui/StockyProcessingOverlay';
 import { StockyStatusToast } from '../../ui/StockyStatusToast';
+import { StockyButton } from '../../ui/StockyButton';
 
 type Props = {
   businessId: string;
@@ -49,6 +50,7 @@ const INITIAL_FORM: ProveedorFormState = {
   nit: '',
   notes: '',
 };
+const SUPPLIERS_PAGE_SIZE = 40;
 
 function normalizeRole(value: unknown): string {
   return String(value || '').trim().toLowerCase();
@@ -81,6 +83,9 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [supplierToDelete, setSupplierToDelete] = useState<ProveedorRecord | null>(null);
   const suppliersRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMoreSuppliers, setHasMoreSuppliers] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const isProcessingAction = saving || deleting;
   const processingLabel = saving
     ? (editingSupplier ? 'Actualizando proveedor...' : 'Guardando proveedor...')
@@ -93,12 +98,16 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
       const result = await listSuppliersForManagement({
         businessId,
         preferredTaxColumn: taxColumn,
+        limit: SUPPLIERS_PAGE_SIZE,
+        offset: 0,
       });
 
       setSuppliers(result.suppliers);
       if (result.taxColumn !== taxColumn) {
         setTaxColumn(result.taxColumn);
       }
+      setHasMoreSuppliers(result.suppliers.length === SUPPLIERS_PAGE_SIZE);
+      setPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudieron cargar los proveedores.');
     } finally {
@@ -113,12 +122,16 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
       const result = await listSuppliersForManagement({
         businessId,
         preferredTaxColumn: taxColumn,
+        limit: SUPPLIERS_PAGE_SIZE,
+        offset: 0,
       });
 
       setSuppliers(result.suppliers);
       if (result.taxColumn !== taxColumn) {
         setTaxColumn(result.taxColumn);
       }
+      setHasMoreSuppliers(result.suppliers.length === SUPPLIERS_PAGE_SIZE);
+      setPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo actualizar la lista de proveedores.');
     } finally {
@@ -131,15 +144,43 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
       const result = await listSuppliersForManagement({
         businessId,
         preferredTaxColumn: taxColumn,
+        limit: SUPPLIERS_PAGE_SIZE,
+        offset: 0,
       });
       setSuppliers(result.suppliers);
       if (result.taxColumn !== taxColumn) {
         setTaxColumn(result.taxColumn);
       }
+      setHasMoreSuppliers(result.suppliers.length === SUPPLIERS_PAGE_SIZE);
+      setPage(1);
     } catch {
       // no-op
     }
   }, [businessId, taxColumn]);
+
+  const loadMoreSuppliers = useCallback(async () => {
+    if (loadingMore || !hasMoreSuppliers) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const result = await listSuppliersForManagement({
+        businessId,
+        preferredTaxColumn: taxColumn,
+        limit: SUPPLIERS_PAGE_SIZE,
+        offset: (nextPage - 1) * SUPPLIERS_PAGE_SIZE,
+      });
+      setSuppliers((prev) => [...prev, ...result.suppliers]);
+      if (result.taxColumn !== taxColumn) {
+        setTaxColumn(result.taxColumn);
+      }
+      setHasMoreSuppliers(result.suppliers.length === SUPPLIERS_PAGE_SIZE);
+      setPage(nextPage);
+    } catch {
+      // no-op
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [businessId, hasMoreSuppliers, loadingMore, page, taxColumn]);
 
   const checkManagePermission = useCallback(async () => {
     if (source === 'owner') {
@@ -380,8 +421,9 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
         ) : suppliers.length === 0 ? (
           <Text style={styles.emptyText}>No hay proveedores registrados.</Text>
         ) : (
-          suppliers.map((supplier) => (
-            <View key={supplier.id} style={styles.supplierCard}>
+          <>
+            {suppliers.map((supplier) => (
+              <View key={supplier.id} style={styles.supplierCard}>
               <View style={styles.supplierHeader}>
                 <View style={styles.supplierHeaderMain}>
                   <Ionicons name="business-outline" size={24} color="#111827" />
@@ -465,7 +507,16 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
                 </>
               ) : null}
             </View>
-          ))
+            ))}
+            {hasMoreSuppliers ? (
+              <View style={styles.loadMoreWrap}>
+                <Text style={styles.loadMoreHint}>Mostrando {suppliers.length} proveedores</Text>
+                <StockyButton onPress={loadMoreSuppliers} loading={loadingMore} variant="ghost">
+                  Cargar más proveedores
+                </StockyButton>
+              </View>
+            ) : null}
+          </>
         )}
       </View>
 
@@ -475,6 +526,7 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
         backdropVariant="blur"
         centeredOffsetY={16}
         modalAnimationType="none"
+        bodyFlex
         sheetStyle={styles.supplierFormSheet}
         onClose={closeFormModal}
         headerSlot={(
@@ -1102,5 +1154,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     lineHeight: 18,
+  },
+  loadMoreWrap: {
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+  },
+  loadMoreHint: {
+    color: STOCKY_COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

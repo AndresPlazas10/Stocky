@@ -90,6 +90,9 @@ export function StockyModal({
   const wrapperPointerEvents = shouldHideContent && !contentReady ? 'none' : 'auto';
   const shouldFlexBody = typeof bodyFlex === 'boolean' ? bodyFlex : !isCentered;
   const wrapperLayoutStyle = shouldFlexBody ? styles.sheetBody : undefined;
+  const sheetFlexStyle = shouldFlexBody
+    ? (isCentered ? styles.centeredSheetFlex : styles.sheetFlex)
+    : undefined;
 
   useEffect(() => {
     if (!visible) return;
@@ -206,6 +209,7 @@ export function StockyModal({
                 { scale: sheetScale },
               ],
             },
+            sheetFlexStyle,
             sheetStyle,
           ]}
         >
@@ -294,14 +298,17 @@ const styles = StyleSheet.create({
     borderTopRightRadius: STOCKY_RADIUS.lg,
     borderWidth: 1,
     borderColor: STOCKY_COLORS.borderSoft,
-    maxHeight: '88%',
+    maxHeight: '92%',
     overflow: 'hidden',
   },
   centeredSheet: {
     width: '100%',
     maxWidth: 460,
-    maxHeight: '78%',
+    maxHeight: '90%',
     borderRadius: STOCKY_RADIUS.lg,
+  },
+  centeredSheetFlex: {
+    minHeight: '70%',
   },
   header: {
     flexDirection: 'row',
@@ -346,6 +353,9 @@ const styles = StyleSheet.create({
     shadowRadius: 0,
     shadowColor: 'transparent',
     elevation: 0,
+  },
+  sheetFlex: {
+    minHeight: '60%',
   },
   sheetBody: {
     flex: 1,

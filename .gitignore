@@ -42,3 +42,8 @@ dist-ssr
 
 # APK artifacts
 /public/apk/*.apk
+/apps/mobile/*.apk
+/apps/mobile/*.aab
+
+# Supabase local temp files
+/supabase/.temp/

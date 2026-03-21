@@ -846,11 +846,6 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
     }
   }, [dayFilter, maxSelectableDate, minSelectableDate]);
 
-  const handlePrintPurchase = useCallback((_purchase: CompraRecord) => {
-    setError(null);
-    setSuccess('Enviando compra a imprimir.');
-  }, []);
-
   return (
     <>
       <View style={styles.container}>
@@ -1022,11 +1017,6 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
                 <Ionicons name="eye-outline" size={20} color="#D1D5DB" />
                 <Text style={styles.saleDetailsText}>Ver Detalles</Text>
               </Pressable>
-
-              <Pressable style={[styles.salePrintButton, styles.saleActionHalf]} onPress={() => handlePrintPurchase(purchase)}>
-                <Ionicons name="print-outline" size={20} color="#DCFCE7" />
-                <Text style={styles.salePrintText}>Imprimir</Text>
-              </Pressable>
             </View>
 
             <Pressable
@@ -1047,6 +1037,7 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
         backdropVariant="blur"
         centeredOffsetY={16}
         modalAnimationType="none"
+        bodyFlex
         sheetStyle={styles.purchaseOrderModalSheet}
         onClose={() => {
           if (creatingPurchase) return;
@@ -1310,6 +1301,7 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={30}
+        bodyFlex
         onClose={() => setShowSupplierFilterModal(false)}
       >
         {supplierOptions.map((option) => {
@@ -1338,6 +1330,7 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
         backdropVariant="blur"
         centeredOffsetY={12}
         modalAnimationType="none"
+        bodyFlex
         sheetStyle={styles.purchaseDetailsModalSheet}
         contentContainerStyle={styles.purchaseDetailsContentContainer}
         footerStyle={styles.purchaseDetailsFooter}
@@ -1953,25 +1946,6 @@ const styles = StyleSheet.create({
   },
   saleDetailsText: {
     color: '#D1D5DB',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  salePrintButton: {
-    minHeight: 42,
-    borderRadius: 12,
-    backgroundColor: '#00C951',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-    shadowColor: '#111827',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.11,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  salePrintText: {
-    color: '#DCFCE7',
     fontSize: 14,
     fontWeight: '600',
   },

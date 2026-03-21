@@ -1,10 +1,9 @@
-import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { StockyButton } from './StockyButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const paymentQr = require('../../assets/QR.jpeg');
 
 type BusinessDisabledScreenProps = {
   businessName: string | null;
@@ -12,12 +11,11 @@ type BusinessDisabledScreenProps = {
 };
 
 export function BusinessDisabledScreen({ businessName, onSignOut }: BusinessDisabledScreenProps) {
-  const { width, height } = useWindowDimensions();
+  const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const name = businessName || 'tu negocio';
   const cardMaxHeight = Math.min(height - insets.top - insets.bottom - 24, 720);
   const contentBottom = Math.max(20, insets.bottom + 12);
-  const qrSize = Math.min(Math.round(width * 0.55), 210);
 
   return (
     <View style={styles.overlay}>
@@ -41,45 +39,28 @@ export function BusinessDisabledScreen({ businessName, onSignOut }: BusinessDisa
             <View style={styles.alertCopy}>
               <Text style={styles.alertTitle}>Servicio Suspendido</Text>
               <Text style={styles.alertText}>
-                El acceso a Stocky ha sido suspendido por falta de pago. Para reactivar su servicio,
-                debe regularizar el pago pendiente.
+                El acceso a Stocky ha sido suspendido. Por favor contacta a soporte para validar el
+                estado de tu cuenta.
               </Text>
             </View>
           </View>
 
-          <View style={styles.paymentBox}>
-            <View style={styles.paymentHeader}>
-              <Ionicons name="card-outline" size={18} color="#15803D" />
-              <Text style={styles.paymentTitle}>Realizar Pago Para Reactivar</Text>
+          <Pressable
+            onPress={() => Linking.openURL('https://wa.me/573188246925')}
+            style={styles.supportBox}
+          >
+            <View style={styles.supportHeader}>
+              <Ionicons name="chatbubble-ellipses-outline" size={18} color="#1D4ED8" />
+              <Text style={styles.supportTitle}>¿Necesitas ayuda?</Text>
             </View>
-            <View style={styles.paymentRow}>
-              <View style={styles.paymentDetails}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>• Valor:</Text>
-                  <Text style={styles.detailValue}>$50.000 COP</Text>
-                </View>
-              </View>
-              <View style={styles.qrBox}>
-                <Text style={styles.qrHint}>
-                  Escanea el QR desde tu app de banco preferida para pagar.
-                </Text>
-                <Image source={paymentQr} style={[styles.qrImage, { height: qrSize }]} resizeMode="contain" />
-              </View>
-            </View>
-            <View style={styles.warningBox}>
-              <Text style={styles.warningText}>
-                <Text style={styles.warningBold}>⚠️ Importante:</Text> Por favor, realice el envío a
-                través de <Text style={styles.warningBold}>Bre-B</Text> al medio de pago indicado y
-                remita una fotografía del comprobante de pago por nuestro canal de WhatsApp
-                <Text style={styles.warningBold}> 318-824-6925</Text>, indicando el nombre de su
-                negocio para poder identificarlo correctamente en nuestro sistema.
-              </Text>
-            </View>
-          </View>
+            <Text style={styles.supportText}>
+              Escríbenos por WhatsApp al 318 824 6925 y con gusto revisamos tu cuenta.
+            </Text>
+          </Pressable>
 
           <View style={styles.noteBox}>
             <Text style={styles.noteText}>
-              💡 Una vez realizado el pago, su servicio será reactivado en las próximas horas.
+              💡 Si tu cuenta ya fue validada, el acceso se restablecerá en las próximas horas.
             </Text>
           </View>
 
@@ -169,80 +150,28 @@ const styles = StyleSheet.create({
     color: '#7F1D1D',
     lineHeight: 18,
   },
-  paymentBox: {
-    backgroundColor: '#ECFDF5',
+  supportBox: {
+    backgroundColor: '#EFF6FF',
     borderWidth: 2,
-    borderColor: '#4ADE80',
+    borderColor: '#93C5FD',
     borderRadius: 16,
     padding: 12,
-    gap: 10,
-  },
-  paymentHeader: {
-    flexDirection: 'row',
     gap: 8,
-    alignItems: 'center',
   },
-  paymentTitle: {
+  supportHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  supportTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#14532D',
+    color: '#1E3A8A',
   },
-  paymentRow: {
-    gap: 12,
-  },
-  paymentDetails: {
-    gap: 6,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  detailLabel: {
+  supportText: {
     fontSize: 12.5,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  detailValue: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  qrBox: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-    borderRadius: 12,
-    padding: 10,
-    gap: 8,
-  },
-  qrHint: {
-    fontSize: 11.5,
-    color: '#374151',
-    textAlign: 'center',
-  },
-  qrImage: {
-    width: '100%',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
-  },
-  warningBox: {
-    backgroundColor: '#FEF9C3',
-    borderWidth: 1,
-    borderColor: '#FACC15',
-    borderRadius: 10,
-    padding: 10,
-  },
-  warningText: {
-    fontSize: 11.5,
-    color: '#713F12',
-    lineHeight: 16,
-  },
-  warningBold: {
-    fontWeight: '700',
-    color: '#713F12',
+    color: '#1E3A8A',
+    lineHeight: 18,
   },
   noteBox: {
     backgroundColor: '#EFF6FF',

@@ -25,6 +25,7 @@ export type InventoryProductRecord = {
 };
 let inventoryProductsFastRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
 let inventoryProductsWithSupplierRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
+let inventoryProductsFastPagedRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
 
 function normalizeText(value: unknown): string {
   return String(value ?? '').trim();
@@ -127,6 +128,16 @@ function isMissingListInventoryProductsFastRpcError(errorLike: any): boolean {
     || message.includes('schema cache');
 }
 
+function isMissingListInventoryProductsFastPagedRpcError(errorLike: any): boolean {
+  const code = normalizeText(errorLike?.code).toUpperCase();
+  const message = normalizeText(errorLike?.message).toLowerCase();
+  return code === 'PGRST202'
+    || code === '42883'
+    || message.includes('list_inventory_products_fast_paged')
+    || message.includes('could not find the function')
+    || message.includes('schema cache');
+}
+
 function buildFallbackProductCode(): string {
   const nonce = Math.floor(Math.random() * 999999)
     .toString()
@@ -160,27 +171,46 @@ function validateProductInput({
   }
 }
 
-export async function listInventorySuppliers(businessId: string): Promise<InventorySupplierRecord[]> {
+export async function listInventorySuppliers(
+  businessId: string,
+  options: { limit?: number; offset?: number } = {},
+): Promise<InventorySupplierRecord[]> {
   const client = getSupabaseClient();
-  const { data, error } = await client
+  const limit = Number.isFinite(options.limit) ? Number(options.limit) : null;
+  const offset = Number.isFinite(options.offset) ? Number(options.offset) : 0;
+  let query = client
     .from('suppliers')
     .select('id,business_name,contact_name')
     .eq('business_id', businessId)
     .order('business_name', { ascending: true });
 
+  if (limit !== null) {
+    query = query.range(offset, offset + limit - 1);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return (Array.isArray(data) ? data : []).map(normalizeSupplier);
 }
 
 export async function listInventoryProducts(
   businessId: string,
-  options: { activeOnly?: boolean; includeSuppliers?: boolean } = {},
+  options: {
+    activeOnly?: boolean;
+    includeSuppliers?: boolean;
+    limit?: number;
+    offset?: number;
+  } = {},
 ): Promise<InventoryProductRecord[]> {
   const client = getSupabaseClient();
   const includeSuppliers = options.includeSuppliers !== false;
+  const limit = Number.isFinite(options.limit) ? Number(options.limit) : null;
+  const offset = Number.isFinite(options.offset) ? Number(options.offset) : 0;
+  const usePaging = limit !== null;
   const baseSelect = 'id,business_id,code,name,category,purchase_price,sale_price,stock,min_stock,unit,supplier_id,is_active,manage_stock,created_at';
+
   if (!includeSuppliers) {
-    if (inventoryProductsFastRpcCompatibility !== 'unsupported') {
+    if (!usePaging && inventoryProductsFastRpcCompatibility !== 'unsupported') {
       const fastRpcResult = await client.rpc('list_inventory_products_fast', {
         p_business_id: businessId,
         p_active_only: options.activeOnly === true,
@@ -199,6 +229,27 @@ export async function listInventoryProducts(
       }
     }
 
+    if (usePaging && inventoryProductsFastPagedRpcCompatibility !== 'unsupported') {
+      const pagedRpcResult = await client.rpc('list_inventory_products_fast_paged', {
+        p_business_id: businessId,
+        p_active_only: options.activeOnly === true,
+        p_limit: limit,
+        p_offset: offset,
+      });
+
+      if (!pagedRpcResult.error) {
+        inventoryProductsFastPagedRpcCompatibility = 'supported';
+        const rows = Array.isArray(pagedRpcResult.data) ? pagedRpcResult.data : [];
+        return rows.map((row: any) => normalizeProduct(row, new Map<string, InventorySupplierRecord>()));
+      }
+
+      if (isMissingListInventoryProductsFastPagedRpcError(pagedRpcResult.error)) {
+        inventoryProductsFastPagedRpcCompatibility = 'unsupported';
+      } else {
+        throw pagedRpcResult.error;
+      }
+    }
+
     let query = client
       .from('products')
       .select(baseSelect)
@@ -208,6 +259,9 @@ export async function listInventoryProducts(
     if (options.activeOnly) {
       query = query.eq('is_active', true);
     }
+    if (usePaging) {
+      query = query.range(offset, offset + limit - 1);
+    }
 
     const { data, error } = await query;
     if (error) throw error;
@@ -215,7 +269,7 @@ export async function listInventoryProducts(
     return products.map((row: any) => normalizeProduct(row, new Map<string, InventorySupplierRecord>()));
   }
 
-  if (inventoryProductsWithSupplierRpcCompatibility !== 'unsupported') {
+  if (!usePaging && inventoryProductsWithSupplierRpcCompatibility !== 'unsupported') {
     const rpcResult = await client.rpc('list_inventory_products_with_supplier', {
       p_business_id: businessId,
       p_active_only: options.activeOnly === true,
@@ -249,6 +303,9 @@ export async function listInventoryProducts(
   if (options.activeOnly) {
     withEmbeddedSuppliersQuery = withEmbeddedSuppliersQuery.eq('is_active', true);
   }
+  if (usePaging) {
+    withEmbeddedSuppliersQuery = withEmbeddedSuppliersQuery.range(offset, offset + limit - 1);
+  }
   const withEmbeddedSuppliers = await withEmbeddedSuppliersQuery;
 
   if (!withEmbeddedSuppliers.error) {
@@ -272,6 +329,9 @@ export async function listInventoryProducts(
     .order('created_at', { ascending: false });
   if (options.activeOnly) {
     fallbackProductsQuery = fallbackProductsQuery.eq('is_active', true);
+  }
+  if (usePaging) {
+    fallbackProductsQuery = fallbackProductsQuery.range(offset, offset + limit - 1);
   }
   const fallbackProducts = await fallbackProductsQuery;
   if (fallbackProducts.error) throw fallbackProducts.error;

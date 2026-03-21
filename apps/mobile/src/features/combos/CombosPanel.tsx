@@ -780,6 +780,7 @@ export function CombosPanel({ businessId, businessName, userId, source }: Props)
         backdropVariant="blur"
         centeredOffsetY={16}
         modalAnimationType="none"
+        bodyFlex
         sheetStyle={styles.comboFormSheet}
         onClose={closeFormModal}
         headerSlot={(
@@ -943,6 +944,7 @@ export function CombosPanel({ businessId, businessName, userId, source }: Props)
         backdropVariant="blur"
         centeredOffsetY={24}
         modalAnimationType="none"
+        bodyFlex
         onClose={closeProductPicker}
       >
         <View style={styles.modalSection}>

@@ -90,9 +90,13 @@ function wrapDbError(errorLike: any, fallbackMessage: string): Error & { code?: 
 export async function listSuppliersForManagement({
   businessId,
   preferredTaxColumn = 'nit',
+  limit,
+  offset = 0,
 }: {
   businessId: string;
   preferredTaxColumn?: SupplierTaxColumn;
+  limit?: number;
+  offset?: number;
 }): Promise<{ suppliers: ProveedorRecord[]; taxColumn: SupplierTaxColumn }> {
   const candidates: SupplierTaxColumn[] = preferredTaxColumn === 'nit'
     ? ['nit', 'tax_id']
@@ -104,12 +108,19 @@ export async function listSuppliersForManagement({
   let lastError: any = null;
 
   for (const column of candidates) {
-    const result = await client
+    let query = client
       .from('suppliers')
       .select(`${BASE_SUPPLIER_COLUMNS},${column}`)
       .eq('business_id', businessId)
       .order('created_at', { ascending: false });
 
+    if (Number.isFinite(limit)) {
+      const safeLimit = Number(limit);
+      const safeOffset = Number.isFinite(offset) ? Number(offset) : 0;
+      query = query.range(safeOffset, safeOffset + safeLimit - 1);
+    }
+
+    const result = await query;
     if (!result.error) {
       data = Array.isArray(result.data) ? result.data : [];
       resolvedTaxColumn = column;
