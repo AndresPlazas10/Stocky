@@ -2,6 +2,7 @@ import { useMemo, useState, type ComponentProps } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -199,6 +200,7 @@ function AuthInput({
 export function AuthScreen() {
   const { height: viewportHeight } = useWindowDimensions();
   const [mode, setMode] = useState<AuthMode>('signin');
+  const allowSignUp = false;
 
   const [signInForm, setSignInForm] = useState<SignInForm>({
     username: '',
@@ -384,6 +386,7 @@ export function AuthScreen() {
   };
 
   const switchMode = () => {
+    if (!allowSignUp) return;
     setMode((prev) => (prev === 'signin' ? 'signup' : 'signin'));
     setError(null);
     setMessage(null);
@@ -548,14 +551,25 @@ export function AuthScreen() {
               </LinearGradient>
             </Pressable>
 
-            <View style={styles.switchRow}>
-              <Text style={styles.switchPrompt}>
-                {isSignIn ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
-              </Text>
-              <Pressable onPress={switchMode}>
-                <Text style={styles.switchAction}>{isSignIn ? 'Registrar negocio' : 'Iniciar sesión'}</Text>
+            {!allowSignUp ? (
+              <Pressable
+                onPress={() => Linking.openURL('https://wa.me/573188246925')}
+                style={styles.signInHelperWrap}
+              >
+                <Text style={styles.signInHelper}>
+                  ¿Necesitas acceso? Escríbenos por WhatsApp al 318 824 6925.
+                </Text>
               </Pressable>
-            </View>
+            ) : (
+              <View style={styles.switchRow}>
+                <Text style={styles.switchPrompt}>
+                  {isSignIn ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
+                </Text>
+                <Pressable onPress={switchMode}>
+                  <Text style={styles.switchAction}>{isSignIn ? 'Registrar negocio' : 'Iniciar sesión'}</Text>
+                </Pressable>
+              </View>
+            )}
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -701,6 +715,16 @@ const styles = StyleSheet.create({
     color: '#4C3CB0',
     fontSize: 15,
     fontWeight: '700',
+  },
+  signInHelperWrap: {
+    marginTop: 12,
+  },
+  signInHelper: {
+    textAlign: 'center',
+    color: '#4B5563',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
   },
   error: {
     color: '#B91C1C',

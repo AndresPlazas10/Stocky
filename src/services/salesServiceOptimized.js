@@ -5,6 +5,7 @@
 
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { isAdminRole } from '../utils/roles.js';
+import { notifyAdminLowStockWeb } from './webNotificationsService.js';
 
 function isFunctionUnavailableError(errorLike, functionName) {
   const message = String(errorLike?.message || errorLike || '').toLowerCase();
@@ -79,6 +80,31 @@ function normalizeRpcSaleItem(item = {}) {
     quantity,
     unit_price: unitPrice
   };
+}
+
+async function maybeNotifyAdminLowStock({ businessId, productIds }) {
+  try {
+    const sessionResult = await supabaseAdapter.getCurrentSession();
+    const accessToken = sessionResult?.data?.session?.access_token || null;
+    if (!accessToken) return;
+    await notifyAdminLowStockWeb({
+      accessToken,
+      businessId,
+      productIds,
+    });
+  } catch {
+    // Best-effort: no bloquear venta por notificaciones
+  }
+}
+
+function collectProductIdsFromItems(items = []) {
+  if (!Array.isArray(items)) return [];
+  const productIds = items
+    .map((item) => item?.product_id)
+    .filter(Boolean)
+    .map((id) => String(id).trim())
+    .filter(Boolean);
+  return Array.from(new Set(productIds));
 }
 
 /**
@@ -198,6 +224,11 @@ export async function createSaleOptimized({
         success: false, 
         error: 'Respuesta inesperada del servidor' 
       };
+    }
+
+    const productIds = collectProductIdsFromItems(itemsForRpc);
+    if (productIds.length > 0) {
+      void maybeNotifyAdminLowStock({ businessId, productIds });
     }
 
     return {

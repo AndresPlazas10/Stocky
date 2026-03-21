@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stocky - Eliminación de cuenta</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f8fafc;
+        --card: #ffffff;
+        --text: #0f172a;
+        --muted: #475569;
+        --brand: #0f766e;
+        --brand-dark: #115e59;
+        --border: #e2e8f0;
+        --warn-bg: #fff7ed;
+        --warn-border: #fdba74;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+        color: #ffffff;
+        padding: 32px 20px;
+      }
+      header h1 {
+        margin: 0 0 6px;
+        font-size: 28px;
+      }
+      header p {
+        margin: 0;
+        opacity: 0.92;
+        font-size: 14px;
+      }
+      main {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      }
+      .notice {
+        margin-top: 16px;
+        background: var(--warn-bg);
+        border: 1px solid var(--warn-border);
+        border-radius: 14px;
+        padding: 16px;
+      }
+      h2 {
+        margin-top: 24px;
+        font-size: 18px;
+      }
+      p,
+      li {
+        color: var(--muted);
+        line-height: 1.6;
+        font-size: 15px;
+      }
+      ul,
+      ol {
+        padding-left: 20px;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 20px;
+      }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 18px;
+        border-radius: 999px;
+        background: var(--brand);
+        color: #ffffff;
+        text-decoration: none;
+        font-weight: 700;
+      }
+      .button.secondary {
+        background: transparent;
+        border: 1px solid var(--brand);
+        color: var(--brand-dark);
+      }
+      footer {
+        padding: 24px 0 10px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      a {
+        color: var(--brand);
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Solicitud de eliminación de cuenta</h1>
+      <p>Stocky - Sistema de Gestión POS</p>
+      <p>Última actualización: 21 de marzo de 2026</p>
+    </header>
+    <main>
+      <div class="card">
+        <p>
+          En Stocky puedes solicitar la eliminación de tu cuenta y de tus datos personales. Esta
+          página explica las opciones disponibles y cómo procesamos la solicitud.
+        </p>
+
+        <h2>Opción 1: eliminar la cuenta desde la app</h2>
+        <ol>
+          <li>Inicia sesión en Stocky.</li>
+          <li>Abre el módulo de <strong>Configuración</strong>.</li>
+          <li>Selecciona la opción <strong>Eliminar cuenta</strong>.</li>
+          <li>Confirma la solicitud para completar el proceso.</li>
+        </ol>
+
+        <h2>Opción 2: solicitar la eliminación por soporte</h2>
+        <p>
+          Si no puedes entrar a la app, puedes pedir la eliminación escribiéndonos por correo o
+          WhatsApp. Para agilizar el proceso, incluye:
+        </p>
+        <ul>
+          <li>Nombre del negocio.</li>
+          <li>Correo asociado a la cuenta.</li>
+          <li>Nombre del titular o administrador.</li>
+          <li>Motivo breve de la solicitud.</li>
+        </ul>
+
+        <div class="actions">
+          <a class="button" href="mailto:soporte@stockypos.app?subject=Solicitud%20de%20eliminaci%C3%B3n%20de%20cuenta%20Stocky">Solicitar por correo</a>
+          <a class="button secondary" href="https://wa.me/573188246925?text=Hola%2C%20quiero%20solicitar%20la%20eliminaci%C3%B3n%20de%20mi%20cuenta%20de%20Stocky." target="_blank" rel="noreferrer">Solicitar por WhatsApp</a>
+        </div>
+
+        <h2>Qué datos se eliminan</h2>
+        <p>
+          Eliminamos o anonimimizamos los datos personales asociados a la cuenta, salvo la
+          información que debamos conservar temporalmente por obligaciones legales, tributarias,
+          contables o de seguridad.
+        </p>
+
+        <div class="notice">
+          <p>
+            El tiempo de procesamiento puede variar según el caso. Si necesitamos validar identidad
+            o revisar dependencias del negocio, te contactaremos por el mismo canal desde el que se
+            hizo la solicitud.
+          </p>
+        </div>
+
+        <h2>Contacto</h2>
+        <p>
+          Correo: <a href="mailto:soporte@stockypos.app">soporte@stockypos.app</a><br />
+          WhatsApp: <a href="https://wa.me/573188246925" target="_blank" rel="noreferrer">+57 318 824 6925</a>
+        </p>
+      </div>
+      <footer>Stocky © 2026</footer>
+    </main>
+  </body>
+</html>

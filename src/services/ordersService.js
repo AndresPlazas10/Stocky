@@ -6,7 +6,7 @@
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { isAdminRole } from '../utils/roles.js';
 import { enqueueOutboxMutation } from '../sync/outboxShadow.js';
-import { notifyAdminSaleRegisteredWeb } from './webNotificationsService.js';
+import { notifyAdminLowStockWeb, notifyAdminSaleRegisteredWeb } from './webNotificationsService.js';
 
 function buildIdempotencyKey({ action, businessId, orderId, tableId }) {
   const normalizedAction = String(action || '').trim().toLowerCase();
@@ -269,6 +269,31 @@ async function maybeNotifyAdminSale({ businessId, saleTotal }) {
   }
 }
 
+async function maybeNotifyAdminLowStock({ businessId, productIds }) {
+  try {
+    const sessionResult = await supabaseAdapter.getCurrentSession();
+    const accessToken = sessionResult?.data?.session?.access_token || null;
+    if (!accessToken) return;
+    await notifyAdminLowStockWeb({
+      accessToken,
+      businessId,
+      productIds,
+    });
+  } catch {
+    // no-op: no bloquear cierre de venta por notificaciones
+  }
+}
+
+function collectProductIdsFromItems(items = []) {
+  if (!Array.isArray(items)) return [];
+  const productIds = items
+    .map((item) => item?.product_id)
+    .filter(Boolean)
+    .map((id) => String(id).trim())
+    .filter(Boolean);
+  return Array.from(new Set(productIds));
+}
+
 function computeChangeFromBreakdown(changeBreakdown = []) {
   return changeBreakdown.reduce((sum, entry) => {
     const denomination = Number(entry?.denomination || 0);
@@ -494,6 +519,12 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
       }
     });
 
+    const productIds = collectProductIdsFromItems(
+      subAccountsWithItems.flatMap((sub) => sub.items || [])
+    );
+    if (productIds.length > 0) {
+      void maybeNotifyAdminLowStock({ businessId, productIds });
+    }
     return { totalSold: atomicTotalSold, saleIds: atomicSaleIds };
   }
 
@@ -604,6 +635,12 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
   });
 
   void maybeNotifyAdminSale({ businessId, saleTotal: totalSold });
+  const fallbackProductIds = collectProductIdsFromItems(
+    subAccountsWithItems.flatMap((sub) => sub.items || [])
+  );
+  if (fallbackProductIds.length > 0) {
+    void maybeNotifyAdminLowStock({ businessId, productIds: fallbackProductIds });
+  }
 
   return { totalSold, saleIds };
 }
@@ -776,6 +813,10 @@ export async function closeOrderSingle(
   });
 
   void maybeNotifyAdminSale({ businessId, saleTotal });
+  const productIds = collectProductIdsFromItems(itemsForRpc);
+  if (productIds.length > 0) {
+    void maybeNotifyAdminLowStock({ businessId, productIds });
+  }
 
   return { saleTotal, saleId: resolvedSaleId };
 }

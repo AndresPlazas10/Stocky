@@ -13,7 +13,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.stocky.mobile"
+      "bundleIdentifier": "com.stocky.mobile",
+      "buildNumber": "1"
     },
     "android": {
       "package": "com.stocky.mobile",

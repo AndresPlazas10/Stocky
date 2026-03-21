@@ -1,6 +1,6 @@
 const defaultApiBaseUrl = 'https://www.stockypos.app';
 const rawBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || defaultApiBaseUrl;
-const defaultAndroidDownloadUrl = 'https://www.stockypos.app/descargar';
+const defaultAndroidDownloadUrl = 'https://play.google.com/store/apps/details?id=com.stocky.mobile';
 
 export const EXPO_CONFIG = {
   apiBaseUrl: rawBaseUrl.replace(/\/+$/, ''),
