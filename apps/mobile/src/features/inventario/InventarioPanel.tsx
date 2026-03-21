@@ -82,6 +82,7 @@ const UNIT_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'l', label: 'Litro' },
   { value: 'box', label: 'Caja' },
 ];
+const INVENTORY_PAGE_SIZE = 40;
 
 function normalizeRole(value: unknown): string {
   return String(value || '').trim().toLowerCase();
@@ -219,6 +220,9 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
   const suppliersRef = useRef<InventorySupplierRecord[]>([]);
   const inventoryRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inventorySuppliersRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMoreProducts, setHasMoreProducts] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const isProcessingAction = saving || deleting;
   const processingLabel = saving
     ? (editingProduct ? 'Actualizando producto...' : 'Guardando producto...')
@@ -242,8 +246,14 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
     setLoading(true);
     setError(null);
     try {
-      const nextProducts = await listInventoryProducts(businessId, { includeSuppliers: false });
+      const nextProducts = await listInventoryProducts(businessId, {
+        includeSuppliers: false,
+        limit: INVENTORY_PAGE_SIZE,
+        offset: 0,
+      });
       setProducts(hydrateProductsWithSuppliers(nextProducts, suppliersRef.current));
+      setHasMoreProducts(nextProducts.length === INVENTORY_PAGE_SIZE);
+      setPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar inventario.');
     } finally {
@@ -257,8 +267,14 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
     setRefreshing(true);
     setError(null);
     try {
-      const nextProducts = await listInventoryProducts(businessId, { includeSuppliers: false });
+      const nextProducts = await listInventoryProducts(businessId, {
+        includeSuppliers: false,
+        limit: INVENTORY_PAGE_SIZE,
+        offset: 0,
+      });
       setProducts(hydrateProductsWithSuppliers(nextProducts, suppliersRef.current));
+      setHasMoreProducts(nextProducts.length === INVENTORY_PAGE_SIZE);
+      setPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo actualizar inventario.');
     } finally {
@@ -268,12 +284,38 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
 
   const refreshProductsSilently = useCallback(async () => {
     try {
-      const nextProducts = await listInventoryProducts(businessId, { includeSuppliers: false });
+      const nextProducts = await listInventoryProducts(businessId, {
+        includeSuppliers: false,
+        limit: INVENTORY_PAGE_SIZE,
+        offset: 0,
+      });
       setProducts(hydrateProductsWithSuppliers(nextProducts, suppliersRef.current));
+      setHasMoreProducts(nextProducts.length === INVENTORY_PAGE_SIZE);
+      setPage(1);
     } catch {
       // no-op
     }
   }, [businessId]);
+
+  const loadMoreProducts = useCallback(async () => {
+    if (loadingMore || !hasMoreProducts) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const nextProducts = await listInventoryProducts(businessId, {
+        includeSuppliers: false,
+        limit: INVENTORY_PAGE_SIZE,
+        offset: (nextPage - 1) * INVENTORY_PAGE_SIZE,
+      });
+      setProducts((prev) => hydrateProductsWithSuppliers([...prev, ...nextProducts], suppliersRef.current));
+      setHasMoreProducts(nextProducts.length === INVENTORY_PAGE_SIZE);
+      setPage(nextPage);
+    } catch {
+      // no-op
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [businessId, hasMoreProducts, loadingMore, page]);
 
   const checkPermissions = useCallback(async () => {
     if (source === 'owner') {
@@ -815,12 +857,22 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
         );
       })}
 
+      {hasMoreProducts ? (
+        <View style={styles.loadMoreWrap}>
+          <Text style={styles.loadMoreHint}>Mostrando {products.length} productos</Text>
+          <StockyButton onPress={loadMoreProducts} loading={loadingMore} variant="ghost">
+            Cargar más productos
+          </StockyButton>
+        </View>
+      ) : null}
+
       <StockyModal
         visible={showFormModal}
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={16}
         modalAnimationType="none"
+        bodyFlex
         sheetStyle={styles.productFormSheet}
         onClose={closeFormModal}
         headerSlot={(
@@ -1004,6 +1056,7 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={26}
+        bodyFlex
         onClose={closeCategoryPicker}
       >
         {INVENTORY_CATEGORY_OPTIONS.map((category) => {
@@ -1029,6 +1082,7 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={26}
+        bodyFlex
         onClose={closeUnitPicker}
       >
         {UNIT_OPTIONS.map((unit) => {
@@ -1054,6 +1108,7 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={26}
+        bodyFlex
         onClose={closeSupplierPicker}
       >
         <Pressable
@@ -1801,6 +1856,16 @@ const styles = StyleSheet.create({
     color: STOCKY_COLORS.textMuted,
     fontSize: 12,
     lineHeight: 18,
+    fontWeight: '600',
+  },
+  loadMoreWrap: {
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+  },
+  loadMoreHint: {
+    color: STOCKY_COLORS.textSecondary,
+    fontSize: 12,
     fontWeight: '600',
   },
 });

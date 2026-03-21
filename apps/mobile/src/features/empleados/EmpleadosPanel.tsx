@@ -24,6 +24,7 @@ import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
 import { StockyModal } from '../../ui/StockyModal';
 import { StockyProcessingOverlay } from '../../ui/StockyProcessingOverlay';
 import { StockyStatusToast } from '../../ui/StockyStatusToast';
+import { StockyButton } from '../../ui/StockyButton';
 
 type Props = {
   businessId: string;
@@ -43,6 +44,7 @@ const INITIAL_FORM: EmployeeFormState = {
   username: '',
   password: '',
 };
+const EMPLOYEES_PAGE_SIZE = 40;
 
 function normalizeRole(value: unknown): string {
   return String(value || '').trim().toLowerCase();
@@ -87,6 +89,9 @@ export function EmpleadosPanel({ businessId, businessName, userId, source }: Pro
     password: string;
   } | null>(null);
   const employeesRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMoreEmployees, setHasMoreEmployees] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const isProcessingAction = creating || deleting;
   const processingLabel = creating
     ? 'Creando empleado...'
@@ -96,8 +101,13 @@ export function EmpleadosPanel({ businessId, businessName, userId, source }: Pro
     setLoading(true);
     setError(null);
     try {
-      const list = await listEmployeesForManagement(businessId);
+      const list = await listEmployeesForManagement(businessId, {
+        limit: EMPLOYEES_PAGE_SIZE,
+        offset: 0,
+      });
       setEmployees(list.filter((employee) => !isOwnerRole(employee.role)));
+      setHasMoreEmployees(list.length === EMPLOYEES_PAGE_SIZE);
+      setPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar la lista de empleados.');
     } finally {
@@ -109,8 +119,13 @@ export function EmpleadosPanel({ businessId, businessName, userId, source }: Pro
     setRefreshing(true);
     setError(null);
     try {
-      const list = await listEmployeesForManagement(businessId);
+      const list = await listEmployeesForManagement(businessId, {
+        limit: EMPLOYEES_PAGE_SIZE,
+        offset: 0,
+      });
       setEmployees(list.filter((employee) => !isOwnerRole(employee.role)));
+      setHasMoreEmployees(list.length === EMPLOYEES_PAGE_SIZE);
+      setPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo actualizar la lista de empleados.');
     } finally {
@@ -120,12 +135,37 @@ export function EmpleadosPanel({ businessId, businessName, userId, source }: Pro
 
   const refreshEmployeesSilently = useCallback(async () => {
     try {
-      const list = await listEmployeesForManagement(businessId);
+      const list = await listEmployeesForManagement(businessId, {
+        limit: EMPLOYEES_PAGE_SIZE,
+        offset: 0,
+      });
       setEmployees(list.filter((employee) => !isOwnerRole(employee.role)));
+      setHasMoreEmployees(list.length === EMPLOYEES_PAGE_SIZE);
+      setPage(1);
     } catch {
       // no-op
     }
   }, [businessId]);
+
+  const loadMoreEmployees = useCallback(async () => {
+    if (loadingMore || !hasMoreEmployees) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const list = await listEmployeesForManagement(businessId, {
+        limit: EMPLOYEES_PAGE_SIZE,
+        offset: (nextPage - 1) * EMPLOYEES_PAGE_SIZE,
+      });
+      const normalized = list.filter((employee) => !isOwnerRole(employee.role));
+      setEmployees((prev) => [...prev, ...normalized]);
+      setHasMoreEmployees(list.length === EMPLOYEES_PAGE_SIZE);
+      setPage(nextPage);
+    } catch {
+      // no-op
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [businessId, hasMoreEmployees, loadingMore, page]);
 
   const checkManagePermission = useCallback(async () => {
     if (source === 'owner') {
@@ -366,12 +406,13 @@ export function EmpleadosPanel({ businessId, businessName, userId, source }: Pro
         ) : employees.length === 0 ? (
           <Text style={styles.emptyText}>No hay empleados registrados.</Text>
         ) : (
-          employees.map((employee) => {
-            const initial = String(employee.full_name || '?').trim().charAt(0).toUpperCase() || '?';
-            const isSelfUser = Boolean(employee.user_id && employee.user_id === userId);
-            const deleteDisabled = !canManageEmployees || checkingPermissions || deleting || isSelfUser;
-            return (
-              <View key={employee.id} style={styles.employeeCard}>
+          <>
+            {employees.map((employee) => {
+              const initial = String(employee.full_name || '?').trim().charAt(0).toUpperCase() || '?';
+              const isSelfUser = Boolean(employee.user_id && employee.user_id === userId);
+              const deleteDisabled = !canManageEmployees || checkingPermissions || deleting || isSelfUser;
+              return (
+                <View key={employee.id} style={styles.employeeCard}>
                 <View style={styles.tableHeader}>
                   <Text style={[styles.tableHeaderText, styles.cellEmployee]}>EMPLEADO</Text>
                   <Text style={[styles.tableHeaderText, styles.cellUser]}>USUARIO</Text>
@@ -432,9 +473,18 @@ export function EmpleadosPanel({ businessId, businessName, userId, source }: Pro
                     )}
                   </View>
                 </View>
+                </View>
+              );
+            })}
+            {hasMoreEmployees ? (
+              <View style={styles.loadMoreWrap}>
+                <Text style={styles.loadMoreHint}>Mostrando {employees.length} empleados</Text>
+                <StockyButton onPress={loadMoreEmployees} loading={loadingMore} variant="ghost">
+                  Cargar más empleados
+                </StockyButton>
               </View>
-            );
-          })
+            ) : null}
+          </>
         )}
       </View>
 
@@ -444,6 +494,7 @@ export function EmpleadosPanel({ businessId, businessName, userId, source }: Pro
         backdropVariant="blur"
         centeredOffsetY={16}
         modalAnimationType="none"
+        bodyFlex
         sheetStyle={styles.employeeFormSheet}
         onClose={() => {
           if (creating) return;
@@ -1046,5 +1097,15 @@ const styles = StyleSheet.create({
     color: STOCKY_COLORS.primary900,
     fontSize: 15,
     fontWeight: '800',
+  },
+  loadMoreWrap: {
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+  },
+  loadMoreHint: {
+    color: STOCKY_COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

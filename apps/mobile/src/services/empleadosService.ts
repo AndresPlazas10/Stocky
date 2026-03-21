@@ -131,14 +131,24 @@ export function isOwnerRole(role: unknown): boolean {
   return normalized === 'owner' || normalized === 'propietario';
 }
 
-export async function listEmployeesForManagement(businessId: string): Promise<EmpleadoRecord[]> {
+export async function listEmployeesForManagement(
+  businessId: string,
+  options: { limit?: number; offset?: number } = {},
+): Promise<EmpleadoRecord[]> {
   const client = getSupabaseClient();
-  const { data, error } = await client
+  const limit = Number.isFinite(options.limit) ? Number(options.limit) : null;
+  const offset = Number.isFinite(options.offset) ? Number(options.offset) : 0;
+  let query = client
     .from('employees')
     .select(EMPLOYEE_LIST_COLUMNS)
     .eq('business_id', businessId)
     .order('created_at', { ascending: false });
 
+  if (limit !== null) {
+    query = query.range(offset, offset + limit - 1);
+  }
+
+  const { data, error } = await query;
   if (error) {
     throw wrapDbError(error, 'No se pudieron cargar los empleados.');
   }

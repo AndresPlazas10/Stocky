@@ -183,6 +183,7 @@ function buildCartItem(catalogItem: MesaOrderCatalogItem): VentaCartItem {
     combo_id: catalogItem.item_type === 'combo' ? catalogItem.combo_id : null,
     name: catalogItem.name,
     code: catalogItem.code,
+    manage_stock: catalogItem.manage_stock !== false,
     quantity: 1,
     unit_price: Number(catalogItem.sale_price || 0),
     subtotal: Number(catalogItem.sale_price || 0),
@@ -1112,6 +1113,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         backdropVariant="blur"
         centeredOffsetY={16}
         modalAnimationType="none"
+        bodyFlex
         sheetStyle={styles.saleOrderModalSheet}
         onClose={() => {
           if (submitting) return;
@@ -1433,6 +1435,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={30}
+        bodyFlex
         onClose={() => setShowSellerFilterModal(false)}
       >
         {sellerOptions.map((option) => {
@@ -1461,6 +1464,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         backdropVariant="blur"
         centeredOffsetY={12}
         modalAnimationType="none"
+        bodyFlex
         sheetStyle={styles.saleDetailsModalSheet}
         contentContainerStyle={styles.saleDetailsContentContainer}
         onClose={closeVentaDetails}

@@ -45,6 +45,27 @@
         "EXPO_PUBLIC_FEATURE_REPORTES": "true",
         "EXPO_PUBLIC_FEATURE_CONFIGURACION": "true"
       }
+    },
+    "production": {
+      "distribution": "store",
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://stocky-mocha.vercel.app",
+        "EXPO_PUBLIC_MOBILE_VERSION": "0.1.1",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://wngjyrkqxblnhxliakqj.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "REDACTED_SUPABASE_ANON_KEY",
+        "EXPO_PUBLIC_FEATURE_HOME": "true",
+        "EXPO_PUBLIC_FEATURE_VENTAS": "true",
+        "EXPO_PUBLIC_FEATURE_COMPRAS": "true",
+        "EXPO_PUBLIC_FEATURE_INVENTARIO": "true",
+        "EXPO_PUBLIC_FEATURE_COMBOS": "true",
+        "EXPO_PUBLIC_FEATURE_PROVEEDORES": "true",
+        "EXPO_PUBLIC_FEATURE_EMPLEADOS": "true",
+        "EXPO_PUBLIC_FEATURE_REPORTES": "true",
+        "EXPO_PUBLIC_FEATURE_CONFIGURACION": "true"
+      }
     }
   }
 }

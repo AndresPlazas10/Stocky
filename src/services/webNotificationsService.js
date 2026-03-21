@@ -126,3 +126,42 @@ export async function notifyAdminSaleRegisteredWeb({
     },
   });
 }
+
+export async function notifyAdminLowStockWeb({
+  accessToken,
+  businessId,
+  productIds,
+}) {
+  const normalizedBusinessId = String(businessId || '').trim();
+  const normalizedProductIds = Array.isArray(productIds)
+    ? productIds.map((id) => String(id || '').trim()).filter(Boolean)
+    : [];
+
+  if (!normalizedBusinessId || normalizedProductIds.length === 0) {
+    return { ok: false, status: null, message: 'Missing business id or product ids' };
+  }
+
+  const preferLegacy = isLocalhost();
+  const firstRoute = preferLegacy ? '/api/notify-low-stock' : '/api/v2/notify-low-stock';
+  const fallbackRoute = preferLegacy ? '/api/v2/notify-low-stock' : '/api/notify-low-stock';
+
+  const primary = await postNotify({
+    route: firstRoute,
+    accessToken,
+    body: {
+      business_id: normalizedBusinessId,
+      product_ids: normalizedProductIds,
+    },
+  });
+  if (primary.ok) return primary;
+  if (primary.status !== 404 && primary.status !== null) return primary;
+
+  return postNotify({
+    route: fallbackRoute,
+    accessToken,
+    body: {
+      business_id: normalizedBusinessId,
+      product_ids: normalizedProductIds,
+    },
+  });
+}
