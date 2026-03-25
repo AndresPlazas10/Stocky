@@ -8,7 +8,6 @@ import type { ConfiguracionSnapshot } from '../../domain/configuracion/contracts
 import { deleteCurrentAccount } from '../../services/accountService';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
 import { StockyModal } from '../../ui/StockyModal';
-import { StockyProcessingOverlay } from '../../ui/StockyProcessingOverlay';
 import { StockyStatusToast } from '../../ui/StockyStatusToast';
 
 const TERMS_URL = 'https://www.stockypos.app/legal/terms.html';
@@ -141,10 +140,6 @@ export function ConfiguracionPanel({
     phone: '',
     address: '',
   });
-  const isProcessingAction = savingBusiness || signingOut || deletingAccount;
-  const processingLabel = signingOut
-    ? 'Cerrando sesión...'
-    : (deletingAccount ? 'Eliminando cuenta...' : (savingBusiness ? 'Guardando configuración...' : 'Procesando...'));
 
   const loadSnapshot = useCallback(async () => {
     setLoading(true);
@@ -687,7 +682,6 @@ export function ConfiguracionPanel({
           </Text>
         </View>
       </StockyModal>
-      <StockyProcessingOverlay visible={isProcessingAction} label={processingLabel} />
       <StockyStatusToast
         visible={showConfigUpdatedToast}
         title="Configuración Actualizada"

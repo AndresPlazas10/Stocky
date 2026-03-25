@@ -12,6 +12,7 @@ export type MesaRecord = {
   status: MesaStatus;
   current_order_id?: string | null;
   order_units?: number;
+  sync_version?: number;
   orders?: {
     id?: string;
     status?: string;
@@ -117,6 +118,7 @@ function normalizeMesaRow(row: any): MesaRecord {
   )
     ? Number.NaN
     : Number(rawOrderUnits);
+  const rawSyncVersion = Number(row?.sync_version);
   return {
     id: String(row?.id || ''),
     business_id: String(row?.business_id || ''),
@@ -126,6 +128,9 @@ function normalizeMesaRow(row: any): MesaRecord {
     current_order_id: row?.current_order_id ?? null,
     order_units: hasOrderUnits && Number.isFinite(normalizedOrderUnits)
       ? Math.max(0, Math.floor(normalizedOrderUnits))
+      : undefined,
+    sync_version: Number.isFinite(rawSyncVersion)
+      ? Math.max(0, Math.floor(rawSyncVersion))
       : undefined,
     orders: row?.orders
       ? {
@@ -315,6 +320,53 @@ function normalizeMesaEditLock(row: any): MesaEditLock {
   };
 }
 
+function hasSyncVersionField(rows: any[]): boolean {
+  return (Array.isArray(rows) ? rows : []).some(
+    (row) => row && typeof row === 'object' && Object.prototype.hasOwnProperty.call(row, 'sync_version'),
+  );
+}
+
+async function enrichMesasWithSyncVersion(mesas: MesaRecord[]): Promise<MesaRecord[]> {
+  const mesaIds = (Array.isArray(mesas) ? mesas : [])
+    .map((mesa) => String(mesa?.id || '').trim())
+    .filter(Boolean);
+
+  if (mesaIds.length === 0) return mesas;
+
+  const client = getSupabaseClient();
+  const { data, error } = await client
+    .from('tables')
+    .select('id,sync_version')
+    .in('id', mesaIds);
+
+  if (error) {
+    if (isMissingColumnInRelationError(error, { tableName: 'tables', columnName: 'sync_version' })) {
+      return mesas;
+    }
+    throw error;
+  }
+
+  const syncVersionByMesaId = new Map<string, number>();
+  (Array.isArray(data) ? data : []).forEach((row) => {
+    const mesaId = String(row?.id || '').trim();
+    if (!mesaId) return;
+    const syncVersion = Number(row?.sync_version);
+    syncVersionByMesaId.set(
+      mesaId,
+      Number.isFinite(syncVersion) ? Math.max(0, Math.floor(syncVersion)) : 0,
+    );
+  });
+
+  return mesas.map((mesa) => {
+    const mesaId = String(mesa?.id || '').trim();
+    if (!mesaId || !syncVersionByMesaId.has(mesaId)) return mesa;
+    return {
+      ...mesa,
+      sync_version: syncVersionByMesaId.get(mesaId),
+    };
+  });
+}
+
 async function fetchMesasWithSelect(businessId: string, includeNameColumn: boolean) {
   const client = getSupabaseClient();
 
@@ -326,6 +378,7 @@ async function fetchMesasWithSelect(businessId: string, includeNameColumn: boole
       name,
       status,
       current_order_id,
+      sync_version,
       orders:orders!current_order_id (
         id,
         status,
@@ -338,6 +391,7 @@ async function fetchMesasWithSelect(businessId: string, includeNameColumn: boole
       table_number,
       status,
       current_order_id,
+      sync_version,
       orders:orders!current_order_id (
         id,
         status,
@@ -358,7 +412,10 @@ async function fetchMesasWithOrderSummaryRpc(businessId: string): Promise<MesaRe
     p_business_id: businessId,
   });
   if (error) throw error;
-  return (Array.isArray(data) ? data : []).map(normalizeMesaRow);
+  const rows = Array.isArray(data) ? data : [];
+  const mesas = rows.map(normalizeMesaRow);
+  if (hasSyncVersionField(rows)) return mesas;
+  return enrichMesasWithSyncVersion(mesas);
 }
 
 async function fetchMesasWithOrderSummaryFastRpc(businessId: string): Promise<MesaRecord[]> {
@@ -367,7 +424,10 @@ async function fetchMesasWithOrderSummaryFastRpc(businessId: string): Promise<Me
     p_business_id: businessId,
   });
   if (error) throw error;
-  return (Array.isArray(data) ? data : []).map(normalizeMesaRow);
+  const rows = Array.isArray(data) ? data : [];
+  const mesas = rows.map(normalizeMesaRow);
+  if (hasSyncVersionField(rows)) return mesas;
+  return enrichMesasWithSyncVersion(mesas);
 }
 
 async function fetchMesaById(tableId: string, includeNameColumn: boolean) {
@@ -381,6 +441,7 @@ async function fetchMesaById(tableId: string, includeNameColumn: boolean) {
       name,
       status,
       current_order_id,
+      sync_version,
       orders:orders!current_order_id (
         id,
         status,
@@ -393,6 +454,7 @@ async function fetchMesaById(tableId: string, includeNameColumn: boolean) {
       table_number,
       status,
       current_order_id,
+      sync_version,
       orders:orders!current_order_id (
         id,
         status,
@@ -535,7 +597,7 @@ async function runLegacyOpenCloseWithSupabaseClient({
       .select('id,business_id,table_number,current_order_id,status')
       .eq('id', tableId)
       .maybeSingle();
-    tableRow = fallback.data;
+    tableRow = fallback.data ? { ...fallback.data, name: null } : null;
     tableError = fallback.error;
   }
 
@@ -610,6 +672,7 @@ async function runLegacyOpenCloseWithSupabaseClient({
     current_order_id: action === 'open' ? nextOrderId : null,
     table_number: tableRow.table_number ?? null,
     name: tableRow.name ?? null,
+    sync_version: undefined,
     orders: null,
   };
 }

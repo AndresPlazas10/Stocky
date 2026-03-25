@@ -25,6 +25,5 @@ app.get('/apk/:file', (req, res) => {
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
   console.log(`APK server running on http://0.0.0.0:${PORT}`);
 });

@@ -45,7 +45,7 @@ function Login() {
       }
 
       // Generar el email basado en el username (igual que en el registro)
-      const { user, session } = await signInWithUsernamePassword({
+      const { user } = await signInWithUsernamePassword({
         username,
         password
       });

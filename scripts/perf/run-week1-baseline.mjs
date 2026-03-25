@@ -663,7 +663,8 @@ async function opEmpleadosLoad({ client, businessId, runMeasuredQuery }) {
       .from('employees')
       .select('id,business_id,user_id,username,full_name,role,is_active,created_at')
       .eq('business_id', businessId)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .range(0, 39),
   );
 }
 

@@ -45,6 +45,7 @@
     "audit:realtime": "node scripts/realtime-audit/run-all.mjs",
     "audit:security": "npm audit --audit-level=critical && (cd apps/mobile && npm audit --audit-level=critical)",
     "audit:perf:baseline": "node scripts/perf/run-week1-baseline.mjs",
+    "audit:perf:csv-summary": "node scripts/perf/summarize-baseline-csv.mjs",
     "audit:perf:budget": "node scripts/perf/check-week1-budget.mjs",
     "audit:perf:pr-diff": "node scripts/perf/build-pr-budget-diff.mjs",
     "audit:perf:ci": "node scripts/perf/run-week1-baseline.mjs --out-json testing/perf/perf-current.json --out-md docs/perf/PERF_CURRENT.md && node scripts/perf/check-week1-budget.mjs --current testing/perf/perf-current.json --budget testing/perf/perf-budget.json",

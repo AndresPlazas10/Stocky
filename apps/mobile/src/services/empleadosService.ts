@@ -3,6 +3,7 @@ import { EXPO_CONFIG } from '../config/env';
 import { getSupabaseClient } from '../lib/supabase';
 
 const EMPLOYEE_LIST_COLUMNS = 'id,business_id,user_id,full_name,username,role,is_active,created_at';
+const DEFAULT_EMPLOYEE_MANAGEMENT_LIMIT = 40;
 
 const isolatedAuthStorage = {
   getItem: async () => null,
@@ -136,7 +137,9 @@ export async function listEmployeesForManagement(
   options: { limit?: number; offset?: number } = {},
 ): Promise<EmpleadoRecord[]> {
   const client = getSupabaseClient();
-  const limit = Number.isFinite(options.limit) ? Number(options.limit) : null;
+  const limit = Number.isFinite(options.limit)
+    ? Math.max(1, Number(options.limit))
+    : DEFAULT_EMPLOYEE_MANAGEMENT_LIMIT;
   const offset = Number.isFinite(options.offset) ? Number(options.offset) : 0;
   let query = client
     .from('employees')
@@ -144,9 +147,7 @@ export async function listEmployeesForManagement(
     .eq('business_id', businessId)
     .order('created_at', { ascending: false });
 
-  if (limit !== null) {
-    query = query.range(offset, offset + limit - 1);
-  }
+  query = query.range(offset, offset + limit - 1);
 
   const { data, error } = await query;
   if (error) {
