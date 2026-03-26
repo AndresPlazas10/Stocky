@@ -17,10 +17,10 @@ import {
   type ProveedorRecord,
   type SupplierTaxColumn,
 } from '../../services/proveedoresService';
+import { invalidatePurchaseCatalogCache } from '../../services/comprasService';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
 import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
 import { StockyModal } from '../../ui/StockyModal';
-import { StockyProcessingOverlay } from '../../ui/StockyProcessingOverlay';
 import { StockyStatusToast } from '../../ui/StockyStatusToast';
 import { StockyButton } from '../../ui/StockyButton';
 
@@ -86,10 +86,6 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
   const [page, setPage] = useState(1);
   const [hasMoreSuppliers, setHasMoreSuppliers] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const isProcessingAction = saving || deleting;
-  const processingLabel = saving
-    ? (editingSupplier ? 'Actualizando proveedor...' : 'Guardando proveedor...')
-    : (deleting ? 'Eliminando proveedor...' : 'Procesando...');
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -339,6 +335,7 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
           ? 'Proveedor actualizado correctamente.'
           : 'Proveedor creado correctamente.',
       );
+      invalidatePurchaseCatalogCache(businessId);
       closeFormModal();
       await refreshSuppliers();
     } catch (err) {
@@ -370,6 +367,7 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
       setShowDeleteModal(false);
       setSupplierToDelete(null);
       setSuccess('Proveedor eliminado correctamente.');
+      invalidatePurchaseCatalogCache(businessId);
       await refreshSuppliers();
     } catch (err: any) {
       if (String(err?.code || '') === '23503') {
@@ -685,7 +683,6 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
         }}
         onConfirm={confirmDeleteSupplier}
       />
-      <StockyProcessingOverlay visible={isProcessingAction} label={processingLabel} />
       <StockyStatusToast
         visible={showSupplierCreatedToast}
         title="Proveedor Creado"

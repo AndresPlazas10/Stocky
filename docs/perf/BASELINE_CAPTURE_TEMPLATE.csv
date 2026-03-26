@@ -1,0 +1,15 @@
+fecha,plataforma,flujo,escenario,run_ms,resultado,error,version_app,build_id,observaciones
+2026-03-24,movil,login,owner,0,pending,,1.0.0,,captura inicial
+2026-03-24,movil,abrir_mesas,owner,0,pending,,1.0.0,,captura inicial
+2026-03-24,movil,abrir_ventas,owner,0,pending,,1.0.0,,captura inicial
+2026-03-24,movil,guardar_orden,owner,0,pending,,1.0.0,,captura inicial
+2026-03-24,movil,crear_compra,owner,0,pending,,1.0.0,,captura inicial
+2026-03-24,movil,crear_producto,owner,0,pending,,1.0.0,,captura inicial
+2026-03-24,movil,crear_combo,owner,0,pending,,1.0.0,,captura inicial
+2026-03-24,web,login,owner,0,pending,,web,,captura inicial
+2026-03-24,web,abrir_mesas,owner,0,pending,,web,,captura inicial
+2026-03-24,web,abrir_ventas,owner,0,pending,,web,,captura inicial
+2026-03-24,web,guardar_orden,owner,0,pending,,web,,captura inicial
+2026-03-24,web,crear_compra,owner,0,pending,,web,,captura inicial
+2026-03-24,web,crear_producto,owner,0,pending,,web,,captura inicial
+2026-03-24,web,crear_combo,owner,0,pending,,web,,captura inicial

@@ -7,7 +7,6 @@ import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
 import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
 import { StockyMoneyText } from '../../ui/StockyMoneyText';
 import { StockyModal } from '../../ui/StockyModal';
-import { StockyProcessingOverlay } from '../../ui/StockyProcessingOverlay';
 import { StockyStatusToast } from '../../ui/StockyStatusToast';
 import { formatCop } from '../../services/mesasService';
 import {
@@ -332,10 +331,8 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
 
   const openCreatePurchaseModal = useCallback(() => {
     setShowCreatePurchaseModal(true);
-    if (products.length === 0 || suppliers.length === 0) {
-      void loadCatalogData();
-    }
-  }, [loadCatalogData, products.length, suppliers.length]);
+    void loadCatalogData(true);
+  }, [loadCatalogData]);
 
   const checkDeletePermission = useCallback(async () => {
     if (source === 'owner') {
@@ -441,11 +438,13 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         schedulePurchasesRefresh();
+        scheduleCatalogRefresh();
       }
     });
 
     fallbackTimer = setInterval(() => {
       schedulePurchasesRefresh();
+      scheduleCatalogRefresh();
     }, 20000);
 
     return () => {
@@ -809,12 +808,6 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
     () => (selectedPurchase ? getPurchasePaymentTheme(selectedPurchase.payment_method) : null),
     [selectedPurchase],
   );
-  const isProcessingAction = creatingPurchase || deletingPurchase || checkingAdmin;
-  const processingLabel = creatingPurchase
-    ? 'Registrando compra...'
-    : (deletingPurchase
-      ? 'Eliminando compra...'
-      : (checkingAdmin ? 'Validando permisos...' : 'Procesando...'));
 
   const openDayFilterCalendar = useCallback(() => {
     const selectedDate = dayFilter !== 'all' ? parseDayKey(dayFilter) : null;
@@ -1485,7 +1478,6 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
         }}
         onConfirm={confirmDeletePurchase}
       />
-      <StockyProcessingOverlay visible={isProcessingAction} label={processingLabel} />
       <StockyStatusToast
         visible={showPurchaseCreatedToast}
         title="Compra Registrada"
@@ -1970,6 +1962,7 @@ const styles = StyleSheet.create({
   },
   purchaseOrderModalSheet: {
     maxHeight: '88%',
+    height: '88%',
     borderRadius: 26,
     borderColor: '#D9DEE8',
   },

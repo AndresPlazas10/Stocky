@@ -47,7 +47,12 @@ export default defineConfig([
     },
   },
   {
-    files: ['api/**/*.js', 'vite.config.js'],
+    files: [
+      'api/**/*.js',
+      'vite.config.js',
+      'apps/mobile/metro.config.js',
+      'apps/mobile/plugins/withFirebaseAppInit.js',
+    ],
     languageOptions: {
       globals: {
         ...globals.node,

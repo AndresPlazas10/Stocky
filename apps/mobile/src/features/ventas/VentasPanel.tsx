@@ -8,7 +8,6 @@ import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
 import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
 import { StockyMoneyText } from '../../ui/StockyMoneyText';
 import { StockyModal } from '../../ui/StockyModal';
-import { StockyProcessingOverlay } from '../../ui/StockyProcessingOverlay';
 import { StockyStatusToast } from '../../ui/StockyStatusToast';
 import { formatCop } from '../../services/mesasService';
 import type { PaymentMethod } from '../../services/mesaCheckoutService';
@@ -594,10 +593,6 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
     () => (selectedVenta ? getPaymentMethodTheme(selectedVenta.payment_method) : null),
     [selectedVenta],
   );
-  const isProcessingAction = submitting || deletingVenta;
-  const processingLabel = submitting
-    ? 'Procesando venta...'
-    : (deletingVenta ? 'Eliminando venta...' : 'Procesando...');
 
   const pageRange = useMemo(() => {
     if (filteredVentas.length === 0) return { from: 0, to: 0 };
@@ -1636,7 +1631,6 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         }}
         onConfirm={confirmDeleteVenta}
       />
-      <StockyProcessingOverlay visible={isProcessingAction} label={processingLabel} />
       <StockyStatusToast
         visible={showSaleCreatedToast}
         title="Venta Registrada"
@@ -2157,6 +2151,7 @@ const styles = StyleSheet.create({
   },
   saleOrderModalSheet: {
     maxHeight: '88%',
+    height: '88%',
     borderRadius: 26,
     borderColor: '#D9DEE8',
   },

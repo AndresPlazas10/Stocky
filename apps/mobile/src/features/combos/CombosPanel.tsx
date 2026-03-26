@@ -27,7 +27,6 @@ import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
 import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
 import { StockyMoneyText } from '../../ui/StockyMoneyText';
 import { StockyModal } from '../../ui/StockyModal';
-import { StockyProcessingOverlay } from '../../ui/StockyProcessingOverlay';
 import { StockyStatusToast } from '../../ui/StockyStatusToast';
 
 type Props = {
@@ -184,10 +183,6 @@ export function CombosPanel({ businessId, businessName, userId, source }: Props)
   const [comboToDelete, setComboToDelete] = useState<ComboRecord | null>(null);
   const combosRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const combosProductsRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isProcessingAction = saving || deleting || Boolean(updatingStatusId);
-  const processingLabel = saving
-    ? (editingCombo ? 'Actualizando combo...' : 'Guardando combo...')
-    : (deleting ? 'Eliminando combo...' : (updatingStatusId ? 'Actualizando estado...' : 'Procesando...'));
 
   const productsById = useMemo(() => {
     const map = new Map<string, ComboProductRecord>();
@@ -1005,7 +1000,6 @@ export function CombosPanel({ businessId, businessName, userId, source }: Props)
         }}
         onConfirm={confirmDeleteCombo}
       />
-      <StockyProcessingOverlay visible={isProcessingAction} label={processingLabel} />
       <StockyStatusToast
         visible={showComboCreatedToast}
         title="Combo Creado"
@@ -1430,11 +1424,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   comboFormSheet: {
-    maxWidth: 920,
-    maxHeight: '92%',
-    borderRadius: 22,
-    borderColor: '#D6DDE7',
-    backgroundColor: '#FFFFFF',
+    maxHeight: '88%',
+    height: '88%',
+    borderRadius: 26,
+    borderColor: '#D9DEE8',
   },
   comboFormHeader: {
     paddingHorizontal: 16,
