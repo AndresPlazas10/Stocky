@@ -54,7 +54,7 @@ export function BusinessDisabledScreen({ businessName, onSignOut }: BusinessDisa
               <Text style={styles.supportTitle}>¿Necesitas ayuda?</Text>
             </View>
             <Text style={styles.supportText}>
-              Escríbenos por WhatsApp al 318 824 6925 y con gusto revisamos tu cuenta.
+              Escríbenos a nuestro correo soporte@stockypos.app y te responderemos con gusto.
             </Text>
           </Pressable>
 

@@ -557,7 +557,7 @@ export function AuthScreen() {
                 style={styles.signInHelperWrap}
               >
                 <Text style={styles.signInHelper}>
-                  ¿Tienes problemas con el acceso? Escríbenos por WhatsApp al 318 824 6925.
+                  ¿Tienes problemas con el acceso? Escríbenos a nuestro correo soporte@stockypos.app y te responderemos con gusto.
                 </Text>
               </Pressable>
             ) : (
