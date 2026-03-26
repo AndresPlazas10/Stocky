@@ -260,7 +260,7 @@ export function useRealtimeSubscription(table, options = {}) {
       stopPolling();
       removeActiveChannel();
     };
-  }, [table, enabled, filterKey, retryOnError, onReconnect, debounceMs, pollingIntervalMs, pollingMode]);
+  }, [table, enabled, filterKey, retryOnError, onReconnect, requireBusinessId, debounceMs, pollingIntervalMs, pollingMode]);
 }
 
 /**

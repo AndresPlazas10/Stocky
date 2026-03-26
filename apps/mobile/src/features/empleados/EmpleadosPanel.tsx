@@ -22,7 +22,6 @@ import {
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
 import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
 import { StockyModal } from '../../ui/StockyModal';
-import { StockyProcessingOverlay } from '../../ui/StockyProcessingOverlay';
 import { StockyStatusToast } from '../../ui/StockyStatusToast';
 import { StockyButton } from '../../ui/StockyButton';
 
@@ -92,10 +91,6 @@ export function EmpleadosPanel({ businessId, businessName, userId, source }: Pro
   const [page, setPage] = useState(1);
   const [hasMoreEmployees, setHasMoreEmployees] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const isProcessingAction = creating || deleting;
-  const processingLabel = creating
-    ? 'Creando empleado...'
-    : (deleting ? 'Eliminando empleado...' : 'Procesando...');
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -650,7 +645,6 @@ export function EmpleadosPanel({ businessId, businessName, userId, source }: Pro
           <Text style={styles.credentialsValue}>{generatedCredentials?.password || '-'}</Text>
         </View>
       </StockyModal>
-      <StockyProcessingOverlay visible={isProcessingAction} label={processingLabel} />
       <StockyStatusToast
         visible={showEmployeeCreatedToast}
         title="Empleado Creado"

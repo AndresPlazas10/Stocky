@@ -10,7 +10,6 @@ import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
 import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
 import { StockyMoneyText } from '../../ui/StockyMoneyText';
 import { StockyModal } from '../../ui/StockyModal';
-import { StockyProcessingOverlay } from '../../ui/StockyProcessingOverlay';
 import { StockyStatusToast } from '../../ui/StockyStatusToast';
 import { buildKitchenOrderHtml } from '../../utils/printTemplates';
 import {
@@ -74,6 +73,43 @@ const COLOMBIAN_DENOMINATIONS = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 
 const CATALOG_LOCAL_TTL_MS = 180_000;
 const MESA_IN_USE_MESSAGE = 'Alguien esta usando esta mesa.';
 const CATALOG_STORAGE_PREFIX = 'stocky:mesa-catalog:';
+const MESA_SYNC_TRACE_ENABLED = __DEV__;
+
+type RealtimeUiTrace = {
+  source: 'tables' | 'orders' | 'order_items' | 'mesa_broadcast' | 'mesa_lock';
+  eventType: string;
+  rowRef: string;
+  receivedAt: number;
+  commitLagMs: number | null;
+};
+
+function parseCommitLagMs(payload: any): number | null {
+  const commitTimestamp = String(payload?.commit_timestamp || '').trim();
+  if (!commitTimestamp) return null;
+  const commitMs = Date.parse(commitTimestamp);
+  if (!Number.isFinite(commitMs)) return null;
+  return Math.max(0, Date.now() - commitMs);
+}
+
+function resolveRealtimeRowRef(payload: any): string {
+  const rowId = String(payload?.new?.id || payload?.old?.id || '').trim();
+  if (rowId) return rowId;
+  const tableId = String(payload?.new?.table_id || payload?.old?.table_id || '').trim();
+  if (tableId) return `table:${tableId}`;
+  const orderId = String(payload?.new?.order_id || payload?.old?.order_id || '').trim();
+  if (orderId) return `order:${orderId}`;
+  return 'unknown';
+}
+
+function traceMesaSync(label: string, data: Record<string, unknown>) {
+  if (!MESA_SYNC_TRACE_ENABLED) return;
+  const safeData = Object.entries(data || {}).reduce<Record<string, unknown>>((acc, [key, value]) => {
+    if (value === undefined) return acc;
+    acc[key] = value;
+    return acc;
+  }, {});
+  console.info(`[mesa-sync] ${label}`, safeData);
+}
 
 type StoredCatalogSnapshot = {
   cachedAt: number;
@@ -126,6 +162,12 @@ function compareMesaTableIdentifiers(left: MesaRecord, right: MesaRecord) {
     numeric: true,
     sensitivity: 'base',
   });
+}
+
+function resolveMesaSyncVersion(mesa: Partial<MesaRecord> | null | undefined): number {
+  const raw = Number((mesa as any)?.sync_version);
+  if (!Number.isFinite(raw)) return 0;
+  return Math.max(0, Math.floor(raw));
 }
 
 function mesaDisplayName(mesa: MesaRecord): string {
@@ -200,6 +242,27 @@ function sumOrderItemsQuantity(items: MesaOrderItem[]) {
     (sum, item) => sum + Math.max(0, Number(item.quantity || 0)),
     0,
   );
+}
+
+function normalizeOrderReference(value: unknown): string {
+  return String(value || '').trim();
+}
+
+function normalizeOrderItemQuantity(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.floor(parsed));
+}
+
+function normalizeOrderItemSubtotal(row: any): number {
+  const subtotal = Number(row?.subtotal);
+  if (Number.isFinite(subtotal)) {
+    return Math.max(0, subtotal);
+  }
+  const quantity = normalizeOrderItemQuantity(row?.quantity);
+  const price = Number(row?.price);
+  const safePrice = Number.isFinite(price) ? price : 0;
+  return Math.max(0, quantity * safePrice);
 }
 
 function formatCatalogItemMeta(item: MesaOrderCatalogItem) {
@@ -441,6 +504,7 @@ export function MesasPanel({ session, businessContext }: Props) {
   const orderModalOpenIntentRef = useRef(false);
   const mesasRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mesaLocksRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const orderRealtimeSummaryTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const mesasSyncBroadcastChannelRef = useRef<any>(null);
   const mesasSyncBroadcastReadyRef = useRef(false);
   const realtimeClientInstanceIdRef = useRef(`mesa-client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
@@ -454,6 +518,7 @@ export function MesasPanel({ session, businessContext }: Props) {
     total: number;
   }>());
   const quantitySyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingUiTraceRef = useRef<RealtimeUiTrace | null>(null);
 
   const [showCloseOrderChoiceModal, setShowCloseOrderChoiceModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -483,25 +548,6 @@ export function MesasPanel({ session, businessContext }: Props) {
   const sessionDisplayName = useMemo(() => resolveSessionDisplayName(session), [session]);
   const heldMesaLockRef = useRef<HeldMesaLock | null>(null);
   const canDeleteMesas = context?.source !== 'employee';
-  const isProcessingAction = isCreatingMesa
-    || isDeletingMesa
-    || Boolean(mutatingOrderItemId)
-    || releasingEmptyOrder
-    || isSavingOrder
-    || isClosingOrder;
-  const processingLabel = isClosingOrder
-    ? 'Cerrando orden...'
-    : (isSavingOrder
-      ? 'Guardando orden...'
-      : (Boolean(mutatingOrderItemId)
-        ? 'Actualizando productos...'
-        : (releasingEmptyOrder
-          ? 'Liberando mesa...'
-          : (isDeletingMesa
-            ? 'Eliminando mesa...'
-            : (isCreatingMesa
-              ? 'Creando mesa...'
-              : 'Procesando...')))));
 
   const patchMesaOrderUnits = useCallback((orderId: string, units: number) => {
     const key = String(orderId || '').trim();
@@ -520,6 +566,40 @@ export function MesasPanel({ session, businessContext }: Props) {
       const next = { ...prev };
       delete next[key];
       return next;
+    });
+  }, []);
+
+  const markRealtimeIngress = useCallback((
+    source: RealtimeUiTrace['source'],
+    payload: any,
+  ) => {
+    const eventType = String(payload?.eventType || '').trim().toUpperCase() || 'UNKNOWN';
+    const rowRef = resolveRealtimeRowRef(payload);
+    const commitLagMs = parseCommitLagMs(payload);
+    const receivedAt = Date.now();
+    pendingUiTraceRef.current = {
+      source,
+      eventType,
+      rowRef,
+      receivedAt,
+      commitLagMs,
+    };
+    traceMesaSync('realtime_in', {
+      source,
+      eventType,
+      rowRef,
+      commitLagMs,
+    });
+  }, []);
+
+  const traceAsyncDuration = useCallback((
+    label: string,
+    startMs: number,
+    extra?: Record<string, unknown>,
+  ) => {
+    traceMesaSync(label, {
+      durationMs: Math.max(0, Date.now() - startMs),
+      ...(extra || {}),
     });
   }, []);
 
@@ -1130,7 +1210,12 @@ export function MesasPanel({ session, businessContext }: Props) {
         // no-op: no bloquear carga de mesas por catalogo
       });
 
+      const initialFetchStart = Date.now();
       const nextMesas = await fetchMesasByBusinessId(nextContext.businessId);
+      traceAsyncDuration('initial_fetch_mesas', initialFetchStart, {
+        businessId: nextContext.businessId,
+        rows: Array.isArray(nextMesas) ? nextMesas.length : 0,
+      });
       const sortedMesas = nextMesas.sort(compareMesaTableIdentifiers);
       setMesas(sortedMesas);
       void refreshMesaLocks(nextContext.businessId);
@@ -1144,21 +1229,48 @@ export function MesasPanel({ session, businessContext }: Props) {
         setLoading(false);
       }
     }
-  }, [applyOrderUnitsSnapshot, businessContext, ensureCatalogLoaded, refreshMesaLocks, session.user.id, sessionDisplayName]);
+  }, [
+    applyOrderUnitsSnapshot,
+    businessContext,
+    ensureCatalogLoaded,
+    refreshMesaLocks,
+    session.user.id,
+    sessionDisplayName,
+    traceAsyncDuration,
+  ]);
 
   const refreshMesasRealtime = useCallback(async () => {
     const businessId = String(context?.businessId || '').trim();
     if (!businessId) return;
 
     try {
+      const refreshStart = Date.now();
       const incoming = (await fetchMesasByBusinessId(businessId)).sort(compareMesaTableIdentifiers);
-    const selectedMesaId = isOrderFlowActive ? String(selectedMesa?.id || '').trim() : '';
+      traceAsyncDuration('refresh_fetch_mesas', refreshStart, {
+        businessId,
+        rows: incoming.length,
+      });
+      const selectedMesaId = isOrderFlowActive ? String(selectedMesa?.id || '').trim() : '';
 
       setMesas((prev) => {
         const previousById = new Map(prev.map((mesa) => [String(mesa.id || ''), mesa]));
         return incoming.map((mesa) => {
+          const mesaId = String(mesa.id || '').trim();
+          const previousMesa = previousById.get(mesaId);
           if (selectedMesaId && String(mesa.id || '') === selectedMesaId) {
             return previousById.get(selectedMesaId) || mesa;
+          }
+          if (previousMesa) {
+            const previousSyncVersion = resolveMesaSyncVersion(previousMesa);
+            const incomingSyncVersion = resolveMesaSyncVersion(mesa);
+            if (previousSyncVersion > incomingSyncVersion) {
+              traceMesaSync('refresh_drop_stale_row', {
+                mesaId,
+                previousSyncVersion,
+                incomingSyncVersion,
+              });
+              return previousMesa;
+            }
           }
           return mesa;
         });
@@ -1168,7 +1280,13 @@ export function MesasPanel({ session, businessContext }: Props) {
     } catch {
       // no-op
     }
-  }, [applyOrderUnitsSnapshot, context?.businessId, selectedMesa?.id, showOrderModal]);
+  }, [
+    applyOrderUnitsSnapshot,
+    context?.businessId,
+    isOrderFlowActive,
+    selectedMesa?.id,
+    traceAsyncDuration,
+  ]);
 
   const scheduleMesasRealtimeRefresh = useCallback(() => {
     if (mesasRealtimeRefreshTimerRef.current) return;
@@ -1188,6 +1306,82 @@ export function MesasPanel({ session, businessContext }: Props) {
     }, 140);
   }, [refreshMesaLocks]);
 
+  const hydrateOrderRealtimeSummary = useCallback(async (orderId: string) => {
+    const normalizedOrderId = normalizeOrderReference(orderId);
+    if (!normalizedOrderId) return;
+
+    try {
+      const hydrateStart = Date.now();
+      const snapshot = await loadOpenOrderSnapshot(normalizedOrderId, { forceRefresh: true });
+      traceAsyncDuration('hydrate_order_summary', hydrateStart, {
+        orderId: normalizedOrderId,
+      });
+      const total = Math.max(0, Number(snapshot?.total || 0));
+      const units = Math.max(0, Math.floor(Number(snapshot?.units || 0)));
+
+      setOrderUnitsByOrderId((prev) => {
+        if (Math.max(0, Math.floor(Number(prev?.[normalizedOrderId] || 0))) === units) return prev;
+        return {
+          ...prev,
+          [normalizedOrderId]: units,
+        };
+      });
+
+      setMesas((prev) => {
+        let changed = false;
+        const next = prev.map((mesa) => {
+          if (normalizeOrderReference(mesa?.current_order_id) !== normalizedOrderId) return mesa;
+          changed = true;
+          return {
+            ...mesa,
+            status: 'occupied',
+            order_units: units,
+            orders: {
+              ...(mesa.orders || {}),
+              id: normalizedOrderId,
+              status: String(mesa?.orders?.status || 'open'),
+              total,
+            },
+          };
+        });
+        return changed ? next : prev;
+      });
+
+      setSelectedMesa((prev) => {
+        if (!prev || normalizeOrderReference(prev?.current_order_id) !== normalizedOrderId) return prev;
+        return {
+          ...prev,
+          status: 'occupied',
+          order_units: units,
+          orders: {
+            ...(prev.orders || {}),
+            id: normalizedOrderId,
+            status: String(prev?.orders?.status || 'open'),
+            total,
+          },
+        };
+      });
+    } catch {
+      // no-op
+    }
+  }, [traceAsyncDuration]);
+
+  const scheduleOrderRealtimeSummaryHydration = useCallback((orderId: string) => {
+    const normalizedOrderId = normalizeOrderReference(orderId);
+    if (!normalizedOrderId) return;
+
+    const timers = orderRealtimeSummaryTimersRef.current;
+    const previousTimer = timers[normalizedOrderId];
+    if (previousTimer) {
+      clearTimeout(previousTimer);
+    }
+
+    timers[normalizedOrderId] = setTimeout(() => {
+      delete timers[normalizedOrderId];
+      void hydrateOrderRealtimeSummary(normalizedOrderId);
+    }, 40);
+  }, [hydrateOrderRealtimeSummary]);
+
   const applyRealtimeTableEvent = useCallback((payload: any) => {
     const eventType = String(payload?.eventType || '').trim().toUpperCase();
     const nextRow = payload?.new && typeof payload.new === 'object' ? payload.new : null;
@@ -1206,6 +1400,10 @@ export function MesasPanel({ session, businessContext }: Props) {
 
     const hasNextTableNumber = Boolean(nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'table_number'));
     const hasNextName = Boolean(nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'name'));
+    const hasNextSyncVersion = Boolean(nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'sync_version'));
+    const nextSyncVersion = hasNextSyncVersion
+      ? resolveMesaSyncVersion({ sync_version: nextRow?.sync_version } as Partial<MesaRecord>)
+      : undefined;
 
     setMesas((prev) => {
       const index = prev.findIndex((mesa) => String(mesa?.id || '').trim() === mesaId);
@@ -1225,12 +1423,26 @@ export function MesasPanel({ session, businessContext }: Props) {
           name: hasNextName ? (nextRow?.name ?? null) : null,
           status: String(nextStatus || 'available'),
           current_order_id: hasNextCurrentOrderId ? nextCurrentOrderId : null,
+          sync_version: hasNextSyncVersion ? nextSyncVersion : undefined,
           orders: null,
         };
         return [...prev, insertedMesa].sort(compareMesaTableIdentifiers);
       }
 
       const current = prev[index];
+      if (hasNextSyncVersion) {
+        const currentSyncVersion = resolveMesaSyncVersion(current);
+        const incomingSyncVersion = nextSyncVersion || 0;
+        if (incomingSyncVersion < currentSyncVersion) {
+          traceMesaSync('drop_stale_table_event', {
+            mesaId,
+            currentSyncVersion,
+            incomingSyncVersion,
+            eventType,
+          });
+          return prev;
+        }
+      }
       const resolvedCurrentOrderId = hasNextCurrentOrderId ? nextCurrentOrderId : (current.current_order_id ?? null);
       const resolvedStatus = String(nextStatus || current.status || 'available');
       const nextMesa: MesaRecord = {
@@ -1239,6 +1451,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         current_order_id: resolvedCurrentOrderId,
         table_number: hasNextTableNumber ? (nextRow?.table_number ?? null) : current.table_number,
         name: hasNextName ? (nextRow?.name ?? null) : current.name,
+        sync_version: hasNextSyncVersion ? nextSyncVersion : current.sync_version,
         orders: (() => {
           if (!resolvedCurrentOrderId || resolvedStatus === 'available') return null;
           if (String(current?.orders?.id || '').trim() === String(resolvedCurrentOrderId || '').trim()) {
@@ -1260,6 +1473,11 @@ export function MesasPanel({ session, businessContext }: Props) {
 
     setSelectedMesa((prev) => {
       if (!prev || String(prev?.id || '').trim() !== mesaId || eventType === 'DELETE') return prev;
+      if (hasNextSyncVersion) {
+        const currentSyncVersion = resolveMesaSyncVersion(prev);
+        const incomingSyncVersion = nextSyncVersion || 0;
+        if (incomingSyncVersion < currentSyncVersion) return prev;
+      }
       const resolvedCurrentOrderId = hasNextCurrentOrderId ? nextCurrentOrderId : (prev.current_order_id ?? null);
       const resolvedStatus = String(nextStatus || prev.status || 'available');
       return {
@@ -1268,6 +1486,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         current_order_id: resolvedCurrentOrderId,
         table_number: hasNextTableNumber ? (nextRow?.table_number ?? null) : prev.table_number,
         name: hasNextName ? (nextRow?.name ?? null) : prev.name,
+        sync_version: hasNextSyncVersion ? nextSyncVersion : prev.sync_version,
         orders: (!resolvedCurrentOrderId || resolvedStatus === 'available')
           ? null
           : prev.orders,
@@ -1384,6 +1603,146 @@ export function MesasPanel({ session, businessContext }: Props) {
     context?.businessId,
   ]);
 
+  const applyRealtimeOrderItemDelta = useCallback((payload: any) => {
+    const eventType = String(payload?.eventType || '').trim().toUpperCase();
+    const nextRow = payload?.new && typeof payload.new === 'object' ? payload.new : null;
+    const prevRow = payload?.old && typeof payload.old === 'object' ? payload.old : null;
+
+    const deltasByOrderId = new Map<string, { deltaUnits: number; deltaTotal: number }>();
+    const pushDelta = (orderId: unknown, deltaUnits: number, deltaTotal: number) => {
+      const normalizedOrderId = normalizeOrderReference(orderId);
+      if (!normalizedOrderId) return;
+      const previous = deltasByOrderId.get(normalizedOrderId) || { deltaUnits: 0, deltaTotal: 0 };
+      deltasByOrderId.set(normalizedOrderId, {
+        deltaUnits: previous.deltaUnits + deltaUnits,
+        deltaTotal: previous.deltaTotal + deltaTotal,
+      });
+    };
+
+    const nextOrderId = normalizeOrderReference(nextRow?.order_id);
+    const previousOrderId = normalizeOrderReference(prevRow?.order_id);
+
+    if (eventType === 'INSERT') {
+      pushDelta(
+        nextOrderId,
+        normalizeOrderItemQuantity(nextRow?.quantity),
+        normalizeOrderItemSubtotal(nextRow),
+      );
+    } else if (eventType === 'DELETE') {
+      pushDelta(
+        previousOrderId,
+        -normalizeOrderItemQuantity(prevRow?.quantity),
+        -normalizeOrderItemSubtotal(prevRow),
+      );
+    } else {
+      const nextQuantity = normalizeOrderItemQuantity(nextRow?.quantity);
+      const previousQuantity = normalizeOrderItemQuantity(prevRow?.quantity);
+      const nextSubtotal = normalizeOrderItemSubtotal(nextRow);
+      const previousSubtotal = normalizeOrderItemSubtotal(prevRow);
+
+      if (nextOrderId && previousOrderId && nextOrderId !== previousOrderId) {
+        pushDelta(previousOrderId, -previousQuantity, -previousSubtotal);
+        pushDelta(nextOrderId, nextQuantity, nextSubtotal);
+      } else {
+        pushDelta(
+          nextOrderId || previousOrderId,
+          nextQuantity - previousQuantity,
+          nextSubtotal - previousSubtotal,
+        );
+      }
+    }
+
+    if (deltasByOrderId.size === 0) return;
+
+    setOrderUnitsByOrderId((prev) => {
+      let changed = false;
+      const next = { ...prev };
+
+      deltasByOrderId.forEach((delta, orderId) => {
+        const currentUnits = Math.max(0, Math.floor(Number(next[orderId] || 0)));
+        const resolvedUnits = Math.max(0, currentUnits + Math.trunc(delta.deltaUnits));
+        if (resolvedUnits === currentUnits) return;
+        changed = true;
+        if (resolvedUnits === 0) {
+          delete next[orderId];
+        } else {
+          next[orderId] = resolvedUnits;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+
+    const normalizeTotal = (value: number) => Math.max(0, Math.round(value * 100) / 100);
+
+    setMesas((prev) => {
+      let changed = false;
+      const next = prev.map((mesa) => {
+        const orderId = normalizeOrderReference(mesa?.current_order_id);
+        if (!orderId) return mesa;
+        const delta = deltasByOrderId.get(orderId);
+        if (!delta) return mesa;
+
+        const currentTotal = Number(mesa?.orders?.total || 0);
+        const safeCurrentTotal = Number.isFinite(currentTotal) ? currentTotal : 0;
+        const nextTotal = normalizeTotal(safeCurrentTotal + delta.deltaTotal);
+
+        const currentUnitsRaw = Number((mesa as any)?.order_units);
+        const safeCurrentUnits = Number.isFinite(currentUnitsRaw)
+          ? Math.max(0, Math.floor(currentUnitsRaw))
+          : 0;
+        const nextUnits = Math.max(0, safeCurrentUnits + Math.trunc(delta.deltaUnits));
+
+        if (nextTotal === safeCurrentTotal && nextUnits === safeCurrentUnits) return mesa;
+        changed = true;
+        return {
+          ...mesa,
+          status: 'occupied',
+          order_units: nextUnits,
+          orders: {
+            ...(mesa.orders || {}),
+            id: orderId,
+            status: String(mesa?.orders?.status || 'open'),
+            total: nextTotal,
+          },
+        };
+      });
+      return changed ? next : prev;
+    });
+
+    setSelectedMesa((prev) => {
+      if (!prev) return prev;
+      const selectedOrderId = normalizeOrderReference(prev?.current_order_id);
+      if (!selectedOrderId) return prev;
+      const delta = deltasByOrderId.get(selectedOrderId);
+      if (!delta) return prev;
+
+      const currentTotal = Number(prev?.orders?.total || 0);
+      const safeCurrentTotal = Number.isFinite(currentTotal) ? currentTotal : 0;
+      const nextTotal = normalizeTotal(safeCurrentTotal + delta.deltaTotal);
+
+      const currentUnitsRaw = Number((prev as any)?.order_units);
+      const safeCurrentUnits = Number.isFinite(currentUnitsRaw)
+        ? Math.max(0, Math.floor(currentUnitsRaw))
+        : 0;
+      const nextUnits = Math.max(0, safeCurrentUnits + Math.trunc(delta.deltaUnits));
+
+      if (nextTotal === safeCurrentTotal && nextUnits === safeCurrentUnits) return prev;
+
+      return {
+        ...prev,
+        status: 'occupied',
+        order_units: nextUnits,
+        orders: {
+          ...(prev.orders || {}),
+          id: selectedOrderId,
+          status: String(prev?.orders?.status || 'open'),
+          total: nextTotal,
+        },
+      };
+    });
+  }, []);
+
   const applyRealtimeMesaBroadcast = useCallback((payload: any) => {
     const senderClientId = String(payload?.sender_client_id || '').trim();
     if (senderClientId && senderClientId === String(realtimeClientInstanceIdRef.current || '').trim()) return;
@@ -1411,6 +1770,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         current_order_id: payload?.current_order_id ?? null,
         table_number: payload?.table_number ?? null,
         name: payload?.name ?? null,
+        sync_version: payload?.sync_version ?? null,
       },
     });
 
@@ -1477,6 +1837,9 @@ export function MesasPanel({ session, businessContext }: Props) {
       order_units: Number.isFinite(Number(options?.orderUnits))
         ? Math.max(0, Math.floor(Number(options?.orderUnits || 0)))
         : null,
+      sync_version: Number.isFinite(Number((mesa as any)?.sync_version))
+        ? Math.max(0, Math.floor(Number((mesa as any)?.sync_version)))
+        : null,
       emitted_at: Date.now(),
     });
   }, [actorDisplayName, sendMesaSyncBroadcast, session.user.id]);
@@ -1491,6 +1854,20 @@ export function MesasPanel({ session, businessContext }: Props) {
 
   useEffect(() => {
     mesasLengthRef.current = Array.isArray(mesas) ? mesas.length : 0;
+  }, [mesas]);
+
+  useEffect(() => {
+    const trace = pendingUiTraceRef.current;
+    if (!trace) return;
+    const uiLagMs = Math.max(0, Date.now() - trace.receivedAt);
+    traceMesaSync('ui_painted', {
+      source: trace.source,
+      eventType: trace.eventType,
+      rowRef: trace.rowRef,
+      commitLagMs: trace.commitLagMs,
+      uiLagMs,
+    });
+    pendingUiTraceRef.current = null;
   }, [mesas]);
 
 
@@ -1530,6 +1907,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         filter: `business_id=eq.${businessId}`,
       }, (payload) => {
         if (cancelled) return;
+        markRealtimeIngress('tables', payload);
         applyRealtimeTableEvent(payload);
         scheduleRefresh();
       })
@@ -1540,6 +1918,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         filter: `business_id=eq.${businessId}`,
       }, (payload) => {
         if (cancelled) return;
+        markRealtimeIngress('orders', payload);
         applyRealtimeOrderEvent(payload);
         scheduleRefresh();
       })
@@ -1547,7 +1926,26 @@ export function MesasPanel({ session, businessContext }: Props) {
         event: '*',
         schema: 'public',
         table: 'order_items',
-      }, scheduleRefresh)
+      }, (payload) => {
+        if (cancelled) return;
+        markRealtimeIngress('order_items', payload);
+        const orderPayload = payload as any;
+        const nextOrderId = normalizeOrderReference(orderPayload?.new?.order_id);
+        const previousOrderId = normalizeOrderReference(orderPayload?.old?.order_id);
+
+        applyRealtimeOrderItemDelta(orderPayload);
+
+        if (nextOrderId) {
+          scheduleOrderRealtimeSummaryHydration(nextOrderId);
+        }
+        if (previousOrderId && previousOrderId !== nextOrderId) {
+          scheduleOrderRealtimeSummaryHydration(previousOrderId);
+        }
+
+        if (!nextOrderId && !previousOrderId) {
+          scheduleRefresh();
+        }
+      })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -1555,6 +1953,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         filter: `business_id=eq.${businessId}`,
       }, (payload) => {
         if (cancelled) return;
+        markRealtimeIngress('mesa_lock', payload);
         applyRealtimeMesaLockEvent(payload);
         scheduleLocks();
       });
@@ -1563,10 +1962,23 @@ export function MesasPanel({ session, businessContext }: Props) {
       .channel(`private:mobile-mesas-sync:${businessId}`)
       .on('broadcast', { event: 'mesa_lock_changed' }, ({ payload }) => {
         if (cancelled) return;
+        traceMesaSync('realtime_in', {
+          source: 'mesa_lock_broadcast',
+          rowRef: String(payload?.mesa_id || '').trim() || 'unknown',
+          syncMode: String(payload?.mode || '').trim() || null,
+        });
         applyRealtimeMesaLockBroadcast(payload);
       })
       .on('broadcast', { event: 'mesa_state_changed' }, ({ payload }) => {
         if (cancelled) return;
+        traceMesaSync('realtime_in', {
+          source: 'mesa_broadcast',
+          rowRef: String(payload?.mesa_id || '').trim() || 'unknown',
+          syncMode: String(payload?.sync_mode || '').trim() || null,
+          emittedLagMs: Number.isFinite(Number(payload?.emitted_at))
+            ? Math.max(0, Date.now() - Number(payload.emitted_at))
+            : null,
+        });
         applyRealtimeMesaBroadcast(payload);
         const mode = String(payload?.sync_mode || 'confirmed').trim().toLowerCase();
         if (mode !== 'optimistic') {
@@ -1608,14 +2020,21 @@ export function MesasPanel({ session, businessContext }: Props) {
         mesasSyncBroadcastChannelRef.current = null;
       }
       mesasSyncBroadcastReadyRef.current = false;
+      Object.values(orderRealtimeSummaryTimersRef.current).forEach((timer) => {
+        clearTimeout(timer);
+      });
+      orderRealtimeSummaryTimersRef.current = {};
     };
   }, [
     applyRealtimeMesaLockBroadcast,
     applyRealtimeMesaBroadcast,
     applyRealtimeMesaLockEvent,
+    applyRealtimeOrderItemDelta,
     applyRealtimeOrderEvent,
     applyRealtimeTableEvent,
     context?.businessId,
+    markRealtimeIngress,
+    scheduleOrderRealtimeSummaryHydration,
     scheduleMesaLocksRefresh,
     scheduleMesasRealtimeRefresh,
     session.user.id,
@@ -3160,18 +3579,6 @@ export function MesasPanel({ session, businessContext }: Props) {
               <Ionicons name="cart-outline" size={32} color="#D1D5DB" />
             </LinearGradient>
             <Text style={styles.orderModalHeaderTitle}>{orderModalTitle}</Text>
-            <Pressable
-              style={[
-                styles.orderModalHeaderClose,
-                (isClosingOrder || releasingEmptyOrder || isSavingOrder) && styles.actionButtonDisabled,
-              ]}
-              onPress={() => {
-                void handleDismissOrderModal();
-              }}
-              disabled={isClosingOrder || releasingEmptyOrder || isSavingOrder}
-            >
-              <Ionicons name="close" size={34} color="#111827" />
-            </Pressable>
           </View>
         )}
         contentContainerStyle={styles.orderModalContent}
@@ -3582,7 +3989,6 @@ export function MesasPanel({ session, businessContext }: Props) {
         }}
         onConfirm={processSplitPaymentAndClose}
       />
-      <StockyProcessingOverlay visible={isProcessingAction} label={processingLabel} />
       <StockyStatusToast
         visible={showMesaCreatedToast}
         title="Mesa Creada"
@@ -3954,12 +4360,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     lineHeight: 28,
     fontWeight: '800',
-  },
-  orderModalHeaderClose: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   orderModalContent: {
     paddingHorizontal: 14,

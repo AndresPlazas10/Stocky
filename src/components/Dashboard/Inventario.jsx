@@ -172,7 +172,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
       setLoading(false);
       setLoadingMoreProductos(false);
     }
-  }, [businessId]);
+  }, [businessId, setProductosWithSnapshot]);
 
   useEffect(() => {
     loadMoreProductosRef.current = () => {
