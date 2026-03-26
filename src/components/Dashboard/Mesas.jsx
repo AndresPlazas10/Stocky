@@ -737,8 +737,8 @@ function Mesas({ businessId, userRole = 'admin' }) {
     const normalizedTableId = String(tableId || '').trim();
     if (!normalizedBusinessId || !normalizedTableId) return;
 
-    const resolvedUserId = normalizeEntityId(currentUser?.id)
-      || `web-${mesaSyncClientIdRef.current}`;
+    const resolvedUserId = normalizeEntityId(currentUser?.id);
+    if (!resolvedUserId) return;
     const lockTtlMs = 45_000;
     const lockExpiresAt = locked
       ? new Date(Date.now() + lockTtlMs).toISOString()
@@ -761,7 +761,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
   }, [businessId, currentUser?.id, sendMesaSyncBroadcast]);
 
   const resolveWebUserId = useCallback(() => (
-    normalizeEntityId(currentUser?.id) || `web-${mesaSyncClientIdRef.current}`
+    normalizeEntityId(currentUser?.id)
   ), [currentUser?.id]);
 
   const resolveWebUserName = useCallback(() => (
@@ -1347,12 +1347,29 @@ function Mesas({ businessId, userRole = 'admin' }) {
       const user = await getAuthenticatedUserFromOrders();
       if (user) {
         // Tabla users (public) no existe, usar auth.users
-        setCurrentUser({ id: user.id, role: 'admin' });
+        const normalizedUser = {
+          id: user.id,
+          email: user.email || '',
+          name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+          role: 'admin'
+        };
+        setCurrentUser(normalizedUser);
+        return normalizedUser;
       }
+      return null;
     } catch {
       // no-op
+      return null;
     }
   }, []);
+
+  const ensureCurrentUser = useCallback(async () => {
+    const existingUserId = normalizeEntityId(currentUser?.id);
+    if (existingUserId) return existingUserId;
+
+    const resolvedUser = await getCurrentUser();
+    return normalizeEntityId(resolvedUser?.id) || null;
+  }, [currentUser?.id, getCurrentUser]);
 
   // Verificar si el usuario autenticado es empleado
   const checkIfEmployee = useCallback(async () => {
@@ -1378,7 +1395,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
       // Si hay error, asumimos que NO es empleado (es admin)
       setIsEmployee(false);
     }
-  }, [businessId, applyRealtimeMesaLockBroadcast]);
+  }, [businessId]);
 
   const loadMesas = useCallback(async () => {
     const offline = isOfflineMode();
@@ -1629,7 +1646,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
         mesaSyncBroadcastChannelRef.current = null;
       }
     };
-  }, [businessId]);
+  }, [applyRealtimeMesaLockBroadcast, businessId]);
 
   useEffect(() => {
     if (!businessId) return undefined;
@@ -2598,6 +2615,12 @@ function Mesas({ businessId, userRole = 'admin' }) {
       return;
     }
 
+    const resolvedUserId = await ensureCurrentUser();
+    if (!resolvedUserId) {
+      setError('❌ No se pudo validar tu sesión. Cierra sesión e inténtalo de nuevo.');
+      return;
+    }
+
     if (normalizedMesa?.id && businessId) {
       const nextMesaId = normalizeEntityId(normalizedMesa.id);
       if (nextMesaId) {
@@ -2618,20 +2641,38 @@ function Mesas({ businessId, userRole = 'admin' }) {
           lockToken
         });
         activeMesaBroadcastRef.current = { tableId: nextMesaId, lockToken };
-        heldMesaLockRef.current = { businessId, tableId: nextMesaId, lockToken };
-        void acquireMesaEditLockWeb({
+        const result = await acquireMesaEditLockWeb({
           targetBusinessId: businessId,
           tableId: nextMesaId,
           lockToken
-        }).then((result) => {
-          if (result?.ok && !result?.unsupported) {
-            heldMesaLockRef.current = {
-              businessId,
-              tableId: nextMesaId,
-              lockToken: result.lockToken || lockToken
-            };
-          }
         });
+
+        if (result?.unsupported) {
+          heldMesaLockRef.current = { businessId, tableId: nextMesaId, lockToken };
+        } else if (result?.ok) {
+          heldMesaLockRef.current = {
+            businessId,
+            tableId: nextMesaId,
+            lockToken: result.lockToken || lockToken
+          };
+          publishMesaLockBroadcast({
+            tableId: nextMesaId,
+            locked: true,
+            mode: 'confirmed',
+            lockToken: result.lockToken || lockToken
+          });
+        } else {
+          publishMesaLockBroadcast({
+            tableId: nextMesaId,
+            locked: false,
+            mode: 'rollback',
+            lockToken
+          });
+          activeMesaBroadcastRef.current = null;
+          heldMesaLockRef.current = null;
+          setError(MESA_IN_USE_MESSAGE);
+          return;
+        }
       }
     }
 
@@ -2657,6 +2698,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
       await createNewOrder(normalizedMesa);
     }
   }, [
+    ensureCurrentUser,
     businessId,
     acquireMesaEditLockWeb,
     createNewOrder,

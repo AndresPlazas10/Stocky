@@ -1,0 +1,79 @@
+{
+  "generated_at": "2026-03-25T02:03:06.308Z",
+  "budget_path": "testing/perf/perf-budget.json",
+  "current_path": "testing/perf/perf-baseline.json",
+  "rows": [
+    {
+      "name": "resolve_business_context_owner",
+      "operation_status": "PASS",
+      "baseline_p95_ms": 776.836458,
+      "current_p95_ms": 1022.839541,
+      "delta_pct": 31.667293735588302,
+      "max_allowed_p95_ms": 932.2037495999999,
+      "gate_status": "FAIL"
+    },
+    {
+      "name": "resolve_business_context_employee",
+      "operation_status": "PASS",
+      "baseline_p95_ms": 704.116083,
+      "current_p95_ms": 718.067167,
+      "delta_pct": 1.9813613602687778,
+      "max_allowed_p95_ms": 844.9392996,
+      "gate_status": "PASS"
+    },
+    {
+      "name": "mesas_initial_load",
+      "operation_status": "PASS",
+      "baseline_p95_ms": 191.511833,
+      "current_p95_ms": 508.14375,
+      "delta_pct": 165.33282149724923,
+      "max_allowed_p95_ms": 229.8141996,
+      "gate_status": "FAIL"
+    },
+    {
+      "name": "mesa_open_order_load",
+      "operation_status": "SKIPPED",
+      "baseline_p95_ms": 189.432542,
+      "current_p95_ms": null,
+      "delta_pct": null,
+      "max_allowed_p95_ms": 227.3190504,
+      "gate_status": "SKIPPED"
+    },
+    {
+      "name": "ventas_initial_load",
+      "operation_status": "PASS",
+      "baseline_p95_ms": 220.45875,
+      "current_p95_ms": 627.114542,
+      "delta_pct": 184.45890308277626,
+      "max_allowed_p95_ms": 264.5505,
+      "gate_status": "FAIL"
+    },
+    {
+      "name": "compras_initial_load",
+      "operation_status": "PASS",
+      "baseline_p95_ms": 211.064458,
+      "current_p95_ms": 417.380167,
+      "delta_pct": 97.750095376077,
+      "max_allowed_p95_ms": 253.27734959999998,
+      "gate_status": "FAIL"
+    },
+    {
+      "name": "inventario_initial_load",
+      "operation_status": "PASS",
+      "baseline_p95_ms": 217.956041,
+      "current_p95_ms": 523.676,
+      "delta_pct": 140.26679765210088,
+      "max_allowed_p95_ms": 261.5472492,
+      "gate_status": "FAIL"
+    },
+    {
+      "name": "empleados_load",
+      "operation_status": "PASS",
+      "baseline_p95_ms": 206.644208,
+      "current_p95_ms": 206.6925,
+      "delta_pct": 0.02336963637519594,
+      "max_allowed_p95_ms": 247.97304959999997,
+      "gate_status": "PASS"
+    }
+  ]
+}

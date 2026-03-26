@@ -26,22 +26,34 @@ export function StockyStatusToast({
   onClose,
 }: Props) {
   const progress = useRef(new Animated.Value(0)).current;
+  const onCloseRef = useRef(onClose);
 
   useEffect(() => {
-    if (!visible) return;
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!visible) {
+      progress.stopAnimation();
+      progress.setValue(0);
+      return;
+    }
+
     progress.setValue(0);
     const anim = Animated.timing(progress, {
       toValue: 1,
       duration: durationMs,
       useNativeDriver: false,
     });
+    let cancelled = false;
     anim.start(({ finished }) => {
-      if (finished) onClose();
+      if (finished && !cancelled) onCloseRef.current();
     });
     return () => {
+      cancelled = true;
       anim.stop();
     };
-  }, [durationMs, onClose, progress, visible]);
+  }, [durationMs, progress, visible]);
 
   const lineWidth = progress.interpolate({
     inputRange: [0, 1],

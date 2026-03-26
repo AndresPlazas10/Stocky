@@ -26,7 +26,6 @@ import { StockyButton } from '../../ui/StockyButton';
 import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
 import { StockyMoneyText } from '../../ui/StockyMoneyText';
 import { StockyModal } from '../../ui/StockyModal';
-import { StockyProcessingOverlay } from '../../ui/StockyProcessingOverlay';
 import { StockyStatusToast } from '../../ui/StockyStatusToast';
 
 type Props = {
@@ -223,10 +222,6 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
   const [page, setPage] = useState(1);
   const [hasMoreProducts, setHasMoreProducts] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const isProcessingAction = saving || deleting;
-  const processingLabel = saving
-    ? (editingProduct ? 'Actualizando producto...' : 'Guardando producto...')
-    : (deleting ? 'Procesando cambios...' : 'Procesando...');
 
   useEffect(() => {
     suppliersRef.current = suppliers;
@@ -246,12 +241,16 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
     setLoading(true);
     setError(null);
     try {
-      const nextProducts = await listInventoryProducts(businessId, {
-        includeSuppliers: false,
-        limit: INVENTORY_PAGE_SIZE,
-        offset: 0,
-      });
-      setProducts(hydrateProductsWithSuppliers(nextProducts, suppliersRef.current));
+      const [nextProducts, nextSuppliers] = await Promise.all([
+        listInventoryProducts(businessId, {
+          includeSuppliers: false,
+          limit: INVENTORY_PAGE_SIZE,
+          offset: 0,
+        }),
+        listInventorySuppliers(businessId),
+      ]);
+      setSuppliers(nextSuppliers);
+      setProducts(hydrateProductsWithSuppliers(nextProducts, nextSuppliers));
       setHasMoreProducts(nextProducts.length === INVENTORY_PAGE_SIZE);
       setPage(1);
     } catch (err) {
@@ -259,20 +258,22 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
     } finally {
       setLoading(false);
     }
-
-    void refreshSuppliersSilently();
-  }, [businessId, refreshSuppliersSilently]);
+  }, [businessId]);
 
   const refreshProducts = useCallback(async () => {
     setRefreshing(true);
     setError(null);
     try {
-      const nextProducts = await listInventoryProducts(businessId, {
-        includeSuppliers: false,
-        limit: INVENTORY_PAGE_SIZE,
-        offset: 0,
-      });
-      setProducts(hydrateProductsWithSuppliers(nextProducts, suppliersRef.current));
+      const [nextProducts, nextSuppliers] = await Promise.all([
+        listInventoryProducts(businessId, {
+          includeSuppliers: false,
+          limit: INVENTORY_PAGE_SIZE,
+          offset: 0,
+        }),
+        listInventorySuppliers(businessId),
+      ]);
+      setSuppliers(nextSuppliers);
+      setProducts(hydrateProductsWithSuppliers(nextProducts, nextSuppliers));
       setHasMoreProducts(nextProducts.length === INVENTORY_PAGE_SIZE);
       setPage(1);
     } catch (err) {
@@ -397,11 +398,13 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         scheduleProductsRefresh();
+        scheduleSuppliersRefresh();
       }
     });
 
     fallbackTimer = setInterval(() => {
       scheduleProductsRefresh();
+      scheduleSuppliersRefresh();
     }, 20000);
 
     return () => {
@@ -426,12 +429,7 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
       if (statusFilter === 'inactive' && product.is_active) return false;
 
       if (!normalizedSearch) return true;
-      const supplierName = getSupplierDisplayName(product.supplier).toLowerCase();
-      const byName = String(product.name || '').toLowerCase().includes(normalizedSearch);
-      const byCategory = String(product.category || '').toLowerCase().includes(normalizedSearch);
-      const byCode = String(product.code || '').toLowerCase().includes(normalizedSearch);
-      const bySupplier = supplierName.includes(normalizedSearch);
-      return byName || byCategory || byCode || bySupplier;
+      return String(product.name || '').toLowerCase().includes(normalizedSearch);
     });
   }, [products, search, statusFilter]);
 
@@ -503,6 +501,7 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
   };
 
   const openSupplierPicker = () => {
+    void refreshSuppliersSilently();
     setShowFormModal(false);
     setShowSupplierModal(true);
   };
@@ -725,6 +724,27 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
       {!canManageProducts ? (
         <Text style={styles.permissionText}>Modo consulta: sin permisos de edición</Text>
       ) : null}
+
+      <View style={styles.searchCard}>
+        <View style={styles.searchTitleRow}>
+          <Ionicons name="search-outline" size={18} color="#1E3A8A" />
+          <Text style={styles.searchTitle}>Buscar producto por nombre</Text>
+        </View>
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Ej: Coca Cola, Arroz, Cerveza..."
+          placeholderTextColor={STOCKY_COLORS.textMuted}
+          style={styles.searchInput}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+        />
+        <StatusFilterSelector value={statusFilter} onChange={setStatusFilter} />
+        <Text style={styles.searchResultText}>
+          Mostrando {filteredProducts.length} de {products.length} productos
+        </Text>
+      </View>
 
       {refreshing ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
 
@@ -1183,7 +1203,6 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
         </Text>
         <Text style={styles.modalSubText}>Puedes desactivarlo para ocultarlo del catálogo activo.</Text>
       </StockyModal>
-      <StockyProcessingOverlay visible={isProcessingAction} label={processingLabel} />
       <StockyStatusToast
         visible={showProductCreatedToast}
         title="Producto Creado"
@@ -1288,6 +1307,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  searchCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#D8E2EC',
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    gap: 10,
+    shadowColor: '#111827',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  searchTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  searchTitle: {
+    color: '#0F172A',
+    fontSize: 14,
+    fontWeight: '800',
+  },
   fieldGroup: {
     gap: 6,
   },
@@ -1306,6 +1348,11 @@ const styles = StyleSheet.create({
     color: STOCKY_COLORS.textPrimary,
     fontSize: 14,
     fontWeight: '500',
+  },
+  searchResultText: {
+    color: STOCKY_COLORS.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
   },
   filterRow: {
     flexDirection: 'row',
@@ -1589,11 +1636,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   productFormSheet: {
-    maxWidth: 760,
-    maxHeight: '92%',
-    borderRadius: 22,
-    borderColor: '#D6DDE7',
-    backgroundColor: '#FFFFFF',
+    maxHeight: '88%',
+    height: '88%',
+    borderRadius: 26,
+    borderColor: '#D9DEE8',
   },
   productFormHeader: {
     paddingHorizontal: 16,

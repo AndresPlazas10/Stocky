@@ -7,6 +7,8 @@ import imagenFondo from '../../assets/imagenFondo.jpeg';
 import logoViejo from '../../assets/logoViejo.png';
 import nuevoLogo from '../../assets/nuevoLogo.png';
 
+const _motionLintUsage = motion;
+
 export default function WhatsNewModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState(0);
@@ -28,7 +30,7 @@ export default function WhatsNewModal() {
       setIsOpen(true);
       setStep(0);
     }
-  }, []);
+  }, [isEnabled]);
 
   const closeModal = () => {
     setIsOpen(false);

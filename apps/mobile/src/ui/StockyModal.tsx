@@ -1,5 +1,5 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -40,6 +40,7 @@ type Props = PropsWithChildren<{
   entryEffect?: 'none' | 'blur';
   animationScaleFrom?: number;
   bodyFlex?: boolean;
+  instantOpen?: boolean;
 }>;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -63,25 +64,40 @@ export function StockyModal({
   deferFallback,
   deferBehavior = 'unmount',
   animationStyle = 'web',
-  animationDurationMs = 260,
+  animationDurationMs = 220,
   entryEffect = 'none',
   animationScaleFrom,
   bodyFlex,
+  instantOpen = false,
 }: Props) {
   const isCentered = layout === 'centered';
   const centeredShift = Math.max(0, centeredOffsetY);
   const effectiveBackdrop =
     backdropVariant === 'blur' && Platform.OS === 'android' ? 'dim' : backdropVariant;
-  const animationPreset =
-    modalAnimationType === 'fade' ? 'fade' : modalAnimationType === 'slide' ? 'slide' : 'pop';
-  const entryDistance = animationStyle === 'web'
-    ? 0
-    : (isCentered ? 14 : animationPreset === 'slide' ? 30 : 16);
+  const openDuration = Math.max(
+    140,
+    Math.min(animationDurationMs + (modalAnimationType === 'slide' ? 30 : 0), 280),
+  );
+  const closeDuration = Math.max(120, Math.min(animationDurationMs - 20, 240));
+  const openEasing = useMemo(
+    () => (animationStyle === 'web' ? Easing.out(Easing.cubic) : Easing.out(Easing.exp)),
+    [animationStyle],
+  );
+  const closeEasing = useMemo(
+    () => (animationStyle === 'web' ? Easing.inOut(Easing.cubic) : Easing.in(Easing.cubic)),
+    [animationStyle],
+  );
   const resolvedScaleFrom = typeof animationScaleFrom === 'number'
-    ? Math.min(1, Math.max(0.9, animationScaleFrom))
-    : (animationStyle === 'web' ? 1 : (animationPreset === 'slide' ? 0.98 : 0.95));
-  const entryScale = resolvedScaleFrom;
+    ? Math.min(1, Math.max(0.94, animationScaleFrom))
+    : (modalAnimationType === 'fade' ? 0.985 : 1);
+  const initialTranslateY = useMemo(() => {
+    if (modalAnimationType === 'slide') return isCentered ? 24 : 32;
+    if (modalAnimationType === 'fade') return isCentered ? 10 : 14;
+    return 0;
+  }, [isCentered, modalAnimationType]);
   const appear = useRef(new Animated.Value(0)).current;
+  const [renderVisible, setRenderVisible] = useState(visible);
+  const visibilityAnimationIdRef = useRef(0);
   const [contentReady, setContentReady] = useState(!deferContent);
   const contentOpacity = useRef(new Animated.Value(deferContent ? 0 : 1)).current;
   const shouldHideContent = deferContent && deferBehavior === 'hide';
@@ -95,27 +111,66 @@ export function StockyModal({
     : undefined;
 
   useEffect(() => {
-    if (!visible) return;
-
-    appear.setValue(0);
-    Animated.timing(appear, {
-      toValue: 1,
-      duration: animationDurationMs,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [animationDurationMs, appear, visible]);
+    if (visible) setRenderVisible(true);
+  }, [visible]);
 
   useEffect(() => {
-    if (!deferContent) {
+    if (!renderVisible) return;
+    visibilityAnimationIdRef.current += 1;
+    const animationId = visibilityAnimationIdRef.current;
+
+    appear.stopAnimation();
+
+    if (visible) {
+      if (instantOpen) {
+        appear.setValue(1);
+      } else {
+        appear.setValue(0);
+        Animated.timing(appear, {
+          toValue: 1,
+          duration: openDuration,
+          easing: openEasing,
+          useNativeDriver: true,
+        }).start();
+      }
+      return;
+    }
+
+    Animated.timing(appear, {
+      toValue: 0,
+      duration: closeDuration,
+      easing: closeEasing,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (!finished) return;
+      if (visibilityAnimationIdRef.current !== animationId) return;
+      setRenderVisible(false);
+    });
+  }, [
+    appear,
+    closeDuration,
+    closeEasing,
+    openDuration,
+    openEasing,
+    instantOpen,
+    renderVisible,
+    visible,
+  ]);
+
+  useEffect(() => {
+    if (!deferContent || instantOpen) {
       setContentReady(true);
       contentOpacity.setValue(1);
       return;
     }
 
-    if (!visible) {
+    if (!renderVisible) {
       setContentReady(false);
       contentOpacity.setValue(0);
+      return;
+    }
+
+    if (!visible) {
       return;
     }
 
@@ -127,11 +182,9 @@ export function StockyModal({
 
     return () => {
       cancelled = true;
-      if (handle && typeof (handle as { cancel?: () => void }).cancel === 'function') {
-        (handle as { cancel?: () => void }).cancel();
-      }
+      (handle as { cancel?: () => void }).cancel?.();
     };
-  }, [deferContent, visible]);
+  }, [deferContent, instantOpen, renderVisible, visible]);
 
   useEffect(() => {
     if (!deferContent) return;
@@ -151,15 +204,15 @@ export function StockyModal({
   const scrimOpacity = appear;
   const sheetOpacity = appear.interpolate({
     inputRange: [0, 1],
-    outputRange: [animationStyle === 'web' ? 0 : 0.6, 1],
+    outputRange: [0, 1],
   });
   const sheetTranslateY = appear.interpolate({
     inputRange: [0, 1],
-    outputRange: [entryDistance, 0],
+    outputRange: [initialTranslateY, 0],
   });
   const sheetScale = appear.interpolate({
     inputRange: [0, 1],
-    outputRange: [entryScale, 1],
+    outputRange: [resolvedScaleFrom, 1],
   });
   const blurOverlayOpacity = appear.interpolate({
     inputRange: [0, 1],
@@ -171,7 +224,7 @@ export function StockyModal({
     <Modal
       animationType="none"
       transparent
-      visible={visible}
+      visible={renderVisible}
       onRequestClose={onClose}
       presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
       statusBarTranslucent
