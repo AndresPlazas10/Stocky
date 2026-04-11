@@ -7,6 +7,7 @@ const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const APP_ORIGIN = process.env.VITE_APP_URL;
 const SUPPORT_EMAIL = 'soporte@stockypos.app';
 const SUPPORT_FROM = `Stocky <${SUPPORT_EMAIL}>`;
+const DEFAULT_PUBLIC_ORIGIN = 'https://www.stockypos.app';
 
 function normalizeOrigin(value) {
   try {
@@ -178,6 +179,9 @@ export default async function handler(req, res) {
     const safeBusinessName = escapeHtml(businessName || 'Stocky');
     const safeCustomerName = escapeHtml(customerName);
     const safeInvoiceNumber = escapeHtml(invoiceNumber);
+    const publicOrigin = normalizeOrigin(APP_ORIGIN) || DEFAULT_PUBLIC_ORIGIN;
+    const brandBackgroundUrl = `${publicOrigin}/branding/imagenFondo.jpeg`;
+    const brandLogoUrl = `${publicOrigin}/branding/logoStocky.png`;
     const formattedIssuedAt = issuedAt
       ? new Date(issuedAt).toLocaleDateString('es-CO', {
         year: 'numeric',
@@ -215,8 +219,13 @@ export default async function handler(req, res) {
       <body style="margin: 0; padding: 24px 0; background-color: #f3f5fb; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #111827;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; max-width: 680px; margin: 0 auto; border-collapse: collapse;">
           <tr>
-            <td style="background-color: #0f172a; border-radius: 14px 14px 0 0; padding: 30px 28px;">
+            <td style="background-color: #0f172a; background-image: url('${brandBackgroundUrl}'); background-size: cover; background-position: center; border-radius: 14px 14px 0 0; padding: 30px 28px;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
+                <tr>
+                  <td style="padding-bottom: 12px;">
+                    <img src="${brandLogoUrl}" alt="Stocky" width="46" height="46" style="display: block; width: 46px; height: 46px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.25);" />
+                  </td>
+                </tr>
                 <tr>
                   <td style="font-size: 12px; letter-spacing: 0.8px; color: #cbd5e1; text-transform: uppercase;">Stocky POS</td>
                 </tr>

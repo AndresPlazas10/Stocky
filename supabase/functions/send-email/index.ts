@@ -8,6 +8,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 const SUPPORT_EMAIL = 'soporte@stockypos.app'
 const SUPPORT_FROM = `Stocky <${SUPPORT_EMAIL}>`
+const APP_ORIGIN = Deno.env.get('VITE_APP_URL') || 'https://www.stockypos.app'
 
 serve(async (req) => {
   // Permitir CORS
@@ -27,6 +28,8 @@ serve(async (req) => {
     const safeCustomerName = customerName || 'Cliente'
     const safeInvoiceNumber = invoiceNumber || 'N/A'
     const numericTotal = Number(total || 0)
+    const brandBackgroundUrl = `${APP_ORIGIN}/branding/imagenFondo.jpeg`
+    const brandLogoUrl = `${APP_ORIGIN}/branding/logoStocky.png`
 
     // Formatear items HTML
     const itemsHTML = items.map((item: any) => `
@@ -49,8 +52,13 @@ serve(async (req) => {
       <body style="margin: 0; padding: 24px 0; background-color: #f3f5fb; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #111827;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; max-width: 680px; margin: 0 auto; border-collapse: collapse;">
           <tr>
-            <td style="background-color: #0f172a; border-radius: 14px 14px 0 0; padding: 30px 28px;">
+            <td style="background-color: #0f172a; background-image: url('${brandBackgroundUrl}'); background-size: cover; background-position: center; border-radius: 14px 14px 0 0; padding: 30px 28px;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
+                <tr>
+                  <td style="padding-bottom: 12px;">
+                    <img src="${brandLogoUrl}" alt="Stocky" width="46" height="46" style="display: block; width: 46px; height: 46px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.25);" />
+                  </td>
+                </tr>
                 <tr>
                   <td style="font-size: 12px; letter-spacing: 0.8px; color: #cbd5e1; text-transform: uppercase;">Stocky POS</td>
                 </tr>
