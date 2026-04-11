@@ -30,14 +30,16 @@ Abre `/Users/andres_plazas/Desktop/Stocky/.env.local` y pega tu API Key:
 # Pega tu API Key aquí (la que copiaste arriba)
 RESEND_API_KEY=re_tu_api_key_aqui
 
-# Usar email de Resend (no requiere verificar dominio)
-VITE_RESEND_FROM_EMAIL=onboarding@resend.dev
+# Remitente oficial de Stocky
+RESEND_FROM_EMAIL=Stocky <soporte@stockypos.app>
+VITE_RESEND_FROM_EMAIL=soporte@stockypos.app
 ```
 
 **Ejemplo:**
 ```env
 RESEND_API_KEY=re_123abc456def789ghi
-VITE_RESEND_FROM_EMAIL=onboarding@resend.dev
+RESEND_FROM_EMAIL=Stocky <soporte@stockypos.app>
+VITE_RESEND_FROM_EMAIL=soporte@stockypos.app
 ```
 
 ---
@@ -75,7 +77,7 @@ VITE_RESEND_FROM_EMAIL=onboarding@resend.dev
    | Key | Value | Environment |
    |-----|-------|-------------|
    | `RESEND_API_KEY` | `re_tu_api_key_aqui` | Production |
-   | `VITE_RESEND_FROM_EMAIL` | `onboarding@resend.dev` | Production |
+   | `RESEND_FROM_EMAIL` | `Stocky <soporte@stockypos.app>` | Production |
 
 4. **Redeploy** (opcional):
    ```bash
@@ -126,7 +128,8 @@ Value: v=DMARC1; p=none; rua=mailto:tu-email@gmail.com
 2. Haz clic en **Verify** (puede tardar 1-5 minutos)
 3. Una vez verificado, actualiza `.env.local`:
    ```env
-   VITE_RESEND_FROM_EMAIL=noreply@tudominio.com
+   RESEND_FROM_EMAIL=Stocky <soporte@stockypos.app>
+   VITE_RESEND_FROM_EMAIL=soporte@stockypos.app
    ```
 
 ---
@@ -136,7 +139,7 @@ Value: v=DMARC1; p=none; rua=mailto:tu-email@gmail.com
 - [ ] Cuenta de Resend creada
 - [ ] API Key copiada y guardada
 - [ ] `RESEND_API_KEY` configurada en `.env.local`
-- [ ] `VITE_RESEND_FROM_EMAIL` configurada
+- [ ] `RESEND_FROM_EMAIL` configurada
 - [ ] Servidor reiniciado (`npm run dev`)
 - [ ] Email de prueba enviado y recibido
 - [ ] Variables configuradas en Vercel (producción)
@@ -174,8 +177,8 @@ Value: v=DMARC1; p=none; rua=mailto:tu-email@gmail.com
 ### Error: "Domain not verified"
 
 **Solución:**
-- Si usas `onboarding@resend.dev` → No requiere verificación
-- Si usas tu dominio → Verifica los DNS records
+- Verifica que `stockypos.app` esté correctamente verificado en Resend
+- Asegura que `RESEND_FROM_EMAIL` sea `Stocky <soporte@stockypos.app>`
 
 ---
 

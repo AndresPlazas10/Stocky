@@ -60,10 +60,8 @@
 5. **Agregar segunda variable (email remitente):**
    ```
    Key: RESEND_FROM_EMAIL
-   Value: onboarding@resend.dev
+   Value: Stocky <soporte@stockypos.app>
    ```
-   
-   **NOTA:** Usa `onboarding@resend.dev` hasta que configures tu propio dominio.
 
 6. **Seleccionar entornos** (para AMBAS variables):
    - ✅ Production
@@ -90,7 +88,7 @@ vercel env add RESEND_API_KEY
 
 # Agregar email remitente
 vercel env add RESEND_FROM_EMAIL
-# Escribir: onboarding@resend.dev
+# Escribir: Stocky <soporte@stockypos.app>
 # Seleccionar: Production, Preview, Development
 ```
 
@@ -274,7 +272,7 @@ Antes de dar por terminada la configuración:
 
 ### Personalizar Email de Remitente
 
-Por defecto, Resend usa: `onboarding@resend.dev`
+Por defecto en Stocky debe usarse: `Stocky <soporte@stockypos.app>`
 
 Para usar tu propio dominio (ej: `ventas@stockly.com`):
 
@@ -322,4 +320,3 @@ Una vez completados todos los pasos, los emails se enviarán con:
 - ✅ 3,000 emails/mes gratis
 - ✅ Template HTML profesional
 - ✅ Analytics en tiempo real
-

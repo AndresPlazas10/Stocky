@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
+  InteractionManager,
   Pressable,
   StyleSheet,
   Text,
@@ -34,8 +36,6 @@ type Props = {
   userId: string;
   source: 'owner' | 'employee';
 };
-
-type StatusFilter = 'all' | 'active' | 'inactive';
 
 type ProductFormState = {
   name: string;
@@ -150,39 +150,6 @@ function StatusBadge({ active }: { active: boolean }) {
   );
 }
 
-function StatusFilterSelector({
-  value,
-  onChange,
-}: {
-  value: StatusFilter;
-  onChange: (next: StatusFilter) => void;
-}) {
-  const options: Array<{ value: StatusFilter; label: string }> = [
-    { value: 'all', label: 'Todos' },
-    { value: 'active', label: 'Activos' },
-    { value: 'inactive', label: 'Inactivos' },
-  ];
-
-  return (
-    <View style={styles.filterRow}>
-      {options.map((option) => {
-        const selected = value === option.value;
-        return (
-          <Pressable
-            key={option.value}
-            onPress={() => onChange(option.value)}
-            style={[styles.filterOption, selected && styles.filterOptionSelected]}
-          >
-            <Text style={[styles.filterOptionText, selected && styles.filterOptionTextSelected]}>
-              {option.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 export function InventarioPanel({ businessId, businessName, userId, source }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -197,7 +164,6 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
   const [suppliers, setSuppliers] = useState<InventorySupplierRecord[]>([]);
 
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
 
   const [canManageProducts, setCanManageProducts] = useState(source === 'owner');
 
@@ -212,6 +178,7 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
   const [showProductDeletedToast, setShowProductDeletedToast] = useState(false);
   const [productToastName, setProductToastName] = useState('');
   const [productToastCategory, setProductToastCategory] = useState('');
+  const [formDetailsReady, setFormDetailsReady] = useState(false);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
@@ -422,16 +389,32 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
     };
   }, [businessId, refreshProductsSilently, refreshSuppliersSilently]);
 
+  useEffect(() => {
+    if (!showFormModal) {
+      setFormDetailsReady(false);
+      return;
+    }
+
+    let cancelled = false;
+    const task = InteractionManager.runAfterInteractions(() => {
+      if (!cancelled) {
+        setFormDetailsReady(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      (task as { cancel?: () => void }).cancel?.();
+    };
+  }, [showFormModal]);
+
   const filteredProducts = useMemo(() => {
     const normalizedSearch = String(search || '').trim().toLowerCase();
     return products.filter((product) => {
-      if (statusFilter === 'active' && !product.is_active) return false;
-      if (statusFilter === 'inactive' && product.is_active) return false;
-
       if (!normalizedSearch) return true;
       return String(product.name || '').toLowerCase().includes(normalizedSearch);
     });
-  }, [products, search, statusFilter]);
+  }, [products, search]);
 
   const selectedUnitLabel = useMemo(
     () => UNIT_OPTIONS.find((item) => item.value === form.unit)?.label || 'Unidad',
@@ -458,6 +441,7 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
     setSuccess(null);
     setEditingProduct(null);
     setForm(INITIAL_FORM);
+    setShowCategoryModal(false);
     setShowFormModal(true);
   };
 
@@ -477,38 +461,38 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
       manageStock: product.manage_stock !== false,
       isActive: product.is_active !== false,
     });
-    setShowFormModal(true);
-  };
-
-  const openCategoryPicker = () => {
-    setShowFormModal(false);
-    setShowCategoryModal(true);
-  };
-
-  const closeCategoryPicker = () => {
     setShowCategoryModal(false);
     setShowFormModal(true);
   };
 
+  const openCategoryPicker = () => {
+    setShowCategoryModal(true);
+  };
+
+  const selectCategory = (category: string) => {
+    setShowCategoryModal(false);
+    requestAnimationFrame(() => {
+      setForm((prev) => ({ ...prev, category }));
+    });
+  };
+
   const openUnitPicker = () => {
-    setShowFormModal(false);
+    setShowCategoryModal(false);
     setShowUnitModal(true);
   };
 
   const closeUnitPicker = () => {
     setShowUnitModal(false);
-    setShowFormModal(true);
   };
 
   const openSupplierPicker = () => {
-    void refreshSuppliersSilently();
-    setShowFormModal(false);
+    setShowCategoryModal(false);
     setShowSupplierModal(true);
+    void refreshSuppliersSilently();
   };
 
   const closeSupplierPicker = () => {
     setShowSupplierModal(false);
-    setShowFormModal(true);
   };
 
   const handleSaveProduct = async () => {
@@ -685,6 +669,12 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
     }
   };
 
+  const suspendBackgroundList = showFormModal
+    || showUnitModal
+    || showSupplierModal
+    || showDeleteModal
+    || showDeactivateModal;
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -694,226 +684,250 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
   }
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#4F46E5', '#7C3AED']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.heroCard}
-      >
-        <View style={styles.heroTop}>
-          <View style={styles.heroIconBox}>
-            <Ionicons name="cube-outline" size={40} color="#D1D5DB" />
-          </View>
-          <View style={styles.heroTitleWrap}>
-            <Text style={styles.heroTitle}>Inventario</Text>
-            <Text style={styles.heroSubtitle}>Gestión de productos y stock</Text>
-          </View>
-        </View>
-
-        <Pressable
-          style={[styles.heroCreateButton, (!canManageProducts || checkingPermissions) && styles.buttonDisabled]}
-          onPress={openCreateModal}
-          disabled={!canManageProducts || checkingPermissions}
-        >
-          <Ionicons name="add" size={22} color="rgba(255,255,255,0.88)" />
-          <Text style={styles.heroCreateButtonText}>Agregar Producto</Text>
-        </Pressable>
-      </LinearGradient>
-
-      {!canManageProducts ? (
-        <Text style={styles.permissionText}>Modo consulta: sin permisos de edición</Text>
-      ) : null}
-
-      <View style={styles.searchCard}>
-        <View style={styles.searchTitleRow}>
-          <Ionicons name="search-outline" size={18} color="#1E3A8A" />
-          <Text style={styles.searchTitle}>Buscar producto por nombre</Text>
-        </View>
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Ej: Coca Cola, Arroz, Cerveza..."
-          placeholderTextColor={STOCKY_COLORS.textMuted}
-          style={styles.searchInput}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-        />
-        <StatusFilterSelector value={statusFilter} onChange={setStatusFilter} />
-        <Text style={styles.searchResultText}>
-          Mostrando {filteredProducts.length} de {products.length} productos
-        </Text>
-      </View>
-
-      {refreshing ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
-
-      {filteredProducts.length === 0 ? (
-        <Text style={styles.emptyText}>No hay productos para los filtros actuales.</Text>
-      ) : null}
-
-      {filteredProducts.map((product) => {
-        const lowStock = product.manage_stock !== false
-          && Number(product.stock || 0) <= Number(product.min_stock || 5);
-
-        return (
-          <View key={product.id} style={styles.productCard}>
-            <View style={styles.productHeader}>
-              <View style={styles.productNameRow}>
-                <Ionicons name="cube-outline" size={24} color="#111827" />
-                <Text style={styles.productName} numberOfLines={1}>{product.name}</Text>
+    <>
+      <FlatList
+        data={suspendBackgroundList ? [] : filteredProducts}
+        keyExtractor={(item) => item.id}
+        style={styles.screenList}
+        contentContainerStyle={styles.screenListContent}
+        ListHeaderComponentStyle={styles.listHeader}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        updateCellsBatchingPeriod={40}
+        ListHeaderComponent={(
+          <View style={styles.container}>
+            <LinearGradient
+              colors={['#4F46E5', '#7C3AED']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroCard}
+            >
+              <View style={styles.heroTop}>
+                <View style={styles.heroIconBox}>
+                  <Ionicons name="cube-outline" size={40} color="#D1D5DB" />
+                </View>
+                <View style={styles.heroTitleWrap}>
+                  <Text style={styles.heroTitle}>Inventario</Text>
+                  <Text style={styles.heroSubtitle}>Gestión de productos y stock</Text>
+                </View>
               </View>
+
+              <Pressable
+                style={[styles.heroCreateButton, (!canManageProducts || checkingPermissions) && styles.buttonDisabled]}
+                onPress={openCreateModal}
+                disabled={!canManageProducts || checkingPermissions}
+              >
+                <Ionicons name="add" size={22} color="rgba(255,255,255,0.88)" />
+                <Text style={styles.heroCreateButtonText}>Agregar Producto</Text>
+              </Pressable>
+            </LinearGradient>
+
+            {!canManageProducts ? (
+              <Text style={styles.permissionText}>Modo consulta: sin permisos de edición</Text>
+            ) : null}
+
+            <View style={styles.searchCard}>
+              <View style={styles.searchTitleRow}>
+                <Ionicons name="search-outline" size={18} color="#1E3A8A" />
+                <Text style={styles.searchTitle}>Buscar producto por nombre</Text>
+              </View>
+              <TextInput
+                value={search}
+                onChangeText={setSearch}
+                placeholder="Ej: Coca Cola, Arroz, Cerveza..."
+                placeholderTextColor={STOCKY_COLORS.textMuted}
+                style={styles.searchInput}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="search"
+              />
+              <Text style={styles.searchResultText}>
+                Mostrando {filteredProducts.length} de {products.length} productos
+              </Text>
             </View>
 
-            <View style={styles.productTagRow}>
-              <View style={styles.metaTag}>
-                <Ionicons name="pricetag-outline" size={15} color="#111827" />
-                <Text style={styles.metaTagText}>{product.code || 'Sin código'}</Text>
-              </View>
-              <View style={styles.categoryTag}>
-                <Ionicons name="bar-chart-outline" size={15} color="#1D4ED8" />
-                <Text style={styles.categoryTagText}>{product.category || 'General'}</Text>
-              </View>
-            </View>
+            {refreshing ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
+          </View>
+        )}
+        ListEmptyComponent={!suspendBackgroundList ? (
+          <Text style={styles.emptyText}>No hay productos para la busqueda actual.</Text>
+        ) : null}
+        ItemSeparatorComponent={() => <View style={styles.listItemSeparator} />}
+        ListFooterComponent={!suspendBackgroundList && hasMoreProducts ? (
+          <View style={styles.loadMoreWrap}>
+            <Text style={styles.loadMoreHint}>Mostrando {products.length} productos</Text>
+            <StockyButton onPress={loadMoreProducts} loading={loadingMore} variant="ghost">
+              Cargar más productos
+            </StockyButton>
+          </View>
+        ) : (
+          <View style={styles.listFooterSpacer} />
+        )}
+        renderItem={({ item: product }) => {
+          const lowStock = product.manage_stock !== false
+            && Number(product.stock || 0) <= Number(product.min_stock || 5);
 
-            <View style={styles.divider} />
-
-            <View style={styles.productInfoGrid}>
-              <View style={styles.infoCell}>
-                <View style={styles.providerBlock}>
-                  <View style={styles.providerTitleRow}>
-                    <Ionicons name="business-outline" size={17} color="#111827" />
-                    <Text style={styles.providerLabel}>PROVEEDOR</Text>
-                  </View>
-                  <Text style={styles.providerValue}>{getSupplierDisplayName(product.supplier)}</Text>
+          return (
+            <View style={styles.productCard}>
+              <View style={styles.productHeader}>
+                <View style={styles.productNameRow}>
+                  <Ionicons name="cube-outline" size={24} color="#111827" />
+                  <Text style={styles.productName} numberOfLines={1}>{product.name}</Text>
                 </View>
               </View>
 
-              <View style={styles.infoCell}>
-                <View style={styles.metricCell}>
-                  <View style={styles.metricTitleRow}>
-                    <Ionicons name="checkmark-done-outline" size={16} color="#111827" />
-                    <Text style={styles.metricLabel}>ESTADO</Text>
-                  </View>
-                  <StatusBadge active={product.is_active} />
+              <View style={styles.productTagRow}>
+                <View style={styles.metaTag}>
+                  <Ionicons name="pricetag-outline" size={15} color="#111827" />
+                  <Text style={styles.metaTagText}>{product.code || 'Sin código'}</Text>
+                </View>
+                <View style={styles.categoryTag}>
+                  <Ionicons name="bar-chart-outline" size={15} color="#1D4ED8" />
+                  <Text style={styles.categoryTagText}>{product.category || 'General'}</Text>
                 </View>
               </View>
 
-              <View style={styles.infoCell}>
-                <View style={styles.metricCell}>
-                  <View style={styles.metricTitleRow}>
-                    <Ionicons name="trending-down-outline" size={16} color="#C2410C" />
-                    <Text style={styles.metricLabel}>P. COMPRA</Text>
-                  </View>
-                  <StockyMoneyText value={product.purchase_price} style={styles.purchaseValue} />
-                </View>
-              </View>
+              <View style={styles.divider} />
 
-              <View style={styles.infoCell}>
-                <View style={styles.metricCell}>
-                  <View style={styles.metricTitleRow}>
-                    <Ionicons name="trending-up-outline" size={16} color="#059669" />
-                    <Text style={styles.metricLabel}>P. VENTA</Text>
+              <View style={styles.productInfoGrid}>
+                <View style={styles.infoCell}>
+                  <View style={styles.providerBlock}>
+                    <View style={styles.providerTitleRow}>
+                      <Ionicons name="business-outline" size={17} color="#111827" />
+                      <Text style={styles.providerLabel}>PROVEEDOR</Text>
+                    </View>
+                    <Text style={styles.providerValue}>{getSupplierDisplayName(product.supplier)}</Text>
                   </View>
-                  <StockyMoneyText value={product.sale_price} style={styles.saleValue} />
                 </View>
-              </View>
 
-              <View style={styles.infoCell}>
-                <View style={styles.metricCell}>
-                  <View style={styles.metricTitleRow}>
-                    <Ionicons name="cube-outline" size={16} color="#111827" />
-                    <Text style={styles.metricLabel}>STOCK</Text>
+                <View style={styles.infoCell}>
+                  <View style={styles.metricCell}>
+                    <View style={styles.metricTitleRow}>
+                      <Ionicons name="checkmark-done-outline" size={16} color="#111827" />
+                      <Text style={styles.metricLabel}>ESTADO</Text>
+                    </View>
+                    <StatusBadge active={product.is_active} />
                   </View>
-                  <View style={styles.stockPill}>
-                    <Text style={[styles.stockText, lowStock && styles.lowStockText]}>
-                      {product.manage_stock !== false ? `${product.stock} ${product.unit}` : 'Sin control'}
+                </View>
+
+                <View style={styles.infoCell}>
+                  <View style={styles.metricCell}>
+                    <View style={styles.metricTitleRow}>
+                      <Ionicons name="trending-down-outline" size={16} color="#C2410C" />
+                      <Text style={styles.metricLabel}>P. COMPRA</Text>
+                    </View>
+                    <StockyMoneyText value={product.purchase_price} style={styles.purchaseValue} />
+                  </View>
+                </View>
+
+                <View style={styles.infoCell}>
+                  <View style={styles.metricCell}>
+                    <View style={styles.metricTitleRow}>
+                      <Ionicons name="trending-up-outline" size={16} color="#059669" />
+                      <Text style={styles.metricLabel}>P. VENTA</Text>
+                    </View>
+                    <StockyMoneyText value={product.sale_price} style={styles.saleValue} />
+                  </View>
+                </View>
+
+                <View style={styles.infoCell}>
+                  <View style={styles.metricCell}>
+                    <View style={styles.metricTitleRow}>
+                      <Ionicons name="cube-outline" size={16} color="#111827" />
+                      <Text style={styles.metricLabel}>STOCK</Text>
+                    </View>
+                    <View style={styles.stockPill}>
+                      <Text style={[styles.stockText, lowStock && styles.lowStockText]}>
+                        {product.manage_stock !== false ? `${product.stock} ${product.unit}` : 'Sin control'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.infoCell}>
+                  <View style={styles.metricCell}>
+                    <View style={styles.metricTitleRow}>
+                      <Ionicons name="warning-outline" size={16} color="#111827" />
+                      <Text style={styles.metricLabel}>MÍNIMO</Text>
+                    </View>
+                    <Text style={styles.minValue}>
+                      {product.manage_stock !== false ? `${product.min_stock} ${product.unit}` : 'No aplica'}
                     </Text>
                   </View>
                 </View>
               </View>
 
-              <View style={styles.infoCell}>
-                <View style={styles.metricCell}>
-                  <View style={styles.metricTitleRow}>
-                    <Ionicons name="warning-outline" size={16} color="#111827" />
-                    <Text style={styles.metricLabel}>MÍNIMO</Text>
+              {canManageProducts ? (
+                <>
+                  <View style={styles.divider} />
+                  <View style={styles.productActionsRow}>
+                    <Pressable style={[styles.editButton, styles.productActionHalf]} onPress={() => openEditModal(product)}>
+                      <Ionicons name="create-outline" size={18} color="#DDE6FF" />
+                      <Text style={styles.editButtonText}>Editar</Text>
+                    </Pressable>
+
+                    {product.is_active ? (
+                      <Pressable style={[styles.deleteButton, styles.productActionHalf]} onPress={() => askDeleteProduct(product)}>
+                        <Ionicons name="trash-outline" size={18} color="#FFE4E6" />
+                        <Text style={styles.deleteButtonText}>Eliminar</Text>
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        style={[styles.activateButton, styles.productActionHalf]}
+                        onPress={() => activateProduct(product)}
+                        disabled={deleting}
+                      >
+                        <Ionicons name="checkmark-circle-outline" size={18} color="#DCFCE7" />
+                        <Text style={styles.activateButtonText}>Activar</Text>
+                      </Pressable>
+                    )}
                   </View>
-                  <Text style={styles.minValue}>
-                    {product.manage_stock !== false ? `${product.min_stock} ${product.unit}` : 'No aplica'}
-                  </Text>
-                </View>
-              </View>
+                </>
+              ) : null}
             </View>
-
-            {canManageProducts ? (
-              <>
-                <View style={styles.divider} />
-                <View style={styles.productActionsRow}>
-                  <Pressable style={[styles.editButton, styles.productActionHalf]} onPress={() => openEditModal(product)}>
-                    <Ionicons name="create-outline" size={18} color="#DDE6FF" />
-                    <Text style={styles.editButtonText}>Editar</Text>
-                  </Pressable>
-
-                  {product.is_active ? (
-                    <Pressable style={[styles.deleteButton, styles.productActionHalf]} onPress={() => askDeleteProduct(product)}>
-                      <Ionicons name="trash-outline" size={18} color="#FFE4E6" />
-                      <Text style={styles.deleteButtonText}>Eliminar</Text>
-                    </Pressable>
-                  ) : (
-                    <Pressable
-                      style={[styles.activateButton, styles.productActionHalf]}
-                      onPress={() => activateProduct(product)}
-                      disabled={deleting}
-                    >
-                      <Ionicons name="checkmark-circle-outline" size={18} color="#DCFCE7" />
-                      <Text style={styles.activateButtonText}>Activar</Text>
-                    </Pressable>
-                  )}
-                </View>
-              </>
-            ) : null}
-          </View>
-        );
-      })}
-
-      {hasMoreProducts ? (
-        <View style={styles.loadMoreWrap}>
-          <Text style={styles.loadMoreHint}>Mostrando {products.length} productos</Text>
-          <StockyButton onPress={loadMoreProducts} loading={loadingMore} variant="ghost">
-            Cargar más productos
-          </StockyButton>
-        </View>
-      ) : null}
+          );
+        }}
+      />
 
       <StockyModal
         visible={showFormModal}
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={16}
-        modalAnimationType="none"
+        modalAnimationType="fade"
+        animationDurationMs={180}
+        deferContent
+        deferFallback={(
+          <View style={styles.formDeferredFallback}>
+            <ActivityIndicator color={STOCKY_COLORS.primary900} />
+            <Text style={styles.formDeferredFallbackText}>Cargando formulario...</Text>
+          </View>
+        )}
         bodyFlex
         sheetStyle={styles.productFormSheet}
+        contentContainerStyle={styles.productFormContent}
+        perfTag="inventario.form_producto"
         onClose={closeFormModal}
         headerSlot={(
-          <LinearGradient
-            colors={['#4F46E5', '#7C3AED']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.productFormHeader}
-          >
-            <View style={styles.productFormHeaderLeft}>
-              <View style={styles.productFormHeaderIconWrap}>
-                <Ionicons name={editingProduct ? 'create-outline' : 'add'} size={22} color="#FFFFFF" />
-              </View>
-              <Text style={styles.productFormHeaderTitle}>
-                {editingProduct ? 'Editar Producto' : 'Agregar Nuevo Producto'}
-              </Text>
-            </View>
-            <Pressable onPress={closeFormModal} style={styles.productFormHeaderClose} disabled={saving}>
-              <Ionicons name="close" size={24} color="#E5E7EB" />
+          <View style={styles.productFormHeader}>
+            <LinearGradient
+              colors={['#4F46E5', '#7C3AED']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.productFormHeaderIconWrap}
+            >
+              <Ionicons name={editingProduct ? 'create-outline' : 'add'} size={30} color="#D1D5DB" />
+            </LinearGradient>
+            <Text style={styles.productFormHeaderTitle}>
+              {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
+            </Text>
+            <Pressable style={[styles.productFormHeaderClose, saving && styles.buttonDisabled]} onPress={closeFormModal} disabled={saving}>
+              <Ionicons name="close" size={34} color="#111827" />
             </Pressable>
-          </LinearGradient>
+          </View>
         )}
         footerStyle={styles.productFormFooter}
         footer={(
@@ -921,18 +935,11 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
             <Pressable style={[styles.productFormCancelButton, saving && styles.buttonDisabled]} onPress={closeFormModal} disabled={saving}>
               <Text style={styles.productFormCancelText}>Cancelar</Text>
             </Pressable>
-            <Pressable style={[styles.productFormSaveWrap, saving && styles.buttonDisabled]} onPress={handleSaveProduct} disabled={saving}>
-              <LinearGradient
-                colors={editingProduct ? ['#2563EB', '#1D4ED8'] : ['#16A34A', '#15803D']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.productFormSaveButton}
-              >
-                {saving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="checkmark-circle-outline" size={17} color="#FFFFFF" />}
-                <Text style={styles.productFormSaveText}>
-                  {saving ? (editingProduct ? 'Actualizando...' : 'Creando...') : (editingProduct ? 'Actualizar Producto' : 'Guardar Producto')}
-                </Text>
-              </LinearGradient>
+            <Pressable style={[styles.productFormSaveButton, saving && styles.buttonDisabled]} onPress={handleSaveProduct} disabled={saving}>
+              {saving ? <ActivityIndicator size="small" color="#F5F3FF" /> : null}
+              <Text style={styles.productFormSaveText}>
+                {saving ? (editingProduct ? 'Actualizando...' : 'Creando...') : (editingProduct ? 'Actualizar' : 'Guardar')}
+              </Text>
             </Pressable>
           </View>
         )}
@@ -972,101 +979,110 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
             </Pressable>
           </View>
 
-          <View style={styles.warningCard}>
-            <Ionicons name="alert-circle-outline" size={16} color="#B45309" />
-            <Text style={styles.warningText}>
-              Nota importante: para que los productos aparezcan en los recibos de cocina, deben estar en la
-              categoría "Platos". Los productos de otras categorías no se incluirán.
-            </Text>
-          </View>
+          {formDetailsReady ? (
+            <>
+              <View style={styles.warningCard}>
+                <Ionicons name="alert-circle-outline" size={16} color="#B45309" />
+                <Text style={styles.warningText}>
+                  Nota importante: para que los productos aparezcan en los recibos de cocina, deben estar en la
+                  categoría "Platos". Los productos de otras categorías no se incluirán.
+                </Text>
+              </View>
 
-          <View style={styles.formRow}>
-            <View style={[styles.fieldGroup, styles.formCol]}>
-              <Text style={styles.inputLabel}>Precio compra *</Text>
-              <TextInput
-                value={form.purchasePrice}
-                onChangeText={(value) => setForm((prev) => ({ ...prev, purchasePrice: value }))}
-                placeholder="0.00"
-                keyboardType="numeric"
-                placeholderTextColor={STOCKY_COLORS.textMuted}
-                style={styles.textInput}
-              />
-            </View>
-            <View style={[styles.fieldGroup, styles.formCol]}>
-              <Text style={styles.inputLabel}>Precio venta *</Text>
-              <TextInput
-                value={form.salePrice}
-                onChangeText={(value) => setForm((prev) => ({ ...prev, salePrice: value }))}
-                placeholder="0.00"
-                keyboardType="numeric"
-                placeholderTextColor={STOCKY_COLORS.textMuted}
-                style={styles.textInput}
-              />
-            </View>
-          </View>
+              <View style={styles.formRow}>
+                <View style={[styles.fieldGroup, styles.formCol]}>
+                  <Text style={styles.inputLabel}>Precio compra *</Text>
+                  <TextInput
+                    value={form.purchasePrice}
+                    onChangeText={(value) => setForm((prev) => ({ ...prev, purchasePrice: value }))}
+                    placeholder="0.00"
+                    keyboardType="numeric"
+                    placeholderTextColor={STOCKY_COLORS.textMuted}
+                    style={styles.textInput}
+                  />
+                </View>
+                <View style={[styles.fieldGroup, styles.formCol]}>
+                  <Text style={styles.inputLabel}>Precio venta *</Text>
+                  <TextInput
+                    value={form.salePrice}
+                    onChangeText={(value) => setForm((prev) => ({ ...prev, salePrice: value }))}
+                    placeholder="0.00"
+                    keyboardType="numeric"
+                    placeholderTextColor={STOCKY_COLORS.textMuted}
+                    style={styles.textInput}
+                  />
+                </View>
+              </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.inputLabel}>Control de stock</Text>
-            <Pressable
-              style={styles.stockControlRow}
-              onPress={() => setForm((prev) => (
-                prev.manageStock
-                  ? { ...prev, manageStock: false, stock: '0', minStock: '0' }
-                  : { ...prev, manageStock: true }
-              ))}
-            >
-              <Text style={styles.stockControlText}>¿Este producto lleva control de stock?</Text>
-              <Ionicons
-                name={form.manageStock ? 'checkbox' : 'square-outline'}
-                size={22}
-                color={form.manageStock ? '#6D28D9' : '#64748B'}
-              />
-            </Pressable>
-          </View>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.inputLabel}>Control de stock</Text>
+                <Pressable
+                  style={styles.stockControlRow}
+                  onPress={() => setForm((prev) => (
+                    prev.manageStock
+                      ? { ...prev, manageStock: false, stock: '0', minStock: '0' }
+                      : { ...prev, manageStock: true }
+                  ))}
+                >
+                  <Text style={styles.stockControlText}>¿Este producto lleva control de stock?</Text>
+                  <Ionicons
+                    name={form.manageStock ? 'checkbox' : 'square-outline'}
+                    size={22}
+                    color={form.manageStock ? '#6D28D9' : '#64748B'}
+                  />
+                </Pressable>
+              </View>
 
-          <View style={styles.formRow}>
-            <View style={[styles.fieldGroup, styles.formColThird]}>
-              <Text style={styles.inputLabel}>Stock {editingProduct ? 'actual' : 'inicial'} {form.manageStock ? '*' : '(deshabilitado)'}</Text>
-              <TextInput
-                value={form.stock}
-                onChangeText={(value) => setForm((prev) => ({ ...prev, stock: value }))}
-                placeholder="0"
-                keyboardType="numeric"
-                editable={!editingProduct && form.manageStock}
-                placeholderTextColor={STOCKY_COLORS.textMuted}
-                style={[styles.textInput, (!form.manageStock || !!editingProduct) && styles.textInputDisabled]}
-              />
-            </View>
-            <View style={[styles.fieldGroup, styles.formColThird]}>
-              <Text style={styles.inputLabel}>Stock mínimo</Text>
-              <TextInput
-                value={form.minStock}
-                onChangeText={(value) => setForm((prev) => ({ ...prev, minStock: value }))}
-                placeholder="5"
-                keyboardType="numeric"
-                editable={form.manageStock}
-                placeholderTextColor={STOCKY_COLORS.textMuted}
-                style={[styles.textInput, !form.manageStock && styles.textInputDisabled]}
-              />
-            </View>
-            <View style={[styles.fieldGroup, styles.formColThird]}>
-              <Text style={styles.inputLabel}>Unidad</Text>
-              <Pressable style={styles.selectInput} onPress={openUnitPicker}>
-                <Text style={styles.selectInputText}>{selectedUnitLabel}</Text>
-                <Ionicons name="chevron-down" size={18} color="#64748B" />
-              </Pressable>
-            </View>
-          </View>
+              <View style={styles.formRow}>
+                <View style={[styles.fieldGroup, styles.formColThird]}>
+                  <Text style={styles.inputLabel}>Stock {editingProduct ? 'actual' : 'inicial'} {form.manageStock ? '*' : '(deshabilitado)'}</Text>
+                  <TextInput
+                    value={form.stock}
+                    onChangeText={(value) => setForm((prev) => ({ ...prev, stock: value }))}
+                    placeholder="0"
+                    keyboardType="numeric"
+                    editable={!editingProduct && form.manageStock}
+                    placeholderTextColor={STOCKY_COLORS.textMuted}
+                    style={[styles.textInput, (!form.manageStock || !!editingProduct) && styles.textInputDisabled]}
+                  />
+                </View>
+                <View style={[styles.fieldGroup, styles.formColThird]}>
+                  <Text style={styles.inputLabel}>Stock mínimo</Text>
+                  <TextInput
+                    value={form.minStock}
+                    onChangeText={(value) => setForm((prev) => ({ ...prev, minStock: value }))}
+                    placeholder="5"
+                    keyboardType="numeric"
+                    editable={form.manageStock}
+                    placeholderTextColor={STOCKY_COLORS.textMuted}
+                    style={[styles.textInput, !form.manageStock && styles.textInputDisabled]}
+                  />
+                </View>
+                <View style={[styles.fieldGroup, styles.formColThird]}>
+                  <Text style={styles.inputLabel}>Unidad</Text>
+                  <Pressable style={styles.selectInput} onPress={openUnitPicker}>
+                    <Text style={styles.selectInputText}>{selectedUnitLabel}</Text>
+                    <Ionicons name="chevron-down" size={18} color="#64748B" />
+                  </Pressable>
+                </View>
+              </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.inputLabel}>Proveedor (opcional)</Text>
-            <Pressable style={styles.selectInput} onPress={openSupplierPicker}>
-              <Text style={[styles.selectInputText, !form.supplierId && styles.selectInputPlaceholder]} numberOfLines={1}>
-                {selectedSupplierLabel}
-              </Text>
-              <Ionicons name="chevron-down" size={18} color="#64748B" />
-            </Pressable>
-          </View>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.inputLabel}>Proveedor (opcional)</Text>
+                <Pressable style={styles.selectInput} onPress={openSupplierPicker}>
+                  <Text style={[styles.selectInputText, !form.supplierId && styles.selectInputPlaceholder]} numberOfLines={1}>
+                    {selectedSupplierLabel}
+                  </Text>
+                  <Ionicons name="chevron-down" size={18} color="#64748B" />
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <View style={styles.formSectionLoader}>
+              <ActivityIndicator color={STOCKY_COLORS.primary900} />
+              <Text style={styles.formSectionLoaderText}>Cargando campos avanzados...</Text>
+            </View>
+          )}
         </View>
       </StockyModal>
 
@@ -1076,8 +1092,11 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={26}
+        modalAnimationType="fade"
+        animationDurationMs={150}
         bodyFlex
-        onClose={closeCategoryPicker}
+        perfTag="inventario.picker_categoria"
+        onClose={() => setShowCategoryModal(false)}
       >
         {INVENTORY_CATEGORY_OPTIONS.map((category) => {
           const selected = form.category === category;
@@ -1085,10 +1104,7 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
             <Pressable
               key={category}
               style={[styles.modalOptionItem, selected && styles.modalOptionItemSelected]}
-              onPress={() => {
-                setForm((prev) => ({ ...prev, category }));
-                closeCategoryPicker();
-              }}
+              onPress={() => selectCategory(category)}
             >
               <Text style={[styles.modalOptionItemText, selected && styles.modalOptionItemTextSelected]}>{category}</Text>
             </Pressable>
@@ -1102,7 +1118,10 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={26}
+        modalAnimationType="fade"
+        animationDurationMs={150}
         bodyFlex
+        perfTag="inventario.picker_unidad"
         onClose={closeUnitPicker}
       >
         {UNIT_OPTIONS.map((unit) => {
@@ -1112,8 +1131,10 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
               key={unit.value}
               style={[styles.modalOptionItem, selected && styles.modalOptionItemSelected]}
               onPress={() => {
-                setForm((prev) => ({ ...prev, unit: unit.value }));
                 closeUnitPicker();
+                requestAnimationFrame(() => {
+                  setForm((prev) => ({ ...prev, unit: unit.value }));
+                });
               }}
             >
               <Text style={[styles.modalOptionItemText, selected && styles.modalOptionItemTextSelected]}>{unit.label}</Text>
@@ -1128,14 +1149,19 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={26}
+        modalAnimationType="fade"
+        animationDurationMs={150}
         bodyFlex
+        perfTag="inventario.picker_proveedor"
         onClose={closeSupplierPicker}
       >
         <Pressable
           style={[styles.modalOptionItem, !form.supplierId && styles.modalOptionItemSelected]}
           onPress={() => {
-            setForm((prev) => ({ ...prev, supplierId: '' }));
             closeSupplierPicker();
+            requestAnimationFrame(() => {
+              setForm((prev) => ({ ...prev, supplierId: '' }));
+            });
           }}
         >
           <Text style={[styles.modalOptionItemText, !form.supplierId && styles.modalOptionItemTextSelected]}>Sin proveedor</Text>
@@ -1147,8 +1173,10 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
               key={supplier.id}
               style={[styles.modalOptionItem, selected && styles.modalOptionItemSelected]}
               onPress={() => {
-                setForm((prev) => ({ ...prev, supplierId: supplier.id }));
                 closeSupplierPicker();
+                requestAnimationFrame(() => {
+                  setForm((prev) => ({ ...prev, supplierId: supplier.id }));
+                });
               }}
             >
               <Text style={[styles.modalOptionItemText, selected && styles.modalOptionItemTextSelected]}>
@@ -1233,13 +1261,30 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
         durationMs={1200}
         onClose={() => setShowProductDeletedToast(false)}
       />
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  screenList: {
+    flex: 1,
+  },
+  screenListContent: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 26,
+  },
+  listHeader: {
+    paddingBottom: 16,
+  },
   container: {
     gap: 16,
+  },
+  listItemSeparator: {
+    height: 16,
+  },
+  listFooterSpacer: {
+    height: 4,
   },
   loadingContainer: {
     minHeight: 120,
@@ -1635,94 +1680,112 @@ const styles = StyleSheet.create({
   formFields: {
     gap: 10,
   },
+  formDeferredFallback: {
+    minHeight: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  formDeferredFallbackText: {
+    color: STOCKY_COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  formSectionLoader: {
+    minHeight: 128,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  formSectionLoaderText: {
+    color: STOCKY_COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   productFormSheet: {
     maxHeight: '88%',
     height: '88%',
     borderRadius: 26,
     borderColor: '#D9DEE8',
   },
-  productFormHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  productFormHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  productFormContent: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     gap: 10,
-    flexShrink: 1,
+  },
+  productFormHeader: {
+    minHeight: 84,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   productFormHeaderIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   productFormHeaderTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
+    flex: 1,
+    color: '#111827',
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: '800',
-    flexShrink: 1,
   },
   productFormHeaderClose: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 42,
+    height: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   productFormFooter: {
-    backgroundColor: '#FFFFFF',
-    borderTopColor: '#E5E7EB',
-    borderTopWidth: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 12,
+    borderTopColor: '#E5E7EB',
+    backgroundColor: '#F3F4F6',
   },
   productFormFooterRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   productFormCancelButton: {
-    minHeight: 45,
-    borderRadius: 12,
+    minHeight: 40,
+    borderRadius: STOCKY_RADIUS.md,
     borderWidth: 1,
-    borderColor: '#D7DEE8',
-    backgroundColor: '#FFFFFF',
+    borderColor: '#C4B5FD',
+    backgroundColor: '#EDE9FE',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  productFormCancelText: {
-    color: '#1F2937',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  productFormSaveWrap: {
+    paddingHorizontal: 12,
     flex: 1,
   },
+  productFormCancelText: {
+    color: '#5B21B6',
+    fontSize: 12,
+    fontWeight: '800',
+  },
   productFormSaveButton: {
-    minHeight: 45,
-    borderRadius: 12,
+    minHeight: 40,
+    borderRadius: STOCKY_RADIUS.md,
+    backgroundColor: '#6D28D9',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 14,
-    shadowColor: '#111827',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.14,
-    shadowRadius: 10,
-    elevation: 4,
+    gap: 6,
+    paddingHorizontal: 12,
+    flex: 1,
   },
   productFormSaveText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
+    color: '#F5F3FF',
+    fontSize: 12,
+    fontWeight: '800',
   },
   readOnlyCode: {
     borderRadius: STOCKY_RADIUS.md,
@@ -1790,6 +1853,10 @@ const styles = StyleSheet.create({
   },
   selectInputPlaceholder: {
     color: '#9CA3AF',
+  },
+  inlineCategoryList: {
+    marginTop: 8,
+    maxHeight: 240,
   },
   formErrorCard: {
     flexDirection: 'row',

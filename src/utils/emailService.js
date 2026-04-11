@@ -13,6 +13,22 @@ import {
 } from './emailServiceSupabase';
 import { EMAIL_PROVIDERS, resolveEmailProviderFromConfig } from './emailProviderResolver';
 
+const toBoolean = (value, fallback = false) => {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (!normalized) return fallback;
+  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+};
+
+const isProductionBuild = () => {
+  const mode = String(import.meta.env?.MODE || '').trim().toLowerCase();
+  return import.meta.env?.PROD === true || mode === 'production';
+};
+
+const isResendOnlyEnforced = () => {
+  // En producción, por defecto forzamos solo Resend para evitar remitentes no corporativos.
+  return toBoolean(import.meta.env?.VITE_ENFORCE_RESEND_ONLY, isProductionBuild());
+};
+
 export const resolveEmailProvider = ({
   providerHint = import.meta.env?.VITE_EMAIL_PROVIDER,
   resendReady = isResendConfigured(),
@@ -23,6 +39,15 @@ export const resolveEmailProvider = ({
 
 export const sendInvoiceEmail = async (params) => {
   const provider = resolveEmailProvider();
+  const enforceResendOnly = isResendOnlyEnforced();
+
+  if (enforceResendOnly && provider !== EMAIL_PROVIDERS.RESEND) {
+    return {
+      success: false,
+      provider,
+      error: 'Email bloqueado: en este entorno solo se permite Resend. Configura RESEND_API_KEY y RESEND_FROM_EMAIL.',
+    };
+  }
 
   if (provider === EMAIL_PROVIDERS.RESEND) {
     const resendResult = await sendInvoiceEmailResend(params);
@@ -30,6 +55,14 @@ export const sendInvoiceEmail = async (params) => {
       return {
         ...resendResult,
         provider: EMAIL_PROVIDERS.RESEND,
+      };
+    }
+
+    if (enforceResendOnly) {
+      return {
+        ...resendResult,
+        provider: EMAIL_PROVIDERS.RESEND,
+        fallbackBlocked: true,
       };
     }
 
