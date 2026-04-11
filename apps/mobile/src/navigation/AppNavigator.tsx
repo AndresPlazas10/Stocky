@@ -25,11 +25,20 @@ import { DashboardSectionScreen } from '../screens/dashboard/DashboardSectionScr
 import { isSectionEnabled } from '../config/features';
 import { OfflineScreen } from '../ui/OfflineScreen';
 import { BusinessDisabledScreen } from '../ui/BusinessDisabledScreen';
-import { UpdateAvailableModal } from '../ui/UpdateAvailableModal';
 import { logSecurityEvent } from '../services/securityAuditService';
+import { perfMark } from '../utils/perfAudit';
 
 const Drawer = createDrawerNavigator<RootDrawerParamList>();
 const DRAWER_WIDTH = 244;
+
+function resolveActiveRouteName(state: any): string {
+  if (!state || !Array.isArray(state.routes) || state.routes.length === 0) return 'unknown';
+  const index = Number.isFinite(Number(state.index)) ? Number(state.index) : 0;
+  const route = state.routes[index] || state.routes[0];
+  if (!route) return 'unknown';
+  if (route.state) return resolveActiveRouteName(route.state);
+  return String(route.name || 'unknown');
+}
 
 function Header({ navigation, route }: DrawerHeaderProps) {
   void route;
@@ -157,7 +166,7 @@ function ScreenBySection({ sectionId }: { sectionId: SectionId }) {
 }
 
 export function AppNavigator() {
-  const { session, businessContext, loadingBusiness, signOut, updateNotice } = useDashboardContext();
+  const { session, businessContext, loadingBusiness, signOut } = useDashboardContext();
   const netInfo = useNetInfo();
   const source = businessContext?.source || 'owner';
   const allowedSectionIds = useMemo<SectionId[]>(() => {
@@ -171,6 +180,7 @@ export function AppNavigator() {
   const isOffline = netInfo.isInternetReachable === false || netInfo.isConnected === false;
   const isBusinessInactive = businessContext?.isActive === false;
   const lastBlockedBusinessIdRef = useRef<string | null>(null);
+  const activeRouteRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!isBusinessInactive) {
@@ -195,7 +205,24 @@ export function AppNavigator() {
     />
   ) : (
     <View style={styles.appShell}>
-      <NavigationContainer>
+      <NavigationContainer
+        onReady={() => {
+          perfMark('navigation_ready', {
+            source,
+          });
+        }}
+        onStateChange={(state) => {
+          const nextRouteName = resolveActiveRouteName(state);
+          if (activeRouteRef.current === nextRouteName) return;
+          const previousRouteName = activeRouteRef.current;
+          activeRouteRef.current = nextRouteName;
+          perfMark('navigation_route_change', {
+            from: previousRouteName || 'unknown',
+            to: nextRouteName,
+            source,
+          });
+        }}
+      >
         <Drawer.Navigator
           key={`${source}:${loadingBusiness ? 'loading' : 'ready'}`}
           drawerContent={(props) => <DrawerContent {...props} sections={allowedSections} source={source} />}
@@ -222,7 +249,6 @@ export function AppNavigator() {
   return (
     <View style={styles.rootShell}>
       {content}
-      {updateNotice ? <UpdateAvailableModal notice={updateNotice} /> : null}
     </View>
   );
 }

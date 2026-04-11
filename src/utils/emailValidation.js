@@ -176,8 +176,8 @@ export const isDevelopment = () => {
  * @returns {string}
  */
 export const getTestEmail = () => {
-  // Cambia 'test@example.com' por tu email real
-  return import.meta.env.VITE_TEST_EMAIL || 'andres.plazas@gmail.com';
+  // Fallback corporativo para evitar redirecciones accidentales a correos personales.
+  return import.meta.env.VITE_TEST_EMAIL || 'soporte@stockypos.app';
 };
 
 /**

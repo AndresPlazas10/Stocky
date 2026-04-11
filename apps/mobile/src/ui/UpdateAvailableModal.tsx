@@ -1,6 +1,7 @@
 import { Linking, Modal, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { StockyButton } from './StockyButton';
 import type { AppUpdateNotice } from '../services/appUpdateService';
 
@@ -17,6 +18,13 @@ export function UpdateAvailableModal({ notice }: UpdateAvailableModalProps) {
   return (
     <Modal transparent visible statusBarTranslucent>
       <View style={styles.backdrop}>
+        <BlurView
+          style={StyleSheet.absoluteFillObject}
+          tint="dark"
+          intensity={24}
+          experimentalBlurMethod="dimezisBlurView"
+        />
+        <View style={styles.scrim} />
         <View style={styles.card}>
           <LinearGradient colors={['#1D4ED8', '#0F172A']} style={styles.header}>
             <View style={styles.iconWrap}>
@@ -41,10 +49,13 @@ export function UpdateAvailableModal({ notice }: UpdateAvailableModalProps) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 18,
+  },
+  scrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.44)',
   },
   card: {
     width: '100%',

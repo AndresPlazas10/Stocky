@@ -1107,9 +1107,10 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={16}
-        modalAnimationType="none"
+        modalAnimationType="fade"
         bodyFlex
         sheetStyle={styles.saleOrderModalSheet}
+        perfTag="ventas.form_nueva_venta"
         onClose={() => {
           if (submitting) return;
           setShowCreateSaleModal(false);
@@ -1458,7 +1459,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={12}
-        modalAnimationType="none"
+        modalAnimationType="fade"
         bodyFlex
         sheetStyle={styles.saleDetailsModalSheet}
         contentContainerStyle={styles.saleDetailsContentContainer}

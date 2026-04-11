@@ -7,6 +7,8 @@ on:
       - "src/**"
       - "scripts/perf/**"
       - "scripts/realtime-audit/**"
+      - "testing/perf/**"
+      - "docs/perf/**"
       - "supabase/migrations/**"
       - "package.json"
       - ".github/workflows/perf-budget.yml"
@@ -50,7 +52,7 @@ jobs:
       - name: Validate performance budget gate
         id: budget_gate
         continue-on-error: true
-        run: npm run audit:perf:budget -- --current testing/perf/perf-current.json --budget testing/perf/perf-budget.json
+        run: npm run audit:perf:budget -- --current testing/perf/perf-current.json --budget testing/perf/perf-budget.json --fail-on-slo
 
       - name: Build PR p95 diff
         if: always()

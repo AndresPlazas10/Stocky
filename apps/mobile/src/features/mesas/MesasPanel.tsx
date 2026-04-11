@@ -519,6 +519,7 @@ export function MesasPanel({ session, businessContext }: Props) {
   }>());
   const quantitySyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUiTraceRef = useRef<RealtimeUiTrace | null>(null);
+  const mesaActionVersionRef = useRef<Record<string, number>>({});
 
   const [showCloseOrderChoiceModal, setShowCloseOrderChoiceModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -567,6 +568,21 @@ export function MesasPanel({ session, businessContext }: Props) {
       delete next[key];
       return next;
     });
+  }, []);
+
+  const bumpMesaActionVersion = useCallback((mesaId: string) => {
+    const normalizedMesaId = String(mesaId || '').trim();
+    if (!normalizedMesaId) return 0;
+    const current = Number(mesaActionVersionRef.current[normalizedMesaId] || 0);
+    const next = current + 1;
+    mesaActionVersionRef.current[normalizedMesaId] = next;
+    return next;
+  }, []);
+
+  const isMesaActionVersionCurrent = useCallback((mesaId: string, version: number) => {
+    const normalizedMesaId = String(mesaId || '').trim();
+    if (!normalizedMesaId) return false;
+    return Number(mesaActionVersionRef.current[normalizedMesaId] || 0) === Number(version || 0);
   }, []);
 
   const markRealtimeIngress = useCallback((
@@ -2251,6 +2267,7 @@ export function MesasPanel({ session, businessContext }: Props) {
 
     const mesaSnapshot = selectedMesa;
     const mesaId = selectedMesa.id;
+    const closeActionVersion = bumpMesaActionVersion(mesaId);
     const orderId = String(selectedMesa.current_order_id || '').trim() || null;
     const optimisticMesa: MesaRecord = {
       ...mesaSnapshot,
@@ -2291,6 +2308,10 @@ export function MesasPanel({ session, businessContext }: Props) {
         action: 'close',
       });
 
+      if (!isMesaActionVersionCurrent(mesaId, closeActionVersion)) {
+        return;
+      }
+
       const mergedMesa: MesaRecord = {
         ...mesaSnapshot,
         ...updatedMesa,
@@ -2308,6 +2329,9 @@ export function MesasPanel({ session, businessContext }: Props) {
         mode: 'confirmed',
       });
     } catch (err) {
+      if (!isMesaActionVersionCurrent(mesaId, closeActionVersion)) {
+        return;
+      }
       setMesas((prev) => prev
         .map((row) => (row.id === mesaSnapshot.id ? mesaSnapshot : row))
         .sort(compareMesaTableIdentifiers));
@@ -2319,7 +2343,16 @@ export function MesasPanel({ session, businessContext }: Props) {
     } finally {
       setReleasingEmptyOrder(false);
     }
-  }, [clearMesaOrderUnits, closeOrderModal, publishMesaStateBroadcast, selectedMesa, session.access_token, session.user.id]);
+  }, [
+    bumpMesaActionVersion,
+    clearMesaOrderUnits,
+    closeOrderModal,
+    isMesaActionVersionCurrent,
+    publishMesaStateBroadcast,
+    selectedMesa,
+    session.access_token,
+    session.user.id,
+  ]);
 
   const patchMesaOrderTotal = useCallback((mesaId: string, orderId: string, total: number) => {
     setMesas((prev) => prev.map((mesa) => {
@@ -2612,6 +2645,7 @@ export function MesasPanel({ session, businessContext }: Props) {
     }
     setError(null);
     const previousOrderId = String(mesa.current_order_id || '').trim() || null;
+    const actionVersion = bumpMesaActionVersion(mesa.id);
 
     const optimisticMesa: MesaRecord = action === 'open'
       ? {
@@ -2658,6 +2692,10 @@ export function MesasPanel({ session, businessContext }: Props) {
         action,
       });
 
+      if (!isMesaActionVersionCurrent(mesa.id, actionVersion)) {
+        return;
+      }
+
       const mergedMesa: MesaRecord = {
         ...mesa,
         ...updatedMesa,
@@ -2696,6 +2734,9 @@ export function MesasPanel({ session, businessContext }: Props) {
         closeOrderModal();
       }
     } catch (err) {
+      if (!isMesaActionVersionCurrent(mesa.id, actionVersion)) {
+        return;
+      }
       if (action === 'open') {
         closeOrderModal();
       }
@@ -2705,12 +2746,16 @@ export function MesasPanel({ session, businessContext }: Props) {
       });
       setError(err instanceof Error ? err.message : 'No se pudo actualizar la mesa.');
     } finally {
-      setActingMesaId(null);
+      if (isMesaActionVersionCurrent(mesa.id, actionVersion)) {
+        setActingMesaId(null);
+      }
     }
   }, [
+    bumpMesaActionVersion,
     closeOrderModal,
     context?.businessId,
     ensureCatalogLoaded,
+    isMesaActionVersionCurrent,
     openOrderModal,
     patchMesaOrderUnits,
     publishMesaStateBroadcast,
@@ -3447,7 +3492,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         backdropVariant="blur"
         layout="centered"
         centeredOffsetY={106}
-        modalAnimationType="none"
+        modalAnimationType="fade"
         onClose={() => {
           if (!isCreatingMesa) {
             setShowCreateMesaModal(false);

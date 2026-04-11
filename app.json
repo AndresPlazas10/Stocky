@@ -4,6 +4,9 @@
       "eas": {
         "projectId": "b3bdddff-d20b-4ce9-aa57-37702d49c69c"
       }
+    },
+    "android": {
+      "package": "com.andresplazas.stocky"
     }
   }
 }

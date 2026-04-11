@@ -17,6 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../theme/tokens';
+import { perfDurationMs, perfMark } from '../utils/perfAudit';
 
 type Props = PropsWithChildren<{
   visible: boolean;
@@ -41,9 +42,29 @@ type Props = PropsWithChildren<{
   animationScaleFrom?: number;
   bodyFlex?: boolean;
   instantOpen?: boolean;
+  perfTag?: string;
 }>;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const MODAL_HEIGHT_REDUCTION_FACTOR = 0.95;
+
+function scaleModalHeightValue<T>(value: T): T {
+  if (typeof value === 'number') {
+    return Math.max(0, Math.round(value * MODAL_HEIGHT_REDUCTION_FACTOR)) as T;
+  }
+
+  if (typeof value === 'string' && value.trim().endsWith('%')) {
+    const parsedValue = Number.parseFloat(value);
+    if (Number.isFinite(parsedValue)) {
+      const scaled = (parsedValue * MODAL_HEIGHT_REDUCTION_FACTOR)
+        .toFixed(2)
+        .replace(/\.?0+$/, '');
+      return `${scaled}%` as T;
+    }
+  }
+
+  return value;
+}
 
 export function StockyModal({
   visible,
@@ -51,7 +72,7 @@ export function StockyModal({
   onClose,
   footer,
   children,
-  backdropVariant = 'dim',
+  backdropVariant = 'blur',
   layout = 'sheet',
   centeredOffsetY = 0,
   modalAnimationType = 'fade',
@@ -69,6 +90,7 @@ export function StockyModal({
   animationScaleFrom,
   bodyFlex,
   instantOpen = false,
+  perfTag,
 }: Props) {
   const isCentered = layout === 'centered';
   const centeredShift = Math.max(0, centeredOffsetY);
@@ -98,6 +120,9 @@ export function StockyModal({
   const appear = useRef(new Animated.Value(0)).current;
   const [renderVisible, setRenderVisible] = useState(visible);
   const visibilityAnimationIdRef = useRef(0);
+  const modalOpenStartedAtRef = useRef(0);
+  const openPaintLoggedRef = useRef(false);
+  const contentReadyLoggedRef = useRef(false);
   const [contentReady, setContentReady] = useState(!deferContent);
   const contentOpacity = useRef(new Animated.Value(deferContent ? 0 : 1)).current;
   const shouldHideContent = deferContent && deferBehavior === 'hide';
@@ -109,10 +134,43 @@ export function StockyModal({
   const sheetFlexStyle = shouldFlexBody
     ? (isCentered ? styles.centeredSheetFlex : styles.sheetFlex)
     : undefined;
+  const adjustedSheetStyle = useMemo(() => {
+    const flattened = StyleSheet.flatten(sheetStyle);
+    if (!flattened) return undefined;
+
+    const adjusted: ViewStyle = { ...flattened };
+
+    if (adjusted.height != null) {
+      adjusted.height = scaleModalHeightValue(adjusted.height);
+    }
+    if (adjusted.maxHeight != null) {
+      adjusted.maxHeight = scaleModalHeightValue(adjusted.maxHeight);
+    }
+    if (adjusted.minHeight != null) {
+      adjusted.minHeight = scaleModalHeightValue(adjusted.minHeight);
+    }
+
+    return adjusted;
+  }, [sheetStyle]);
 
   useEffect(() => {
     if (visible) setRenderVisible(true);
   }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    modalOpenStartedAtRef.current = Date.now();
+    openPaintLoggedRef.current = false;
+    contentReadyLoggedRef.current = false;
+    perfMark('modal_open_start', {
+      modal: perfTag || title || 'untagged',
+      animation: modalAnimationType,
+      layout,
+      backdrop: effectiveBackdrop,
+      deferContent,
+      instantOpen,
+    });
+  }, [deferContent, effectiveBackdrop, instantOpen, layout, modalAnimationType, perfTag, title, visible]);
 
   useEffect(() => {
     if (!renderVisible) return;
@@ -124,6 +182,14 @@ export function StockyModal({
     if (visible) {
       if (instantOpen) {
         appear.setValue(1);
+        if (!openPaintLoggedRef.current) {
+          openPaintLoggedRef.current = true;
+          perfMark('modal_open_painted', {
+            modal: perfTag || title || 'untagged',
+            openMs: perfDurationMs(modalOpenStartedAtRef.current),
+            mode: 'instant',
+          });
+        }
       } else {
         appear.setValue(0);
         Animated.timing(appear, {
@@ -131,7 +197,15 @@ export function StockyModal({
           duration: openDuration,
           easing: openEasing,
           useNativeDriver: true,
-        }).start();
+        }).start(({ finished }) => {
+          if (!finished || openPaintLoggedRef.current) return;
+          openPaintLoggedRef.current = true;
+          perfMark('modal_open_painted', {
+            modal: perfTag || title || 'untagged',
+            openMs: perfDurationMs(modalOpenStartedAtRef.current),
+            mode: 'animated',
+          });
+        });
       }
       return;
     }
@@ -144,6 +218,10 @@ export function StockyModal({
     }).start(({ finished }) => {
       if (!finished) return;
       if (visibilityAnimationIdRef.current !== animationId) return;
+      perfMark('modal_close_complete', {
+        modal: perfTag || title || 'untagged',
+        closeMs: closeDuration,
+      });
       setRenderVisible(false);
     });
   }, [
@@ -153,7 +231,9 @@ export function StockyModal({
     openDuration,
     openEasing,
     instantOpen,
+    perfTag,
     renderVisible,
+    title,
     visible,
   ]);
 
@@ -200,6 +280,16 @@ export function StockyModal({
       useNativeDriver: true,
     }).start();
   }, [contentOpacity, contentReady, deferContent]);
+
+  useEffect(() => {
+    if (!visible || !renderVisible || !contentReady || contentReadyLoggedRef.current) return;
+    contentReadyLoggedRef.current = true;
+    perfMark('modal_content_ready', {
+      modal: perfTag || title || 'untagged',
+      readyMs: perfDurationMs(modalOpenStartedAtRef.current),
+      deferContent,
+    });
+  }, [contentReady, deferContent, perfTag, renderVisible, title, visible]);
 
   const scrimOpacity = appear;
   const sheetOpacity = appear.interpolate({
@@ -263,7 +353,7 @@ export function StockyModal({
               ],
             },
             sheetFlexStyle,
-            sheetStyle,
+            adjustedSheetStyle,
           ]}
         >
           <Animated.View
@@ -351,17 +441,17 @@ const styles = StyleSheet.create({
     borderTopRightRadius: STOCKY_RADIUS.lg,
     borderWidth: 1,
     borderColor: STOCKY_COLORS.borderSoft,
-    maxHeight: '92%',
+    maxHeight: '87%',
     overflow: 'hidden',
   },
   centeredSheet: {
     width: '100%',
     maxWidth: 460,
-    maxHeight: '90%',
+    maxHeight: '85%',
     borderRadius: STOCKY_RADIUS.lg,
   },
   centeredSheetFlex: {
-    minHeight: '70%',
+    minHeight: '65%',
   },
   header: {
     flexDirection: 'row',
@@ -408,7 +498,7 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   sheetFlex: {
-    minHeight: '60%',
+    minHeight: '55%',
   },
   sheetBody: {
     flex: 1,

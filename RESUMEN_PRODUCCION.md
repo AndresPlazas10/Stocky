@@ -49,7 +49,7 @@
 - **Estado**: ✅ Funciona correctamente (confirmado por logs del usuario)
 
 ### ✅ Sistema de Emails CONFIGURADO
-- **Desarrollo**: Redirige a `andres.plazas@gmail.com`
+- **Desarrollo**: Redirige a `VITE_TEST_EMAIL` (fallback: `soporte@stockypos.app`)
 - **Producción**: Envía a clientes reales
 - **Fallback**: EmailJS → Resend
 - **Estado**: ✅ Emails se envían correctamente (confirmado)
@@ -95,7 +95,7 @@ VITE_EMAILJS_PUBLIC_KEY=xxxxx
 
 # OPCIONALES (Fallback)
 RESEND_API_KEY=re_xxxxx
-VITE_RESEND_FROM_EMAIL=noreply@tudominio.com
+RESEND_FROM_EMAIL=Stocky <soporte@stockypos.app>
 ```
 
 ---

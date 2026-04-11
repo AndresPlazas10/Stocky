@@ -518,7 +518,7 @@ export function ConfiguracionPanel({
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={16}
-        modalAnimationType="none"
+        modalAnimationType="fade"
         bodyFlex
         sheetStyle={styles.businessEditSheet}
         onClose={closeBusinessEditModal}
@@ -629,7 +629,7 @@ export function ConfiguracionPanel({
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={16}
-        modalAnimationType="none"
+        modalAnimationType="fade"
         sheetStyle={styles.deleteAccountSheet}
         onClose={() => {
           if (deletingAccount) return;

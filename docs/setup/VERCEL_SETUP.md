@@ -45,17 +45,12 @@ Esta guía te ayudará a configurar las variables de entorno necesarias para que
 
 1. En el campo **Name**, escribe:
    ```
-   VITE_RESEND_FROM_EMAIL
+   RESEND_FROM_EMAIL
    ```
 
 2. En el campo **Value**, escribe:
    ```
-   noreply@stocky.com
-   ```
-   
-   **⚠️ NOTA:** Si aún no has verificado el dominio `stocky.com` en Resend, usa temporalmente:
-   ```
-   onboarding@resend.dev
+   Stocky <soporte@stockypos.app>
    ```
 
 3. Selecciona los ambientes:
@@ -77,7 +72,7 @@ Si quieres que los deploys de **Preview** también usen email de testing:
 
 2. **Value:**
    ```
-   andres.plazas@example.com
+   qa@stockypos.app
    ```
 
 3. Selecciona **SOLO**:
@@ -125,8 +120,8 @@ En **Settings** → **Environment Variables** deberías ver:
 
 ```
 RESEND_API_KEY          Production, Preview    •••••••z9f
-VITE_RESEND_FROM_EMAIL       Production, Preview    noreply@stocky.com
-VITE_TEST_EMAIL             Preview                andres.plazas@example.com (opcional)
+RESEND_FROM_EMAIL       Production, Preview    Stocky <soporte@stockypos.app>
+VITE_TEST_EMAIL         Preview                qa@stockypos.app (opcional)
 ```
 
 ### 5.2 Verificar build exitoso
@@ -172,7 +167,7 @@ VITE_EMAILJS_TEMPLATE_ID=template_mkz4rb4
 
 ```
 RESEND_API_KEY=re_RBm8gZw1_Lspv5VqCYzFNGkANzmnTfz9f
-VITE_RESEND_FROM_EMAIL=noreply@stocky.com
+RESEND_FROM_EMAIL=Stocky <soporte@stockypos.app>
 ```
 
 ---
@@ -190,13 +185,12 @@ VITE_RESEND_FROM_EMAIL=noreply@stocky.com
 
 ### ❌ Error: "Invalid from address"
 
-**Causa:** Dominio `stocky.com` no verificado en Resend
+**Causa:** Dominio del remitente no verificado en Resend o variable mal nombrada
 
 **Solución:**
-Temporalmente usa `onboarding@resend.dev`:
 1. Ve a Settings → Environment Variables
-2. Edita `VITE_RESEND_FROM_EMAIL`
-3. Cambia a: `onboarding@resend.dev`
+2. Edita `RESEND_FROM_EMAIL`
+3. Usa: `Stocky <soporte@stockypos.app>`
 4. Redesplega
 
 ### ❌ Emails no llegan en producción
@@ -212,7 +206,7 @@ Temporalmente usa `onboarding@resend.dev`:
 **Solución común:**
 - Verifica que el email del cliente sea válido
 - Revisa los logs de Vercel para errores
-- Asegúrate de que el dominio esté verificado (si usas stocky.com)
+- Asegúrate de que el dominio `stockypos.app` esté verificado en Resend
 
 ### ❌ Variables no toman efecto
 
@@ -247,13 +241,13 @@ git push origin main
 
 ## 🎯 Próximos Pasos (Opcional)
 
-### 1. Verificar dominio stocky.com
+### 1. Verificar dominio stockypos.app
 
-Para usar `noreply@stocky.com` necesitas:
+Para usar `Stocky <soporte@stockypos.app>` necesitas:
 
 1. Ve a https://resend.com/domains
 2. Click en **Add Domain**
-3. Ingresa: `stocky.com`
+3. Ingresa: `stockypos.app`
 4. Resend te dará registros DNS:
 
 ```dns
@@ -289,12 +283,12 @@ tags: [
 
 Antes de considerar completo:
 
-- [ ] Variables agregadas en Vercel (RESEND_API_KEY, VITE_RESEND_FROM_EMAIL)
+- [ ] Variables agregadas en Vercel (RESEND_API_KEY, RESEND_FROM_EMAIL)
 - [ ] Redespliegue exitoso (sin errores)
 - [ ] Email de prueba enviado y recibido en producción
 - [ ] Dashboard de Resend muestra "Delivered"
 - [ ] Logs de Vercel muestran "✅ Email enviado con Resend"
-- [ ] (Opcional) Dominio stocky.com verificado
+- [ ] (Opcional) Dominio stockypos.app verificado
 - [ ] (Opcional) Variables de entorno documentadas en README
 
 ---

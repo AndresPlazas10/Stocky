@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
+  InteractionManager,
   Pressable,
   StyleSheet,
   Text,
@@ -79,6 +81,7 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
   const [showSupplierDeletedToast, setShowSupplierDeletedToast] = useState(false);
   const [supplierToastName, setSupplierToastName] = useState('');
   const [supplierToastNit, setSupplierToastNit] = useState('');
+  const [formDetailsReady, setFormDetailsReady] = useState(false);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [supplierToDelete, setSupplierToDelete] = useState<ProveedorRecord | null>(null);
@@ -262,6 +265,25 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
     };
   }, [businessId, refreshSuppliersSilently]);
 
+  useEffect(() => {
+    if (!showFormModal) {
+      setFormDetailsReady(false);
+      return;
+    }
+
+    let cancelled = false;
+    const task = InteractionManager.runAfterInteractions(() => {
+      if (!cancelled) {
+        setFormDetailsReady(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      (task as { cancel?: () => void }).cancel?.();
+    };
+  }, [showFormModal]);
+
   const resetFormState = useCallback(() => {
     setError(null);
     setEditingSupplier(null);
@@ -380,179 +402,196 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
     }
   }, [businessId, canManageSuppliers, deleting, refreshSuppliers, supplierToDelete]);
 
+  const suspendBackgroundList = showFormModal || showDeleteModal;
+
   return (
     <>
-      <View style={styles.container}>
-        <View style={styles.heroCard}>
-          <View style={styles.heroTop}>
-            <Ionicons name="business-outline" size={56} color="#C9CBD2" />
-            <View style={styles.heroTitleWrap}>
-              <Text style={styles.heroTitle}>Proveedores</Text>
-              <Text style={styles.heroSubtitle}>Gestiona tu red de proveedores</Text>
+      <FlatList
+        data={suspendBackgroundList ? [] : suppliers}
+        keyExtractor={(item) => item.id}
+        style={styles.screenList}
+        contentContainerStyle={styles.screenListContent}
+        ListHeaderComponentStyle={styles.listHeader}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        updateCellsBatchingPeriod={40}
+        ListHeaderComponent={(
+          <View style={styles.container}>
+            <View style={styles.heroCard}>
+              <View style={styles.heroTop}>
+                <Ionicons name="business-outline" size={56} color="#C9CBD2" />
+                <View style={styles.heroTitleWrap}>
+                  <Text style={styles.heroTitle}>Proveedores</Text>
+                  <Text style={styles.heroSubtitle}>Gestiona tu red de proveedores</Text>
+                </View>
+              </View>
+
+              <Pressable
+                style={[styles.heroCreateButtonWrap, (!canManageSuppliers || checkingPermissions) && styles.buttonDisabled]}
+                onPress={openCreateModal}
+                disabled={!canManageSuppliers || checkingPermissions}
+              >
+                <LinearGradient
+                  colors={['#4F46E5', '#7C3AED']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.heroCreateButton}
+                >
+                  <Ionicons name="add" size={22} color="#D1D5DB" />
+                  <Text style={styles.heroCreateButtonText}>Nuevo Proveedor</Text>
+                </LinearGradient>
+              </Pressable>
             </View>
+
+            {(loading || refreshing) ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
           </View>
-
-          <Pressable
-            style={[styles.heroCreateButtonWrap, (!canManageSuppliers || checkingPermissions) && styles.buttonDisabled]}
-            onPress={openCreateModal}
-            disabled={!canManageSuppliers || checkingPermissions}
-          >
-            <LinearGradient
-              colors={['#4F46E5', '#7C3AED']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.heroCreateButton}
-            >
-              <Ionicons name="add" size={22} color="#D1D5DB" />
-              <Text style={styles.heroCreateButtonText}>Nuevo Proveedor</Text>
-            </LinearGradient>
-          </Pressable>
-        </View>
-
-        {(loading || refreshing) ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
-
-        {loading ? (
+        )}
+        ListEmptyComponent={loading ? (
           <View style={styles.loadingBlock}>
             <ActivityIndicator color={STOCKY_COLORS.primary900} />
             <Text style={styles.loadingText}>Cargando proveedores...</Text>
           </View>
-        ) : suppliers.length === 0 ? (
+        ) : (!suspendBackgroundList ? (
           <Text style={styles.emptyText}>No hay proveedores registrados.</Text>
+        ) : null)}
+        ItemSeparatorComponent={() => <View style={styles.listItemSeparator} />}
+        ListFooterComponent={!suspendBackgroundList && hasMoreSuppliers ? (
+          <View style={styles.loadMoreWrap}>
+            <Text style={styles.loadMoreHint}>Mostrando {suppliers.length} proveedores</Text>
+            <StockyButton onPress={loadMoreSuppliers} loading={loadingMore} variant="ghost">
+              Cargar más proveedores
+            </StockyButton>
+          </View>
         ) : (
-          <>
-            {suppliers.map((supplier) => (
-              <View key={supplier.id} style={styles.supplierCard}>
-              <View style={styles.supplierHeader}>
-                <View style={styles.supplierHeaderMain}>
-                  <Ionicons name="business-outline" size={24} color="#111827" />
-                  <Text style={styles.supplierTitle} numberOfLines={1}>
-                    {supplier.business_name}
-                  </Text>
+          <View style={styles.listFooterSpacer} />
+        )}
+        renderItem={({ item: supplier }) => (
+          <View style={styles.supplierCard}>
+            <View style={styles.supplierHeader}>
+              <View style={styles.supplierHeaderMain}>
+                <Ionicons name="business-outline" size={24} color="#111827" />
+                <Text style={styles.supplierTitle} numberOfLines={1}>
+                  {supplier.business_name}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.supplierTagRow}>
+              <View style={styles.supplierNitTag}>
+                <Ionicons name="document-text-outline" size={13} color="#111827" />
+                <Text style={styles.supplierNitTagText}>NIT: {supplier.nit || 'Sin NIT'}</Text>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.supplierInfoGrid}>
+              <View style={styles.supplierInfoCell}>
+                <View style={styles.infoTitleRow}>
+                  <Ionicons name="person-outline" size={16} color="#111827" />
+                  <Text style={styles.infoLabel}>CONTACTO</Text>
                 </View>
+                <Text style={styles.infoValue} numberOfLines={2}>
+                  {supplier.contact_name || 'Sin contacto'}
+                </Text>
               </View>
 
-              <View style={styles.supplierTagRow}>
-                <View style={styles.supplierNitTag}>
-                  <Ionicons name="document-text-outline" size={13} color="#111827" />
-                  <Text style={styles.supplierNitTagText}>NIT: {supplier.nit || 'Sin NIT'}</Text>
+              <View style={styles.supplierInfoCell}>
+                <View style={styles.infoTitleRow}>
+                  <Ionicons name="mail-outline" size={16} color="#111827" />
+                  <Text style={styles.infoLabel}>EMAIL</Text>
                 </View>
+                <Text style={styles.infoLink} numberOfLines={2}>
+                  {supplier.email || 'Sin email'}
+                </Text>
               </View>
 
-              <View style={styles.divider} />
-
-              <View style={styles.supplierInfoGrid}>
-                <View style={styles.supplierInfoCell}>
-                  <View style={styles.infoTitleRow}>
-                    <Ionicons name="person-outline" size={16} color="#111827" />
-                    <Text style={styles.infoLabel}>CONTACTO</Text>
-                  </View>
-                  <Text style={styles.infoValue} numberOfLines={2}>
-                    {supplier.contact_name || 'Sin contacto'}
-                  </Text>
+              <View style={styles.supplierInfoCell}>
+                <View style={styles.infoTitleRow}>
+                  <Ionicons name="call-outline" size={16} color="#111827" />
+                  <Text style={styles.infoLabel}>TELÉFONO</Text>
                 </View>
-
-                <View style={styles.supplierInfoCell}>
-                  <View style={styles.infoTitleRow}>
-                    <Ionicons name="mail-outline" size={16} color="#111827" />
-                    <Text style={styles.infoLabel}>EMAIL</Text>
-                  </View>
-                  <Text style={styles.infoLink} numberOfLines={2}>
-                    {supplier.email || 'Sin email'}
-                  </Text>
-                </View>
-
-                <View style={styles.supplierInfoCell}>
-                  <View style={styles.infoTitleRow}>
-                    <Ionicons name="call-outline" size={16} color="#111827" />
-                    <Text style={styles.infoLabel}>TELÉFONO</Text>
-                  </View>
-                  <Text style={styles.infoValue} numberOfLines={2}>
-                    {supplier.phone || 'Sin teléfono'}
-                  </Text>
-                </View>
-
-                <View style={styles.supplierInfoCell}>
-                  <View style={styles.infoTitleRow}>
-                    <Ionicons name="location-outline" size={16} color="#111827" />
-                    <Text style={styles.infoLabel}>DIRECCIÓN</Text>
-                  </View>
-                  <Text style={styles.infoValue} numberOfLines={2}>
-                    {supplier.address || 'Sin dirección'}
-                  </Text>
-                </View>
-
-                {supplier.notes ? (
-                  <View style={[styles.supplierInfoCell, styles.supplierInfoCellFull]}>
-                    <Text style={styles.notesLabel}>NOTAS</Text>
-                    <Text style={styles.notesText}>{supplier.notes}</Text>
-                  </View>
-                ) : null}
+                <Text style={styles.infoValue} numberOfLines={2}>
+                  {supplier.phone || 'Sin teléfono'}
+                </Text>
               </View>
 
-              {canManageSuppliers ? (
-                <>
-                  <View style={styles.divider} />
-                  <View style={styles.supplierActionsRow}>
-                    <Pressable style={[styles.supplierEditButton, styles.supplierActionHalf]} onPress={() => openEditModal(supplier)}>
-                      <Ionicons name="create-outline" size={18} color="#DDE6FF" />
-                      <Text style={styles.supplierEditButtonText}>Editar</Text>
-                    </Pressable>
-                    <Pressable style={[styles.supplierDeleteButton, styles.supplierActionHalf]} onPress={() => askDeleteSupplier(supplier)}>
-                      <Ionicons name="trash-outline" size={18} color="#FFE4E6" />
-                      <Text style={styles.supplierDeleteButtonText}>Eliminar</Text>
-                    </Pressable>
-                  </View>
-                </>
+              <View style={styles.supplierInfoCell}>
+                <View style={styles.infoTitleRow}>
+                  <Ionicons name="location-outline" size={16} color="#111827" />
+                  <Text style={styles.infoLabel}>DIRECCIÓN</Text>
+                </View>
+                <Text style={styles.infoValue} numberOfLines={2}>
+                  {supplier.address || 'Sin dirección'}
+                </Text>
+              </View>
+
+              {supplier.notes ? (
+                <View style={[styles.supplierInfoCell, styles.supplierInfoCellFull]}>
+                  <Text style={styles.notesLabel}>NOTAS</Text>
+                  <Text style={styles.notesText}>{supplier.notes}</Text>
+                </View>
               ) : null}
             </View>
-            ))}
-            {hasMoreSuppliers ? (
-              <View style={styles.loadMoreWrap}>
-                <Text style={styles.loadMoreHint}>Mostrando {suppliers.length} proveedores</Text>
-                <StockyButton onPress={loadMoreSuppliers} loading={loadingMore} variant="ghost">
-                  Cargar más proveedores
-                </StockyButton>
-              </View>
+
+            {canManageSuppliers ? (
+              <>
+                <View style={styles.divider} />
+                <View style={styles.supplierActionsRow}>
+                  <Pressable style={[styles.supplierEditButton, styles.supplierActionHalf]} onPress={() => openEditModal(supplier)}>
+                    <Ionicons name="create-outline" size={18} color="#DDE6FF" />
+                    <Text style={styles.supplierEditButtonText}>Editar</Text>
+                  </Pressable>
+                  <Pressable style={[styles.supplierDeleteButton, styles.supplierActionHalf]} onPress={() => askDeleteSupplier(supplier)}>
+                    <Ionicons name="trash-outline" size={18} color="#FFE4E6" />
+                    <Text style={styles.supplierDeleteButtonText}>Eliminar</Text>
+                  </Pressable>
+                </View>
+              </>
             ) : null}
-          </>
+          </View>
         )}
-      </View>
+      />
 
       <StockyModal
         visible={showFormModal}
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={16}
-        modalAnimationType="none"
+        modalAnimationType="fade"
+        animationDurationMs={180}
+        deferContent
+        deferFallback={(
+          <View style={styles.formDeferredFallback}>
+            <ActivityIndicator color={STOCKY_COLORS.primary900} />
+            <Text style={styles.formDeferredFallbackText}>Cargando formulario...</Text>
+          </View>
+        )}
         bodyFlex
         sheetStyle={styles.supplierFormSheet}
+        contentContainerStyle={styles.supplierFormContent}
+        perfTag="proveedores.form_proveedor"
         onClose={closeFormModal}
         headerSlot={(
-          <LinearGradient
-            colors={['#4F46E5', '#7C3AED']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.supplierFormHeader}
-          >
-            <View style={styles.supplierFormHeaderLeft}>
-              <View style={styles.supplierFormHeaderIconWrap}>
-                <Ionicons name={editingSupplier ? 'create-outline' : 'add'} size={22} color="#FFFFFF" />
-              </View>
-              <View style={styles.supplierFormHeaderTitleWrap}>
-                <Text style={styles.supplierFormHeaderTitle}>
-                  {editingSupplier ? 'Editar Proveedor' : 'Nuevo Proveedor'}
-                </Text>
-                <Text style={styles.supplierFormHeaderSubtitle}>
-                  {editingSupplier
-                    ? 'Actualiza la información del proveedor'
-                    : 'Completa los datos del nuevo proveedor'}
-                </Text>
-              </View>
-            </View>
-            <Pressable onPress={closeFormModal} style={styles.supplierFormHeaderClose} disabled={saving}>
-              <Ionicons name="close" size={24} color="#E5E7EB" />
+          <View style={styles.supplierFormHeader}>
+            <LinearGradient
+              colors={['#4F46E5', '#7C3AED']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.supplierFormHeaderIconWrap}
+            >
+              <Ionicons name={editingSupplier ? 'create-outline' : 'add'} size={30} color="#D1D5DB" />
+            </LinearGradient>
+            <Text style={styles.supplierFormHeaderTitle}>
+              {editingSupplier ? 'Editar Proveedor' : 'Nuevo Proveedor'}
+            </Text>
+            <Pressable style={[styles.supplierFormHeaderClose, saving && styles.buttonDisabled]} onPress={closeFormModal} disabled={saving}>
+              <Ionicons name="close" size={34} color="#111827" />
             </Pressable>
-          </LinearGradient>
+          </View>
         )}
         footerStyle={styles.supplierFormFooter}
         footer={(
@@ -565,21 +604,14 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
               <Text style={styles.supplierFormCancelText}>Cancelar</Text>
             </Pressable>
             <Pressable
-              style={[styles.supplierFormSaveWrap, saving && styles.buttonDisabled]}
+              style={[styles.supplierFormSaveButton, saving && styles.buttonDisabled]}
               onPress={submitForm}
               disabled={saving}
             >
-              <LinearGradient
-                colors={['#4F46E5', '#7C3AED']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.supplierFormSaveButton}
-              >
-                {saving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name={editingSupplier ? 'create-outline' : 'add'} size={17} color="#FFFFFF" />}
-                <Text style={styles.supplierFormSaveText}>
-                  {saving ? 'Guardando...' : (editingSupplier ? 'Actualizar' : 'Crear Proveedor')}
-                </Text>
-              </LinearGradient>
+              {saving ? <ActivityIndicator size="small" color="#F5F3FF" /> : null}
+              <Text style={styles.supplierFormSaveText}>
+                {saving ? 'Guardando...' : (editingSupplier ? 'Actualizar' : 'Guardar')}
+              </Text>
             </Pressable>
           </View>
         )}
@@ -600,72 +632,81 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
             />
           </View>
 
-          <View style={styles.formRow}>
-            <View style={[styles.fieldGroup, styles.formCol]}>
-              <Text style={styles.inputLabel}>Persona de Contacto</Text>
-              <TextInput
-                value={form.contact_name}
-                onChangeText={(next) => setForm((prev) => ({ ...prev, contact_name: next }))}
-                style={styles.input}
-              />
-            </View>
+          {formDetailsReady ? (
+            <>
+              <View style={styles.formRow}>
+                <View style={[styles.fieldGroup, styles.formCol]}>
+                  <Text style={styles.inputLabel}>Persona de Contacto</Text>
+                  <TextInput
+                    value={form.contact_name}
+                    onChangeText={(next) => setForm((prev) => ({ ...prev, contact_name: next }))}
+                    style={styles.input}
+                  />
+                </View>
 
-            <View style={[styles.fieldGroup, styles.formCol]}>
-              <Text style={styles.inputLabel}>NIT</Text>
-              <TextInput
-                value={form.nit}
-                onChangeText={(next) => setForm((prev) => ({ ...prev, nit: next }))}
-                style={styles.input}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-          </View>
+                <View style={[styles.fieldGroup, styles.formCol]}>
+                  <Text style={styles.inputLabel}>NIT</Text>
+                  <TextInput
+                    value={form.nit}
+                    onChangeText={(next) => setForm((prev) => ({ ...prev, nit: next }))}
+                    style={styles.input}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+              </View>
 
-          <View style={styles.formRow}>
-            <View style={[styles.fieldGroup, styles.formCol]}>
-              <Text style={styles.inputLabel}>Email</Text>
-              <TextInput
-                value={form.email}
-                onChangeText={(next) => setForm((prev) => ({ ...prev, email: next }))}
-                style={styles.input}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="email-address"
-              />
-            </View>
+              <View style={styles.formRow}>
+                <View style={[styles.fieldGroup, styles.formCol]}>
+                  <Text style={styles.inputLabel}>Email</Text>
+                  <TextInput
+                    value={form.email}
+                    onChangeText={(next) => setForm((prev) => ({ ...prev, email: next }))}
+                    style={styles.input}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="email-address"
+                  />
+                </View>
 
-            <View style={[styles.fieldGroup, styles.formCol]}>
-              <Text style={styles.inputLabel}>Teléfono</Text>
-              <TextInput
-                value={form.phone}
-                onChangeText={(next) => setForm((prev) => ({ ...prev, phone: next }))}
-                style={styles.input}
-                keyboardType="phone-pad"
-              />
-            </View>
-          </View>
+                <View style={[styles.fieldGroup, styles.formCol]}>
+                  <Text style={styles.inputLabel}>Teléfono</Text>
+                  <TextInput
+                    value={form.phone}
+                    onChangeText={(next) => setForm((prev) => ({ ...prev, phone: next }))}
+                    style={styles.input}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+              </View>
 
-          <View style={styles.formRow}>
-            <View style={[styles.fieldGroup, styles.formCol]}>
-              <Text style={styles.inputLabel}>Dirección</Text>
-              <TextInput
-                value={form.address}
-                onChangeText={(next) => setForm((prev) => ({ ...prev, address: next }))}
-                style={styles.input}
-              />
-            </View>
+              <View style={styles.formRow}>
+                <View style={[styles.fieldGroup, styles.formCol]}>
+                  <Text style={styles.inputLabel}>Dirección</Text>
+                  <TextInput
+                    value={form.address}
+                    onChangeText={(next) => setForm((prev) => ({ ...prev, address: next }))}
+                    style={styles.input}
+                  />
+                </View>
 
-            <View style={[styles.fieldGroup, styles.formCol]}>
-              <Text style={styles.inputLabel}>Notas</Text>
-              <TextInput
-                value={form.notes}
-                onChangeText={(next) => setForm((prev) => ({ ...prev, notes: next }))}
-                style={[styles.input, styles.textArea]}
-                multiline
-              />
+                <View style={[styles.fieldGroup, styles.formCol]}>
+                  <Text style={styles.inputLabel}>Notas</Text>
+                  <TextInput
+                    value={form.notes}
+                    onChangeText={(next) => setForm((prev) => ({ ...prev, notes: next }))}
+                    style={[styles.input, styles.textArea]}
+                    multiline
+                  />
+                </View>
+              </View>
+            </>
+          ) : (
+            <View style={styles.formSectionLoader}>
+              <ActivityIndicator color={STOCKY_COLORS.primary900} />
+              <Text style={styles.formSectionLoaderText}>Cargando campos adicionales...</Text>
             </View>
-          </View>
+          )}
         </View>
       </StockyModal>
 
@@ -718,8 +759,25 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
 }
 
 const styles = StyleSheet.create({
+  screenList: {
+    flex: 1,
+  },
+  screenListContent: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 26,
+  },
+  listHeader: {
+    paddingBottom: 16,
+  },
   container: {
     gap: 16,
+  },
+  listItemSeparator: {
+    height: 16,
+  },
+  listFooterSpacer: {
+    height: 4,
   },
   buttonDisabled: {
     opacity: 0.65,
@@ -966,101 +1024,109 @@ const styles = StyleSheet.create({
     borderColor: '#D6DDE7',
     backgroundColor: '#FFFFFF',
   },
-  supplierFormHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  supplierFormHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  supplierFormContent: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     gap: 10,
-    flex: 1,
-    minWidth: 0,
   },
-  supplierFormHeaderIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  supplierFormHeaderTitleWrap: {
-    flex: 1,
-    minWidth: 0,
-    gap: 2,
-  },
-  supplierFormHeaderTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  supplierFormHeaderSubtitle: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  supplierFormHeaderClose: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  supplierFormFooter: {
-    backgroundColor: '#FFFFFF',
-    borderTopColor: '#E5E7EB',
-    borderTopWidth: 1,
+  supplierFormHeader: {
+    minHeight: 84,
     paddingHorizontal: 16,
     paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  supplierFormHeaderIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  supplierFormHeaderTitle: {
+    flex: 1,
+    color: '#111827',
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '800',
+  },
+  supplierFormHeaderClose: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  supplierFormFooter: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderTopColor: '#E5E7EB',
+    backgroundColor: '#F3F4F6',
   },
   supplierFormFooterRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   supplierFormCancelButton: {
-    minHeight: 45,
-    borderRadius: 12,
+    minHeight: 40,
+    borderRadius: STOCKY_RADIUS.md,
     borderWidth: 1,
-    borderColor: '#D7DEE8',
-    backgroundColor: '#FFFFFF',
+    borderColor: '#C4B5FD',
+    backgroundColor: '#EDE9FE',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  supplierFormCancelText: {
-    color: '#1F2937',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  supplierFormSaveWrap: {
+    paddingHorizontal: 12,
     flex: 1,
   },
+  supplierFormCancelText: {
+    color: '#5B21B6',
+    fontSize: 12,
+    fontWeight: '800',
+  },
   supplierFormSaveButton: {
-    minHeight: 45,
-    borderRadius: 12,
+    minHeight: 40,
+    borderRadius: STOCKY_RADIUS.md,
+    backgroundColor: '#6D28D9',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 14,
-    shadowColor: '#111827',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.14,
-    shadowRadius: 10,
-    elevation: 4,
+    gap: 6,
+    paddingHorizontal: 12,
+    flex: 1,
   },
   supplierFormSaveText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
+    color: '#F5F3FF',
+    fontSize: 12,
+    fontWeight: '800',
   },
   supplierFormFields: {
     gap: 10,
+  },
+  formDeferredFallback: {
+    minHeight: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  formDeferredFallbackText: {
+    color: STOCKY_COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  formSectionLoader: {
+    minHeight: 120,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  formSectionLoaderText: {
+    color: STOCKY_COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
   },
   formRow: {
     flexDirection: 'row',
