@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Pressable,
   StyleSheet,
   Text,
@@ -480,8 +481,10 @@ export function CombosPanel({ businessId, businessName, userId, source }: Props)
     }
 
     setError(null);
-    handleItemChange(productPickerRowIndex, 'productoId', productId);
     closeProductPicker();
+    requestAnimationFrame(() => {
+      handleItemChange(productPickerRowIndex, 'productoId', productId);
+    });
   }, [closeProductPicker, form.items, handleItemChange, productPickerRowIndex, productsById]);
 
   const submitForm = useCallback(async () => {
@@ -648,54 +651,71 @@ export function CombosPanel({ businessId, businessName, userId, source }: Props)
     }
   }, [businessId, canManageCombos, updatingStatusId]);
 
+  const suspendBackgroundList = showFormModal || showProductPickerModal || showDeleteModal;
+
   return (
     <>
-      <View style={styles.container}>
-        <LinearGradient
-          colors={['#4F46E5', '#7C3AED']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.heroCard}
-        >
-          <View style={styles.heroTop}>
-            <View style={styles.heroIconBox}>
-              <Ionicons name="layers-outline" size={32} color="#D1D5DB" />
-            </View>
-            <View style={styles.heroTitleWrap}>
-              <Text style={styles.heroTitle}>Combos</Text>
-              <Text style={styles.heroSubtitle}>Gestiona combos estructurados de productos</Text>
-            </View>
+      <FlatList
+        data={suspendBackgroundList ? [] : filteredCombos}
+        keyExtractor={(item) => item.id}
+        style={styles.screenList}
+        contentContainerStyle={styles.screenListContent}
+        ListHeaderComponentStyle={styles.listHeader}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        updateCellsBatchingPeriod={40}
+        ListHeaderComponent={(
+          <View style={styles.container}>
+            <LinearGradient
+              colors={['#4F46E5', '#7C3AED']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroCard}
+            >
+              <View style={styles.heroTop}>
+                <View style={styles.heroIconBox}>
+                  <Ionicons name="layers-outline" size={32} color="#D1D5DB" />
+                </View>
+                <View style={styles.heroTitleWrap}>
+                  <Text style={styles.heroTitle}>Combos</Text>
+                  <Text style={styles.heroSubtitle}>Gestiona combos estructurados de productos</Text>
+                </View>
+              </View>
+
+              <Pressable
+                style={[styles.heroCreateButton, (!canManageCombos || checkingPermissions) && styles.buttonDisabled]}
+                onPress={openCreateModal}
+                disabled={!canManageCombos || checkingPermissions}
+              >
+                <Ionicons name="add" size={20} color="rgba(255,255,255,0.88)" />
+                <Text style={styles.heroCreateButtonText}>Nuevo Combo</Text>
+              </Pressable>
+            </LinearGradient>
+
+            {loading || refreshing ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
+            {error ? (
+              <View style={styles.errorCard}>
+                <Ionicons name="alert-circle-outline" size={18} color="#B91C1C" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+            {!canManageCombos && !checkingPermissions ? null : null}
           </View>
-
-          <Pressable
-            style={[styles.heroCreateButton, (!canManageCombos || checkingPermissions) && styles.buttonDisabled]}
-            onPress={openCreateModal}
-            disabled={!canManageCombos || checkingPermissions}
-          >
-            <Ionicons name="add" size={20} color="rgba(255,255,255,0.88)" />
-            <Text style={styles.heroCreateButtonText}>Nuevo Combo</Text>
-          </Pressable>
-        </LinearGradient>
-
-        {loading || refreshing ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
-        {error ? (
-          <View style={styles.errorCard}>
-            <Ionicons name="alert-circle-outline" size={18} color="#B91C1C" />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : null}
-        {!canManageCombos && !checkingPermissions ? null : null}
-
-        {filteredCombos.length === 0 && !loading ? (
+        )}
+        ListEmptyComponent={!suspendBackgroundList && !loading ? (
           <Text style={styles.emptyText}>No hay combos para los filtros seleccionados.</Text>
         ) : null}
-
-        {filteredCombos.map((combo) => {
+        ItemSeparatorComponent={() => <View style={styles.listItemSeparator} />}
+        ListFooterComponent={<View style={styles.listFooterSpacer} />}
+        renderItem={({ item: combo }) => {
           const status = normalizeStatus(combo.estado);
           const isActive = status === COMBO_STATUS.ACTIVE;
 
           return (
-            <View key={combo.id} style={styles.comboCard}>
+            <View style={styles.comboCard}>
               <View style={styles.comboHeader}>
                 <View style={styles.comboNameRow}>
                   <Ionicons name="layers-outline" size={24} color="#111827" />
@@ -766,37 +786,38 @@ export function CombosPanel({ businessId, businessName, userId, source }: Props)
               ) : null}
             </View>
           );
-        })}
-      </View>
+        }}
+      />
 
       <StockyModal
         visible={showFormModal}
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={16}
-        modalAnimationType="none"
+        modalAnimationType="fade"
+        animationDurationMs={180}
         bodyFlex
         sheetStyle={styles.comboFormSheet}
+        contentContainerStyle={styles.comboFormContent}
+        perfTag="combos.form_combo"
         onClose={closeFormModal}
         headerSlot={(
-          <LinearGradient
-            colors={['#4F46E5', '#7C3AED']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.comboFormHeader}
-          >
-            <View style={styles.comboFormHeaderLeft}>
-              <View style={styles.comboFormHeaderIconWrap}>
-                <Ionicons name={editingCombo ? 'create-outline' : 'layers-outline'} size={20} color="#FFFFFF" />
-              </View>
-              <Text style={styles.comboFormHeaderTitle}>
-                {editingCombo ? 'Editar Combo' : 'Nuevo Combo'}
-              </Text>
-            </View>
-            <Pressable onPress={closeFormModal} style={styles.comboFormHeaderClose} disabled={saving}>
-              <Ionicons name="close" size={24} color="#E5E7EB" />
+          <View style={styles.comboFormHeader}>
+            <LinearGradient
+              colors={['#4F46E5', '#7C3AED']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.comboFormHeaderIconWrap}
+            >
+              <Ionicons name={editingCombo ? 'create-outline' : 'layers-outline'} size={30} color="#D1D5DB" />
+            </LinearGradient>
+            <Text style={styles.comboFormHeaderTitle}>
+              {editingCombo ? 'Editar Combo' : 'Nuevo Combo'}
+            </Text>
+            <Pressable style={[styles.comboFormHeaderClose, saving && styles.buttonDisabled]} onPress={closeFormModal} disabled={saving}>
+              <Ionicons name="close" size={34} color="#111827" />
             </Pressable>
-          </LinearGradient>
+          </View>
         )}
         footerStyle={styles.comboFormFooter}
         footer={(
@@ -805,21 +826,14 @@ export function CombosPanel({ businessId, businessName, userId, source }: Props)
               <Text style={styles.comboFormCancelButtonText}>Cancelar</Text>
             </Pressable>
             <Pressable
-              style={[styles.comboFormSaveWrap, saving && styles.buttonDisabled]}
+              style={[styles.comboFormSaveButton, saving && styles.buttonDisabled]}
               onPress={submitForm}
               disabled={saving}
             >
-              <LinearGradient
-                colors={['#4F46E5', '#7C3AED']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.comboFormSaveButton}
-              >
-                {saving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="save-outline" size={17} color="#FFFFFF" />}
-                <Text style={styles.comboFormSaveButtonText}>
-                  {saving ? 'Guardando...' : (editingCombo ? 'Guardar cambios' : 'Crear combo')}
-                </Text>
-              </LinearGradient>
+              {saving ? <ActivityIndicator size="small" color="#F5F3FF" /> : null}
+              <Text style={styles.comboFormSaveButtonText}>
+                {saving ? 'Guardando...' : (editingCombo ? 'Actualizar' : 'Guardar')}
+              </Text>
             </Pressable>
           </View>
         )}
@@ -938,8 +952,10 @@ export function CombosPanel({ businessId, businessName, userId, source }: Props)
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={24}
-        modalAnimationType="none"
+        modalAnimationType="fade"
+        animationDurationMs={150}
         bodyFlex
+        perfTag="combos.picker_producto"
         onClose={closeProductPicker}
       >
         <View style={styles.modalSection}>
@@ -1045,8 +1061,25 @@ export function CombosPanel({ businessId, businessName, userId, source }: Props)
 }
 
 const styles = StyleSheet.create({
+  screenList: {
+    flex: 1,
+  },
+  screenListContent: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 26,
+  },
+  listHeader: {
+    paddingBottom: 16,
+  },
   container: {
     gap: 16,
+  },
+  listItemSeparator: {
+    height: 16,
+  },
+  listFooterSpacer: {
+    height: 4,
   },
   heroCard: {
     borderRadius: 22,
@@ -1429,88 +1462,80 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     borderColor: '#D9DEE8',
   },
-  comboFormHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  comboFormHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  comboFormContent: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     gap: 10,
-    flexShrink: 1,
+  },
+  comboFormHeader: {
+    minHeight: 84,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   comboFormHeaderIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   comboFormHeaderTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
+    flex: 1,
+    color: '#111827',
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: '800',
-    flexShrink: 1,
   },
   comboFormHeaderClose: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 42,
+    height: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   comboFormFooter: {
-    backgroundColor: '#FFFFFF',
-    borderTopColor: '#E5E7EB',
-    borderTopWidth: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 12,
+    borderTopColor: '#E5E7EB',
+    backgroundColor: '#F3F4F6',
   },
   comboFormFooterRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   comboFormCancelButton: {
-    minHeight: 45,
-    borderRadius: 12,
+    minHeight: 40,
+    borderRadius: STOCKY_RADIUS.md,
     borderWidth: 1,
-    borderColor: '#D7DEE8',
-    backgroundColor: '#FFFFFF',
+    borderColor: '#C4B5FD',
+    backgroundColor: '#EDE9FE',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  comboFormCancelButtonText: {
-    color: '#1F2937',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  comboFormSaveWrap: {
+    paddingHorizontal: 12,
     flex: 1,
   },
+  comboFormCancelButtonText: {
+    color: '#5B21B6',
+    fontSize: 12,
+    fontWeight: '800',
+  },
   comboFormSaveButton: {
-    minHeight: 45,
-    borderRadius: 12,
+    minHeight: 40,
+    borderRadius: STOCKY_RADIUS.md,
+    backgroundColor: '#6D28D9',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 14,
-    shadowColor: '#111827',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.14,
-    shadowRadius: 10,
-    elevation: 4,
+    gap: 6,
+    paddingHorizontal: 12,
+    flex: 1,
   },
   comboFormSaveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
+    color: '#F5F3FF',
+    fontSize: 12,
+    fontWeight: '800',
   },
   comboFormFields: {
     gap: 10,

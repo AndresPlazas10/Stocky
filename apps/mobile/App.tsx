@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -10,11 +11,34 @@ import { StockyBackground } from './src/ui/StockyBackground';
 import { StockyCard } from './src/ui/StockyCard';
 import { StockyErrorBoundary } from './src/ui/StockyErrorBoundary';
 import { STOCKY_COLORS } from './src/theme/tokens';
+import { perfDurationMs, perfMark } from './src/utils/perfAudit';
+
+const APP_BOOT_STARTED_AT = Date.now();
 
 export default function App() {
   const auth = useAuthSession();
   useMobileNotifications(auth.session);
   const hasSupabase = Boolean(EXPO_CONFIG.supabaseUrl && EXPO_CONFIG.supabaseAnonKey);
+  const mountLoggedRef = useRef(false);
+  const authReadyLoggedRef = useRef(false);
+
+  useEffect(() => {
+    if (mountLoggedRef.current) return;
+    mountLoggedRef.current = true;
+    perfMark('app_component_mounted', {
+      sinceBootMs: perfDurationMs(APP_BOOT_STARTED_AT),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (authReadyLoggedRef.current) return;
+    if (!hasSupabase || auth.loading || auth.error) return;
+    authReadyLoggedRef.current = true;
+    perfMark('app_auth_ready', {
+      sinceBootMs: perfDurationMs(APP_BOOT_STARTED_AT),
+      hasSession: Boolean(auth.session),
+    });
+  }, [auth.error, auth.loading, auth.session, hasSupabase]);
 
   if (!hasSupabase) {
     return (

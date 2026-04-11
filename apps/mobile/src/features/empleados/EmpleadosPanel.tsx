@@ -488,7 +488,7 @@ export function EmpleadosPanel({ businessId, businessName, userId, source }: Pro
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={16}
-        modalAnimationType="none"
+        modalAnimationType="fade"
         bodyFlex
         sheetStyle={styles.employeeFormSheet}
         onClose={() => {

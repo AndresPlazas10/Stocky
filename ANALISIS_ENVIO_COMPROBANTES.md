@@ -92,7 +92,7 @@ Las variables de entorno de Vercel **NO están configuradas**:
 **Variables del CLIENTE** (navegador):
 ```env
 RESEND_API_KEY=          # ← Vacío en .env.local
-VITE_RESEND_FROM_EMAIL=onboarding@resend.dev
+VITE_RESEND_FROM_EMAIL=soporte@stockypos.app
 ```
 
 **Variables del SERVIDOR** (Vercel Function):
@@ -194,7 +194,7 @@ if (!response.ok) {
    Variable               | Valor                    | Environment
    ---------------------- | ------------------------ | -----------
    RESEND_API_KEY         | re_tu_key_aqui          | Production
-   RESEND_FROM_EMAIL      | onboarding@resend.dev   | Production
+   RESEND_FROM_EMAIL      | Stocky <soporte@stockypos.app> | Production
 ```
 
 **Opción 2B: Desde Terminal**
@@ -204,7 +204,7 @@ vercel env add RESEND_API_KEY
 # Selecciona: Production
 
 vercel env add RESEND_FROM_EMAIL
-# Pega: onboarding@resend.dev
+# Pega: Stocky <soporte@stockypos.app>
 # Selecciona: Production
 ```
 
@@ -278,7 +278,7 @@ cat .env.local | grep RESEND
 
 # Debe mostrar:
 # RESEND_API_KEY=re_tu_key_aqui
-# VITE_RESEND_FROM_EMAIL=onboarding@resend.dev
+# RESEND_FROM_EMAIL=Stocky <soporte@stockypos.app>
 ```
 
 **En producción (Vercel):**

@@ -114,7 +114,7 @@ Supabase Dashboard → Database → Backups
 ### ✅ 3. Configuración de Emails
 
 #### Modo Desarrollo (Local):
-- ✅ Emails redirigidos a: `andres.plazas@gmail.com`
+- ✅ Emails redirigidos a: `VITE_TEST_EMAIL` (fallback: `soporte@stockypos.app`)
 - ✅ Override con variable: `VITE_TEST_EMAIL`
 - ✅ Detección automática con `import.meta.env.MODE`
 
@@ -165,7 +165,7 @@ VITE_EMAILJS_PUBLIC_KEY=tu-public-key
 
 # Resend (Fallback - Opcional)
 RESEND_API_KEY=re_xxxxx
-VITE_RESEND_FROM_EMAIL=noreply@tudominio.com
+RESEND_FROM_EMAIL=Stocky <soporte@stockypos.app>
 
 # Test Email (Solo para desarrollo - NO necesario en producción)
 # VITE_TEST_EMAIL=test@example.com

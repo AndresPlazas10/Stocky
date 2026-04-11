@@ -21,7 +21,7 @@
  * 2. Obtén API Key
  * 3. Configura en .env.local:
  *    RESEND_API_KEY=re_xxxxx
- *    VITE_RESEND_FROM_EMAIL=onboarding@resend.dev
+ *    VITE_RESEND_FROM_EMAIL=soporte@stockypos.app
  * 
  * Ver guía completa: RESEND_SETUP.md
  */

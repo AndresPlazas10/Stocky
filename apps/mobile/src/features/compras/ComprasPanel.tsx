@@ -1029,9 +1029,10 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={16}
-        modalAnimationType="none"
+        modalAnimationType="fade"
         bodyFlex
         sheetStyle={styles.purchaseOrderModalSheet}
+        perfTag="compras.form_nueva_compra"
         onClose={() => {
           if (creatingPurchase) return;
           setShowCreatePurchaseModal(false);
@@ -1322,7 +1323,7 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
         layout="centered"
         backdropVariant="blur"
         centeredOffsetY={12}
-        modalAnimationType="none"
+        modalAnimationType="fade"
         bodyFlex
         sheetStyle={styles.purchaseDetailsModalSheet}
         contentContainerStyle={styles.purchaseDetailsContentContainer}

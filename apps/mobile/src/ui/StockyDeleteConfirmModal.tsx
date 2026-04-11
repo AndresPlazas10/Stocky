@@ -44,7 +44,7 @@ export function StockyDeleteConfirmModal({
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={70}
-      modalAnimationType="none"
+      modalAnimationType="fade"
       onClose={() => {
         if (disableCancel) return;
         onCancel();
