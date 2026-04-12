@@ -180,7 +180,6 @@ export default async function handler(req, res) {
     const safeCustomerName = escapeHtml(customerName);
     const safeInvoiceNumber = escapeHtml(invoiceNumber);
     const publicOrigin = normalizeOrigin(APP_ORIGIN) || DEFAULT_PUBLIC_ORIGIN;
-    const brandBackgroundUrl = `${publicOrigin}/branding/imagenFondo.jpeg`;
     const brandLogoUrl = `${publicOrigin}/branding/logoStocky.png`;
     const formattedIssuedAt = issuedAt
       ? new Date(issuedAt).toLocaleDateString('es-CO', {
@@ -219,7 +218,7 @@ export default async function handler(req, res) {
       <body style="margin: 0; padding: 24px 0; background-color: #f3f5fb; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #111827;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; max-width: 680px; margin: 0 auto; border-collapse: collapse;">
           <tr>
-            <td style="background-color: #0f172a; background-image: url('${brandBackgroundUrl}'); background-size: cover; background-position: center; border-radius: 14px 14px 0 0; padding: 30px 28px;">
+            <td style="background-color: #0f172a; border-radius: 14px 14px 0 0; padding: 30px 28px;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
                 <tr>
                   <td style="padding-bottom: 12px;">
