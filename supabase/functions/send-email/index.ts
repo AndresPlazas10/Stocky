@@ -28,7 +28,6 @@ serve(async (req) => {
     const safeCustomerName = customerName || 'Cliente'
     const safeInvoiceNumber = invoiceNumber || 'N/A'
     const numericTotal = Number(total || 0)
-    const brandBackgroundUrl = `${APP_ORIGIN}/branding/imagenFondo.jpeg`
     const brandLogoUrl = `${APP_ORIGIN}/branding/logoStocky.png`
 
     // Formatear items HTML
@@ -52,7 +51,7 @@ serve(async (req) => {
       <body style="margin: 0; padding: 24px 0; background-color: #f3f5fb; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #111827;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; max-width: 680px; margin: 0 auto; border-collapse: collapse;">
           <tr>
-            <td style="background-color: #0f172a; background-image: url('${brandBackgroundUrl}'); background-size: cover; background-position: center; border-radius: 14px 14px 0 0; padding: 30px 28px;">
+            <td style="background-color: #0f172a; border-radius: 14px 14px 0 0; padding: 30px 28px;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
                 <tr>
                   <td style="padding-bottom: 12px;">
