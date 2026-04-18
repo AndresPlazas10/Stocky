@@ -439,6 +439,17 @@ export function AuthScreen() {
                 : 'Completa la información de tu negocio para comenzar'}
             </Text>
 
+            {isSignIn ? (
+              <Pressable
+                onPress={() => Linking.openURL('https://www.stockypos.app')}
+                style={styles.registerPromptWrap}
+              >
+                <Text style={styles.registerPromptText}>
+                  ¿No has registrado tu negocio? Registrate gratis en www.stockypos.app
+                </Text>
+              </Pressable>
+            ) : null}
+
             {error ? <Text style={styles.error}>{error}</Text> : null}
             {message ? <Text style={styles.message}>{message}</Text> : null}
 
@@ -649,6 +660,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '500',
+  },
+  registerPromptWrap: {
+    marginBottom: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(91, 51, 214, 0.14)',
+    backgroundColor: 'rgba(91, 51, 214, 0.06)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  registerPromptText: {
+    textAlign: 'center',
+    color: '#4338CA',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
   },
   inputGroup: {
     gap: 8,
