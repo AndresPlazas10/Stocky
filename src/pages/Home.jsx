@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { signOutSession } from '../data/commands/authCommands.js';
 import { Button } from '@/components/ui/button';
 import WhatsNewModal from '../components/Modals/WhatsNewModal.jsx';
+import { getApkDownloadUrl } from '../utils/apkDownload.js';
 import {
   Menu,
   X,
@@ -69,8 +70,7 @@ const process = [
 function Home() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const mobileAppUrl = String(import.meta.env?.VITE_APK_URL || '').trim()
-    || '/apk/stocky-latest.apk';
+  const mobileAppUrl = getApkDownloadUrl();
 
   const handleDownloadClick = () => {
     if (mobileAppUrl.startsWith('/')) {

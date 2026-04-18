@@ -1,11 +1,12 @@
 import { motion } from 'framer-motion';
 import { Download, ShieldCheck, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getApkDownloadUrl } from '../utils/apkDownload.js';
 
 const _motionLintUsage = motion;
 
 function DownloadPage() {
-  const apkUrl = String(import.meta.env?.VITE_APK_URL || '').trim() || '/apk/stocky-latest.apk';
+  const apkUrl = getApkDownloadUrl();
   const apkVersion = String(import.meta.env?.VITE_APK_VERSION || '').trim();
 
   return (

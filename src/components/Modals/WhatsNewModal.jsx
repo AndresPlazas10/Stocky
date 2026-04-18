@@ -6,6 +6,7 @@ import logoStocky from '../../assets/logoStocky.png';
 import imagenFondo from '../../assets/imagenFondo.jpeg';
 import logoViejo from '../../assets/logoViejo.png';
 import nuevoLogo from '../../assets/nuevoLogo.png';
+import { getApkDownloadUrl } from '../../utils/apkDownload.js';
 
 const _motionLintUsage = motion;
 
@@ -17,10 +18,7 @@ export default function WhatsNewModal() {
   const isEnabled = String(import.meta.env?.VITE_WHATS_NEW_ENABLED || '')
     .trim()
     .toLowerCase() === 'true';
-  const downloadUrl = useMemo(() => {
-    const raw = String(import.meta.env?.VITE_APK_URL || '').trim();
-    return raw || '/apk/stocky-latest.apk';
-  }, []);
+  const downloadUrl = useMemo(() => getApkDownloadUrl(), []);
 
   useEffect(() => {
     if (!isEnabled) return;
