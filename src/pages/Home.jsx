@@ -4,11 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { signOutSession } from '../data/commands/authCommands.js';
 import { Button } from '@/components/ui/button';
 import WhatsNewModal from '../components/Modals/WhatsNewModal.jsx';
-import { getApkDownloadUrl } from '../utils/apkDownload.js';
 import {
   Menu,
   X,
   ArrowRight,
+  Download,
   Sparkles,
   ShoppingCart,
   Receipt,
@@ -70,15 +70,6 @@ const process = [
 function Home() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const mobileAppUrl = getApkDownloadUrl();
-
-  const handleDownloadClick = () => {
-    if (mobileAppUrl.startsWith('/')) {
-      window.location.href = mobileAppUrl;
-      return;
-    }
-    window.open(mobileAppUrl, '_blank', 'noopener');
-  };
 
   useEffect(() => {
     const signOut = async () => {
@@ -123,10 +114,11 @@ function Home() {
           <div className="flex items-center gap-2 md:hidden">
             <Button
               variant="outline"
-              onClick={handleDownloadClick}
-              className="h-9 border-violet-300 px-2 text-[11px] font-semibold text-violet-700 hover:bg-violet-50"
+              onClick={() => navigate('/descargar')}
+              className="h-9 border-indigo-300 px-2 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-50"
             >
-              Descargar para tu teléfono
+              <Download className="mr-1 h-3.5 w-3.5" />
+              Ver descargas
             </Button>
             <button
               className="rounded-lg p-2 text-slate-700 hover:bg-violet-100"
