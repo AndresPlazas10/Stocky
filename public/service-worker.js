@@ -152,7 +152,7 @@ self.addEventListener('push', (event) => {
     event.waitUntil(
       self.registration.showNotification(title, options)
     );
-  } catch (error) {
+  } catch {
     // Fallback si el payload no es JSON válido
     event.waitUntil(
       self.registration.showNotification('Stocky', {
