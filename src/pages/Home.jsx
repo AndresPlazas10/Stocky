@@ -75,7 +75,6 @@ function Home() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showIosBanner, setShowIosBanner] = useState(false);
-  const [iosBannerDismissed, setIosBannerDismissed] = useState(false);
 
   useEffect(() => {
     const signOut = async () => {
@@ -100,7 +99,6 @@ function Home() {
 
   const dismissIosBanner = () => {
     setShowIosBanner(false);
-    setIosBannerDismissed(true);
     localStorage.setItem('ios-banner-dismissed', 'true');
   };
 
