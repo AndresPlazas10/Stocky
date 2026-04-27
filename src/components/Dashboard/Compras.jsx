@@ -54,6 +54,11 @@ const getPaymentMethodLabel = (method) => {
   if (value === 'card') return 'Tarjeta';
   if (value === 'transfer') return 'Transferencia';
   if (value === 'mixed') return 'Mixto';
+  if (value === 'nequi') return 'Nequi';
+  if (value === 'bancolombia') return 'Bancolombia';
+  if (value === 'banco_bogota') return 'Banco de Bogotá';
+  if (value === 'nu') return 'Nu';
+  if (value === 'davivienda') return 'Davivienda';
   return method || '-';
 };
 

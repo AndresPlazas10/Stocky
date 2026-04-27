@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BarChart, PieChart } from 'react-native-chart-kit';
@@ -8,6 +8,7 @@ import type { ReportesPeriod, ReportesSnapshot } from '../../domain/reportes/con
 import { formatCop } from '../../services/mesasService';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
 import { StockyMoneyText } from '../../ui/StockyMoneyText';
+import { getBankLogoSource, isBankPaymentMethod } from '../../utils/paymentMethodBranding';
 
 type Props = {
   businessId: string;
@@ -40,6 +41,7 @@ function getPaymentMethodIcon(method: string): keyof typeof Ionicons.glyphMap {
   if (method === 'card') return 'card-outline';
   if (method === 'transfer') return 'swap-horizontal-outline';
   if (method === 'mixed') return 'wallet-outline';
+  if (['nequi', 'bancolombia', 'banco_bogota', 'nu', 'davivienda'].includes(method)) return 'business-outline';
   return 'help-circle-outline';
 }
 
@@ -323,7 +325,11 @@ export function ReportesPanel({ businessId, businessName, source }: Props) {
               <View key={item.method} style={styles.breakdownItem}>
                 <View style={styles.breakdownTop}>
                   <View style={styles.breakdownLeft}>
-                    <Ionicons name={getPaymentMethodIcon(item.method)} size={19} color="#334155" />
+                    {isBankPaymentMethod(item.method) ? (
+                      <Image source={getBankLogoSource(item.method)!} style={styles.breakdownLogo} resizeMode="contain" />
+                    ) : (
+                      <Ionicons name={getPaymentMethodIcon(item.method)} size={19} color="#334155" />
+                    )}
                     <Text style={styles.breakdownLabel}>{item.label}</Text>
                   </View>
                   <StockyMoneyText value={item.total} style={styles.breakdownValue} />
@@ -630,7 +636,11 @@ const styles = StyleSheet.create({
   breakdownLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 7,
+  },
+  breakdownLogo: {
+    width: 20,
+    height: 12,
   },
   breakdownLabel: {
     color: STOCKY_COLORS.textPrimary,

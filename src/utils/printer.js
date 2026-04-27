@@ -27,9 +27,11 @@ export const setThermalPaperWidthMm = (width) => {
 
 export const isAutoPrintReceiptEnabled = () => {
   try {
-    return window.localStorage.getItem(AUTO_PRINT_RECEIPT_KEY) === 'true';
+    const stored = window.localStorage.getItem(AUTO_PRINT_RECEIPT_KEY);
+    if (stored === null) return true;
+    return stored === 'true';
   } catch {
-    return false;
+    return true;
   }
 };
 

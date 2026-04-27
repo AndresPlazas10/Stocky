@@ -21,6 +21,11 @@ const PAYMENT_OPTIONS = [
   { value: 'card', label: '💳 Tarjeta', icon: CreditCard },
   { value: 'transfer', label: '🏦 Transferencia', icon: CreditCard },
   { value: 'mixed', label: '🔄 Mixto', icon: DollarSign },
+  { value: 'nequi', label: '🏦 Nequi', icon: CreditCard },
+  { value: 'bancolombia', label: '🏦 Bancolombia', icon: CreditCard },
+  { value: 'banco_bogota', label: '🏦 Banco de Bogotá', icon: CreditCard },
+  { value: 'nu', label: '🏦 Nu', icon: CreditCard },
+  { value: 'davivienda', label: '🏦 Davivienda', icon: CreditCard },
 ];
 
 const parseCopAmount = (value) => {

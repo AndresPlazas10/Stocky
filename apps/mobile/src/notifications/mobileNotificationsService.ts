@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import type { Session } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import { EXPO_CONFIG } from '../config/env';
@@ -11,6 +10,21 @@ const INSTALLATION_ID_KEY = 'stocky.mobile.installation_id';
 const DEFAULT_NOTIFICATION_CHANNEL_ID = 'stocky-default';
 
 let notificationsConfigured = false;
+let notificationsModuleCache: typeof import('expo-notifications') | null = null;
+
+function getNotificationsModule() {
+  if (!shouldEnableMobileNotificationsRuntime()) return null;
+  if (notificationsModuleCache) return notificationsModuleCache;
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    notificationsModuleCache = require('expo-notifications') as typeof import('expo-notifications');
+    return notificationsModuleCache;
+  } catch (error) {
+    console.log('[notifications] expo-notifications unavailable in current runtime', error);
+    return null;
+  }
+}
 
 type PushRegistrationResult =
   | { ok: true; token: string; installationId: string }
@@ -56,26 +70,50 @@ function isExpoGoRuntime() {
   return executionEnvironment === 'storeclient';
 }
 
+export function shouldEnableMobileNotificationsRuntime() {
+  if (Platform.OS === 'web') return false;
+  if (isExpoGoRuntime()) return false;
+  return true;
+}
+
+export function getMobileNotificationsModule() {
+  return getNotificationsModule();
+}
+
 export function configureMobileNotifications() {
+  if (!shouldEnableMobileNotificationsRuntime()) return;
   if (notificationsConfigured) return;
+
+  const Notifications = getNotificationsModule();
+  if (!Notifications) return;
+
   notificationsConfigured = true;
 
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-    }),
-  });
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      }),
+    });
+  } catch (error) {
+    console.log('[notifications] setNotificationHandler skipped', error);
+    return;
+  }
 
   if (Platform.OS === 'android') {
-    void Notifications.setNotificationChannelAsync(DEFAULT_NOTIFICATION_CHANNEL_ID, {
-      name: 'General',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 150, 250],
-      lightColor: '#1D4ED8',
-    });
+    try {
+      void Notifications.setNotificationChannelAsync(DEFAULT_NOTIFICATION_CHANNEL_ID, {
+        name: 'General',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 150, 250],
+        lightColor: '#1D4ED8',
+      });
+    } catch (error) {
+      console.log('[notifications] setNotificationChannelAsync skipped', error);
+    }
   }
 }
 
@@ -94,6 +132,15 @@ export async function registerPushTokenForSession(session: Session): Promise<Pus
         ok: false,
         reason: 'expo_go_unsupported',
         message: 'Expo Go does not support remote push notifications on SDK 53+.',
+      };
+    }
+
+    const Notifications = getNotificationsModule();
+    if (!Notifications) {
+      return {
+        ok: false,
+        reason: 'unsupported',
+        message: 'expo-notifications module is unavailable in this runtime.',
       };
     }
 

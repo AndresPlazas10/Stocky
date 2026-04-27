@@ -2,6 +2,16 @@ import type { MesaOrderItem } from '../services/mesaOrderService';
 import type { VentaDetailRecord, VentaRecord } from '../services/ventasService';
 
 const DEFAULT_PRINTER_WIDTH_MM = 80;
+const PRINT_FONT_SIZES = {
+  body: 18,
+  header: 28,
+  row: 18,
+  item: 20,
+  total: 26,
+  footer: 16,
+  qty: 86,
+  price: 110,
+} as const;
 
 function formatDateTimeTicket(timestamp: string | Date | null | undefined) {
   if (!timestamp) return 'Fecha inválida';
@@ -59,6 +69,11 @@ function getPaymentMethodLabel(method?: string | null) {
   if (method === 'card') return '💳 Tarjeta';
   if (method === 'transfer') return '🏦 Transferencia';
   if (method === 'mixed') return '🔀 Mixto';
+  if (method === 'nequi') return '🏦 Nequi';
+  if (method === 'bancolombia') return '🏦 Bancolombia';
+  if (method === 'banco_bogota') return '🏦 Banco de Bogotá';
+  if (method === 'nu') return '🏦 Nu';
+  if (method === 'davivienda') return '🏦 Davivienda';
   return String(method || 'No especificado');
 }
 
@@ -87,6 +102,15 @@ export function buildSaleReceiptHtml({
       <meta charset="UTF-8">
       <title>Comprobante #${sale.id}</title>
       <style>
+        * {
+          color: #000 !important;
+          -webkit-text-fill-color: #000 !important;
+          text-shadow: none !important;
+          box-shadow: none !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+
         @media print {
           @page {
             size: ${printerWidthMm}mm auto;
@@ -109,8 +133,8 @@ export function buildSaleReceiptHtml({
 
         body {
           font-family: 'Courier New', monospace;
-          font-size: 12px;
-          line-height: 1.35;
+          font-size: ${PRINT_FONT_SIZES.body}px;
+          line-height: 1.45;
           width: ${printerWidthMm}mm;
           max-width: ${printerWidthMm}mm;
           box-sizing: border-box;
@@ -135,7 +159,7 @@ export function buildSaleReceiptHtml({
         }
 
         .header h1 {
-          font-size: 16px;
+          font-size: ${PRINT_FONT_SIZES.header}px;
           margin: 0 0 4px 0;
           font-weight: bold;
         }
@@ -144,8 +168,9 @@ export function buildSaleReceiptHtml({
           display: flex;
           justify-content: space-between;
           margin: 2px 0;
-          font-size: 11px;
+          font-size: ${PRINT_FONT_SIZES.row}px;
           font-weight: 700;
+          gap: 8px;
         }
 
         .separator {
@@ -159,26 +184,26 @@ export function buildSaleReceiptHtml({
           font-weight: bold;
           border-bottom: 1px solid #000;
           padding: 4px 0;
-          font-size: 11px;
+          font-size: ${PRINT_FONT_SIZES.row}px;
         }
 
         .item {
           display: flex;
           justify-content: space-between;
           margin: 4px 0;
-          font-size: 11px;
+          font-size: ${PRINT_FONT_SIZES.item}px;
           font-weight: 700;
         }
 
         .item-name { flex: 1; padding-right: 4px; }
-        .item-qty { width: 36px; text-align: center; }
-        .item-price { width: 72px; text-align: right; }
+        .item-qty { width: ${PRINT_FONT_SIZES.qty}px; text-align: center; font-variant-numeric: tabular-nums; }
+        .item-price { width: ${PRINT_FONT_SIZES.price}px; text-align: right; font-variant-numeric: tabular-nums; }
 
         .total {
           margin-top: 10px;
           border-top: 2px solid #000;
           padding-top: 8px;
-          font-size: 16px;
+          font-size: ${PRINT_FONT_SIZES.total}px;
           font-weight: bold;
           display: flex;
           justify-content: space-between;
@@ -189,7 +214,7 @@ export function buildSaleReceiptHtml({
           margin-top: 12px;
           padding-top: 8px;
           border-top: 2px dashed #000;
-          font-size: 10px;
+          font-size: ${PRINT_FONT_SIZES.footer}px;
           font-weight: 700;
         }
       </style>
@@ -286,8 +311,10 @@ export function buildKitchenOrderHtml({
         
         body {
           font-family: 'Courier New', monospace;
-          font-size: 12px;
-          line-height: 1.4;
+          font-size: ${PRINT_FONT_SIZES.body + 2}px;
+          line-height: 1.65;
+          font-weight: 700;
+          color: #000 !important;
           width: ${printerWidthMm}mm;
           max-width: ${printerWidthMm}mm;
           box-sizing: border-box;
@@ -309,26 +336,30 @@ export function buildKitchenOrderHtml({
           border-bottom: 2px dashed #000;
           padding-bottom: 10px;
           margin-bottom: 10px;
+          color: #000;
         }
         
         .header h1 {
-          font-size: 20px;
+          font-size: ${PRINT_FONT_SIZES.header + 6}px;
           margin: 0 0 5px 0;
-          font-weight: bold;
+          font-weight: 900;
+          letter-spacing: 0.5px;
         }
         
         .header p {
           margin: 2px 0;
-          font-size: 11px;
+          font-size: ${PRINT_FONT_SIZES.row + 2}px;
+          font-weight: 700;
         }
         
         .info {
           margin: 10px 0;
-          font-size: 13px;
+          font-size: ${PRINT_FONT_SIZES.item + 3}px;
+          font-weight: 700;
         }
         
         .info strong {
-          font-weight: bold;
+          font-weight: 900;
         }
         
         .items {
@@ -345,15 +376,19 @@ export function buildKitchenOrderHtml({
         
         .item-name {
           flex: 1;
-          font-weight: bold;
-          font-size: 13px;
+          font-weight: 900;
+          font-size: ${PRINT_FONT_SIZES.item + 4}px;
+          line-height: 1.35;
+          color: #000;
         }
         
         .item-qty {
-          width: 60px;
+          width: ${PRINT_FONT_SIZES.qty + 10}px;
           text-align: right;
-          font-size: 13px;
-          font-weight: bold;
+          font-size: ${PRINT_FONT_SIZES.item + 4}px;
+          font-weight: 900;
+          font-variant-numeric: tabular-nums;
+          color: #000;
         }
         
         .total {
@@ -365,7 +400,8 @@ export function buildKitchenOrderHtml({
           margin-top: 20px;
           padding-top: 10px;
           border-top: 2px dashed #000;
-          font-size: 11px;
+          font-size: ${PRINT_FONT_SIZES.footer + 2}px;
+          font-weight: 800;
         }
         
         .separator {

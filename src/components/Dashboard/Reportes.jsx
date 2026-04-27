@@ -20,8 +20,40 @@ import {
 } from 'lucide-react';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
+import { getPaymentMethodLogoCandidates, isBankPaymentMethod } from '../../utils/paymentMethodBranding.js';
 
 const _motionLintUsage = motion;
+
+function PaymentMethodSummaryIcon({ method, fallback }) {
+  const [logoIndex, setLogoIndex] = useState(0);
+  const normalizedMethod = String(method || '').trim().toLowerCase();
+  const isBankMethod = isBankPaymentMethod(normalizedMethod);
+  const logoCandidates = getPaymentMethodLogoCandidates(normalizedMethod);
+
+  useEffect(() => {
+    setLogoIndex(0);
+  }, [normalizedMethod]);
+
+  if (!isBankMethod) {
+    return fallback;
+  }
+
+  if (!Array.isArray(logoCandidates) || logoCandidates.length === 0 || logoIndex < 0) {
+    return fallback;
+  }
+
+  return (
+    <img
+      src={logoCandidates[logoIndex]}
+      alt={`Logo ${normalizedMethod}`}
+      className="h-6 w-auto object-contain"
+      loading="lazy"
+      onError={() => {
+        setLogoIndex((current) => (current + 1 < logoCandidates.length ? current + 1 : -1));
+      }}
+    />
+  );
+}
 
 function Reportes({ businessId }) {
   const [loading, setLoading] = useState(true);
@@ -42,6 +74,22 @@ function Reportes({ businessId }) {
 
   const [topProductos, setTopProductos] = useState([]);
   const [ventasPorMetodo, setVentasPorMetodo] = useState([]);
+
+  const normalizePaymentMethodKey = useCallback((method) => {
+    const methodLower = String(method || '').trim().toLowerCase();
+    if (!methodLower) return 'other';
+
+    if (methodLower === 'cash' || methodLower.includes('efectivo')) return 'cash';
+    if (methodLower === 'card' || methodLower.includes('tarjeta')) return 'card';
+    if (methodLower === 'transfer' || methodLower.includes('transferencia')) return 'transfer';
+    if (methodLower === 'mixed' || methodLower.includes('mixto')) return 'mixed';
+    if (methodLower.includes('nequi')) return 'nequi';
+    if (methodLower.includes('bancolombia')) return 'bancolombia';
+    if (methodLower.includes('banco_bogota') || methodLower.includes('banco de bogotá') || methodLower.includes('banco de bogota') || methodLower.includes('bogota')) return 'banco_bogota';
+    if (methodLower === 'nu' || methodLower.includes('nu')) return 'nu';
+    if (methodLower.includes('davivienda')) return 'davivienda';
+    return methodLower;
+  }, []);
 
   const getDateRange = useCallback(() => {
     const now = new Date();
@@ -79,7 +127,10 @@ function Reportes({ businessId }) {
         productos,
         totalProveedores,
         totalFacturas,
-        saleDetails
+        saleDetails,
+        comboSaleDetails,
+        combos,
+        purchaseProducts
       } = await getReportsSnapshot({
         businessId,
         start,
@@ -95,7 +146,7 @@ function Reportes({ businessId }) {
 
       const paymentMethods = {};
       ventas?.forEach(v => {
-        const method = v.payment_method || 'Otro';
+        const method = normalizePaymentMethodKey(v.payment_method || 'other');
         paymentMethods[method] = (paymentMethods[method] || 0) + v.total;
       });
       setVentasPorMetodo(
@@ -104,6 +155,38 @@ function Reportes({ businessId }) {
 
       const productMap = {};
       let costoProductosVendidos = 0;
+
+      const purchasePriceByProductId = new Map();
+      (purchaseProducts || []).forEach((product) => {
+        const productId = String(product?.id || '').trim();
+        if (!productId) return;
+        const price = Number(product?.purchase_price || 0);
+        purchasePriceByProductId.set(productId, Number.isFinite(price) ? price : 0);
+      });
+
+      const comboCostByComboId = new Map();
+      (combos || []).forEach((combo) => {
+        const comboId = String(combo?.id || '').trim();
+        if (!comboId) return;
+
+        const comboUnitCost = (combo?.combo_items || []).reduce((sum, component) => {
+          const componentProductId = String(component?.producto_id || component?.product_id || '').trim();
+          if (!componentProductId) return sum;
+
+          const componentQty = Number(component?.cantidad ?? component?.quantity ?? 0);
+          if (!Number.isFinite(componentQty) || componentQty <= 0) return sum;
+
+          const embeddedPurchasePrice = Number(component?.products?.purchase_price);
+          const mappedPurchasePrice = Number(purchasePriceByProductId.get(componentProductId) || 0);
+          const purchasePrice = Number.isFinite(embeddedPurchasePrice) && embeddedPurchasePrice > 0
+            ? embeddedPurchasePrice
+            : mappedPurchasePrice;
+
+          return sum + (purchasePrice * componentQty);
+        }, 0);
+
+        comboCostByComboId.set(comboId, comboUnitCost);
+      });
 
       saleDetails?.forEach(item => {
         const productName = item.products?.name || 'Producto sin nombre';
@@ -119,6 +202,36 @@ function Reportes({ businessId }) {
 
         // Calcular costo real de productos vendidos
         costoProductosVendidos += purchasePrice * quantity;
+      });
+
+      comboSaleDetails?.forEach((item) => {
+        const comboId = String(item?.combo_id || '').trim();
+        if (!comboId) return;
+
+        const soldQty = Number(item?.quantity || 0);
+        if (!Number.isFinite(soldQty) || soldQty <= 0) return;
+
+        const comboFromDetail = item?.combos || null;
+        const comboUnitCostFromDetail = (comboFromDetail?.combo_items || []).reduce((sum, component) => {
+          const componentProductId = String(component?.producto_id || component?.product_id || '').trim();
+          if (!componentProductId) return sum;
+
+          const componentQty = Number(component?.cantidad ?? component?.quantity ?? 0);
+          if (!Number.isFinite(componentQty) || componentQty <= 0) return sum;
+
+          const embeddedPurchasePrice = Number(component?.products?.purchase_price);
+          const mappedPurchasePrice = Number(purchasePriceByProductId.get(componentProductId) || 0);
+          const purchasePrice = Number.isFinite(embeddedPurchasePrice) && embeddedPurchasePrice > 0
+            ? embeddedPurchasePrice
+            : mappedPurchasePrice;
+
+          return sum + (purchasePrice * componentQty);
+        }, 0);
+
+        const comboUnitCost = comboUnitCostFromDetail > 0
+          ? comboUnitCostFromDetail
+          : Number(comboCostByComboId.get(comboId) || 0);
+        costoProductosVendidos += (comboUnitCost * soldQty);
       });
 
       const topProducts = Object.entries(productMap)
@@ -171,7 +284,7 @@ function Reportes({ businessId }) {
     } finally {
       setLoading(false);
     }
-  }, [businessId, getDateRange, selectedPeriod]);
+  }, [businessId, getDateRange, normalizePaymentMethodKey, selectedPeriod]);
 
   useEffect(() => {
     if (businessId) {
@@ -189,34 +302,54 @@ function Reportes({ businessId }) {
   };
 
   const getPaymentMethodIcon = (method) => {
-    const methodLower = method?.toLowerCase() || '';
-    if (methodLower.includes('cash') || methodLower.includes('efectivo')) {
+    const methodKey = normalizePaymentMethodKey(method);
+    if (methodKey === 'cash') {
       return <DollarSign className="w-6 h-6" />;
     }
-    if (methodLower.includes('card') || methodLower.includes('tarjeta')) {
+    if (methodKey === 'card') {
       return <CreditCard className="w-6 h-6" />;
+    }
+    if (['transfer', 'nequi', 'bancolombia', 'banco_bogota', 'nu', 'davivienda'].includes(methodKey)) {
+      return <Building2 className="w-6 h-6" />;
     }
     return <CreditCard className="w-6 h-6" />;
   };
 
   const getPaymentMethodColor = (method) => {
-    const methodLower = method?.toLowerCase() || '';
-    if (methodLower.includes('cash') || methodLower.includes('efectivo')) {
+    const methodKey = normalizePaymentMethodKey(method);
+    if (methodKey === 'cash') {
       return 'from-green-500 to-green-600';
     }
-    if (methodLower.includes('card') || methodLower.includes('tarjeta')) {
+    if (methodKey === 'card') {
       return 'from-blue-500 to-blue-600';
     }
+    if (methodKey === 'transfer') return 'from-violet-500 to-violet-600';
+    if (methodKey === 'nequi') return 'from-fuchsia-500 to-fuchsia-600';
+    if (methodKey === 'bancolombia') return 'from-yellow-500 to-amber-600';
+    if (methodKey === 'banco_bogota') return 'from-red-500 to-red-600';
+    if (methodKey === 'nu') return 'from-purple-500 to-purple-700';
+    if (methodKey === 'davivienda') return 'from-orange-500 to-orange-600';
     return 'from-gray-500 to-gray-600';
   };
 
   const getPaymentMethodLabel = (method) => {
-    const methodLower = method?.toLowerCase() || '';
-    if (methodLower.includes('cash') || methodLower.includes('efectivo')) return 'Efectivo';
-    if (methodLower.includes('card') || methodLower.includes('tarjeta')) return 'Tarjeta';
-    if (methodLower.includes('transfer') || methodLower.includes('transferencia')) return 'Transferencia';
-    if (methodLower.includes('mixed') || methodLower.includes('mixto')) return 'Mixto';
+    const methodKey = normalizePaymentMethodKey(method);
+    if (methodKey === 'cash') return 'Efectivo';
+    if (methodKey === 'card') return 'Tarjeta';
+    if (methodKey === 'transfer') return 'Transferencia';
+    if (methodKey === 'mixed') return 'Mixto';
+    if (methodKey === 'nequi') return 'Nequi';
+    if (methodKey === 'bancolombia') return 'Bancolombia';
+    if (methodKey === 'banco_bogota') return 'Banco de Bogotá';
+    if (methodKey === 'nu') return 'Nu';
+    if (methodKey === 'davivienda') return 'Davivienda';
+    if (methodKey === 'other') return 'Otro';
     return method || 'Otro';
+  };
+
+  const isBankMethodForSummary = (method) => {
+    const methodKey = normalizePaymentMethodKey(method);
+    return isBankPaymentMethod(methodKey);
   };
 
   return (
@@ -540,9 +673,18 @@ function Reportes({ businessId }) {
                           className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-100 hover:shadow-md transition-all"
                         >
                           <div className="flex items-center gap-3">
-                            <div className={`p-2 bg-gradient-to-br ${getPaymentMethodColor(metodo.method)} rounded-lg text-white`}>
-                              {getPaymentMethodIcon(metodo.method)}
-                            </div>
+                            {isBankMethodForSummary(metodo.method) ? (
+                              <div className="h-10 w-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center shadow-sm">
+                                <PaymentMethodSummaryIcon
+                                  method={metodo.method}
+                                  fallback={<Building2 className="w-5 h-5 text-gray-600" />}
+                                />
+                              </div>
+                            ) : (
+                              <div className={`p-2 bg-gradient-to-br ${getPaymentMethodColor(metodo.method)} rounded-lg text-white`}>
+                                {getPaymentMethodIcon(metodo.method)}
+                              </div>
+                            )}
                             <span className="font-semibold text-gray-800">{getPaymentMethodLabel(metodo.method)}</span>
                           </div>
                           <span className="text-lg font-bold text-green-600">

@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, Alert, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import { BlurView } from 'expo-blur';
@@ -11,7 +11,8 @@ import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
 import { StockyMoneyText } from '../../ui/StockyMoneyText';
 import { StockyModal } from '../../ui/StockyModal';
 import { StockyStatusToast } from '../../ui/StockyStatusToast';
-import { buildKitchenOrderHtml } from '../../utils/printTemplates';
+import { PrintReceiptConfirmModal } from '../../ui/PrintReceiptConfirmModal';
+import { buildKitchenOrderHtml, buildSaleReceiptHtml } from '../../utils/printTemplates';
 import {
   addCatalogItemToOrder,
   calculateCashChange,
@@ -55,8 +56,11 @@ import {
   type MesaEditLock,
   type MesaRecord,
 } from '../../services/mesasService';
+import { listVentaDetails, type VentaRecord } from '../../services/ventasService';
 import { SplitBillModalRN } from './SplitBillModalRN';
 import { getSupabaseClient } from '../../lib/supabase';
+import { getBankLogoSource, isBankPaymentMethod } from '../../utils/paymentMethodBranding';
+import { getThermalPaperWidthMm, isAutoPrintReceiptEnabled } from '../../utils/printer';
 
 type Props = {
   session: Session;
@@ -204,6 +208,11 @@ function getPaymentMethodLabel(method: PaymentMethod) {
   if (method === 'card') return 'Tarjeta';
   if (method === 'transfer') return 'Transferencia';
   if (method === 'mixed') return 'Mixto';
+  if (method === 'nequi') return 'Nequi';
+  if (method === 'bancolombia') return 'Bancolombia';
+  if (method === 'banco_bogota') return 'Banco de Bogotá';
+  if (method === 'nu') return 'Nu';
+  if (method === 'davivienda') return 'Davivienda';
   return method;
 }
 
@@ -212,6 +221,7 @@ function getPaymentMethodIcon(method: PaymentMethod): keyof typeof Ionicons.glyp
   if (method === 'card') return 'card-outline';
   if (method === 'transfer') return 'swap-horizontal-outline';
   if (method === 'mixed') return 'wallet-outline';
+  if (['nequi', 'bancolombia', 'banco_bogota', 'nu', 'davivienda'].includes(method)) return 'business-outline';
   return 'help-circle-outline';
 }
 
@@ -220,6 +230,11 @@ const PAYMENT_METHOD_OPTIONS: Array<{ value: PaymentMethod; label: string }> = [
   { value: 'card', label: 'Tarjeta' },
   { value: 'transfer', label: 'Transferencia' },
   { value: 'mixed', label: 'Mixto' },
+  { value: 'nequi', label: 'Nequi' },
+  { value: 'bancolombia', label: 'Bancolombia' },
+  { value: 'banco_bogota', label: 'Banco de Bogotá' },
+  { value: 'nu', label: 'Nu' },
+  { value: 'davivienda', label: 'Davivienda' },
 ];
 
 function buildCashBreakdown(change: number) {
@@ -535,11 +550,31 @@ export function MesasPanel({ session, businessContext }: Props) {
   const [saleTotalLabel, setSaleTotalLabel] = useState('');
   const [showMesaSavedToast, setShowMesaSavedToast] = useState(false);
   const [mesaSavedLabel, setMesaSavedLabel] = useState('Mesa');
+
+  // Estados para modal de impresión
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printSalesData, setPrintSalesData] = useState<Array<{ saleRecord: VentaRecord; saleDetails: any[] }>>([]);
+  const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
+  const [isPrintInProgress, setIsPrintInProgress] = useState(false);
+  const printInFlightRef = useRef(false);
+
   const isOrderFlowActive = showOrderModal
     || showCloseOrderChoiceModal
     || showPaymentModal
     || showSplitBillModal
     || showPaymentMethodMenu;
+
+  const beginPrintFlow = useCallback(() => {
+    if (printInFlightRef.current) return false;
+    printInFlightRef.current = true;
+    setIsPrintInProgress(true);
+    return true;
+  }, []);
+
+  const endPrintFlow = useCallback(() => {
+    printInFlightRef.current = false;
+    setIsPrintInProgress(false);
+  }, []);
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [amountReceived, setAmountReceived] = useState('');
@@ -716,7 +751,10 @@ export function MesasPanel({ session, businessContext }: Props) {
     }
 
     setIsCatalogLoading(true);
-    const promise = listCatalogItems(normalizedBusinessId)
+    const promise = listCatalogItems(
+      normalizedBusinessId,
+      forceRefresh ? { forceRefresh: true } : undefined,
+    )
       .then((items) => {
         catalogBusinessIdRef.current = normalizedBusinessId;
         catalogUpdatedAtRef.current = Date.now();
@@ -2519,7 +2557,7 @@ export function MesasPanel({ session, businessContext }: Props) {
 
     try {
       // Mantiene catalogo precargado sin bloquear apertura de orden.
-      void ensureCatalogLoaded(context.businessId).catch(() => {
+      void ensureCatalogLoaded(context.businessId, { forceRefresh: true }).catch(() => {
         // no-op: mostramos orden aunque el catalogo falle temporalmente
       });
 
@@ -2678,7 +2716,7 @@ export function MesasPanel({ session, businessContext }: Props) {
       setShowOrderModal(true);
       setLoadingOrder(true);
       if (context?.businessId) {
-        void ensureCatalogLoaded(context.businessId).catch(() => {
+        void ensureCatalogLoaded(context.businessId, { forceRefresh: true }).catch(() => {
           // no-op: no bloquear apertura por catalogo
         });
       }
@@ -3119,13 +3157,77 @@ export function MesasPanel({ session, businessContext }: Props) {
       return;
     }
 
-    const categoriasParaCocina = ['Platos'];
-    const itemsParaCocina = orderItems.filter((item) =>
-      item.combo_id || categoriasParaCocina.includes(String(item.products?.category || '')),
+    const normalizeCategory = (value: unknown) => String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase();
+
+    const productCatalogLookup = new Map(
+      catalogItemsRef.current
+        .filter((item) => item.item_type === 'product')
+        .map((item) => [item.product_id, item]),
     );
 
-    if (itemsParaCocina.length === 0) {
+    const comboCatalogLookup = new Map(
+      catalogItemsRef.current
+        .filter((item) => item.item_type === 'combo')
+        .map((item) => [item.combo_id, item]),
+    );
+
+    const categoriasParaCocina = new Set(['plato', 'platos', 'cocina', 'comida']);
+    const itemsParaCocina = orderItems.filter((item) => {
+      if (item.combo_id) return true;
+      const catalogCategory = productCatalogLookup.get(item.product_id || '')?.category;
+      const category = normalizeCategory(item.category ?? item.products?.category ?? catalogCategory);
+      return categoriasParaCocina.has(category)
+        || category.startsWith('plato')
+        || category.includes('plato');
+    });
+
+    const itemsParaCocinaConNombre = itemsParaCocina.map((item) => {
+      if (item.combo_id) {
+        const catalogCombo = comboCatalogLookup.get(item.combo_id || '');
+        const existingComboName = String(item?.combos?.nombre || '').trim();
+        const fallbackComboName = String(catalogCombo?.name || '').trim();
+
+        if (existingComboName || !fallbackComboName) return item;
+
+        return {
+          ...item,
+          combos: {
+            ...(item.combos || {}),
+            id: item?.combos?.id || catalogCombo?.combo_id,
+            nombre: fallbackComboName,
+          },
+        };
+      }
+
+      const catalogProduct = productCatalogLookup.get(item.product_id || '');
+      const existingName = String(item?.products?.name || '').trim();
+      const fallbackName = String(catalogProduct?.name || '').trim();
+
+      if (existingName || !fallbackName) return item;
+
+      return {
+        ...item,
+        products: {
+          ...(item.products || {}),
+          id: item?.products?.id || catalogProduct?.product_id,
+          name: fallbackName,
+          code: item?.products?.code || catalogProduct?.code || undefined,
+          category: item?.products?.category || catalogProduct?.category || undefined,
+        },
+      };
+    });
+
+    if (itemsParaCocinaConNombre.length === 0) {
       Alert.alert('Impresion de cocina', 'No hay productos que requieran preparación en cocina.');
+      return;
+    }
+
+    if (!beginPrintFlow()) {
+      Alert.alert('Impresion de cocina', 'Ya hay una impresión en curso. Espera a que finalice.');
       return;
     }
 
@@ -3134,14 +3236,178 @@ export function MesasPanel({ session, businessContext }: Props) {
       const html = buildKitchenOrderHtml({
         mesaNumber: mesaLabel,
         mesaStatus: selectedMesa.status,
-        items: itemsParaCocina,
+        items: itemsParaCocinaConNombre,
         createdAt: new Date(),
       });
       await Print.printAsync({ html });
     } catch (err) {
       Alert.alert('Impresion de cocina', err instanceof Error ? err.message : 'No se pudo imprimir la orden.');
+    } finally {
+      endPrintFlow();
     }
-  }, [orderItems, selectedMesa]);
+  }, [beginPrintFlow, endPrintFlow, orderItems, selectedMesa]);
+
+  const askReceiptPrintConfirmation = useCallback(async (saleIds: string[] = []) => {
+    if (!Array.isArray(saleIds) || saleIds.length === 0) return false;
+
+    try {
+      const salesDataList: Array<{ saleRecord: VentaRecord; saleDetails: any[] }> = [];
+
+      for (const saleId of saleIds) {
+        try {
+          const normalizedSaleId = String(saleId || '').trim();
+          if (!normalizedSaleId) continue;
+
+          const fetchedDetails = await listVentaDetails(normalizedSaleId);
+          const details = Array.isArray(fetchedDetails) && fetchedDetails.length > 0 ? fetchedDetails : [];
+
+          const computedTotal = details.reduce((sum, item) => sum + Number(item?.subtotal || 0), 0);
+          const saleForPrint: VentaRecord = {
+            id: normalizedSaleId,
+            business_id: context?.businessId || '',
+            user_id: null,
+            seller_name: context?.source === 'employee' ? 'Empleado' : 'Administrador',
+            payment_method: paymentMethod,
+            total: Number(computedTotal),
+            created_at: new Date().toISOString(),
+            amount_received: null,
+            change_amount: null,
+            change_breakdown: [],
+          };
+
+          salesDataList.push({ saleRecord: saleForPrint, saleDetails: details });
+        } catch {
+          // Continuar con el siguiente
+        }
+      }
+
+      if (salesDataList.length === 0) return false;
+
+      // Guardar datos y mostrar modal
+      setPrintSalesData(salesDataList);
+      setShowPrintModal(true);
+
+      return true;
+    } catch {
+      return false;
+    }
+  }, [context?.businessId, context?.source, paymentMethod]);
+
+  const handlePrintConfirm = useCallback(async () => {
+    if (!beginPrintFlow()) {
+      setOrderModalError('Ya hay una impresión en curso. Espera a que finalice.');
+      return;
+    }
+
+    setIsPrintingReceipt(true);
+    try {
+      const printerWidthMm = await getThermalPaperWidthMm();
+
+      for (const { saleRecord, saleDetails } of printSalesData) {
+        try {
+          const html = buildSaleReceiptHtml({
+            sale: saleRecord,
+            saleDetails,
+            sellerName: saleRecord.seller_name,
+            printerWidthMm,
+          });
+
+          await Print.printAsync({ html });
+        } catch {
+          setOrderModalError('No se pudo imprimir alguno de los comprobantes.');
+        }
+      }
+    } catch {
+      setOrderModalError('No se pudo imprimir los comprobantes.');
+    } finally {
+      endPrintFlow();
+      setIsPrintingReceipt(false);
+      setShowPrintModal(false);
+      setPrintSalesData([]);
+    }
+  }, [beginPrintFlow, endPrintFlow, printSalesData]);
+
+  const handlePrintCancel = useCallback(() => {
+    setShowPrintModal(false);
+    setPrintSalesData([]);
+  }, []);
+
+  const tryAutoPrintReceiptBySaleId = useCallback(async ({
+    saleId,
+    saleTotal,
+    paymentMethod,
+    fallbackItems = [],
+  }: {
+    saleId: string | null;
+    saleTotal: number;
+    paymentMethod: PaymentMethod;
+    fallbackItems?: Array<{
+      product_id?: string | null;
+      combo_id?: string | null;
+      quantity?: number;
+      price?: number;
+      unit_price?: number;
+      subtotal?: number;
+      products?: { name?: string; code?: string | null } | null;
+      combos?: { nombre?: string } | null;
+    }>;
+  }) => {
+    const normalizedSaleId = String(saleId || '').trim();
+    if (!normalizedSaleId || !context?.businessId) return;
+
+    if (!beginPrintFlow()) return;
+
+    try {
+      const autoPrintEnabled = await isAutoPrintReceiptEnabled();
+      if (!autoPrintEnabled) return;
+
+      const printerWidthMm = await getThermalPaperWidthMm();
+      const fetchedDetails = await listVentaDetails(normalizedSaleId);
+      const details = Array.isArray(fetchedDetails) && fetchedDetails.length > 0
+        ? fetchedDetails
+        : (Array.isArray(fallbackItems) ? fallbackItems : []).map((item, index) => ({
+            id: `${normalizedSaleId}:${index + 1}`,
+            sale_id: normalizedSaleId,
+            quantity: Number(item?.quantity || 0),
+            unit_price: Number(item?.price || item?.unit_price || 0),
+            subtotal: Number(
+              item?.subtotal
+              || (Number(item?.quantity || 0) * Number(item?.price || item?.unit_price || 0)),
+            ),
+            product_id: item?.product_id || null,
+            combo_id: item?.combo_id || null,
+            products: item?.product_id ? { name: item?.products?.name || 'Producto', code: item?.products?.code || undefined } : null,
+            combos: item?.combo_id ? { nombre: item?.combos?.nombre || 'Combo' } : null,
+          }));
+
+      const computedTotal = details.reduce((sum, item) => sum + Number(item?.subtotal || 0), 0);
+      const saleForPrint: VentaRecord = {
+        id: normalizedSaleId,
+        business_id: context.businessId,
+        user_id: null,
+        seller_name: context.source === 'employee' ? 'Empleado' : 'Administrador',
+        payment_method: paymentMethod,
+        total: Number(saleTotal || computedTotal),
+        created_at: new Date().toISOString(),
+        amount_received: null,
+        change_amount: null,
+        change_breakdown: [],
+      };
+
+      const html = buildSaleReceiptHtml({
+        sale: saleForPrint,
+        saleDetails: details,
+        sellerName: saleForPrint.seller_name,
+        printerWidthMm,
+      });
+
+      await Print.printAsync({ html });
+    } catch {
+      setOrderModalError('La venta se cerró, pero no se pudo imprimir el comprobante automáticamente.');
+    } finally {
+      endPrintFlow();
+    }
+  }, [beginPrintFlow, context?.businessId, context?.source, endPrintFlow]);
 
   const getStockValidationMessage = useCallback(() => {
     if (insufficientItems.length > 0) {
@@ -3253,7 +3519,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         ? buildCashBreakdown(Number(cashChangeData?.change || 0))
         : [];
 
-      await closeOrderSingle({
+      const closeResult = await closeOrderSingle({
         businessId: context.businessId,
         orderId: selectedMesa.current_order_id,
         tableId: selectedMesa.id,
@@ -3262,6 +3528,14 @@ export function MesasPanel({ session, businessContext }: Props) {
         changeBreakdown: resolvedChangeBreakdown,
         orderItems,
       });
+
+      const autoPrintEnabled = await isAutoPrintReceiptEnabled();
+      if (autoPrintEnabled && closeResult.saleId) {
+        const shouldPrintReceipt = await askReceiptPrintConfirmation([closeResult.saleId]);
+        if (!shouldPrintReceipt) {
+          // Usuario canceló la impresión
+        }
+      }
 
       const saleMesaName = mesaDisplayName(selectedMesa);
       const saleTotal = formatCop(orderTotal);
@@ -3286,6 +3560,8 @@ export function MesasPanel({ session, businessContext }: Props) {
     orderItems,
     paymentMethod,
     selectedMesa,
+    askReceiptPrintConfirmation,
+    tryAutoPrintReceiptBySaleId,
   ]);
 
   const processSplitPaymentAndClose = useCallback(async ({ subAccounts }: { subAccounts: SplitSubAccount[] }) => {
@@ -3304,12 +3580,20 @@ export function MesasPanel({ session, businessContext }: Props) {
     setOrderModalError(null);
 
     try {
-      await closeOrderAsSplit({
+      const splitResult = await closeOrderAsSplit({
         businessId: context.businessId,
         orderId: selectedMesa.current_order_id,
         tableId: selectedMesa.id,
         subAccounts,
       });
+
+      const autoPrintEnabled = await isAutoPrintReceiptEnabled();
+      if (autoPrintEnabled && Array.isArray(splitResult.saleIds) && splitResult.saleIds.length > 0) {
+        const shouldPrintReceipts = await askReceiptPrintConfirmation(splitResult.saleIds);
+        if (!shouldPrintReceipts) {
+          // Usuario canceló la impresión
+        }
+      }
 
       const saleMesaName = mesaDisplayName(selectedMesa);
       const saleTotal = formatCop(orderTotal);
@@ -3324,7 +3608,7 @@ export function MesasPanel({ session, businessContext }: Props) {
     } finally {
       setIsClosingOrder(false);
     }
-  }, [closeOrderModal, context?.businessId, getStockValidationMessage, loadData, markMesaAsAvailableAfterSale, selectedMesa]);
+  }, [askReceiptPrintConfirmation, closeOrderModal, context?.businessId, getStockValidationMessage, loadData, markMesaAsAvailableAfterSale, selectedMesa, tryAutoPrintReceiptBySaleId]);
 
   const mesaPreviewName = useMemo(() => {
     const identifier = normalizeTableIdentifier(newTableNumber);
@@ -3652,14 +3936,14 @@ export function MesasPanel({ session, businessContext }: Props) {
               style={[
                 styles.orderActionButton,
                 styles.orderPrintButton,
-                (orderItems.length === 0 || releasingEmptyOrder) && styles.orderActionButtonDisabledLight,
+                (orderItems.length === 0 || releasingEmptyOrder || isPrintInProgress) && styles.orderActionButtonDisabledLight,
               ]}
               onPress={handlePrintKitchen}
-              disabled={orderItems.length === 0 || releasingEmptyOrder}
+              disabled={orderItems.length === 0 || releasingEmptyOrder || isPrintInProgress}
             >
               <Ionicons name="print-outline" size={20} color={orderItems.length === 0 ? '#93A5CD' : '#64748B'} />
               <Text style={[styles.orderActionButtonText, styles.orderPrintButtonText]}>
-                Imprimir para cocina
+                {isPrintInProgress ? 'Imprimiendo...' : 'Imprimir para cocina'}
               </Text>
             </Pressable>
 
@@ -3940,7 +4224,11 @@ export function MesasPanel({ session, businessContext }: Props) {
             disabled={isClosingOrder}
           >
             <View style={styles.payFieldLeft}>
-              <Ionicons name={getPaymentMethodIcon(paymentMethod)} size={20} color="#111827" />
+              {isBankPaymentMethod(paymentMethod) ? (
+                <Image source={getBankLogoSource(paymentMethod)!} style={styles.payMethodLogo} resizeMode="contain" />
+              ) : (
+                <Ionicons name={getPaymentMethodIcon(paymentMethod)} size={20} color="#111827" />
+              )}
               <Text style={styles.payFieldValue}>{getPaymentMethodLabel(paymentMethod)}</Text>
             </View>
             <Ionicons name={showPaymentMethodMenu ? 'chevron-up' : 'chevron-down'} size={20} color="#374151" />
@@ -3962,7 +4250,11 @@ export function MesasPanel({ session, businessContext }: Props) {
                     }}
                   >
                     <View style={styles.payFieldLeft}>
-                      <Ionicons name={getPaymentMethodIcon(option.value)} size={18} color={selected ? '#4F46E5' : '#111827'} />
+                      {isBankPaymentMethod(option.value) ? (
+                        <Image source={getBankLogoSource(option.value)!} style={styles.payMethodLogoSmall} resizeMode="contain" />
+                      ) : (
+                        <Ionicons name={getPaymentMethodIcon(option.value)} size={18} color={selected ? '#4F46E5' : '#111827'} />
+                      )}
                       <Text style={[styles.payMethodMenuText, selected && styles.payMethodMenuTextSelected]}>{option.label}</Text>
                     </View>
                     {selected ? <Ionicons name="checkmark" size={18} color="#4F46E5" /> : null}
@@ -4073,6 +4365,12 @@ export function MesasPanel({ session, businessContext }: Props) {
         secondaryValue="Actualizada"
         durationMs={1000}
         onClose={() => setShowMesaSavedToast(false)}
+      />
+      <PrintReceiptConfirmModal
+        visible={showPrintModal}
+        onConfirm={handlePrintConfirm}
+        onCancel={handlePrintCancel}
+        isLoading={isPrintingReceipt}
       />
     </>
   );
@@ -4706,8 +5004,16 @@ const styles = StyleSheet.create({
   payFieldLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 7,
     flexShrink: 1,
+  },
+  payMethodLogo: {
+    width: 22,
+    height: 14,
+  },
+  payMethodLogoSmall: {
+    width: 20,
+    height: 12,
   },
   payFieldValue: {
     color: '#111827',

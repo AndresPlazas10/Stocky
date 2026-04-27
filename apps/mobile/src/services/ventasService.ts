@@ -280,6 +280,11 @@ function normalizeVentaRecord(row: any): VentaRecord {
   const safeMethod: PaymentMethod = paymentMethod === 'card'
     || paymentMethod === 'transfer'
     || paymentMethod === 'mixed'
+    || paymentMethod === 'nequi'
+    || paymentMethod === 'bancolombia'
+    || paymentMethod === 'banco_bogota'
+    || paymentMethod === 'nu'
+    || paymentMethod === 'davivienda'
     ? paymentMethod
     : 'cash';
 

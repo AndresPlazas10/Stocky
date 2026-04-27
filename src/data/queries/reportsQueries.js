@@ -11,14 +11,20 @@ export async function getReportsSnapshot({
     { data: productos, error: productosError },
     { count: totalProveedores, error: proveedoresError },
     { count: totalFacturas, error: facturasError },
-    { data: saleDetails, error: saleDetailsError }
+    { data: saleDetails, error: saleDetailsError },
+    { data: comboSaleDetails, error: comboSaleDetailsError },
+    { data: combos, error: combosError },
+    { data: purchaseProducts, error: purchaseProductsError }
   ] = await Promise.all([
     readAdapter.getSalesByBusinessDateRange({ businessId, start, end }),
     readAdapter.getPurchasesByBusinessDateRange({ businessId, start, end }),
     readAdapter.getActiveProductsStockByBusiness(businessId),
     readAdapter.countSuppliersByBusiness(businessId),
     readAdapter.countInvoicesByBusinessDateRange({ businessId, start, end }),
-    readAdapter.getSaleDetailsWithProductCostByBusinessDateRange({ businessId, start, end })
+    readAdapter.getSaleDetailsWithProductCostByBusinessDateRange({ businessId, start, end }),
+    readAdapter.getComboSaleDetailsByBusinessDateRange({ businessId, start, end }),
+    readAdapter.getCombosByBusinessWithItems({ businessId, onlyActive: false }),
+    readAdapter.getProductPurchasePricesByBusiness(businessId)
   ]);
 
   if (ventasError) throw ventasError;
@@ -27,6 +33,9 @@ export async function getReportsSnapshot({
   if (proveedoresError) throw proveedoresError;
   if (facturasError) throw facturasError;
   if (saleDetailsError) throw saleDetailsError;
+  if (comboSaleDetailsError) throw comboSaleDetailsError;
+  if (combosError) throw combosError;
+  if (purchaseProductsError) throw purchaseProductsError;
 
   return {
     ventas: ventas || [],
@@ -34,6 +43,9 @@ export async function getReportsSnapshot({
     productos: productos || [],
     totalProveedores: totalProveedores || 0,
     totalFacturas: totalFacturas || 0,
-    saleDetails: saleDetails || []
+    saleDetails: saleDetails || [],
+    comboSaleDetails: comboSaleDetails || [],
+    combos: combos || [],
+    purchaseProducts: purchaseProducts || []
   };
 }

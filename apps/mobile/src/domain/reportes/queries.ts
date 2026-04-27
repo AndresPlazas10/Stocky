@@ -88,6 +88,11 @@ function resolvePaymentMethodLabel(method: string) {
   if (method === 'card') return 'Tarjeta';
   if (method === 'transfer') return 'Transferencia';
   if (method === 'mixed') return 'Mixto';
+  if (method === 'nequi') return 'Nequi';
+  if (method === 'bancolombia') return 'Bancolombia';
+  if (method === 'banco_bogota') return 'Banco de Bogotá';
+  if (method === 'nu') return 'Nu';
+  if (method === 'davivienda') return 'Davivienda';
   return method || 'Otro';
 }
 

@@ -7,6 +7,7 @@ import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { isAdminRole } from '../utils/roles.js';
 import { enqueueOutboxMutation } from '../sync/outboxShadow.js';
 import { notifyAdminLowStockWeb, notifyAdminSaleRegisteredWeb } from './webNotificationsService.js';
+import { createSaleWithOutbox } from '../data/commands/salesCommands.js';
 
 function buildIdempotencyKey({ action, businessId, orderId, tableId }) {
   const normalizedAction = String(action || '').trim().toLowerCase();
@@ -425,7 +426,68 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
   }
   const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
   if (offlineMode) {
-    throw new Error(buildOfflineCloseUnavailableMessage());
+    const idempotencyKey = buildIdempotencyKey({
+      action: 'close-order-split-offline',
+      businessId,
+      orderId,
+      tableId
+    });
+
+    let totalSold = 0;
+    const saleIds = [];
+    const sales = [];
+
+    for (let i = 0; i < subAccountsWithItems.length; i += 1) {
+      const sub = subAccountsWithItems[i];
+      const items = Array.isArray(sub?.items) ? sub.items : [];
+      if (items.length === 0) continue;
+
+      const saleTotal = items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0);
+      totalSold += saleTotal;
+
+      const cart = items.map((item) => ({
+        item_type: item?.combo_id ? 'combo' : 'product',
+        product_id: item?.product_id || null,
+        combo_id: item?.combo_id || null,
+        quantity: Number(item?.quantity || 0),
+        unit_price: Number(item?.unit_price || 0)
+      }));
+
+      const result = await createSaleWithOutbox({
+        businessId,
+        cart,
+        paymentMethod: sub.paymentMethod || 'cash',
+        total: saleTotal,
+        idempotencyKey: `${idempotencyKey}:sub:${i + 1}`
+      });
+
+      if (!result?.success) {
+        throw new Error(result?.error || 'No se pudo registrar la venta offline.');
+      }
+
+      const saleId = result?.data?.id || null;
+      if (saleId) saleIds.push(saleId);
+      sales.push({
+        id: saleId,
+        payment_method: sub.paymentMethod || 'cash',
+        total: Number(saleTotal || 0),
+        amount_received: Number.isFinite(Number(sub.amountReceived ?? sub.amount_received))
+          ? Number(sub.amountReceived ?? sub.amount_received)
+          : null,
+        change_breakdown: Array.isArray(sub.changeBreakdown)
+          ? sub.changeBreakdown
+          : (Array.isArray(sub.change_breakdown) ? sub.change_breakdown : []),
+        pending_sync: true,
+        created_at: result?.data?.created_at || new Date().toISOString()
+      });
+    }
+
+    return {
+      totalSold,
+      saleIds,
+      sales,
+      pending_sync: true
+    };
   }
 
   let user = null;
@@ -664,9 +726,6 @@ export async function closeOrderSingle(
   }
 ) {
   const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (offlineMode) {
-    throw new Error(buildOfflineCloseUnavailableMessage());
-  }
 
   const idempotencyKey = buildIdempotencyKey({
     action: 'close-order-single',
@@ -680,6 +739,51 @@ export async function closeOrderSingle(
   const normalizedChangeBreakdown = Array.isArray(changeBreakdown)
     ? changeBreakdown
     : null;
+
+  if (offlineMode) {
+    if (!Array.isArray(orderItems) || orderItems.length === 0) {
+      throw new Error('❌ No hay productos en la orden para cerrar offline.');
+    }
+
+    const itemsForOfflineSale = normalizeOrderItemsForSale(orderItems);
+    if (itemsForOfflineSale.length === 0) {
+      throw new Error('❌ No hay productos en la orden para cerrar offline.');
+    }
+
+    const saleTotal = itemsForOfflineSale.reduce(
+      (sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)),
+      0
+    );
+
+    const offlineCart = itemsForOfflineSale.map((item) => ({
+      item_type: item?.combo_id ? 'combo' : 'product',
+      product_id: item?.product_id || null,
+      combo_id: item?.combo_id || null,
+      quantity: Number(item?.quantity || 0),
+      unit_price: Number(item?.unit_price || 0)
+    }));
+
+    const result = await createSaleWithOutbox({
+      businessId,
+      cart: offlineCart,
+      paymentMethod: paymentMethod || 'cash',
+      total: saleTotal,
+      idempotencyKey: `${idempotencyKey}:offline`
+    });
+
+    if (!result?.success) {
+      throw new Error(result?.error || '❌ No se pudo registrar la venta offline.');
+    }
+
+    return {
+      saleTotal,
+      saleId: result?.data?.id || null,
+      pending_sync: true,
+      amount_received: normalizedAmountReceived,
+      change_breakdown: normalizedChangeBreakdown ?? [],
+      created_at: result?.data?.created_at || new Date().toISOString()
+    };
+  }
 
   let itemsForRpc = [];
   if (Array.isArray(orderItems) && orderItems.length > 0) {

@@ -6,6 +6,11 @@ const getPaymentMethodLabel = (method) => {
   if (method === 'card') return '💳 Tarjeta';
   if (method === 'transfer') return '🏦 Transferencia';
   if (method === 'mixed') return '🔀 Mixto';
+  if (method === 'nequi') return '🏦 Nequi';
+  if (method === 'bancolombia') return '🏦 Bancolombia';
+  if (method === 'banco_bogota') return '🏦 Banco de Bogotá';
+  if (method === 'nu') return '🏦 Nu';
+  if (method === 'davivienda') return '🏦 Davivienda';
   return String(method || 'No especificado');
 };
 
@@ -56,8 +61,8 @@ export function printSaleReceipt({ sale, saleDetails = [], sellerName = 'Emplead
 
         body {
           font-family: 'Courier New', monospace;
-          font-size: 12px;
-          line-height: 1.35;
+          font-size: 16px;
+          line-height: 1.45;
           width: ${printerWidthMm}mm;
           max-width: ${printerWidthMm}mm;
           box-sizing: border-box;
@@ -82,7 +87,7 @@ export function printSaleReceipt({ sale, saleDetails = [], sellerName = 'Emplead
         }
 
         .header h1 {
-          font-size: 16px;
+          font-size: 22px;
           margin: 0 0 4px 0;
           font-weight: bold;
         }
@@ -91,8 +96,9 @@ export function printSaleReceipt({ sale, saleDetails = [], sellerName = 'Emplead
           display: flex;
           justify-content: space-between;
           margin: 2px 0;
-          font-size: 11px;
+          font-size: 15px;
           font-weight: 700;
+          gap: 8px;
         }
 
         .separator {
@@ -106,26 +112,26 @@ export function printSaleReceipt({ sale, saleDetails = [], sellerName = 'Emplead
           font-weight: bold;
           border-bottom: 1px solid #000;
           padding: 4px 0;
-          font-size: 11px;
+          font-size: 15px;
         }
 
         .item {
           display: flex;
           justify-content: space-between;
           margin: 4px 0;
-          font-size: 11px;
+          font-size: 15px;
           font-weight: 700;
         }
 
         .item-name { flex: 1; padding-right: 4px; }
-        .item-qty { width: 36px; text-align: center; }
-        .item-price { width: 72px; text-align: right; }
+        .item-qty { width: 46px; text-align: center; font-variant-numeric: tabular-nums; }
+        .item-price { width: 90px; text-align: right; font-variant-numeric: tabular-nums; }
 
         .total {
           margin-top: 10px;
           border-top: 2px solid #000;
           padding-top: 8px;
-          font-size: 16px;
+          font-size: 21px;
           font-weight: bold;
           display: flex;
           justify-content: space-between;
@@ -136,7 +142,7 @@ export function printSaleReceipt({ sale, saleDetails = [], sellerName = 'Emplead
           margin-top: 12px;
           padding-top: 8px;
           border-top: 2px dashed #000;
-          font-size: 10px;
+          font-size: 13px;
           font-weight: 700;
         }
       </style>

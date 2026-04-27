@@ -1,6 +1,7 @@
 import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
 import { supabaseAdapter } from './supabaseAdapter.js';
 import { readCacheGet, readCacheSet } from './readCacheStore.js';
+import { listShapeRows } from '../../localdb/shapeMaterializationStore.js';
 
 function buildCacheKey(parts = []) {
   return parts
@@ -46,6 +47,198 @@ function shouldUseCatalogCache() {
   if (typeof navigator === 'undefined') return true;
   if (navigator.onLine === false) return true;
   return true;
+}
+
+function shouldUseMaterializedProductsRead() {
+  return Boolean(LOCAL_SYNC_CONFIG.localReads.products && LOCAL_SYNC_CONFIG.electricPullEnabled);
+}
+
+function shouldUseMaterializedOrdersRead() {
+  return Boolean(LOCAL_SYNC_CONFIG.localReads.orders && LOCAL_SYNC_CONFIG.electricPullEnabled);
+}
+
+function normalizeProductName(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function projectProductsForSales(rows = []) {
+  return rows
+    .filter((row) => row?.is_active !== false)
+    .map((row) => ({
+      id: row?.id || null,
+      code: row?.code || null,
+      name: row?.name || 'Producto',
+      description: row?.description || null,
+      sale_price: Number(row?.sale_price || 0),
+      stock: Number(row?.stock || 0),
+      category: row?.category || null,
+      image_url: row?.image_url || null,
+      is_active: row?.is_active !== false,
+      manage_stock: row?.manage_stock !== false
+    }))
+    .sort((a, b) => normalizeProductName(a?.name).localeCompare(normalizeProductName(b?.name)));
+}
+
+function projectProductsForOrders(rows = []) {
+  return rows
+    .filter((row) => row?.is_active !== false)
+    .map((row) => ({
+      id: row?.id || null,
+      code: row?.code || null,
+      name: row?.name || 'Producto',
+      sale_price: Number(row?.sale_price || 0),
+      stock: Number(row?.stock || 0),
+      category: row?.category || null,
+      manage_stock: row?.manage_stock !== false
+    }))
+    .sort((a, b) => normalizeProductName(a?.name).localeCompare(normalizeProductName(b?.name)));
+}
+
+async function getMaterializedProductsByBusiness(businessId) {
+  const rows = await listShapeRows({
+    businessId,
+    shapeKey: 'products',
+    limit: 2000
+  });
+
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function getMaterializedOrdersByBusiness(businessId) {
+  const rows = await listShapeRows({
+    businessId,
+    shapeKey: 'orders',
+    limit: 2000
+  });
+
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function getMaterializedOrderItemsByBusiness(businessId) {
+  const rows = await listShapeRows({
+    businessId,
+    shapeKey: 'order_items',
+    limit: 5000
+  });
+
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function getMaterializedCombosByBusiness(businessId) {
+  const rows = await listShapeRows({
+    businessId,
+    shapeKey: 'combos',
+    limit: 2000
+  });
+
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function getMaterializedTablesByBusiness(businessId) {
+  const rows = await listShapeRows({
+    businessId,
+    shapeKey: 'tables',
+    limit: 500
+  });
+
+  return Array.isArray(rows) ? rows : [];
+}
+
+function projectOpenOrders(rows = []) {
+  return rows
+    .filter((row) => String(row?.status || '').toLowerCase() === 'open')
+    .map((row) => ({
+      id: row?.id || null,
+      business_id: row?.business_id || null,
+      table_id: row?.table_id || null,
+      status: row?.status || 'open',
+      opened_at: row?.opened_at || null,
+      updated_at: row?.updated_at || null,
+      total: Number(row?.total || 0)
+    }))
+    .sort((a, b) => Date.parse(String(a?.opened_at || '')) - Date.parse(String(b?.opened_at || '')));
+}
+
+function projectTablesWithCurrentOrder(tables = [], orders = [], orderItems = [], products = [], combos = []) {
+  const orderById = new Map(
+    orders
+      .filter((order) => order?.id)
+      .map((order) => [String(order.id), order])
+  );
+
+  const orderItemsByOrderId = orderItems.reduce((acc, item) => {
+    const key = String(item?.order_id || '').trim();
+    if (!key) return acc;
+    if (!Array.isArray(acc[key])) acc[key] = [];
+    acc[key].push(item);
+    return acc;
+  }, {});
+
+  const productsById = new Map(
+    products
+      .filter((row) => row?.id)
+      .map((row) => [String(row.id), row])
+  );
+
+  const combosById = new Map(
+    combos
+      .filter((row) => row?.id)
+      .map((row) => [String(row.id), row])
+  );
+
+  function buildOrderItemsBundle(currentOrderId) {
+    const rows = Array.isArray(orderItemsByOrderId[currentOrderId])
+      ? orderItemsByOrderId[currentOrderId]
+      : [];
+
+    return rows.map((item) => {
+      const product = item?.product_id ? productsById.get(String(item.product_id)) : null;
+      const combo = item?.combo_id ? combosById.get(String(item.combo_id)) : null;
+
+      return {
+        id: item?.id || null,
+        product_id: item?.product_id || null,
+        combo_id: item?.combo_id || null,
+        quantity: Number(item?.quantity || 0),
+        price: Number(item?.price || 0),
+        subtotal: Number(item?.subtotal || 0),
+        products: product
+          ? {
+            id: product?.id || null,
+            name: product?.name || null,
+            category: product?.category || null
+          }
+          : null,
+        combos: combo
+          ? {
+            id: combo?.id || null,
+            nombre: combo?.nombre || null,
+            descripcion: combo?.descripcion || null
+          }
+          : null
+      };
+    });
+  }
+
+  return tables
+    .map((table) => {
+      const currentOrderId = String(table?.current_order_id || '').trim() || null;
+      const currentOrder = currentOrderId ? orderById.get(currentOrderId) : null;
+
+      return {
+        ...table,
+        orders: currentOrder
+          ? {
+            id: currentOrder?.id || null,
+            status: currentOrder?.status || null,
+            total: Number(currentOrder?.total || 0),
+            opened_at: currentOrder?.opened_at || null,
+            order_items: buildOrderItemsBundle(currentOrderId)
+          }
+          : null
+      };
+    })
+    .sort((a, b) => Number(a?.table_number || 0) - Number(b?.table_number || 0));
 }
 
 async function readThroughCache({
@@ -104,6 +297,16 @@ export const readAdapter = {
   },
 
   async getActiveProductsForSale(businessId) {
+    if (shouldUseMaterializedProductsRead()) {
+      const materialized = await getMaterializedProductsByBusiness(businessId);
+      if (materialized.length > 0) {
+        return {
+          data: projectProductsForSales(materialized),
+          error: null
+        };
+      }
+    }
+
     return readThroughCache({
       cacheKey: buildCacheKey(['products', 'sales', businessId, 'active']),
       enabled: shouldUseCatalogCache(),
@@ -224,6 +427,16 @@ export const readAdapter = {
       cacheKey: buildCacheKey(['reports', businessId, 'sale_details_cost', startKey, endKey]),
       enabled: LOCAL_SYNC_CONFIG.localReads.sales || LOCAL_SYNC_CONFIG.localReads.products,
       fetcher: () => supabaseAdapter.getSaleDetailsWithProductCostByBusinessDateRange({ businessId, start, end })
+    });
+  },
+
+  async getComboSaleDetailsByBusinessDateRange({ businessId, start, end }) {
+    const startKey = normalizeDateKey(start);
+    const endKey = normalizeDateKey(end);
+    return readThroughCache({
+      cacheKey: buildCacheKey(['reports', businessId, 'combo_sale_details', startKey, endKey]),
+      enabled: LOCAL_SYNC_CONFIG.localReads.sales || LOCAL_SYNC_CONFIG.localReads.products,
+      fetcher: () => supabaseAdapter.getComboSaleDetailsByBusinessDateRange({ businessId, start, end })
     });
   },
 
@@ -351,6 +564,14 @@ export const readAdapter = {
     });
   },
 
+  async getProductPurchasePricesByBusiness(businessId) {
+    return readThroughCache({
+      cacheKey: buildCacheKey(['products', 'purchase_prices', businessId, 'all']),
+      enabled: shouldUseCatalogCache(),
+      fetcher: () => supabaseAdapter.getProductPurchasePricesByBusiness(businessId)
+    });
+  },
+
   async getPurchaseDetailsByPurchaseId(purchaseId) {
     return readThroughCache({
       cacheKey: buildCacheKey(['purchases', purchaseId, 'details_min']),
@@ -377,6 +598,23 @@ export const readAdapter = {
   },
 
   async getTablesWithCurrentOrderByBusiness(businessId) {
+    if (shouldUseMaterializedOrdersRead()) {
+      const [tables, orders, orderItems, products, combos] = await Promise.all([
+        getMaterializedTablesByBusiness(businessId),
+        getMaterializedOrdersByBusiness(businessId),
+        getMaterializedOrderItemsByBusiness(businessId),
+        getMaterializedProductsByBusiness(businessId),
+        getMaterializedCombosByBusiness(businessId)
+      ]);
+
+      if (tables.length > 0) {
+        return {
+          data: projectTablesWithCurrentOrder(tables, orders, orderItems, products, combos),
+          error: null
+        };
+      }
+    }
+
     return readThroughCache({
       cacheKey: buildCacheKey(['tables', businessId, 'current_order']),
       enabled: shouldUseCriticalOrdersReadCache(),
@@ -385,6 +623,19 @@ export const readAdapter = {
   },
 
   async getOpenOrdersByBusiness(businessId, selectSql = 'id, business_id, table_id, status, opened_at, updated_at') {
+    const normalizedSelectSql = String(selectSql || '').trim();
+    const canUseMaterializedSelect = normalizedSelectSql === 'id, business_id, table_id, status, opened_at, updated_at';
+
+    if (shouldUseMaterializedOrdersRead() && canUseMaterializedSelect) {
+      const orders = await getMaterializedOrdersByBusiness(businessId);
+      if (orders.length > 0) {
+        return {
+          data: projectOpenOrders(orders),
+          error: null
+        };
+      }
+    }
+
     return readThroughCache({
       cacheKey: buildCacheKey(['orders', businessId, 'open', selectSql]),
       enabled: shouldUseOrdersReadCache(),
@@ -393,6 +644,16 @@ export const readAdapter = {
   },
 
   async getProductsForOrdersByBusiness(businessId) {
+    if (shouldUseMaterializedProductsRead()) {
+      const materialized = await getMaterializedProductsByBusiness(businessId);
+      if (materialized.length > 0) {
+        return {
+          data: projectProductsForOrders(materialized),
+          error: null
+        };
+      }
+    }
+
     return readThroughCache({
       cacheKey: buildCacheKey(['products', 'orders', businessId, 'active']),
       enabled: shouldUseCatalogCache(),

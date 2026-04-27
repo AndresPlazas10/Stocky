@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, InteractionManager, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, InteractionManager, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
@@ -9,6 +9,7 @@ import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
 import { StockyMoneyText } from '../../ui/StockyMoneyText';
 import { StockyModal } from '../../ui/StockyModal';
 import { StockyStatusToast } from '../../ui/StockyStatusToast';
+import { PrintReceiptConfirmModal } from '../../ui/PrintReceiptConfirmModal';
 import { formatCop } from '../../services/mesasService';
 import type { PaymentMethod } from '../../services/mesaCheckoutService';
 import {
@@ -31,6 +32,8 @@ import {
 } from '../../services/ventasService';
 import { getSupabaseClient } from '../../lib/supabase';
 import { buildSaleReceiptHtml } from '../../utils/printTemplates';
+import { getBankLogoSource, isBankPaymentMethod } from '../../utils/paymentMethodBranding';
+import { getThermalPaperWidthMm, isAutoPrintReceiptEnabled } from '../../utils/printer';
 
 type Props = {
   businessId: string;
@@ -46,6 +49,11 @@ function getPaymentMethodLabel(method: PaymentMethod) {
   if (method === 'card') return 'Tarjeta';
   if (method === 'transfer') return 'Transferencia';
   if (method === 'mixed') return 'Mixto';
+  if (method === 'nequi') return 'Nequi';
+  if (method === 'bancolombia') return 'Bancolombia';
+  if (method === 'banco_bogota') return 'Banco de Bogotá';
+  if (method === 'nu') return 'Nu';
+  if (method === 'davivienda') return 'Davivienda';
   return method;
 }
 
@@ -74,6 +82,14 @@ function getPaymentMethodTheme(method: PaymentMethod): {
   if (method === 'mixed') {
     return {
       icon: 'layers-outline',
+      backgroundColor: '#F3E8FF',
+      textColor: '#7E22CE',
+      iconColor: '#9333EA',
+    };
+  }
+  if (['nequi', 'bancolombia', 'banco_bogota', 'nu', 'davivienda'].includes(method)) {
+    return {
+      icon: 'business-outline',
       backgroundColor: '#F3E8FF',
       textColor: '#7E22CE',
       iconColor: '#9333EA',
@@ -205,6 +221,11 @@ function PaymentMethodSelector({
     { value: 'card', label: 'Tarjeta' },
     { value: 'transfer', label: 'Transferencia' },
     { value: 'mixed', label: 'Mixto' },
+    { value: 'nequi', label: 'Nequi' },
+    { value: 'bancolombia', label: 'Bancolombia' },
+    { value: 'banco_bogota', label: 'Banco de Bogotá' },
+    { value: 'nu', label: 'Nu' },
+    { value: 'davivienda', label: 'Davivienda' },
   ];
 
   return (
@@ -223,9 +244,20 @@ function PaymentMethodSelector({
               onChange(option.value);
             }}
           >
-            <Text style={[styles.paymentMethodOptionText, selected && styles.paymentMethodOptionTextSelected]}>
-              {option.label}
-            </Text>
+            <View style={styles.paymentMethodOptionContent}>
+              {isBankPaymentMethod(option.value) ? (
+                <Image source={getBankLogoSource(option.value)!} style={styles.paymentMethodOptionLogo} resizeMode="contain" />
+              ) : (
+                <Ionicons
+                  name={getPaymentMethodTheme(option.value).icon}
+                  size={14}
+                  color={selected ? '#1D4ED8' : '#475569'}
+                />
+              )}
+              <Text style={[styles.paymentMethodOptionText, selected && styles.paymentMethodOptionTextSelected]}>
+                {option.label}
+              </Text>
+            </View>
           </Pressable>
         );
       })}
@@ -257,6 +289,12 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
   const [salePaymentLabel, setSalePaymentLabel] = useState('');
   const [showSaleDeletedToast, setShowSaleDeletedToast] = useState(false);
   const [saleDeletedTotalLabel, setSaleDeletedTotalLabel] = useState('');
+
+  // Estados para modal de impresión
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printSaleDetails, setPrintSaleDetails] = useState<VentaDetailRecord[]>([]);
+  const [printSaleRecord, setPrintSaleRecord] = useState<VentaRecord | null>(null);
+  const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
 
   const [dayFilter, setDayFilter] = useState('all');
   const [sellerFilter, setSellerFilter] = useState('all');
@@ -807,6 +845,8 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
       const idempotencySeed = `${paymentMethod}:${cart.map((item) => `${cartReferenceKey(item)}:${item.quantity}`).sort().join('|')}`;
       const amount = paymentMethod === 'cash' ? Number(cashChangeData?.paid || 0) : null;
       const breakdown = paymentMethod === 'cash' && cashChangeData?.isValid ? [] : [];
+      const cartSnapshot = Array.isArray(cart) ? [...cart] : [];
+      const createdAt = new Date().toISOString();
 
       const result = await createVenta({
         businessId,
@@ -816,6 +856,54 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         changeBreakdown: breakdown,
         idempotencySeed,
       });
+
+      const autoPrintEnabled = await isAutoPrintReceiptEnabled();
+      if (autoPrintEnabled) {
+        try {
+          const printerWidthMm = await getThermalPaperWidthMm();
+          const detailsFromSale = result.saleId ? await listVentaDetails(result.saleId) : [];
+          const details = Array.isArray(detailsFromSale) && detailsFromSale.length > 0
+            ? detailsFromSale
+            : cartSnapshot.map((item, index) => ({
+                id: `${result.saleId || 'tmp-sale'}:${index + 1}`,
+                sale_id: result.saleId || 'tmp-sale',
+                quantity: Number(item.quantity || 0),
+                unit_price: Number(item.unit_price || 0),
+                subtotal: Number(item.subtotal || (Number(item.quantity || 0) * Number(item.unit_price || 0))),
+                product_id: item.product_id || null,
+                combo_id: item.combo_id || null,
+                products: item.product_id ? { name: item.name, code: item.code || undefined } : null,
+                combos: item.combo_id ? { nombre: item.name } : null,
+              }));
+
+          const fallbackTotal = details.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
+          const saleForPrint: VentaRecord = {
+            id: result.saleId || `tmp-${Date.now()}`,
+            business_id: businessId,
+            user_id: null,
+            seller_name: source === 'employee' ? 'Empleado' : 'Administrador',
+            payment_method: paymentMethod,
+            total: Number(result.total || fallbackTotal),
+            created_at: createdAt,
+            amount_received: amount,
+            change_amount: (paymentMethod === 'cash' && Number.isFinite(amount))
+              ? Math.max(Number(amount) - Number(result.total || fallbackTotal), 0)
+              : null,
+            change_breakdown: [],
+          };
+
+          // Guardar datos para el modal
+          setPrintSaleRecord(saleForPrint);
+          setPrintSaleDetails(details);
+          
+          // Mostrar el modal después de un pequeño delay
+          setTimeout(() => {
+            setShowPrintModal(true);
+          }, 300);
+        } catch {
+          setError('No se pudo preparar la impresión del comprobante.');
+        }
+      }
 
       clearCart();
       setShowCreateSaleModal(false);
@@ -837,8 +925,37 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
     clearCart,
     paymentMethod,
     refreshSales,
+    source,
     submitting,
   ]);
+
+  const handlePrintConfirm = useCallback(async () => {
+    if (!printSaleRecord) return;
+    setIsPrintingReceipt(true);
+    try {
+      const printerWidthMm = await getThermalPaperWidthMm();
+      const html = buildSaleReceiptHtml({
+        sale: printSaleRecord,
+        saleDetails: printSaleDetails,
+        sellerName: printSaleRecord.seller_name,
+        printerWidthMm,
+      });
+      await Print.printAsync({ html });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al imprimir el comprobante.');
+    } finally {
+      setIsPrintingReceipt(false);
+      setShowPrintModal(false);
+      setPrintSaleRecord(null);
+      setPrintSaleDetails([]);
+    }
+  }, [printSaleRecord, printSaleDetails]);
+
+  const handlePrintCancel = useCallback(() => {
+    setShowPrintModal(false);
+    setPrintSaleRecord(null);
+    setPrintSaleDetails([]);
+  }, []);
 
   const selectedDayLabel = useMemo(() => formatDayLabelFromKey(dayFilter), [dayFilter]);
 
@@ -888,10 +1005,13 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         return;
       }
 
+      const printerWidthMm = await getThermalPaperWidthMm();
+
       const html = buildSaleReceiptHtml({
         sale: venta,
         saleDetails: details,
         sellerName: venta.seller_name || 'Empleado',
+        printerWidthMm,
       });
 
       await Print.printAsync({ html });
@@ -927,7 +1047,11 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
             <View style={styles.paymentRow}>
               <Ionicons name="wallet-outline" size={20} color="#111827" />
               <View style={styles.paymentPill}>
-                <Ionicons name="cash-outline" size={13} color="#166534" style={styles.paymentIcon} />
+                {isBankPaymentMethod(venta.payment_method) ? (
+                  <Image source={getBankLogoSource(venta.payment_method)!} style={styles.paymentIconLogo} resizeMode="contain" />
+                ) : (
+                  <Ionicons name={getPaymentMethodTheme(venta.payment_method).icon} size={13} color="#166534" style={styles.paymentIcon} />
+                )}
                 <Text style={styles.paymentPillText}>{getPaymentMethodLabel(venta.payment_method)}</Text>
               </View>
             </View>
@@ -1501,11 +1625,15 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
                   { backgroundColor: selectedVentaPaymentTheme?.backgroundColor || '#DCFCE7' },
                 ]}
               >
-                <Ionicons
-                  name={selectedVentaPaymentTheme?.icon || 'cash-outline'}
-                  size={14}
-                  color={selectedVentaPaymentTheme?.iconColor || '#16A34A'}
-                />
+                {isBankPaymentMethod(selectedVenta.payment_method) ? (
+                  <Image source={getBankLogoSource(selectedVenta.payment_method)!} style={styles.saleDetailsHeroMethodLogo} resizeMode="contain" />
+                ) : (
+                  <Ionicons
+                    name={selectedVentaPaymentTheme?.icon || 'cash-outline'}
+                    size={14}
+                    color={selectedVentaPaymentTheme?.iconColor || '#16A34A'}
+                  />
+                )}
                 <Text
                   style={[
                     styles.saleDetailsHeroMethodBadgeText,
@@ -1651,6 +1779,12 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         secondaryValue="Eliminada"
         durationMs={1200}
         onClose={() => setShowSaleDeletedToast(false)}
+      />
+      <PrintReceiptConfirmModal
+        visible={showPrintModal}
+        onConfirm={handlePrintConfirm}
+        onCancel={handlePrintCancel}
+        isLoading={isPrintingReceipt}
       />
     </>
   );
@@ -2035,7 +2169,7 @@ const styles = StyleSheet.create({
   paymentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 7,
   },
   paymentPill: {
     borderRadius: 999,
@@ -2046,6 +2180,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   paymentIcon: {
+    marginRight: 4,
+  },
+  paymentIconLogo: {
+    width: 20,
+    height: 12,
     marginRight: 4,
   },
   paymentPillText: {
@@ -2489,6 +2628,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
+  paymentMethodOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  paymentMethodOptionLogo: {
+    width: 20,
+    height: 12,
+  },
   paymentMethodOptionSelected: {
     backgroundColor: '#6D28D9',
     borderColor: '#6D28D9',
@@ -2734,11 +2882,15 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
   saleDetailsHeroMethodBadgeText: {
     fontSize: 11,
     fontWeight: '700',
+  },
+  saleDetailsHeroMethodLogo: {
+    width: 20,
+    height: 12,
   },
   saleDetailsHeroMetaGrid: {
     flexDirection: 'row',

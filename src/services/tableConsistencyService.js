@@ -2,6 +2,7 @@ import { getOpenOrdersByBusiness, getTablesWithCurrentOrderByBusiness } from '..
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { logger } from '../utils/logger.js';
 import { detectTableOrderInconsistencies } from './tableConsistencyDetect.js';
+import { appendConflictLogRecord } from '../localdb/conflictLogStore.js';
 
 function normalizeText(value) {
   const normalized = String(value ?? '').trim();
@@ -32,11 +33,18 @@ async function appendConflict({
   reason,
   details = null
 }) {
-  void businessId;
-  void mutationType;
-  void mutationId;
-  void reason;
-  void details;
+  const normalizedBusinessId = normalizeText(businessId);
+  const normalizedReason = normalizeText(reason);
+  if (!normalizedBusinessId || !normalizedReason) return null;
+
+  return appendConflictLogRecord({
+    business_id: normalizedBusinessId,
+    mutation_id: normalizeText(mutationId),
+    mutation_type: normalizeText(mutationType),
+    conflict_type: normalizeText(mutationType) || 'table.consistency',
+    reason: normalizedReason,
+    details
+  });
 }
 
 async function applyFixOperation(operation) {

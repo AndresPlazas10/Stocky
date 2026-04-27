@@ -3,7 +3,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getFilteredSales } from '../../services/salesService';
 import { recordSaleCreationTime } from '../../services/salesServiceOptimized';
 import { fetchComboCatalog } from '../../services/combosService.js';
-import { createSaleWithOutbox, deleteSaleWithDetails } from '../../data/commands/salesCommands.js';
+import {
+  createSaleWithOutbox,
+  deleteSaleWithDetails,
+  flushSalesOutbox,
+  getSalesOutboxSnapshot,
+  retryAllSalesOutboxErrorEvents,
+  retrySalesOutboxEventByTempSaleId,
+  subscribeSalesOutboxUpdates,
+  subscribeSalesSyncUpdates
+} from '../../data/commands/salesCommands.js';
 import {
   getBusinessNameById,
   getProductsForSale,
@@ -27,9 +36,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
+import PaymentMethodSelect from '../ui/PaymentMethodSelect.jsx';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { SaleUpdateAlert } from '../ui/SaleUpdateAlert';
+import { PrintReceiptConfirmModal } from '../ui/PrintReceiptConfirmModal';
 import Pagination from '../Pagination';
 import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
 import { useProgressiveList } from '../../hooks/useProgressiveList.js';
@@ -54,6 +65,12 @@ import {
 } from 'lucide-react';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
+import { getPaymentMethodLogoCandidates, isBankPaymentMethod } from '../../utils/paymentMethodBranding.js';
+import {
+  applyOfflineStockConsumption,
+  buildCartConsumptionByProduct,
+  evaluateOfflineStockShortages
+} from '../../utils/offlineStockGuards.js';
 
 const _motionLintUsage = motion;
 
@@ -80,8 +97,40 @@ const getPaymentMethodLabel = (method) => {
   if (method === 'card') return 'Tarjeta';
   if (method === 'transfer') return 'Transferencia';
   if (method === 'mixed') return 'Mixto';
+  if (method === 'nequi') return 'Nequi';
+  if (method === 'bancolombia') return 'Bancolombia';
+  if (method === 'banco_bogota') return 'Banco de Bogotá';
+  if (method === 'nu') return 'Nu';
+  if (method === 'davivienda') return 'Davivienda';
   return method || '-';
 };
+
+function PaymentMethodBankLogo({ method, sizeClass = 'h-4' }) {
+  const [index, setIndex] = useState(0);
+  const normalizedMethod = String(method || '').trim().toLowerCase();
+  const candidates = getPaymentMethodLogoCandidates(normalizedMethod);
+
+  useEffect(() => {
+    setIndex(0);
+  }, [normalizedMethod]);
+
+  if (!isBankPaymentMethod(normalizedMethod)) return null;
+  if (!Array.isArray(candidates) || candidates.length === 0 || index < 0) {
+    return <span className="text-sm">🏦</span>;
+  }
+
+  return (
+    <img
+      src={candidates[index]}
+      alt={`Logo ${getPaymentMethodLabel(normalizedMethod)}`}
+      className={`${sizeClass} w-auto object-contain`}
+      loading="lazy"
+      onError={() => {
+        setIndex((current) => (current + 1 < candidates.length ? current + 1 : -1));
+      }}
+    />
+  );
+}
 
 const isConnectivityError = (errorLike) => {
   const message = String(errorLike?.message || errorLike || '').toLowerCase();
@@ -120,6 +169,29 @@ const buildDiagnosticAlertMessage = (errorLike, fallback = 'Error desconocido') 
 
   if (diagnosticParts.length === 0) return `❌ ${message}`;
   return `❌ ${message} [diag: ${diagnosticParts.join(' | ')}]`;
+};
+
+const getActionableSyncErrorMessage = (errorLike) => {
+  const message = String(errorLike || '').trim();
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes('idx_sales_prevent_duplicates')) {
+    return 'Esta venta ya se había registrado previamente. Se recomienda recargar el historial para validar el estado final.';
+  }
+
+  if (normalized.includes('sesión no válida') || normalized.includes('sesion no valida') || normalized.includes('unauthorized')) {
+    return 'La sesión no es válida para sincronizar. Inicia sesión nuevamente y luego reintenta.';
+  }
+
+  if (normalized.includes('permission denied') || normalized.includes('row-level security') || normalized.includes('forbidden')) {
+    return 'No tienes permisos para sincronizar esta venta. Verifica el rol del usuario en este negocio.';
+  }
+
+  if (normalized.includes('datos de venta inválidos') || normalized.includes('datos de venta invalidos') || normalized.includes('item inválido') || normalized.includes('item invalido')) {
+    return 'La venta quedó con datos inválidos para sincronizar. Revísala y vuelve a crearla si es necesario.';
+  }
+
+  return message || 'No se pudo sincronizar esta venta.';
 };
 
 const toNumberOrNull = (value) => {
@@ -187,8 +259,15 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [saleDetailsError, setSaleDetailsError] = useState('');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [salesOutboxState, setSalesOutboxState] = useState(() => getSalesOutboxSnapshot());
   const saleIntentKeyRef = useRef(null);
   const saleIntentSignatureRef = useRef('');
+
+  // Estados para modal de impresión
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printSaleData, setPrintSaleData] = useState(null);
+  const [printSaleDetails, setPrintSaleDetails] = useState([]);
+  const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
 
   const closeSaleModal = useCallback(() => {
     setShowSaleModal(false);
@@ -197,6 +276,42 @@ function Ventas({ businessId, userRole = 'admin' }) {
     setPaymentMethod('cash');
     setSearchProduct('');
     setSaleModalPanel('catalog');
+  }, []);
+
+  // Callbacks para modal de impresión
+  const handlePrintConfirm = useCallback(async () => {
+    if (!printSaleData) {
+      setError('⚠️ No hay datos de venta para imprimir.');
+      return;
+    }
+
+    setIsPrintingReceipt(true);
+    try {
+      const printResult = printSaleReceipt({
+        sale: printSaleData,
+        saleDetails: printSaleDetails,
+        sellerName: printSaleData.seller_name || getVendedorName(printSaleData)
+      });
+
+      if (!printResult.ok) {
+        setError('⚠️ No se pudo imprimir el recibo. Intenta nuevamente.');
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error al imprimir:', err);
+      setError('⚠️ No se pudo imprimir el recibo. Intenta nuevamente.');
+    } finally {
+      setIsPrintingReceipt(false);
+      setShowPrintModal(false);
+      setPrintSaleData(null);
+      setPrintSaleDetails([]);
+    }
+  }, [printSaleData, printSaleDetails]);
+
+  const handlePrintCancel = useCallback(() => {
+    setShowPrintModal(false);
+    setPrintSaleData(null);
+    setPrintSaleDetails([]);
   }, []);
 
   // Funciones de carga memoizadas SIN cache para evitar problemas de actualización
@@ -399,6 +514,81 @@ function Ventas({ businessId, userRole = 'admin' }) {
     }
   }, [businessId, loadData]);
 
+  useEffect(() => {
+    const syncState = () => setSalesOutboxState(getSalesOutboxSnapshot());
+    syncState();
+
+    const unsubscribe = subscribeSalesOutboxUpdates((snapshot) => {
+      setSalesOutboxState(snapshot);
+    });
+
+    const timer = setInterval(syncState, 5000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeSalesSyncUpdates((payload) => {
+      const tempSaleId = String(payload?.tempSaleId || '').trim();
+      const remoteSaleId = String(payload?.remoteSaleId || '').trim();
+      const syncedAt = payload?.syncedAt || new Date().toISOString();
+      const payloadBusinessId = String(payload?.businessId || '').trim();
+
+      if (!tempSaleId || !remoteSaleId) return;
+      if (payloadBusinessId && String(businessId || '').trim() && payloadBusinessId !== String(businessId || '').trim()) {
+        return;
+      }
+
+      setVentas((prevVentas) => {
+        const list = Array.isArray(prevVentas) ? [...prevVentas] : [];
+        const tempIndex = list.findIndex((sale) => String(sale?.id || '').trim() === tempSaleId);
+        if (tempIndex < 0) return prevVentas;
+
+        const remoteIndex = list.findIndex((sale) => String(sale?.id || '').trim() === remoteSaleId);
+        if (remoteIndex >= 0 && remoteIndex !== tempIndex) {
+          const tempSale = list[tempIndex] || {};
+          const remoteSale = list[remoteIndex] || {};
+          list[remoteIndex] = {
+            ...tempSale,
+            ...remoteSale,
+            id: remoteSaleId,
+            pending_sync: false,
+            synced_at: syncedAt
+          };
+          list.splice(tempIndex, 1);
+          return list;
+        }
+
+        list[tempIndex] = {
+          ...(list[tempIndex] || {}),
+          id: remoteSaleId,
+          pending_sync: false,
+          synced_at: syncedAt
+        };
+        return list;
+      });
+
+      setSelectedSale((prevSelected) => {
+        if (!prevSelected) return prevSelected;
+        const selectedId = String(prevSelected?.id || '').trim();
+        if (selectedId !== tempSaleId) return prevSelected;
+        return {
+          ...prevSelected,
+          id: remoteSaleId,
+          pending_sync: false,
+          synced_at: syncedAt
+        };
+      });
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [businessId]);
+
   // 🔥 TIEMPO REAL: Suscripción a cambios en ventas
   useRealtimeSubscription('sales', {
     filter: { business_id: businessId },
@@ -488,6 +678,21 @@ function Ventas({ businessId, userRole = 'admin' }) {
       loadCombos().catch(() => {});
     }
   });
+
+  useEffect(() => {
+    if (!businessId || !Array.isArray(ventas) || loading) return;
+
+    const snapshotKey = `ventas.list:${businessId}`;
+    if (ventas.length === 0) {
+      const offline = isOfflineMode();
+      const existing = readOfflineSnapshot(snapshotKey, []);
+      if (offline && Array.isArray(existing) && existing.length > 0) {
+        return;
+      }
+    }
+
+    saveOfflineSnapshot(snapshotKey, ventas);
+  }, [businessId, ventas, loading]);
 
   const comboById = useMemo(() => {
     const map = new Map();
@@ -585,80 +790,14 @@ function Ventas({ businessId, userRole = 'admin' }) {
     )));
   }, [removeFromCart]);
 
-  // Stock en vivo por producto para evitar desincronización en carrito
-  const stockByProductId = useMemo(() => {
-    const map = new Map();
-    productos.forEach((producto) => map.set(producto.id, Number(producto.stock ?? 0)));
-    return map;
-  }, [productos]);
-
-  const manageStockByProductId = useMemo(() => {
-    const map = new Map();
-    productos.forEach((producto) => map.set(producto.id, producto.manage_stock !== false));
-    return map;
-  }, [productos]);
-
-  const comboStockShortages = useMemo(() => {
-    const requiredByProduct = new Map();
-
-    cart.forEach((item) => {
-      if (!item?.combo_id) return;
-
-      const combo = comboById.get(item.combo_id);
-      if (!combo) return;
-
-      const comboQuantity = Number(item.quantity || 0);
-      if (!Number.isFinite(comboQuantity) || comboQuantity <= 0) return;
-
-      (combo.combo_items || []).forEach((component) => {
-        const productId = component?.producto_id;
-        if (!productId) return;
-
-        const componentQty = Number(component?.cantidad || 0);
-        if (!Number.isFinite(componentQty) || componentQty <= 0) return;
-
-        const current = Number(requiredByProduct.get(productId) || 0);
-        requiredByProduct.set(productId, current + (comboQuantity * componentQty));
-      });
-    });
-
-    const shortages = [];
-    requiredByProduct.forEach((requiredQty, productId) => {
-      const shouldManageStock = manageStockByProductId.get(productId) !== false;
-      if (!shouldManageStock) return;
-
-      const stock = Number(stockByProductId.get(productId) || 0);
-      if (stock >= requiredQty) return;
-
-      const product = productos.find((p) => p.id === productId);
-      shortages.push({
-        product_id: productId,
-        product_name: product?.name || 'Producto',
-        available_stock: stock,
-        required_quantity: requiredQty
-      });
-    });
-
-    return shortages;
-  }, [cart, comboById, productos, stockByProductId, manageStockByProductId]);
-
-  const simpleStockShortages = useMemo(() => {
-    return cart
-      .filter((item) => item.item_type === SALE_ITEM_TYPE.PRODUCT && item.product_id && item.manage_stock !== false)
-      .map((item) => {
-        const liveStock = stockByProductId.get(item.product_id);
-        const availableStock = Number.isFinite(liveStock) ? Number(liveStock) : Number(item.available_stock || 0);
-        if (availableStock >= Number(item.quantity || 0)) return null;
-
-        return {
-          product_id: item.product_id,
-          product_name: item.name || 'Producto',
-          available_stock: availableStock,
-          required_quantity: Number(item.quantity || 0)
-        };
-      })
-      .filter(Boolean);
-  }, [cart, stockByProductId]);
+  const {
+    comboStockShortages,
+    simpleStockShortages
+  } = useMemo(() => evaluateOfflineStockShortages({
+    cart,
+    products: productos,
+    comboById
+  }), [cart, productos, comboById]);
 
   const total = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.subtotal, 0);
@@ -755,40 +894,104 @@ function Ventas({ businessId, userRole = 'admin' }) {
         { label: 'Total', value: formatPrice(saleTotal) },
         { label: 'Método', value: getPaymentMethodLabel(paymentMethod) },
         { label: 'Tiempo', value: `${elapsedMs.toFixed(0)}ms` },
-        { label: 'Artículos', value: cart.length }
+        { label: 'Artículos', value: cart.length },
+        ...(result?.data?.pending_sync ? [{ label: 'Estado', value: 'Pendiente de sincronización' }] : [])
       ]);
       setAlertType('success');
       setSuccess(true);
 
-      // Autoimprimir recibo si el usuario lo tiene activado en configuración.
-      if (isAutoPrintReceiptEnabled()) {
-        try {
-          const [saleRow, saleDetails] = await Promise.all([
-            getSaleForPrintById(result.data.id),
-            getSaleDetailsBySaleId(result.data.id)
-          ]);
+      if (result?.data?.pending_sync) {
+        const pendingSale = {
+          id: result?.data?.id,
+          business_id: businessId,
+          user_id: null,
+          seller_name: 'Venta offline',
+          payment_method: paymentMethod,
+          total: Number(saleTotal || 0),
+          created_at: result?.data?.created_at || new Date().toISOString(),
+          notes: 'Pendiente de sincronización',
+          pending_sync: true,
+          employees: { full_name: 'Pendiente sync', role: 'employee' }
+        };
 
-          const saleForPrint = saleRow || {
+        setVentas((prev) => {
+          const next = [pendingSale, ...prev];
+          saveOfflineSnapshot(`ventas.list:${businessId}`, next);
+          return next;
+        });
+        setTotalCount((prev) => prev + 1);
+
+        const consumptionByProduct = buildCartConsumptionByProduct({ cart, comboById });
+
+        setProductos((prevProducts) => {
+          const nextProducts = applyOfflineStockConsumption({
+            products: prevProducts,
+            consumptionByProduct
+          });
+
+          saveOfflineSnapshot(`ventas.productos:${businessId}`, nextProducts);
+          return nextProducts;
+        });
+      }
+
+      // Mostrar modal de impresión después de que la venta se registre
+      if (isAutoPrintReceiptEnabled()) {
+        // Preparar datos para impresión
+        const isPendingSync = !!result?.data?.pending_sync;
+
+        let saleForPrint = null;
+        let detailsForPrint = [];
+
+        if (isPendingSync) {
+          saleForPrint = {
             id: result.data.id,
             total: saleTotal,
             payment_method: paymentMethod,
-            created_at: new Date().toISOString(),
-            seller_name: 'Empleado'
+            created_at: result?.data?.created_at || new Date().toISOString(),
+            seller_name: 'Venta offline'
           };
+          detailsForPrint = cart.map((item) => ({
+            quantity: Number(item.quantity || 0),
+            unit_price: Number(item.unit_price || 0),
+            subtotal: Number(item.subtotal || (Number(item.quantity || 0) * Number(item.unit_price || 0))),
+            product_name: item.name || 'Item'
+          }));
+        } else {
+          try {
+            const [saleRow, saleDetails] = await Promise.all([
+              getSaleForPrintById(result.data.id),
+              getSaleDetailsBySaleId(result.data.id)
+            ]);
 
-          const detailsForPrint = Array.isArray(saleDetails) ? saleDetails : [];
-          const printResult = printSaleReceipt({
-            sale: saleForPrint,
-            saleDetails: detailsForPrint,
-            sellerName: saleForPrint.seller_name || getVendedorName(saleForPrint)
-          });
+            saleForPrint = saleRow || {
+              id: result.data.id,
+              total: saleTotal,
+              payment_method: paymentMethod,
+              created_at: new Date().toISOString(),
+              seller_name: 'Empleado'
+            };
 
-          if (!printResult.ok) {
-            setError('⚠️ La venta se registró, pero no se pudo imprimir el recibo automáticamente.');
+            detailsForPrint = Array.isArray(saleDetails) ? saleDetails : [];
+          } catch {
+            saleForPrint = {
+              id: result.data.id,
+              total: saleTotal,
+              payment_method: paymentMethod,
+              created_at: new Date().toISOString(),
+              seller_name: 'Empleado'
+            };
+            detailsForPrint = [];
           }
-        } catch {
-          setError('⚠️ La venta se registró, pero no se pudo imprimir el recibo automáticamente.');
         }
+
+        // Guardar datos para el modal
+        setPrintSaleData(saleForPrint);
+        setPrintSaleDetails(detailsForPrint);
+
+        // Mostrar el modal después de un pequeño delay para que se vea el toast primero
+        setTimeout(() => {
+          setShowPrintModal(true);
+        }, 500);
       }
       
       // Limpiar el carrito y cerrar POS
@@ -815,7 +1018,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear
     }
-  }, [cart, sessionChecked, comboStockShortages, simpleStockShortages, businessId, paymentMethod, loadVentas, isSubmitting, currentFilters, limit, page, saleIntentSignature]);
+  }, [cart, sessionChecked, comboStockShortages, simpleStockShortages, comboById, businessId, paymentMethod, loadVentas, isSubmitting, currentFilters, limit, page, saleIntentSignature]);
 
   // Funciones de eliminación de venta (solo admin)
   const handleDeleteSale = (saleId) => {
@@ -1069,6 +1272,9 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const showCashPaymentDetails = selectedSale?.payment_method === 'cash'
     && (hasAmountReceivedValue || hasChangeAmountValue || hasChangeBreakdown);
   const shouldBlockWithError = Boolean(ventas.length === 0 && error && !isConnectivityError(error));
+  const lastSuccessfulSyncText = salesOutboxState?.lastSuccessfulSyncAt
+    ? formatDate(salesOutboxState.lastSuccessfulSyncAt)
+    : 'Sin sincronizaciones aún';
 
   return (
     <AsyncStateWrapper
@@ -1174,6 +1380,13 @@ function Ventas({ businessId, userRole = 'admin' }) {
           details={successDetails}
           duration={7000}
         />
+        <PrintReceiptConfirmModal
+          key="print-receipt-confirm"
+          isOpen={showPrintModal}
+          onConfirm={handlePrintConfirm}
+          onCancel={handlePrintCancel}
+          isLoading={isPrintingReceipt}
+        />
       </AnimatePresence>
 
       {!showSaleModal && (
@@ -1190,6 +1403,47 @@ function Ventas({ businessId, userRole = 'admin' }) {
             loadVentas({}, { limit, offset: 0, includeCount: false });
           }}
         />
+      )}
+
+      {!showSaleModal && (
+        <Card className="mb-6 rounded-2xl border border-accent-200 bg-white shadow-sm">
+          <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-accent-700">Estado de sincronización de ventas</p>
+              <p className="text-xs text-gray-500 mt-0.5">Monitorea ventas pendientes o con error mientras trabajas offline.</p>
+              <p className="text-xs text-gray-500 mt-0.5">Último sync exitoso: {lastSuccessfulSyncText}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge className="bg-slate-100 text-slate-800 border border-slate-200">Cola: {salesOutboxState.total}</Badge>
+              <Badge className="bg-amber-100 text-amber-800 border border-amber-200">Pendientes: {salesOutboxState.pending}</Badge>
+              <Badge className="bg-blue-100 text-blue-800 border border-blue-200">Procesando: {salesOutboxState.processing}</Badge>
+              <Badge className="bg-red-100 text-red-800 border border-red-200">Errores: {salesOutboxState.error}</Badge>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={salesOutboxState.error <= 0}
+                className="h-8 border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                onClick={() => {
+                  const retried = retryAllSalesOutboxErrorEvents();
+                  if (retried <= 0) {
+                    setError('⚠️ No hay ventas con error para reintentar en este momento.');
+                    return;
+                  }
+                  setSuccessTitle('🔄 Reintento de sincronización iniciado');
+                  setSuccessDetails([
+                    { label: 'Ventas', value: retried },
+                    { label: 'Estado', value: 'Reintentando errores de sincronización' }
+                  ]);
+                  setAlertType('update');
+                  setSuccess(true);
+                }}
+              >
+                Reintentar errores
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Modal para Nueva Venta */}
@@ -1399,16 +1653,11 @@ function Ventas({ businessId, userRole = 'admin' }) {
                             <CreditCard className="w-4 h-4" />
                             Método de pago
                           </label>
-                          <select
+                          <PaymentMethodSelect
                             value={paymentMethod}
-                            onChange={(e) => setPaymentMethod(e.target.value)}
-                            className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#edb886] focus:ring-[#edb886] transition-all duration-300"
-                          >
-                            <option value="cash">💵 Efectivo</option>
-                            <option value="card">💳 Tarjeta</option>
-                            <option value="transfer">🏦 Transferencia</option>
-                            <option value="mixed">🔀 Mixto</option>
-                          </select>
+                            onChange={setPaymentMethod}
+                            className="w-full"
+                          />
                         </div>
                       </div>
 
@@ -1479,15 +1728,14 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                     {(() => {
                                       if (item.item_type !== SALE_ITEM_TYPE.PRODUCT || !item.product_id) return false;
                                       if (item.manage_stock === false) return false;
-                                      const liveStock = stockByProductId.get(item.product_id);
-                                      const available = Number.isFinite(liveStock) ? liveStock : item.available_stock;
+                                      const available = Number.isFinite(item.available_stock) ? item.available_stock : 0;
                                       return typeof available === 'number' && item.quantity > available;
                                     })() && (
                                       <div className="mt-3 p-2.5 bg-red-50 border border-red-200 rounded-md">
                                         <div className="flex items-center gap-2">
                                           <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
                                           <p className="text-xs text-red-700">
-                                            Disponibles: {Number.isFinite(stockByProductId.get(item.product_id)) ? stockByProductId.get(item.product_id) : item.available_stock} - Pedido: {item.quantity}
+                                            Disponibles: {item.available_stock} - Pedido: {item.quantity}
                                           </p>
                                         </div>
                                       </div>
@@ -1627,6 +1875,12 @@ function Ventas({ businessId, userRole = 'admin' }) {
                     animate={{ opacity: 1, y: 0 }}
                     transition={lowMotionMode ? { duration: 0 } : { duration: 0.2, delay: index * 0.02 }}
                   >
+                    {(() => {
+                      const outboxEntry = salesOutboxState.byTempSaleId?.[venta.id] || null;
+                      const saleSyncStatus = outboxEntry?.status || (venta?.pending_sync ? 'pending' : 'synced');
+                      const saleSyncError = outboxEntry?.last_error || null;
+
+                      return (
                     <Card className="shadow-lg rounded-2xl bg-white border-2 border-accent-100 hover:border-primary-300 hover:shadow-xl transition-all duration-300">
                       <CardContent className="p-4 sm:p-6">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1674,14 +1928,80 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                     : venta.payment_method === 'transfer'
                                     ? 'bg-purple-100 text-purple-800 border-purple-200'
                                     : 'bg-orange-100 text-orange-800 border-orange-200'
-                                } border`}
+                                } border inline-flex items-center gap-1.5`}
                               >
-                                {venta.payment_method === 'cash' && '💵 Efectivo'}
-                                {venta.payment_method === 'card' && '💳 Tarjeta'}
-                                {venta.payment_method === 'transfer' && '🏦 Transferencia'}
-                                {venta.payment_method === 'mixed' && '🔀 Mixto'}
+                                {venta.payment_method === 'cash' && (
+                                  <>
+                                    <span>💵</span>
+                                    <span>Efectivo</span>
+                                  </>
+                                )}
+                                {venta.payment_method === 'card' && (
+                                  <>
+                                    <span>💳</span>
+                                    <span>Tarjeta</span>
+                                  </>
+                                )}
+                                {venta.payment_method === 'transfer' && (
+                                  <>
+                                    <span>🏦</span>
+                                    <span>Transferencia</span>
+                                  </>
+                                )}
+                                {venta.payment_method === 'mixed' && (
+                                  <>
+                                    <span>🔀</span>
+                                    <span>Mixto</span>
+                                  </>
+                                )}
+                                {![ 'cash', 'card', 'transfer', 'mixed' ].includes(venta.payment_method) && (
+                                  <>
+                                    <PaymentMethodBankLogo method={venta.payment_method} sizeClass="h-4" />
+                                    <span>{getPaymentMethodLabel(venta.payment_method)}</span>
+                                  </>
+                                )}
                               </Badge>
+
+                              {saleSyncStatus === 'pending' && (
+                                <Badge className="bg-amber-100 text-amber-800 border border-amber-200">Pendiente sync</Badge>
+                              )}
+                              {saleSyncStatus === 'processing' && (
+                                <Badge className="bg-blue-100 text-blue-800 border border-blue-200">Sincronizando...</Badge>
+                              )}
+                              {saleSyncStatus === 'error' && (
+                                <Badge className="bg-red-100 text-red-800 border border-red-200">Error sync</Badge>
+                              )}
+                              {saleSyncStatus === 'synced' && (
+                                <Badge className="bg-emerald-100 text-emerald-800 border border-emerald-200">Sincronizada</Badge>
+                              )}
                             </div>
+
+                            {saleSyncStatus === 'error' && saleSyncError && (
+                              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-2 py-1">
+                                {getActionableSyncErrorMessage(saleSyncError)}
+                              </p>
+                            )}
+
+                            {saleSyncStatus === 'error' && (
+                              <div className="pt-1">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs border-red-300 text-red-700 hover:bg-red-50"
+                                  onClick={() => {
+                                    const retried = retrySalesOutboxEventByTempSaleId(venta.id);
+                                    if (!retried) {
+                                      setError('⚠️ No se encontró la venta pendiente para reintentar sincronización.');
+                                      return;
+                                    }
+                                    void flushSalesOutbox();
+                                  }}
+                                >
+                                  Reintentar sync
+                                </Button>
+                              </div>
+                            )}
                           </div>
 
                           {/* Total y Acciones */}
@@ -1743,6 +2063,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
                         </div>
                       </CardContent>
                     </Card>
+                      );
+                    })()}
                   </motion.div>
                 ))}
               </div>

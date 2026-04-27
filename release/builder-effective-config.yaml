@@ -1,0 +1,22 @@
+directories:
+  output: release
+  buildResources: build
+appId: com.stocky.desktop
+productName: Stocky
+files:
+  - filter:
+      - dist/**/*
+      - electron/**/*
+      - package.json
+win:
+  signAndEditExecutable: true
+  target:
+    - nsis
+    - portable
+nsis:
+  artifactName: ${productName} Setup ${version} ${arch}.${ext}
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+portable:
+  artifactName: ${productName} ${version} ${arch} Portable.${ext}
+electronVersion: 37.10.3

@@ -619,6 +619,31 @@ export const supabaseAdapter = {
       .lte('sales.created_at', end);
   },
 
+  async getComboSaleDetailsByBusinessDateRange({ businessId, start, end }) {
+    return supabase
+      .from('sale_details')
+      .select(`
+        quantity,
+        combo_id,
+        combos (
+          id,
+          combo_items (
+            producto_id,
+            cantidad,
+            products (
+              id,
+              purchase_price
+            )
+          )
+        ),
+        sales!inner(business_id, created_at)
+      `)
+      .eq('sales.business_id', businessId)
+      .not('combo_id', 'is', null)
+      .gte('sales.created_at', start)
+      .lte('sales.created_at', end);
+  },
+
   async getSaleCashMetadata(saleId) {
     return supabase
       .from('sales')
@@ -810,6 +835,13 @@ export const supabaseAdapter = {
       .eq('is_active', true);
   },
 
+  async getProductPurchasePricesByBusiness(businessId) {
+    return supabase
+      .from('products')
+      .select('id, purchase_price')
+      .eq('business_id', businessId);
+  },
+
   async getPurchasesEnrichedRpc(payload) {
     return supabase.rpc('get_purchases_enriched', payload);
   },
@@ -943,6 +975,7 @@ export const supabaseAdapter = {
             id,
             name,
             code,
+            purchase_price,
             stock,
             is_active,
             category
@@ -1574,5 +1607,107 @@ export const supabaseAdapter = {
       .eq('id', invoiceId)
       .eq('business_id', businessId)
       .maybeSingle();
+  },
+
+  async getLatestShapeCursor({
+    table,
+    businessId,
+    cursorColumn = 'updated_at'
+  }) {
+    const normalizedTable = String(table || '').trim();
+    const normalizedBusinessId = String(businessId || '').trim();
+    const normalizedCursorColumn = String(cursorColumn || 'updated_at').trim() || 'updated_at';
+
+    if (!normalizedTable || !normalizedBusinessId) {
+      return {
+        data: null,
+        error: new Error('missing_table_or_business_id')
+      };
+    }
+
+    return supabase
+      .from(normalizedTable)
+      .select(`id, ${normalizedCursorColumn}`)
+      .eq('business_id', normalizedBusinessId)
+      .not(normalizedCursorColumn, 'is', null)
+      .order(normalizedCursorColumn, { ascending: false })
+      .limit(1)
+      .maybeSingle();
+  },
+
+  async getShapeRowsSinceCursor({
+    table,
+    businessId,
+    cursorColumn = 'updated_at',
+    cursorValue = null,
+    limit = 200,
+    selectSql = '*'
+  }) {
+    const normalizedTable = String(table || '').trim();
+    const normalizedBusinessId = String(businessId || '').trim();
+    const normalizedCursorColumn = String(cursorColumn || 'updated_at').trim() || 'updated_at';
+    const normalizedLimit = Number.isFinite(Number(limit)) ? Math.max(1, Number(limit)) : 200;
+
+    if (!normalizedTable || !normalizedBusinessId) {
+      return {
+        data: [],
+        error: new Error('missing_table_or_business_id')
+      };
+    }
+
+    let query = supabase
+      .from(normalizedTable)
+      .select(selectSql)
+      .eq('business_id', normalizedBusinessId)
+      .order(normalizedCursorColumn, { ascending: true })
+      .limit(normalizedLimit);
+
+    if (cursorValue) {
+      query = query.gt(normalizedCursorColumn, cursorValue);
+    }
+
+    return query;
+  },
+
+  async getOrderItemsByBusinessSinceCursor({
+    businessId,
+    cursorColumn = 'created_at',
+    cursorValue = null,
+    limit = 200
+  }) {
+    const normalizedBusinessId = String(businessId || '').trim();
+    const normalizedCursorColumn = String(cursorColumn || 'created_at').trim() || 'created_at';
+    const normalizedLimit = Number.isFinite(Number(limit)) ? Math.max(1, Number(limit)) : 200;
+
+    if (!normalizedBusinessId) {
+      return {
+        data: [],
+        error: new Error('missing_business_id')
+      };
+    }
+
+    let query = supabase
+      .from('order_items')
+      .select(`
+        id,
+        order_id,
+        product_id,
+        combo_id,
+        quantity,
+        price,
+        subtotal,
+        created_at,
+        updated_at,
+        orders!inner(business_id)
+      `)
+      .eq('orders.business_id', normalizedBusinessId)
+      .order(normalizedCursorColumn, { ascending: true })
+      .limit(normalizedLimit);
+
+    if (cursorValue) {
+      query = query.gt(normalizedCursorColumn, cursorValue);
+    }
+
+    return query;
   }
 };

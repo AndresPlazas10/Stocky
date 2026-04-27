@@ -47,3 +47,14 @@ dist-ssr
 
 # Supabase local temp files
 /supabase/.temp/
+
+# Large binary files (builds)
+*.exe
+*.exe.blockmap
+*.apk
+*.aab
+*.asar
+Stocky_windows/
+stocky_play/
+release/win-unpacked/
+release/win-arm64-unpacked/

@@ -192,10 +192,12 @@ export const sendInvoiceEmailResend = async ({
       </html>
     `;
 
-    // ✅ PASO 5: Enviar con Resend API (a través de Vercel Function para evitar CORS)
-    const apiUrl = import.meta.env.DEV 
-      ? 'http://localhost:3000/api/send-email'  // Desarrollo local
-      : '/api/send-email';  // Producción en Vercel
+    // ✅ PASO 5: Enviar con Resend API (a través de función serverless)
+    // En desarrollo usar base configurable y fallback relativo (proxy de Vite).
+    const apiBaseUrl = String(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/$/, '');
+    const apiUrl = apiBaseUrl
+      ? `${apiBaseUrl}/api/send-email`
+      : '/api/send-email';
 
     const { data: sessionData } = await supabaseAdapter.getCurrentSession();
     const accessToken = sessionData?.session?.access_token;
@@ -203,25 +205,36 @@ export const sendInvoiceEmailResend = async ({
       throw new Error('Sesión inválida para enviar correo');
     }
 
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`
-      },
-      body: JSON.stringify({
-        email: targetEmail,
-        invoiceNumber,
-        customerName,
-        total,
-        items,
-        businessName,
-        businessId,
-        issuedAt
-      })
-    });
+    let response;
+    try {
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          email: targetEmail,
+          invoiceNumber,
+          customerName,
+          total,
+          items,
+          businessName,
+          businessId,
+          issuedAt
+        })
+      });
+    } catch (_networkError) {
+      throw new Error(
+        `No se pudo conectar al servicio de correo (${apiUrl}). ` +
+        'Configura VITE_API_BASE_URL o habilita el proxy /api en Vite.'
+      );
+    }
 
-    const data = await response.json();
+    const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+    const data = contentType.includes('application/json')
+      ? await response.json()
+      : { message: await response.text() };
 
     if (!response.ok) {
       // Mensaje de error más claro
@@ -272,9 +285,8 @@ export const isResendConfigured = (env = import.meta.env || {}) => {
   const explicitDisable = String(env.VITE_RESEND_ENABLED || '').trim().toLowerCase();
   if (explicitDisable === 'false' || explicitDisable === '0') return false;
 
-  // No dependemos de API key en frontend para evitar exponer secretos.
+  // No dependemos de API key ni from-email en frontend para evitar exponer secretos.
   // La validación definitiva ocurre en /api/send-email con variables server-side.
-  const hasFromEmail = !!String(env.VITE_RESEND_FROM_EMAIL || env.VITE_FROM_EMAIL || '').trim();
-
-  return hasFromEmail;
+  // Si no está explícitamente deshabilitado, preferimos Resend para mantener remitente corporativo.
+  return true;
 };

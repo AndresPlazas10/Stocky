@@ -87,15 +87,15 @@ Opcionales comunes:
 - Email cliente: `VITE_EMAILJS_*`, `VITE_RESEND_FROM_EMAIL`, `VITE_RESEND_ENABLED`, `VITE_TEST_EMAIL`
 - Email servidor: `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (en entorno serverless, no en cliente)
 - App URL: `VITE_APP_URL`
-- Flags `VITE_LOCAL_SYNC_*` y `VITE_FF_LOCAL_*` se mantienen por compatibilidad, pero en runtime están desactivadas por rollback online-only.
+- Local-first flags: `VITE_LOCAL_SYNC_*` (rollout controlado por entorno). Por defecto en `.env.example` quedan en `false`.
 
-## Estado online-only
+## Estado operativo actual
 
-Stocky opera en modo online-only:
+Stocky mantiene modo seguro por defecto (online-first), con componentes local-first activables por flags:
 
-- No guarda datos offline para sincronizar después.
-- Si no hay conexión, muestra: `Perdiste la conexión, intentando reconectar...`.
-- Al reconectar, reanuda operaciones directas contra Supabase.
+- Sin flags, comportamiento equivalente a online-only.
+- Con flags `VITE_LOCAL_SYNC_*`, se habilitan gradualmente outbox local, pull incremental y lecturas locales materializadas.
+- Si no hay conexión en rutas críticas, sigue mostrando: `Perdiste la conexión, intentando reconectar...`.
 
 SQL recomendado de rollback/aseguramiento:
 

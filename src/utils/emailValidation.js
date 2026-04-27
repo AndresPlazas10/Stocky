@@ -180,6 +180,16 @@ export const getTestEmail = () => {
   return import.meta.env.VITE_TEST_EMAIL || 'soporte@stockypos.app';
 };
 
+const isEmailTestRedirectEnabled = () => {
+  const raw = String(
+    import.meta.env.VITE_EMAIL_REDIRECT_TO_TEST
+    ?? import.meta.env.VITE_FORCE_TEST_EMAIL
+    ?? ''
+  ).trim().toLowerCase();
+
+  return raw === '1' || raw === 'true' || raw === 'yes';
+};
+
 /**
  * Decide si se debe enviar un email real o solo simularlo
  * @param {string} email - Email destinatario
@@ -196,18 +206,19 @@ export const shouldSendEmail = (email) => {
     };
   }
 
-  // En desarrollo, usar email de testing
-  if (isDevelopment()) {
+  // Solo redirigir a email de testing cuando se habilite explícitamente.
+  // Esto evita enviar siempre a soporte@stockypos.app por accidente.
+  if (isEmailTestRedirectEnabled()) {
     const testEmail = getTestEmail();
     
     return {
       shouldSend: true,
       testEmail,
-      reason: 'Modo desarrollo: usando email de testing'
+      reason: 'Redirección a email de testing habilitada por configuración'
     };
   }
 
-  // En producción, enviar al email real si es válido
+  // Por defecto (dev/prod), enviar al email real validado.
   return {
     shouldSend: true,
     email: validation.normalized

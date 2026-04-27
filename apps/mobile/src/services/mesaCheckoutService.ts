@@ -2,7 +2,16 @@ import { getSupabaseClient } from '../lib/supabase';
 import { notifyAdminLowStock, notifyAdminSaleRegistered } from '../notifications/mobileNotificationsService';
 import type { MesaOrderItem } from './mesaOrderService';
 
-export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'mixed';
+export type PaymentMethod =
+  | 'cash'
+  | 'card'
+  | 'transfer'
+  | 'mixed'
+  | 'nequi'
+  | 'bancolombia'
+  | 'banco_bogota'
+  | 'nu'
+  | 'davivienda';
 
 export type CashChangeEntry = {
   denomination: number;
