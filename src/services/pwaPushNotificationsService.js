@@ -13,6 +13,36 @@ function resolveApiBaseUrl() {
   return normalized;
 }
 
+let cachedPublicKey = null;
+
+async function fetchWebPushPublicKey() {
+  if (cachedPublicKey) return cachedPublicKey;
+
+  // Primero intentar desde variable de entorno
+  const envKey = String(import.meta.env?.VITE_WEB_PUSH_PUBLIC_KEY || '').trim();
+  if (envKey) {
+    cachedPublicKey = envKey;
+    return envKey;
+  }
+
+  // Si no está en env, obtener del endpoint
+  try {
+    const baseUrl = resolveApiBaseUrl();
+    const response = await fetch(`${baseUrl}/api/pwa-push-public-key`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.publicKey) {
+        cachedPublicKey = data.publicKey;
+        return data.publicKey;
+      }
+    }
+  } catch {
+    // Silenciar error
+  }
+
+  return '';
+}
+
 function resolveWebPushPublicKey() {
   return String(import.meta.env?.VITE_WEB_PUSH_PUBLIC_KEY || '').trim();
 }
@@ -36,7 +66,7 @@ function normalizePermission(value) {
   return 'default';
 }
 
-export function getWebPushSupportStatus() {
+export async function getWebPushSupportStatus() {
   if (typeof window === 'undefined') {
     return { supported: false, reason: 'server_runtime', permission: 'default' };
   }
@@ -58,7 +88,7 @@ export function getWebPushSupportStatus() {
     return { supported: false, reason: 'missing_notification_api', permission: 'default' };
   }
 
-  const publicKey = resolveWebPushPublicKey();
+  const publicKey = await fetchWebPushPublicKey();
   if (!publicKey) {
     return { supported: false, reason: 'missing_vapid_public_key', permission: normalizePermission(window.Notification.permission) };
   }
@@ -123,7 +153,7 @@ async function postWithAuth(route, body, accessToken) {
 }
 
 export async function registerPwaPushSubscription({ askPermission = false } = {}) {
-  const support = getWebPushSupportStatus();
+  const support = await getWebPushSupportStatus();
   if (!support.supported) {
     return {
       ok: false,
@@ -158,7 +188,15 @@ export async function registerPwaPushSubscription({ askPermission = false } = {}
   }
 
   const registration = await navigator.serviceWorker.ready;
-  const publicKey = resolveWebPushPublicKey();
+  const publicKey = await fetchWebPushPublicKey();
+  if (!publicKey) {
+    return {
+      ok: false,
+      reason: 'missing_vapid_public_key',
+      permission,
+      message: 'VAPID public key not available.',
+    };
+  }
   const appServerKey = urlBase64ToUint8Array(publicKey);
 
   let subscription = await registration.pushManager.getSubscription();
