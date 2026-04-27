@@ -24,7 +24,11 @@ import {
   Info,
   Database,
   Shield,
-  Printer
+  Printer,
+  Smartphone,
+  Bell,
+  Download,
+  ExternalLink
 } from 'lucide-react';
 import InvoicingSection from '../Settings/InvoicingSection';
 import {
@@ -44,7 +48,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [printerPaperWidth, setPrinterPaperWidth] = useState(() => getThermalPaperWidthMm());
   const [autoPrintReceipt, setAutoPrintReceipt] = useState(() => isAutoPrintReceiptEnabled());
-  
+
   const [businessData, setBusinessData] = useState({
     name: '',
     nit: '',
@@ -75,7 +79,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
 
   const handleUpdateBusiness = useCallback(async (e) => {
     e.preventDefault();
-    
+
     if (!businessData.name.trim()) {
       setError('⚠️ El nombre del negocio es obligatorio');
       return;
@@ -99,7 +103,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
 
       setSuccess('Información actualizada correctamente');
       setEditingBusiness(false);
-      
+
       // Actualizar business en el componente padre
       if (onBusinessUpdate && data) {
         onBusinessUpdate(data);
@@ -190,7 +194,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#ffe498]/10 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        
+
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -209,7 +213,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
         </motion.div>
 
         {/* Alertas mejoradas */}
-        <SaleErrorAlert 
+        <SaleErrorAlert
           isVisible={!!error}
           onClose={() => setError('')}
           title="Error"
@@ -217,7 +221,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
           duration={5000}
         />
 
-        <SaleSuccessAlert 
+        <SaleSuccessAlert
           isVisible={!!success}
           onClose={() => setSuccess('')}
           title="✨ Configuración Guardada"
@@ -553,6 +557,70 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                     Imprimir recibo automáticamente al cerrar venta
                   </label>
                 </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Sección de Dispositivos y Notificaciones */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
+        >
+          <div className="gradient-primary text-white p-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                <Smartphone className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Dispositivos y Notificaciones</h2>
+                <p className="text-white/80">Gestiona tus apps y alertas</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Tarjeta de Descargas */}
+              <div className="p-4 bg-gradient-to-br from-violet-50 to-white rounded-xl border border-violet-100">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 bg-violet-100 rounded-lg">
+                    <Download className="w-5 h-5 text-violet-600" />
+                  </div>
+                  <span className="text-sm text-gray-600 font-medium">Descargar App</span>
+                </div>
+                <p className="text-sm text-gray-600 mb-3 pl-11">
+                  Descarga Stocky para Android, Windows o instala la versión web en tu iPhone.
+                </p>
+                <button
+                  onClick={() => window.open('/descargar', '_blank')}
+                  className="ml-11 flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium transition-all text-sm"
+                >
+                  Ver descargas
+                  <ExternalLink className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Tarjeta de Notificaciones */}
+              <div className="p-4 bg-gradient-to-br from-sky-50 to-white rounded-xl border border-sky-100">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 bg-sky-100 rounded-lg">
+                    <Bell className="w-5 h-5 text-sky-600" />
+                  </div>
+                  <span className="text-sm text-gray-600 font-medium">Notificaciones Push</span>
+                </div>
+                <p className="text-sm text-gray-600 mb-3 pl-11">
+                  Activa notificaciones para recibir alertas de ventas, stock bajo y más.
+                </p>
+                <button
+                  onClick={() => window.open('/descargar', '_blank')}
+                  className="ml-11 flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium transition-all text-sm"
+                >
+                  Configurar notificaciones
+                  <ExternalLink className="w-4 h-4" />
+                </button>
               </div>
             </div>
           </div>
