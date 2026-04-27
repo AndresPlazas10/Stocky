@@ -13,13 +13,11 @@ const Router = isFileProtocol ? HashRouter : BrowserRouter;
 if ('serviceWorker' in navigator && !isFileProtocol) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js')
-      .then((registration) => {
+      .then(() => {
         // Service Worker registrado exitosamente
-        console.log('SW registrado:', registration.scope);
       })
-      .catch((error) => {
-        // Error en registro del SW
-        console.log('Error SW:', error);
+      .catch(() => {
+        // Error en registro del SW - silenciar
       });
   });
 }
