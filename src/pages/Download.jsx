@@ -1,8 +1,14 @@
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Download, ShieldCheck, Smartphone, AlertTriangle, Monitor } from 'lucide-react';
+import { Download, ShieldCheck, Smartphone, AlertTriangle, Monitor, BellRing } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getApkDownloadUrl } from '../utils/apkDownload.js';
 import { getWindowsDownloadUrl } from '../utils/windowsDownload.js';
+import {
+  getWebPushSupportStatus,
+  registerPwaPushSubscription,
+  sendPwaPushTestNotification,
+} from '../services/pwaPushNotificationsService.js';
 
 const _motionLintUsage = motion;
 
@@ -11,6 +17,56 @@ function DownloadPage() {
   const windowsUrl = getWindowsDownloadUrl();
   const apkVersion = String(import.meta.env?.VITE_APK_VERSION || '').trim();
   const windowsVersion = String(import.meta.env?.VITE_WINDOWS_VERSION || '').trim();
+  const [enablingPush, setEnablingPush] = useState(false);
+  const [testingPush, setTestingPush] = useState(false);
+  const [pushFeedback, setPushFeedback] = useState('');
+  const support = useMemo(() => getWebPushSupportStatus(), []);
+
+  const handleEnableNotifications = async () => {
+    setEnablingPush(true);
+    setPushFeedback('');
+
+    try {
+      const result = await registerPwaPushSubscription({ askPermission: true });
+      if (result.ok) {
+        setPushFeedback('Notificaciones activadas. Ya puedes recibir alertas en iPhone (PWA instalada).');
+        return;
+      }
+
+      if (result.reason === 'missing_access_token') {
+        setPushFeedback('Inicia sesión primero para vincular notificaciones a tu cuenta.');
+        return;
+      }
+
+      setPushFeedback(result.message || 'No se pudo activar notificaciones en este dispositivo.');
+    } catch {
+      setPushFeedback('Ocurrió un error al activar notificaciones. Intenta nuevamente.');
+    } finally {
+      setEnablingPush(false);
+    }
+  };
+
+  const handleSendTest = async () => {
+    setTestingPush(true);
+    setPushFeedback('');
+    try {
+      const result = await sendPwaPushTestNotification();
+      if (result.ok) {
+        const sent = Number(result?.data?.sent || 0);
+        if (sent > 0) {
+          setPushFeedback('Notificación de prueba enviada. Revisa tu iPhone.');
+        } else {
+          setPushFeedback('No hay suscripción activa. Activa notificaciones primero.');
+        }
+        return;
+      }
+      setPushFeedback(result.message || 'No se pudo enviar la notificación de prueba.');
+    } catch {
+      setPushFeedback('Error de red enviando notificación de prueba.');
+    } finally {
+      setTestingPush(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#f8f5ff] via-[#f2edff] to-[#ebe4ff] text-slate-900">
@@ -75,6 +131,43 @@ function DownloadPage() {
               </Button>
             </div>
 
+            <div className="rounded-2xl border border-sky-200/80 bg-sky-50/80 p-4 text-sm text-sky-950 shadow-sm">
+              <div className="mb-3 flex items-center gap-2 font-semibold">
+                <BellRing className="h-4 w-4" />
+                iPhone (PWA): notificaciones web
+              </div>
+              <p className="leading-relaxed text-sky-900/90">
+                Para iOS necesitas abrir Stocky en Safari, usar "Añadir a pantalla de inicio" y luego activar notificaciones desde la app instalada.
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <Button
+                  size="sm"
+                  onClick={handleEnableNotifications}
+                  disabled={enablingPush || !support.supported}
+                  className="h-10 rounded-lg bg-gradient-to-r from-sky-600 to-cyan-600 px-4 font-semibold text-slate-50 hover:opacity-90"
+                >
+                  {enablingPush ? 'Activando...' : 'Activar notificaciones iPhone'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSendTest}
+                  disabled={testingPush || !support.supported}
+                  className="h-10 rounded-lg border-sky-300 bg-white text-sky-800 hover:bg-sky-100"
+                >
+                  {testingPush ? 'Enviando prueba...' : 'Enviar prueba push'}
+                </Button>
+              </div>
+              {!support.supported && (
+                <p className="mt-2 text-xs text-sky-800/80">
+                  Este navegador/contexto no soporta Web Push. Usa Safari en HTTPS con PWA instalada.
+                </p>
+              )}
+              {pushFeedback && (
+                <p className="mt-2 text-xs font-medium text-sky-900">{pushFeedback}</p>
+              )}
+            </div>
+
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <ShieldCheck className="h-4 w-4 text-violet-600" />
               Enlace oficial de descargas por plataforma
@@ -84,8 +177,9 @@ function DownloadPage() {
               Pasos rápidos:
               <ul className="mt-2 space-y-1">
                 <li>1. Android: instala el APK y habilita instalación de apps desconocidas.</li>
-                <li>2. Windows: descarga el instalador y ejecuta como instalación normal.</li>
-                <li>3. Si SmartScreen aparece en Windows, usa "Más información" y luego "Ejecutar de todas formas".</li>
+                <li>2. iPhone: abre en Safari, añade a pantalla de inicio y activa notificaciones.</li>
+                <li>3. Windows: descarga el instalador y ejecútalo como instalación normal.</li>
+                <li>4. Si SmartScreen aparece en Windows, usa "Más información" y luego "Ejecutar de todas formas".</li>
               </ul>
             </div>
 
