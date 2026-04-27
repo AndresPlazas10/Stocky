@@ -227,12 +227,7 @@ function Register() {
   };
 
   return (
-    <div className="min-h-screen md:h-screen relative overflow-x-hidden overflow-y-auto md:overflow-y-hidden flex items-start md:items-center justify-center p-3">
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-indigo-100">
-        <div className="absolute top-0 -left-4 w-72 h-72 bg-indigo-300/30 rounded-full mix-blend-multiply filter blur-xl animate-blob"></div>
-        <div className="absolute top-0 -right-4 w-72 h-72 bg-blue-300/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000"></div>
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-purple-300/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000"></div>
-      </div>
+    <div className="min-h-screen relative overflow-x-hidden overflow-y-auto flex items-start md:items-center justify-center p-3 bg-gradient-to-br from-[#E1E8F8] via-[#E8EEF8] to-[#EDE9FB]">
 
       <motion.div
         initial={{ opacity: 0, x: -20 }}
@@ -241,7 +236,7 @@ function Register() {
       >
         <Button
           variant="ghost"
-          className="h-9 bg-white/80 backdrop-blur-sm border-0 text-indigo-700 hover:bg-white shadow-md"
+          className="h-9 bg-white/85 backdrop-blur-sm border border-[#D7E2F3] text-[#1F4E8F] hover:bg-white shadow-sm"
           onClick={() => navigate('/')}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -255,20 +250,19 @@ function Register() {
         transition={{ duration: 0.5 }}
         className="w-full max-w-5xl relative z-10 mt-12 md:mt-0 pb-4 md:pb-0"
       >
-        <Card className="bg-white/90 backdrop-blur-xl border-white/50 shadow-2xl overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-white/10 pointer-events-none"></div>
+        <Card className="bg-white/95 border border-[#DEE6F4] shadow-[0_20px_45px_-22px_rgba(37,99,235,0.55)] rounded-3xl overflow-hidden">
           
           <CardHeader className="space-y-2 text-center pb-4 pt-5 relative">
             <div className="flex justify-center">
-              <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-3 rounded-2xl shadow-xl">
+              <div className="bg-gradient-to-br from-[#1F4E8F] to-[#2D6FC9] p-3 rounded-2xl shadow-sm">
                 <Building2 className="h-8 w-8 text-white drop-shadow-md" />
               </div>
             </div>
             <div>
-              <CardTitle className="text-2xl font-bold text-gray-900 mb-1">
+              <CardTitle className="text-2xl font-bold text-slate-900 mb-1">
                 Registrar Negocio
               </CardTitle>
-              <CardDescription className="text-sm text-gray-600">
+              <CardDescription className="text-sm text-slate-600">
                 Completa la información de tu negocio para comenzar
               </CardDescription>
             </div>
@@ -298,7 +292,7 @@ function Register() {
                     Nombre del Negocio <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
-                    <Store className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Store className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-500" />
                     <Input
                       id="name"
                       name="name"
@@ -306,7 +300,7 @@ function Register() {
                       placeholder="Ej: Mi Cafetería"
                       value={formData.name}
                       onChange={handleChange}
-                      className="pl-10 h-10 border-2 border-gray-200 focus:border-indigo-400"
+                      className="pl-10 h-10 border border-[#D7E2F3] bg-[#F5F8FD] focus:border-[#8FB3E5] focus-visible:ring-[#8FB3E5]/30"
                       required
                     />
                   </div>
@@ -317,7 +311,7 @@ function Register() {
                     Nombre de Usuario <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-500" />
                     <Input
                       id="username"
                       name="username"
@@ -325,7 +319,7 @@ function Register() {
                       placeholder="usuario_negocio"
                       value={formData.username}
                       onChange={handleChange}
-                      className="pl-10 h-10 border-2 border-gray-200 focus:border-indigo-400"
+                      className="pl-10 h-10 border border-[#D7E2F3] bg-[#F5F8FD] focus:border-[#8FB3E5] focus-visible:ring-[#8FB3E5]/30"
                       required
                       pattern="[a-z0-9_]{3,20}"
                       title="Solo letras minúsculas, números y guiones bajos (3-20 caracteres)"
@@ -338,7 +332,7 @@ function Register() {
                     NIT <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
                   </Label>
                   <div className="relative">
-                    <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-500" />
                     <Input
                       id="nit"
                       name="nit"
@@ -346,7 +340,7 @@ function Register() {
                       placeholder="900.123.456-7"
                       value={formData.nit}
                       onChange={handleChange}
-                      className="pl-10 h-10 border-2 border-gray-200 focus:border-indigo-400"
+                      className="pl-10 h-10 border border-[#D7E2F3] bg-[#F5F8FD] focus:border-[#8FB3E5] focus-visible:ring-[#8FB3E5]/30"
                     />
                   </div>
                 </div>
@@ -356,7 +350,7 @@ function Register() {
                     Teléfono
                   </Label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-500" />
                     <Input
                       id="phone"
                       name="phone"
@@ -364,7 +358,7 @@ function Register() {
                       placeholder="+57 300 123 4567"
                       value={formData.phone}
                       onChange={handleChange}
-                      className="pl-10 h-10 border-2 border-gray-200 focus:border-indigo-400"
+                      className="pl-10 h-10 border border-[#D7E2F3] bg-[#F5F8FD] focus:border-[#8FB3E5] focus-visible:ring-[#8FB3E5]/30"
                     />
                   </div>
                 </div>
@@ -374,7 +368,7 @@ function Register() {
                     Dirección
                   </Label>
                   <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-500" />
                     <Input
                       id="address"
                       name="address"
@@ -382,7 +376,7 @@ function Register() {
                       placeholder="Calle 123 #45-67"
                       value={formData.address}
                       onChange={handleChange}
-                      className="pl-10 h-10 border-2 border-gray-200 focus:border-indigo-400"
+                      className="pl-10 h-10 border border-[#D7E2F3] bg-[#F5F8FD] focus:border-[#8FB3E5] focus-visible:ring-[#8FB3E5]/30"
                     />
                   </div>
                 </div>
@@ -392,7 +386,7 @@ function Register() {
                     Contraseña <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-500" />
                     <Input
                       id="password"
                       name="password"
@@ -400,7 +394,7 @@ function Register() {
                       placeholder="Mínimo 6 caracteres"
                       value={formData.password}
                       onChange={handleChange}
-                      className="pl-10 pr-10 h-10 border-2 border-gray-200 focus:border-indigo-400"
+                      className="pl-10 pr-10 h-10 border border-[#D7E2F3] bg-[#F5F8FD] focus:border-[#8FB3E5] focus-visible:ring-[#8FB3E5]/30"
                       required
                       minLength={6}
                     />
@@ -419,7 +413,7 @@ function Register() {
                     Confirmar Contraseña <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-500" />
                     <Input
                       id="confirmPassword"
                       name="confirmPassword"
@@ -427,7 +421,7 @@ function Register() {
                       placeholder="Repite la contraseña"
                       value={formData.confirmPassword}
                       onChange={handleChange}
-                      className="pl-10 pr-10 h-10 border-2 border-gray-200 focus:border-indigo-400"
+                      className="pl-10 pr-10 h-10 border border-[#D7E2F3] bg-[#F5F8FD] focus:border-[#8FB3E5] focus-visible:ring-[#8FB3E5]/30"
                       required
                       minLength={6}
                     />
@@ -444,7 +438,7 @@ function Register() {
 
               <Button
                 type="submit"
-                className="w-full h-10 text-sm font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg transition-all duration-300"
+                className="w-full h-10 text-sm font-semibold bg-gradient-to-r from-[#1F4E8F] to-[#2D6FC9] text-white hover:opacity-95 transition-all duration-300 rounded-xl"
                 disabled={isSubmitting || success}
                 size="lg"
               >
@@ -474,7 +468,7 @@ function Register() {
 
             <Button
               variant="outline"
-              className="w-full h-10 text-sm border-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+              className="w-full h-10 text-sm border border-[#8FB3E5] text-[#1F4E8F] hover:bg-[#EDF3FB] rounded-xl"
               onClick={() => navigate('/login')}
             >
               Iniciar sesión
@@ -482,32 +476,6 @@ function Register() {
           </CardContent>
         </Card>
       </motion.div>
-      
-      <style>{`
-        @keyframes blob {
-          0%, 100% {
-            transform: translate(0, 0) scale(1);
-          }
-          25% {
-            transform: translate(20px, -50px) scale(1.1);
-          }
-          50% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-          75% {
-            transform: translate(50px, 50px) scale(1.05);
-          }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-      `}</style>
     </div>
   );
 }

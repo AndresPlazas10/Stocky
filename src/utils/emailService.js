@@ -29,6 +29,11 @@ const isResendOnlyEnforced = () => {
   return toBoolean(import.meta.env?.VITE_ENFORCE_RESEND_ONLY, isProductionBuild());
 };
 
+const isEmailJsFallbackAllowed = () => {
+  // Por defecto NO hacemos fallback a EmailJS para evitar remitentes personales (ej. Gmail).
+  return toBoolean(import.meta.env?.VITE_ALLOW_EMAILJS_FALLBACK, false);
+};
+
 export const resolveEmailProvider = ({
   providerHint = import.meta.env?.VITE_EMAIL_PROVIDER,
   resendReady = isResendConfigured(),
@@ -40,6 +45,7 @@ export const resolveEmailProvider = ({
 export const sendInvoiceEmail = async (params) => {
   const provider = resolveEmailProvider();
   const enforceResendOnly = isResendOnlyEnforced();
+  const allowEmailJsFallback = isEmailJsFallbackAllowed();
 
   if (enforceResendOnly && provider !== EMAIL_PROVIDERS.RESEND) {
     return {
@@ -58,11 +64,12 @@ export const sendInvoiceEmail = async (params) => {
       };
     }
 
-    if (enforceResendOnly) {
+    if (enforceResendOnly || !allowEmailJsFallback) {
       return {
         ...resendResult,
         provider: EMAIL_PROVIDERS.RESEND,
         fallbackBlocked: true,
+        error: resendResult?.error || 'No se pudo enviar con Resend. El fallback a EmailJS está deshabilitado.',
       };
     }
 

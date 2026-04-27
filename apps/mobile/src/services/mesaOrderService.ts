@@ -7,6 +7,7 @@ export type MesaOrderProduct = {
   combo_id: null;
   name: string;
   code: string | null;
+  category: string | null;
   sale_price: number;
   stock: number;
   manage_stock: boolean;
@@ -45,6 +46,7 @@ export type MesaOrderItem = {
   quantity: number;
   price: number;
   subtotal: number;
+  category?: string;
   products?: {
     id?: string;
     name?: string;
@@ -217,6 +219,7 @@ function normalizeProduct(row: any): MesaOrderProduct {
     combo_id: null,
     name: normalizeText(row?.name, 'Producto'),
     code: row?.code ? String(row.code) : null,
+    category: row?.category ? String(row.category) : null,
     sale_price: normalizeNumber(row?.sale_price, 0),
     stock: normalizeNumber(row?.stock, 0),
     manage_stock: row?.manage_stock !== false,
@@ -276,6 +279,7 @@ function normalizeOrderItem(row: any): MesaOrderItem {
           category: row.products.category ? String(row.products.category) : undefined,
         }
       : null,
+    category: row?.products?.category ? String(row.products.category) : undefined,
     combos: row?.combos
       ? {
           id: row.combos.id ? String(row.combos.id) : undefined,
@@ -327,7 +331,7 @@ export async function listProductsForMesaOrder(businessId: string): Promise<Mesa
   const client = getSupabaseClient();
   const { data, error } = await client
     .from('products')
-    .select('id, code, name, sale_price, stock, manage_stock')
+    .select('id, code, name, category, sale_price, stock, manage_stock')
     .eq('business_id', businessId)
     .eq('is_active', true)
     .order('name', { ascending: true })

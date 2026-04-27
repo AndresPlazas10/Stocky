@@ -68,12 +68,7 @@ function Login() {
   };
 
   return (
-    <div className="h-screen relative overflow-hidden flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-indigo-100">
-        <div className="absolute top-0 -left-4 w-72 h-72 bg-indigo-300/30 rounded-full mix-blend-multiply filter blur-xl animate-blob"></div>
-        <div className="absolute top-0 -right-4 w-72 h-72 bg-blue-300/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000"></div>
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-purple-300/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000"></div>
-      </div>
+    <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4 bg-gradient-to-br from-[#E1E8F8] via-[#E8EEF8] to-[#EDE9FB]">
 
       <motion.div
         initial={{ opacity: 0, x: -20 }}
@@ -82,7 +77,7 @@ function Login() {
       >
         <Button
           variant="ghost"
-          className="bg-white/80 backdrop-blur-sm border-0 text-indigo-700 hover:bg-white shadow-md"
+          className="bg-white/85 backdrop-blur-sm border border-[#D7E2F3] text-[#1F4E8F] hover:bg-white shadow-sm"
           onClick={() => navigate('/')}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -96,16 +91,16 @@ function Login() {
         transition={{ duration: 0.5 }}
         className="w-full max-w-md relative z-10 max-h-[calc(100vh-120px)] overflow-auto"
       >
-        <Card className="bg-white/90 backdrop-blur-xl border-2 border-white/50 shadow-2xl">
+        <Card className="bg-white/95 border border-[#DEE6F4] shadow-[0_20px_45px_-22px_rgba(37,99,235,0.55)] rounded-3xl">
           <CardHeader className="space-y-3 pb-6">
-            <div className="mx-auto w-16 h-16 rounded-2xl border border-indigo-200 bg-white flex items-center justify-center shadow-lg">
+            <div className="mx-auto w-16 h-16 rounded-2xl border border-[#C7D7EE] bg-[#F5F8FD] flex items-center justify-center shadow-sm">
               <img src={logoStocky} alt="Stocky" className="w-12 h-12 object-contain" />
             </div>
-            <CardTitle className="text-3xl font-bold text-center bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            <CardTitle className="text-3xl font-bold text-center text-slate-900">
               Iniciar Sesión
             </CardTitle>
-            <CardDescription className="text-center text-base text-gray-600">
-              Ingresa tus credenciales para acceder
+            <CardDescription className="text-center text-base text-slate-600">
+              Ingresa tu usuario y contraseña para continuar en Stocky
             </CardDescription>
           </CardHeader>
 
@@ -124,7 +119,7 @@ function Login() {
                   Usuario
                 </Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-500" />
                   <Input
                     id="username"
                     name="username"
@@ -132,7 +127,7 @@ function Login() {
                     placeholder="Tu nombre de usuario"
                     value={formData.username}
                     onChange={handleChange}
-                    className="pl-10 h-12 text-base border-2 border-gray-200 focus:border-indigo-400"
+                    className="pl-10 h-12 text-base border border-[#D7E2F3] bg-[#F5F8FD] focus:border-[#8FB3E5] focus-visible:ring-[#8FB3E5]/30"
                     required
                     autoComplete="username"
                   />
@@ -144,7 +139,7 @@ function Login() {
                   Contraseña
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-500" />
                   <Input
                     id="password"
                     name="password"
@@ -152,7 +147,7 @@ function Login() {
                     placeholder="Tu contraseña"
                     value={formData.password}
                     onChange={handleChange}
-                    className="pl-10 pr-10 h-12 text-base border-2 border-gray-200 focus:border-indigo-400"
+                    className="pl-10 pr-10 h-12 text-base border border-[#D7E2F3] bg-[#F5F8FD] focus:border-[#8FB3E5] focus-visible:ring-[#8FB3E5]/30"
                     required
                     autoComplete="current-password"
                   />
@@ -168,7 +163,7 @@ function Login() {
 
               <Button
                 type="submit"
-                className="w-full h-12 text-base font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg transition-all duration-300"
+                className="w-full h-12 text-base font-semibold bg-gradient-to-r from-[#1F4E8F] to-[#2D6FC9] text-white hover:opacity-95 transition-all duration-300 rounded-xl"
                 disabled={loading}
               >
                 {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
@@ -180,7 +175,7 @@ function Login() {
                 ¿No tienes cuenta?{' '}
                 <button
                   onClick={() => navigate('/register')}
-                  className="font-semibold text-indigo-600 hover:text-indigo-700 transition-colors"
+                  className="font-semibold text-[#1F4E8F] hover:text-[#2D6FC9] transition-colors"
                 >
                   Registrar negocio
                 </button>
@@ -189,32 +184,6 @@ function Login() {
           </CardContent>
         </Card>
       </motion.div>
-
-      <style>{`
-        @keyframes blob {
-          0%, 100% {
-            transform: translate(0, 0) scale(1);
-          }
-          25% {
-            transform: translate(20px, -50px) scale(1.1);
-          }
-          50% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-          75% {
-            transform: translate(50px, 50px) scale(1.05);
-          }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-      `}</style>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
@@ -7,6 +7,7 @@ import { StockyModal } from '../../ui/StockyModal';
 import type { MesaOrderItem } from '../../services/mesaOrderService';
 import { getOrderItemName } from '../../services/mesaOrderService';
 import type { PaymentMethod, SplitSubAccount } from '../../services/mesaCheckoutService';
+import { getBankLogoSource, isBankPaymentMethod } from '../../utils/paymentMethodBranding';
 
 const MAX_SUB_ACCOUNTS = 10;
 const COLOMBIAN_DENOMINATIONS = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50];
@@ -16,6 +17,11 @@ const PAYMENT_OPTIONS: Array<{ value: PaymentMethod; label: string }> = [
   { value: 'card', label: 'Tarjeta' },
   { value: 'transfer', label: 'Transferencia' },
   { value: 'mixed', label: 'Mixto' },
+  { value: 'nequi', label: 'Nequi' },
+  { value: 'bancolombia', label: 'Bancolombia' },
+  { value: 'banco_bogota', label: 'Banco de Bogotá' },
+  { value: 'nu', label: 'Nu' },
+  { value: 'davivienda', label: 'Davivienda' },
 ];
 
 function getPaymentOptionIcon(method: PaymentMethod): keyof typeof Ionicons.glyphMap {
@@ -23,6 +29,7 @@ function getPaymentOptionIcon(method: PaymentMethod): keyof typeof Ionicons.glyp
   if (method === 'card') return 'card-outline';
   if (method === 'transfer') return 'swap-horizontal-outline';
   if (method === 'mixed') return 'wallet-outline';
+  if (['nequi', 'bancolombia', 'banco_bogota', 'nu', 'davivienda'].includes(method)) return 'business-outline';
   return 'help-circle-outline';
 }
 
@@ -452,11 +459,15 @@ export function SplitBillModalRN({
                   onPress={() => setIsPaymentMenuOpen((prev) => !prev)}
                 >
                   <View style={styles.dropdownTriggerLeft}>
-                    <Ionicons
-                      name={getPaymentOptionIcon(currentAccount.paymentMethod)}
-                      size={16}
-                      color={STOCKY_COLORS.textSecondary}
-                    />
+                    {isBankPaymentMethod(currentAccount.paymentMethod) ? (
+                      <Image source={getBankLogoSource(currentAccount.paymentMethod)!} style={styles.paymentLogo} resizeMode="contain" />
+                    ) : (
+                      <Ionicons
+                        name={getPaymentOptionIcon(currentAccount.paymentMethod)}
+                        size={16}
+                        color={STOCKY_COLORS.textSecondary}
+                      />
+                    )}
                     <Text style={styles.dropdownTriggerText}>{getPaymentOptionLabel(currentAccount.paymentMethod)}</Text>
                   </View>
                   <Ionicons
@@ -481,11 +492,15 @@ export function SplitBillModalRN({
                           }}
                           style={[styles.dropdownItem, selected && styles.dropdownItemSelected]}
                         >
-                          <Ionicons
-                            name={getPaymentOptionIcon(option.value)}
-                            size={15}
-                            color={selected ? '#4F46E5' : STOCKY_COLORS.textSecondary}
-                          />
+                          {isBankPaymentMethod(option.value) ? (
+                            <Image source={getBankLogoSource(option.value)!} style={styles.paymentLogoSmall} resizeMode="contain" />
+                          ) : (
+                            <Ionicons
+                              name={getPaymentOptionIcon(option.value)}
+                              size={15}
+                              color={selected ? '#4F46E5' : STOCKY_COLORS.textSecondary}
+                            />
+                          )}
                           <Text style={[styles.dropdownItemText, selected && styles.dropdownItemTextSelected]}>
                             {option.label}
                           </Text>
@@ -627,7 +642,15 @@ const styles = StyleSheet.create({
   dropdownTriggerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 7,
+  },
+  paymentLogo: {
+    width: 22,
+    height: 14,
+  },
+  paymentLogoSmall: {
+    width: 20,
+    height: 12,
   },
   dropdownTriggerText: {
     color: STOCKY_COLORS.textPrimary,
@@ -646,7 +669,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 7,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(148, 163, 184, 0.2)',
   },

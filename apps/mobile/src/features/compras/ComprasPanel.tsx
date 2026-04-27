@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getSupabaseClient } from '../../lib/supabase';
@@ -22,6 +22,7 @@ import {
   type CompraRecord,
   type CompraSupplierRecord,
 } from '../../services/comprasService';
+import { getBankLogoSource, isBankPaymentMethod } from '../../utils/paymentMethodBranding';
 
 type Props = {
   businessId: string;
@@ -39,6 +40,11 @@ function getPaymentMethodLabel(method: string) {
   if (value === 'card') return 'Tarjeta';
   if (value === 'transfer') return 'Transferencia';
   if (value === 'mixed') return 'Mixto';
+  if (value === 'nequi') return 'Nequi';
+  if (value === 'bancolombia') return 'Bancolombia';
+  if (value === 'banco_bogota') return 'Banco de Bogotá';
+  if (value === 'nu') return 'Nu';
+  if (value === 'davivienda') return 'Davivienda';
   if (value === 'efectivo') return 'Efectivo';
   if (value === 'tarjeta') return 'Tarjeta';
   if (value === 'transferencia') return 'Transferencia';
@@ -71,6 +77,14 @@ function getPurchasePaymentTheme(method: string): {
   if (value === 'mixed' || value === 'mixto') {
     return {
       icon: 'layers-outline',
+      backgroundColor: '#F3E8FF',
+      textColor: '#7E22CE',
+      iconColor: '#9333EA',
+    };
+  }
+  if (value === 'nequi' || value === 'bancolombia' || value === 'banco_bogota' || value === 'nu' || value === 'davivienda') {
+    return {
+      icon: 'business-outline',
       backgroundColor: '#F3E8FF',
       textColor: '#7E22CE',
       iconColor: '#9333EA',
@@ -177,6 +191,11 @@ function PaymentMethodSelector({
     { value: 'card', label: 'Tarjeta' },
     { value: 'transfer', label: 'Transferencia' },
     { value: 'mixed', label: 'Mixto' },
+    { value: 'nequi', label: 'Nequi' },
+    { value: 'bancolombia', label: 'Bancolombia' },
+    { value: 'banco_bogota', label: 'Banco de Bogotá' },
+    { value: 'nu', label: 'Nu' },
+    { value: 'davivienda', label: 'Davivienda' },
   ];
 
   return (
@@ -189,9 +208,20 @@ function PaymentMethodSelector({
             style={[styles.paymentMethodOption, selected && styles.paymentMethodOptionSelected]}
             onPress={() => onChange(option.value)}
           >
-            <Text style={[styles.paymentMethodOptionText, selected && styles.paymentMethodOptionTextSelected]}>
-              {option.label}
-            </Text>
+            <View style={styles.paymentMethodOptionContent}>
+              {isBankPaymentMethod(option.value) ? (
+                <Image source={getBankLogoSource(option.value)!} style={styles.paymentMethodOptionLogo} resizeMode="contain" />
+              ) : (
+                <Ionicons
+                  name={getPurchasePaymentTheme(option.value).icon}
+                  size={14}
+                  color={selected ? '#1D4ED8' : '#475569'}
+                />
+              )}
+              <Text style={[styles.paymentMethodOptionText, selected && styles.paymentMethodOptionTextSelected]}>
+                {option.label}
+              </Text>
+            </View>
           </Pressable>
         );
       })}
@@ -994,7 +1024,11 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
                 <View style={styles.paymentRow}>
                   <Ionicons name="wallet-outline" size={20} color="#111827" />
                   <View style={styles.paymentPill}>
-                    <Ionicons name="card-outline" size={13} color="#166534" style={styles.paymentIcon} />
+                    {isBankPaymentMethod(purchase.payment_method) ? (
+                      <Image source={getBankLogoSource(purchase.payment_method)!} style={styles.paymentIconLogo} resizeMode="contain" />
+                    ) : (
+                      <Ionicons name={getPurchasePaymentTheme(purchase.payment_method).icon} size={13} color="#166534" style={styles.paymentIcon} />
+                    )}
                     <Text style={styles.paymentPillText}>{getPaymentMethodLabel(purchase.payment_method)}</Text>
                   </View>
                 </View>
@@ -1882,7 +1916,7 @@ const styles = StyleSheet.create({
   paymentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 7,
   },
   paymentPill: {
     borderRadius: 999,
@@ -1893,6 +1927,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   paymentIcon: {
+    marginRight: 4,
+  },
+  paymentIconLogo: {
+    width: 20,
+    height: 12,
     marginRight: 4,
   },
   paymentPillText: {
@@ -2470,6 +2509,15 @@ const styles = StyleSheet.create({
     backgroundColor: STOCKY_COLORS.surface,
     paddingHorizontal: 10,
     paddingVertical: 8,
+  },
+  paymentMethodOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  paymentMethodOptionLogo: {
+    width: 20,
+    height: 12,
   },
   paymentMethodOptionSelected: {
     backgroundColor: '#6D28D9',
