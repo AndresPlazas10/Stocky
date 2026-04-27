@@ -33,18 +33,23 @@ function DownloadPage() {
     try {
       const result = await registerPwaPushSubscription({ askPermission: true });
       if (result.ok) {
-        setPushFeedback('Notificaciones activadas. Ya puedes recibir alertas en iPhone (PWA instalada).');
+        setPushFeedback('✅ Notificaciones activadas correctamente.');
         return;
       }
 
       if (result.reason === 'missing_access_token') {
-        setPushFeedback('Inicia sesión primero para vincular notificaciones a tu cuenta.');
+        setPushFeedback('⚠️ Inicia sesión primero para vincular notificaciones a tu cuenta.');
         return;
       }
 
-      setPushFeedback(result.message || 'No se pudo activar notificaciones en este dispositivo.');
-    } catch {
-      setPushFeedback('Ocurrió un error al activar notificaciones. Intenta nuevamente.');
+      if (result.reason === 'missing_vapid_public_key') {
+        setPushFeedback('❌ Error de configuración: VAPID key no configurada. Contacta soporte.');
+        return;
+      }
+
+      setPushFeedback(`❌ Error: ${result.message || result.reason || 'Desconocido'}`);
+    } catch (err) {
+      setPushFeedback(`❌ Error inesperado: ${err?.message || String(err)}`);
     } finally {
       setEnablingPush(false);
     }
