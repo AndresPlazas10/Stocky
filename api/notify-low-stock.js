@@ -1,5 +1,9 @@
 /* eslint-env node */
 import { createClient } from '@supabase/supabase-js';
+import {
+  parseWebPushSubscription,
+  sendWebPushNotifications,
+} from './_lib/pushProviders.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
@@ -251,26 +255,36 @@ export default async function handler(req, res) {
 
     const pushTokensResult = await admin
       .from('mobile_push_tokens')
-      .select('id,push_token')
+      .select('id,push_token,platform')
       .eq('user_id', adminUserId)
       .eq('is_active', true)
       .order('updated_at', { ascending: false });
 
     if (pushTokensResult.error) throw pushTokensResult.error;
 
-    const uniqueTokens = Array.from(
+    const pushRows = Array.isArray(pushTokensResult.data) ? pushTokensResult.data : [];
+    const uniqueExpoTokens = Array.from(
       new Set(
-        (Array.isArray(pushTokensResult.data) ? pushTokensResult.data : [])
+        pushRows
+          .filter((row) => normalizeText(row?.platform).toLowerCase() !== 'web')
           .map((row) => normalizeText(row?.push_token))
           .filter(Boolean),
       ),
     );
 
-    if (uniqueTokens.length === 0) {
+    const webSubscriptionsById = pushRows
+      .filter((row) => normalizeText(row?.platform).toLowerCase() === 'web')
+      .map((row) => ({
+        id: row.id,
+        subscription: parseWebPushSubscription(row?.push_token),
+      }))
+      .filter((item) => item.subscription);
+
+    if (uniqueExpoTokens.length === 0 && webSubscriptionsById.length === 0) {
       res.status(200).json({
         ok: true,
         notified: 0,
-        skipped: 'admin_without_mobile_tokens',
+        skipped: 'admin_without_push_tokens',
       });
       return;
     }
@@ -279,7 +293,7 @@ export default async function handler(req, res) {
     for (const product of lowStockProducts) {
       const productName = normalizeText(product?.name, 'Producto');
       const stockValue = Number.isFinite(Number(product?.stock)) ? Number(product.stock) : 0;
-      for (const pushToken of uniqueTokens) {
+      for (const pushToken of uniqueExpoTokens) {
         messages.push({
           to: pushToken,
           sound: 'default',
@@ -298,7 +312,9 @@ export default async function handler(req, res) {
       }
     }
 
-    const tickets = await sendExpoPushMessages(messages);
+    const tickets = messages.length > 0
+      ? await sendExpoPushMessages(messages)
+      : [];
     const invalidTokens = [];
 
     for (let index = 0; index < tickets.length; index += 1) {
@@ -318,14 +334,73 @@ export default async function handler(req, res) {
         .in('push_token', invalidTokens);
     }
 
+    const webPushNotifications = lowStockProducts.map((product) => {
+      const productName = normalizeText(product?.name, 'Producto');
+      const stockValue = Number.isFinite(Number(product?.stock)) ? Number(product.stock) : 0;
+      return {
+        title: '⚠️ Stock bajo',
+        body: `${productName} tiene solo ${stockValue} unidades`,
+        data: {
+          type: 'low_stock',
+          business_id: businessId,
+          product_id: normalizeText(product?.id),
+          stock: stockValue,
+          threshold: LOW_STOCK_THRESHOLD,
+          url: '/dashboard',
+        },
+      };
+    });
+
+    const webPushErrors = [];
+    const invalidWebEndpoints = [];
+    let webPushSent = 0;
+
+    for (const payload of webPushNotifications) {
+      const webPushResult = await sendWebPushNotifications({
+        subscriptions: webSubscriptionsById.map((item) => item.subscription),
+        payload,
+      });
+      webPushSent += webPushResult.sent;
+      webPushErrors.push(webPushResult.errors);
+      if (Array.isArray(webPushResult.invalidEndpoints)) {
+        invalidWebEndpoints.push(...webPushResult.invalidEndpoints);
+      }
+    }
+
+    const uniqueInvalidWebEndpoints = Array.from(new Set(invalidWebEndpoints));
+
+    if (uniqueInvalidWebEndpoints.length > 0) {
+      const idsToDeactivate = webSubscriptionsById
+        .filter((item) => {
+          const endpoint = normalizeText(item.subscription?.endpoint);
+          return endpoint && uniqueInvalidWebEndpoints.includes(endpoint);
+        })
+        .map((item) => item.id)
+        .filter(Boolean);
+
+      if (idsToDeactivate.length > 0) {
+        await admin
+          .from('mobile_push_tokens')
+          .update({
+            is_active: false,
+            updated_at: new Date().toISOString(),
+          })
+          .in('id', idsToDeactivate);
+      }
+    }
+
     const errorCount = tickets.filter((ticket) => normalizeText(ticket?.status).toLowerCase() === 'error').length;
     res.status(200).json({
       ok: true,
-      notified: messages.length,
+      notified: messages.length + webPushSent,
+      expoNotified: messages.length,
+      webNotified: webPushSent,
       products: lowStockProducts.length,
       ticketCount: tickets.length,
       ticketErrors: errorCount,
       invalidatedTokens: invalidTokens.length,
+      invalidatedWebSubscriptions: uniqueInvalidWebEndpoints.length,
+      webPushErrors: webPushErrors.reduce((acc, value) => acc + Number(value || 0), 0),
     });
   } catch (error) {
     const status = error?.message === 'Unauthorized' ? 401 : 500;
