@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Download, ShieldCheck, Smartphone, AlertTriangle, Monitor, BellRing } from 'lucide-react';
+import { Download, ShieldCheck, Smartphone, AlertTriangle, Monitor, BellRing, Share, PlusSquare, AppWindow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getApkDownloadUrl } from '../utils/apkDownload.js';
 import { getWindowsDownloadUrl } from '../utils/windowsDownload.js';
@@ -9,6 +9,7 @@ import {
   registerPwaPushSubscription,
   sendPwaPushTestNotification,
 } from '../services/pwaPushNotificationsService.js';
+import { isIOs, isStandalone } from '../utils/deviceDetection.js';
 
 const _motionLintUsage = motion;
 
@@ -20,7 +21,10 @@ function DownloadPage() {
   const [enablingPush, setEnablingPush] = useState(false);
   const [testingPush, setTestingPush] = useState(false);
   const [pushFeedback, setPushFeedback] = useState('');
+  const [showIOsSteps, setShowIOsSteps] = useState(false);
   const support = useMemo(() => getWebPushSupportStatus(), []);
+  const userIsOnIOs = isIOs();
+  const userInStandalone = isStandalone();
 
   const handleEnableNotifications = async () => {
     setEnablingPush(true);
@@ -131,41 +135,142 @@ function DownloadPage() {
               </Button>
             </div>
 
-            <div className="rounded-2xl border border-sky-200/80 bg-sky-50/80 p-4 text-sm text-sky-950 shadow-sm">
-              <div className="mb-3 flex items-center gap-2 font-semibold">
-                <BellRing className="h-4 w-4" />
-                iPhone (PWA): notificaciones web
+            {/* Sección iPhone PWA */}
+            <div className="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50/90 to-cyan-50/90 p-5 text-sm text-sky-950 shadow-sm">
+              <div className="mb-4 flex items-center gap-2">
+                <div className="rounded-full bg-sky-100 p-2">
+                  <BellRing className="h-4 w-4 text-sky-700" />
+                </div>
+                <div>
+                  <p className="font-bold text-sky-900">iPhone (PWA)</p>
+                  <p className="text-xs text-sky-700">Instala Stocky como app y recibe notificaciones</p>
+                </div>
               </div>
-              <p className="leading-relaxed text-sky-900/90">
-                Para iOS necesitas abrir Stocky en Safari, usar "Añadir a pantalla de inicio" y luego activar notificaciones desde la app instalada.
-              </p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <Button
-                  size="sm"
-                  onClick={handleEnableNotifications}
-                  disabled={enablingPush || !support.supported}
-                  className="h-10 rounded-lg bg-gradient-to-r from-sky-600 to-cyan-600 px-4 font-semibold text-slate-50 hover:opacity-90"
+
+              {/* Estado: Ya instalada */}
+              {userInStandalone && (
+                <div className="mb-4 rounded-xl border border-green-300 bg-green-50 p-3">
+                  <div className="flex items-center gap-2 text-green-800">
+                    <AppWindow className="h-4 w-4" />
+                    <span className="font-semibold">¡Stocky está instalada!</span>
+                  </div>
+                  <p className="mt-1 text-xs text-green-700">
+                    Tienes la PWA instalada. Activa las notificaciones para recibir alertas.
+                  </p>
+                </div>
+              )}
+
+              {/* Estado: En Safari pero no instalada */}
+              {userIsOnIOs && !userInStandalone && (
+                <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3">
+                  <p className="text-xs text-amber-800">
+                    <strong>Detectamos que estás en iPhone.</strong> Sigue los pasos de abajo para instalar Stocky.
+                  </p>
+                </div>
+              )}
+
+              {/* Botón mostrar/ocultar pasos */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowIOsSteps(!showIOsSteps)}
+                className="mb-3 w-full rounded-lg border-sky-300 bg-white text-sky-800 hover:bg-sky-100"
+              >
+                {showIOsSteps ? 'Ocultar pasos de instalación' : 'Ver pasos de instalación en iPhone'}
+              </Button>
+
+              {/* Pasos de instalación iOS */}
+              {showIOsSteps && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="mb-4 space-y-3"
                 >
-                  {enablingPush ? 'Activando...' : 'Activar notificaciones iPhone'}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleSendTest}
-                  disabled={testingPush || !support.supported}
-                  className="h-10 rounded-lg border-sky-300 bg-white text-sky-800 hover:bg-sky-100"
-                >
-                  {testingPush ? 'Enviando prueba...' : 'Enviar prueba push'}
-                </Button>
+                  <div className="rounded-xl border border-sky-200 bg-white/80 p-4">
+                    <p className="mb-3 font-semibold text-sky-900">Instalación paso a paso:</p>
+
+                    <div className="space-y-3">
+                      <div className="flex gap-3">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white">1</div>
+                        <div>
+                          <p className="font-medium text-sky-900">Abre en Safari</p>
+                          <p className="text-xs text-sky-700">Usa Safari (no Chrome ni otros navegadores)</p>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white">2</div>
+                        <div>
+                          <p className="font-medium text-sky-900">Toca el botón Compartir</p>
+                          <div className="mt-1 flex items-center gap-1 rounded bg-sky-100 px-2 py-1 text-xs text-sky-800">
+                            <Share className="h-3 w-3" />
+                            Icono de compartir en la barra de Safari
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white">3</div>
+                        <div>
+                          <p className="font-medium text-sky-900">Selecciona "Añadir a pantalla de inicio"</p>
+                          <div className="mt-1 flex items-center gap-1 rounded bg-sky-100 px-2 py-1 text-xs text-sky-800">
+                            <PlusSquare className="h-3 w-3" />
+                            Desplázate y busca esta opción
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white">4</div>
+                        <div>
+                          <p className="font-medium text-sky-900">Toca "Añadir"</p>
+                          <p className="text-xs text-sky-700">Stocky aparecerá en tu pantalla de inicio</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-sky-200 bg-sky-100/50 p-3 text-xs text-sky-800">
+                    <strong>Nota:</strong> Después de instalar, abre la app desde tu pantalla de inicio y luego activa las notificaciones.
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Controles de notificaciones */}
+              <div className="rounded-xl border border-sky-200 bg-white/80 p-4">
+                <p className="mb-3 font-semibold text-sky-900">Notificaciones push:</p>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button
+                    size="sm"
+                    onClick={handleEnableNotifications}
+                    disabled={enablingPush || !support.supported}
+                    className="h-10 rounded-lg bg-gradient-to-r from-sky-600 to-cyan-600 px-4 font-semibold text-slate-50 hover:opacity-90"
+                  >
+                    {enablingPush ? 'Activando...' : 'Activar notificaciones'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleSendTest}
+                    disabled={testingPush || !support.supported}
+                    className="h-10 rounded-lg border-sky-300 bg-white text-sky-800 hover:bg-sky-100"
+                  >
+                    {testingPush ? 'Enviando...' : 'Enviar prueba'}
+                  </Button>
+                </div>
+
+                {!support.supported && (
+                  <p className="mt-3 text-xs text-sky-800/80">
+                    ⚠️ Este navegador no soporta Web Push. Usa Safari en HTTPS con la PWA instalada.
+                  </p>
+                )}
+                {pushFeedback && (
+                  <p className={`mt-3 text-xs font-medium ${pushFeedback.includes('error') || pushFeedback.includes('No') ? 'text-red-600' : 'text-green-700'}`}>
+                    {pushFeedback}
+                  </p>
+                )}
               </div>
-              {!support.supported && (
-                <p className="mt-2 text-xs text-sky-800/80">
-                  Este navegador/contexto no soporta Web Push. Usa Safari en HTTPS con PWA instalada.
-                </p>
-              )}
-              {pushFeedback && (
-                <p className="mt-2 text-xs font-medium text-sky-900">{pushFeedback}</p>
-              )}
             </div>
 
             <div className="flex items-center gap-2 text-sm text-slate-600">

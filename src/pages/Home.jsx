@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { signOutSession } from '../data/commands/authCommands.js';
 import { Button } from '@/components/ui/button';
 import WhatsNewModal from '../components/Modals/WhatsNewModal.jsx';
+import { isIOs, isStandalone, supportsPWA } from '../utils/deviceDetection.js';
 import {
   Menu,
   X,
@@ -16,7 +17,10 @@ import {
   Users,
   Shield,
   Clock3,
-  Check
+  Check,
+  Smartphone,
+  Share2,
+  PlusSquare
 } from 'lucide-react';
 import logoStocky from '../assets/logoStocky.png';
 
@@ -70,6 +74,8 @@ const process = [
 function Home() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showIosBanner, setShowIosBanner] = useState(false);
+  const [iosBannerDismissed, setIosBannerDismissed] = useState(false);
 
   useEffect(() => {
     const signOut = async () => {
@@ -80,14 +86,72 @@ function Home() {
       }
     };
     signOut();
+
+    // Mostrar banner de iOS si aplica
+    const isIosDevice = isIOs();
+    const isInstalled = isStandalone();
+    const supportsPwa = supportsPWA();
+    const dismissed = localStorage.getItem('ios-banner-dismissed');
+
+    if (isIosDevice && !isInstalled && supportsPwa && !dismissed) {
+      setShowIosBanner(true);
+    }
   }, []);
+
+  const dismissIosBanner = () => {
+    setShowIosBanner(false);
+    setIosBannerDismissed(true);
+    localStorage.setItem('ios-banner-dismissed', 'true');
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#f8f5ff] via-[#f2edff] to-[#ebe4ff] text-slate-900">
       <WhatsNewModal />
       <div className="pointer-events-none fixed inset-0 -z-0 bg-[radial-gradient(circle_at_15%_10%,rgba(139,92,246,0.25),transparent_34%),radial-gradient(circle_at_85%_5%,rgba(99,102,241,0.2),transparent_32%),radial-gradient(circle_at_50%_95%,rgba(168,85,247,0.18),transparent_40%)]" />
 
-      <header className="sticky top-0 z-50 border-b border-violet-200/60 bg-[#f8f5ff]/80 backdrop-blur-xl">
+      {/* Banner de instalación iOS */}
+      <AnimatePresence>
+        {showIosBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: -100 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -100 }}
+            className="relative z-50 bg-gradient-to-r from-sky-500 to-cyan-500 px-4 py-3 text-white"
+          >
+            <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-full bg-white/20 p-2">
+                  <Smartphone className="h-5 w-5" />
+                </div>
+                <div className="text-sm">
+                  <p className="font-semibold">¡Instala Stocky en tu iPhone!</p>
+                  <p className="text-xs text-sky-100">
+                    Abre en Safari, toca <Share2 className="mx-1 inline h-3 w-3" /> y selecciona "Añadir a pantalla de inicio"
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => navigate('/descargar')}
+                  className="h-8 rounded-lg bg-white text-sky-600 hover:bg-sky-50"
+                >
+                  Ver guía
+                </Button>
+                <button
+                  onClick={dismissIosBanner}
+                  className="rounded-full p-1 text-white/80 hover:bg-white/20 hover:text-white"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <header className="sticky top-0 z-40 border-b border-violet-200/60 bg-[#f8f5ff]/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <button onClick={() => navigate('/')} className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-violet-100/70">
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-violet-200/70 bg-white shadow-sm">
