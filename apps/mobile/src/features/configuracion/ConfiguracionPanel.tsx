@@ -9,6 +9,12 @@ import { deleteCurrentAccount } from '../../services/accountService';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
 import { StockyModal } from '../../ui/StockyModal';
 import { StockyStatusToast } from '../../ui/StockyStatusToast';
+import {
+  getThermalPaperWidthMm,
+  isAutoPrintReceiptEnabled,
+  setAutoPrintReceiptEnabled,
+  setThermalPaperWidthMm,
+} from '../../utils/printer';
 
 const TERMS_URL = 'https://www.stockypos.app/legal/terms.html';
 const PRIVACY_URL = 'https://www.stockypos.app/legal/privacy.html';
@@ -163,6 +169,56 @@ export function ConfiguracionPanel({
   useEffect(() => {
     loadSnapshot();
   }, [loadSnapshot]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const [widthMm, autoPrintEnabled] = await Promise.all([
+          getThermalPaperWidthMm(),
+          isAutoPrintReceiptEnabled(),
+        ]);
+
+        if (!mounted) return;
+        setPaperWidth(widthMm === 58 ? '58mm' : '80mm');
+        setAutoPrintOnSale(autoPrintEnabled);
+      } catch {
+        // no-op
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleTogglePaperWidth = useCallback(() => {
+    const nextValue = paperWidth === '80mm' ? '58mm' : '80mm';
+    const nextWidthMm = nextValue === '58mm' ? 58 : 80;
+    setPaperWidth(nextValue);
+
+    void (async () => {
+      const saved = await setThermalPaperWidthMm(nextWidthMm);
+      if (!saved) {
+        setPaperWidth(paperWidth);
+        setError('No se pudo guardar el ancho de impresión.');
+      }
+    })();
+  }, [paperWidth]);
+
+  const handleToggleAutoPrintOnSale = useCallback(() => {
+    const nextValue = !autoPrintOnSale;
+    setAutoPrintOnSale(nextValue);
+
+    void (async () => {
+      const saved = await setAutoPrintReceiptEnabled(nextValue);
+      if (!saved) {
+        setAutoPrintOnSale(!nextValue);
+        setError('No se pudo guardar la configuración de autoimpresión.');
+      }
+    })();
+  }, [autoPrintOnSale]);
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -413,13 +469,13 @@ export function ConfiguracionPanel({
             <Text style={styles.systemSubLabel}>Ancho de papel</Text>
             <Pressable
               style={styles.paperSelector}
-              onPress={() => setPaperWidth((current) => (current === '80mm' ? '58mm' : '80mm'))}
+              onPress={handleTogglePaperWidth}
             >
               <Text style={styles.paperSelectorText}>{paperWidth}</Text>
               <Ionicons name="chevron-down-outline" size={20} color="#78716C" />
             </Pressable>
 
-            <Pressable style={styles.checkRow} onPress={() => setAutoPrintOnSale((prev) => !prev)}>
+            <Pressable style={styles.checkRow} onPress={handleToggleAutoPrintOnSale}>
               <Ionicons
                 name={autoPrintOnSale ? 'checkbox-outline' : 'square-outline'}
                 size={30}

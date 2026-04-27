@@ -23,6 +23,7 @@ import {
   type InventoryProductRecord,
   type InventorySupplierRecord,
 } from '../../services/inventoryService';
+import { invalidateCatalogItemsCache } from '../../services/mesaOrderService';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
 import { StockyButton } from '../../ui/StockyButton';
 import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
@@ -576,6 +577,7 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
       }
 
       closeFormModal();
+      invalidateCatalogItemsCache(businessId);
       await refreshProducts();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar el producto.');
@@ -613,6 +615,7 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
       setSuccess('Producto eliminado.');
       setShowDeleteModal(false);
       setProductTarget(null);
+      invalidateCatalogItemsCache(businessId);
       await refreshProducts();
     } catch (err: any) {
       if (String(err?.code || '').trim() === '23503') {
@@ -642,6 +645,7 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
       setSuccess('Producto desactivado.');
       setShowDeactivateModal(false);
       setProductTarget(null);
+      invalidateCatalogItemsCache(businessId);
       await refreshProducts();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo desactivar el producto.');
@@ -661,6 +665,7 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
         isActive: true,
       });
       setSuccess('Producto activado.');
+      invalidateCatalogItemsCache(businessId);
       await refreshProducts();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo activar el producto.');

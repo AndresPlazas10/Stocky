@@ -34,9 +34,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
+import PaymentMethodSelect from '../ui/PaymentMethodSelect.jsx';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { SaleUpdateAlert } from '../ui/SaleUpdateAlert';
+import { PrintReceiptConfirmModal } from '../ui/PrintReceiptConfirmModal';
 import { 
   Plus, 
   Layers, 
@@ -55,11 +57,18 @@ import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { normalizeTableRecord } from '../../utils/tableStatus.js';
 import { getThermalPaperWidthMm, isAutoPrintReceiptEnabled } from '../../utils/printer.js';
 import { printSaleReceipt } from '../../utils/saleReceiptPrint.js';
-import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
+import { isOfflineMode, isOfflinePersistenceEnabled, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
 import { invalidateOrderCache } from '../../data/adapters/cacheInvalidation.js';
 import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
 import { useProgressiveList } from '../../hooks/useProgressiveList.js';
 import { useRafBatchedQueue } from '../../hooks/useRafBatchedQueue.js';
+import {
+  DEFAULT_CLOSE_ORDER_LOCK_TTL_MS,
+  isCloseOrderLockActive,
+  sanitizeCloseOrderLocksRecord,
+  removeCloseOrderLockFromRecord,
+  upsertCloseOrderLockInRecord
+} from '../../utils/closeOrderLocks.js';
 import { supabase } from '../../supabase/Client.jsx';
 
 const getPaymentMethodLabel = (method) => {
@@ -67,6 +76,11 @@ const getPaymentMethodLabel = (method) => {
   if (method === 'card') return 'Tarjeta';
   if (method === 'transfer') return 'Transferencia';
   if (method === 'mixed') return 'Mixto';
+  if (method === 'nequi') return 'Nequi';
+  if (method === 'bancolombia') return 'Bancolombia';
+  if (method === 'banco_bogota') return 'Banco de Bogotá';
+  if (method === 'nu') return 'Nu';
+  if (method === 'davivienda') return 'Davivienda';
   return method || '-';
 };
 
@@ -108,6 +122,20 @@ const MESAS_REMOTE_FALLBACK_POLL_MS = 5000;
 const MESA_LOCK_TTL_SECONDS = 45;
 const MESA_LOCK_HEARTBEAT_MS = 20000;
 const MESA_IN_USE_MESSAGE = 'Alguien esta usando esta mesa.';
+const CLOSE_ORDER_LOCK_TTL_MS = DEFAULT_CLOSE_ORDER_LOCK_TTL_MS;
+const CLOSE_ORDER_LOCKS_STORAGE_KEY = 'stocky.orders.close.locks.v1';
+
+const isConnectivityError = (errorLike) => {
+  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+  return (
+    message.includes('failed to fetch')
+    || message.includes('networkerror')
+    || message.includes('network request failed')
+    || message.includes('fetch failed')
+    || message.includes('load failed')
+    || message.includes('network')
+  );
+};
 
 const normalizeDisplayName = (value, fallback = 'Usuario') => {
   const normalized = String(value || '').trim();
@@ -673,6 +701,8 @@ function Mesas({ businessId, userRole = 'admin' }) {
   const activeMesaBroadcastRef = useRef(null);
   const heldMesaLockRef = useRef(null);
   const mesaLockHeartbeatTimerRef = useRef(null);
+  const mesaOpenDebugRef = useRef({ stage: 'idle', ts: null });
+  const closeOrderInFlightRef = useRef(new Map());
 
   // Ref para prevenir que el modal se reabra después de completar una venta
   const justCompletedSaleRef = useRef(false);
@@ -680,6 +710,13 @@ function Mesas({ businessId, userRole = 'admin' }) {
   // Estado para bloquear completamente el renderizado del modal mientras se procesa la venta
   const [canShowOrderModal, setCanShowOrderModal] = useState(true);
   const isOrderItemsSyncing = pendingOrderItemOps > 0;
+
+  // Estados para modal de impresión
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printSaleIds, setPrintSaleIds] = useState([]);
+  const [printSaleDataList, setPrintSaleDataList] = useState([]);
+  const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
+
   const lowMotionMode = useLowMotionMode();
   const enqueueRealtimeUpdate = useRafBatchedQueue({ useTransition: false });
   const {
@@ -701,6 +738,106 @@ function Mesas({ businessId, userRole = 'admin' }) {
     pendingQuantityUpdatesRef.current = normalizedNext;
     setPendingQuantityUpdates(normalizedNext);
   }, []);
+
+  const setMesaOpenDebugStage = useCallback((stage) => {
+    mesaOpenDebugRef.current = {
+      stage: String(stage || 'unknown'),
+      ts: new Date().toISOString()
+    };
+  }, []);
+
+  const buildMesaOpenDebugTag = useCallback((errorLike, mesa) => {
+    const dbg = mesaOpenDebugRef.current || {};
+    const mesaId = normalizeEntityId(mesa?.id) || 'na';
+    const navOnline = (typeof navigator !== 'undefined' && navigator.onLine === false) ? '0' : '1';
+    const runtimeOffline = isOfflineMode() ? '1' : '0';
+    const persistence = isOfflinePersistenceEnabled() ? '1' : '0';
+    const msg = String(errorLike?.message || errorLike || 'unknown').replace(/\s+/g, ' ').slice(0, 80);
+    return `MESA_OPEN_DBG|stage=${dbg.stage || 'na'}|mesa=${mesaId}|online=${navOnline}|offline=${runtimeOffline}|persist=${persistence}|msg=${msg}`;
+  }, []);
+
+  const isOfflineFirstRuntime = isOfflineMode() && isOfflinePersistenceEnabled();
+
+  const readPersistedCloseOrderLocks = useCallback(() => {
+    if (typeof window === 'undefined' || !window.localStorage) return {};
+    try {
+      const raw = window.localStorage.getItem(CLOSE_ORDER_LOCKS_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }, []);
+
+  const writePersistedCloseOrderLocks = useCallback((next) => {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(CLOSE_ORDER_LOCKS_STORAGE_KEY, JSON.stringify(next && typeof next === 'object' ? next : {}));
+    } catch {
+      // no-op
+    }
+  }, []);
+
+  const acquireCloseOrderLock = useCallback((lockKey) => {
+    const key = String(lockKey || '').trim();
+    if (!key) return false;
+
+    const now = Date.now();
+    const current = closeOrderInFlightRef.current.get(key);
+
+    if (isCloseOrderLockActive(current?.ts, { now, ttlMs: CLOSE_ORDER_LOCK_TTL_MS })) {
+      return false;
+    }
+
+    const persisted = readPersistedCloseOrderLocks();
+    const persistedTs = Number(persisted?.[key] || 0);
+    const persistedIsActive = isCloseOrderLockActive(persistedTs, { now, ttlMs: CLOSE_ORDER_LOCK_TTL_MS });
+    if (persistedIsActive) {
+      closeOrderInFlightRef.current.set(key, { ts: persistedTs });
+      return false;
+    }
+
+    if (persisted?.[key]) {
+      writePersistedCloseOrderLocks(removeCloseOrderLockFromRecord(persisted, key));
+    }
+
+    closeOrderInFlightRef.current.set(key, { ts: now });
+    writePersistedCloseOrderLocks(upsertCloseOrderLockInRecord(persisted, key, now));
+    return true;
+  }, [readPersistedCloseOrderLocks, writePersistedCloseOrderLocks]);
+
+  const releaseCloseOrderLock = useCallback((lockKey) => {
+    const key = String(lockKey || '').trim();
+    if (!key) return;
+    closeOrderInFlightRef.current.delete(key);
+    const persisted = readPersistedCloseOrderLocks();
+    if (!persisted?.[key]) return;
+    writePersistedCloseOrderLocks(removeCloseOrderLockFromRecord(persisted, key));
+  }, [readPersistedCloseOrderLocks, writePersistedCloseOrderLocks]);
+
+  const purgeExpiredCloseOrderLocks = useCallback(() => {
+    const now = Date.now();
+
+    closeOrderInFlightRef.current.forEach((value, key) => {
+      if (!isCloseOrderLockActive(value?.ts, { now, ttlMs: CLOSE_ORDER_LOCK_TTL_MS })) {
+        closeOrderInFlightRef.current.delete(key);
+      }
+    });
+
+    const persisted = readPersistedCloseOrderLocks();
+    const nextPersisted = sanitizeCloseOrderLocksRecord(persisted, {
+      now,
+      ttlMs: CLOSE_ORDER_LOCK_TTL_MS
+    });
+
+    if (Object.keys(nextPersisted).length !== Object.keys(persisted).length) {
+      writePersistedCloseOrderLocks(nextPersisted);
+    }
+  }, [readPersistedCloseOrderLocks, writePersistedCloseOrderLocks]);
+
+  useEffect(() => {
+    purgeExpiredCloseOrderLocks();
+  }, [purgeExpiredCloseOrderLocks]);
 
 
   const sendMesaSyncBroadcast = useCallback((event, payload) => {
@@ -912,6 +1049,10 @@ function Mesas({ businessId, userRole = 'admin' }) {
   }, [businessId]);
 
   const getMesaLockState = useCallback((mesaId) => {
+    if (isOfflineFirstRuntime) {
+      return { lockedByOther: false, lockOwnerName: null };
+    }
+
     const normalizedMesaId = String(mesaId || '').trim();
     if (!normalizedMesaId) return { lockedByOther: false, lockOwnerName: null };
     const mesaLock = mesaLocksByTableId[normalizedMesaId];
@@ -941,7 +1082,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
       lockedByOther,
       lockOwnerName: normalizeDisplayName(mesaLock?.lock_owner_name || 'Alguien', 'Alguien')
     };
-  }, [businessId, mesaLocksByTableId, resolveWebUserId]);
+  }, [businessId, isOfflineFirstRuntime, mesaLocksByTableId, resolveWebUserId]);
 
   const selectMesaEditLockByTableId = useCallback(async ({ businessId: targetBusinessId, tableId }) => {
     const normalizedBusinessId = String(targetBusinessId || '').trim();
@@ -2347,8 +2488,59 @@ function Mesas({ businessId, userRole = 'admin' }) {
 
   // IMPORTANTE: Definir estas funciones ANTES de handleOpenTable
   const createNewOrder = useCallback(async (mesa) => {
+    const openLocalOfflineOrder = () => {
+      const localOrderId = `offline-order-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const localNow = new Date().toISOString();
+      const localOrder = {
+        id: localOrderId,
+        business_id: businessId,
+        table_id: mesa.id,
+        user_id: currentUser?.id || null,
+        status: 'open',
+        total: 0,
+        opened_at: localNow,
+        updated_at: localNow,
+        order_items: [],
+        __localOnly: true,
+        pending_sync: true
+      };
+
+      setMesas((prevMesas) =>
+        prevMesas.map((item) => (
+          item.id === mesa.id
+            ? {
+              ...item,
+              status: 'occupied',
+              current_order_id: localOrder.id,
+              orders: localOrder
+            }
+            : item
+        ))
+      );
+      setSelectedMesa(normalizeTableRecord({
+        ...mesa,
+        status: 'occupied',
+        current_order_id: localOrder.id,
+        orders: localOrder
+      }));
+      orderItemsDirtyRef.current = false;
+      orderItemsRef.current = [];
+      setOrderItems([]);
+      setPendingQuantityUpdatesSafe({});
+      setModalOpenIntent(true);
+      setShowOrderDetails(true);
+    };
+
     try {
       setError(null);
+      setMesaOpenDebugStage('create:start');
+
+      if (isOfflineFirstRuntime) {
+        setMesaOpenDebugStage('create:offline-runtime-local');
+        openLocalOfflineOrder();
+        return;
+      }
+
       let effectiveUserId = currentUser?.id || null;
       if (!effectiveUserId) {
         try {
@@ -2364,6 +2556,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
         tableId: mesa.id,
         userId: effectiveUserId
       });
+      setMesaOpenDebugStage('create:remote-ok');
 
       setMesas((prevMesas) =>
         prevMesas.map((item) => (
@@ -2398,6 +2591,19 @@ function Mesas({ businessId, userRole = 'admin' }) {
         await loadMesas();
       }
     } catch (error) {
+      setMesaOpenDebugStage('create:catch');
+      if (isOfflinePersistenceEnabled()) {
+        setMesaOpenDebugStage('create:catch-local-fallback-1');
+        openLocalOfflineOrder();
+        return;
+      }
+
+      if (isConnectivityError(error)) {
+        setMesaOpenDebugStage('create:connectivity-fallback');
+        openLocalOfflineOrder();
+        return;
+      }
+
       // Recuperación best-effort: si hubo carrera y la orden sí quedó creada/asignada,
       // abrirla en lugar de mostrar fallo.
       try {
@@ -2446,12 +2652,23 @@ function Mesas({ businessId, userRole = 'admin' }) {
         // Si falla recuperación, caer a error visible para diagnóstico.
       }
 
+      if (isOfflinePersistenceEnabled()) {
+        try {
+          setMesaOpenDebugStage('create:last-local-fallback');
+          openLocalOfflineOrder();
+          return;
+        } catch {
+          setMesaOpenDebugStage('create:last-local-fallback-failed');
+          // continuar al error visible solo si también falla fallback local
+        }
+      }
+
       setShowOrderDetails(false);
       setModalOpenIntent(false);
       setSelectedMesa(null);
-      setError(`❌ No se pudo abrir la mesa: ${error?.message || 'Error desconocido'}`);
+      setError(`❌ No se pudo abrir la mesa: ${error?.message || 'Error desconocido'} [${buildMesaOpenDebugTag(error, mesa)}]`);
     }
-  }, [businessId, currentUser, loadMesas, setPendingQuantityUpdatesSafe]);
+  }, [buildMesaOpenDebugTag, businessId, currentUser, isOfflineFirstRuntime, loadMesas, setMesaOpenDebugStage, setPendingQuantityUpdatesSafe]);
 
   const loadOrderDetails = useCallback(async (mesa, { requestId = null } = {}) => {
     const normalizedRequestId = Number(requestId);
@@ -2597,6 +2814,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
   }, [setPendingQuantityUpdatesSafe]);
 
   const handleOpenTable = useCallback(async (mesa) => {
+    setMesaOpenDebugStage('open:start');
     const requestId = orderDetailsRequestRef.current + 1;
     orderDetailsRequestRef.current = requestId;
 
@@ -2609,19 +2827,25 @@ function Mesas({ businessId, userRole = 'admin' }) {
       ? normalizedMesa.orders.order_items
       : [];
 
-    const lockState = getMesaLockState(normalizedMesa?.id);
-    if (lockState?.lockedByOther) {
-      setError(MESA_IN_USE_MESSAGE);
-      return;
+    if (!isOfflineFirstRuntime) {
+      setMesaOpenDebugStage('open:lock-check');
+      const lockState = getMesaLockState(normalizedMesa?.id);
+      if (lockState?.lockedByOther) {
+        setMesaOpenDebugStage('open:lock-blocked');
+        setError(MESA_IN_USE_MESSAGE);
+        return;
+      }
     }
 
     const resolvedUserId = await ensureCurrentUser();
     if (!resolvedUserId) {
+      setMesaOpenDebugStage('open:user-missing');
       setError('❌ No se pudo validar tu sesión. Cierra sesión e inténtalo de nuevo.');
       return;
     }
 
-    if (normalizedMesa?.id && businessId) {
+    if (!isOfflineFirstRuntime && normalizedMesa?.id && businessId) {
+      setMesaOpenDebugStage('open:lock-acquire');
       const nextMesaId = normalizeEntityId(normalizedMesa.id);
       if (nextMesaId) {
         const previousActive = activeMesaBroadcastRef.current;
@@ -2662,6 +2886,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
             lockToken: result.lockToken || lockToken
           });
         } else {
+          setMesaOpenDebugStage('open:lock-rejected');
           publishMesaLockBroadcast({
             tableId: nextMesaId,
             locked: false,
@@ -2683,6 +2908,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
     ensureCatalogWarmup().catch(() => {});
 
     if (normalizedMesa.status === 'occupied' && normalizedMesa.current_order_id) {
+      setMesaOpenDebugStage('open:load-existing');
       // Pintado inmediato con datos ya presentes en la card y refresh remoto en background.
       const initialOrderItems = applyPendingQuantities(
         preloadedOrderItems,
@@ -2693,6 +2919,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
       loadOrderDetails(normalizedMesa, { requestId }).catch(() => {});
     } else {
       // Crear nueva orden
+      setMesaOpenDebugStage('open:create-new-order');
       orderItemsRef.current = [];
       setOrderItems([]);
       await createNewOrder(normalizedMesa);
@@ -2700,12 +2927,14 @@ function Mesas({ businessId, userRole = 'admin' }) {
   }, [
     ensureCurrentUser,
     businessId,
+    isOfflineFirstRuntime,
     acquireMesaEditLockWeb,
     createNewOrder,
     ensureCatalogWarmup,
     getMesaLockState,
     loadOrderDetails,
     publishMesaLockBroadcast,
+    setMesaOpenDebugStage,
     setPendingQuantityUpdatesSafe
   ]);
 
@@ -2936,6 +3165,29 @@ function Mesas({ businessId, userRole = 'admin' }) {
       return;
     }
 
+    const currentOrderId = String(selectedMesa?.current_order_id || '');
+    const isLocalOnlyOrder = (
+      String(selectedMesa?.orders?.__localOnly || '').toLowerCase() === 'true'
+      || currentOrderId.startsWith('offline-order-')
+    );
+    const shouldUseLocalRemove = isLocalOnlyOrder || isOfflineFirstRuntime || isOfflineMode();
+
+    if (shouldUseLocalRemove) {
+      const currentOrderItems = Array.isArray(orderItemsRef.current) ? orderItemsRef.current : [];
+      const nextOrderItems = currentOrderItems.filter((item) => item.id !== itemId);
+      orderItemsDirtyRef.current = true;
+      orderItemsRef.current = nextOrderItems;
+      setOrderItems(nextOrderItems);
+      setPendingQuantityUpdatesSafe((prev) => {
+        const next = { ...(prev || {}) };
+        delete next[itemId];
+        return next;
+      });
+      delete optimisticTempItemQuantitiesRef.current[itemId];
+      updateOrderTotal(selectedMesa?.current_order_id, nextOrderItems, { skipMesaState: true }).catch(() => {});
+      return;
+    }
+
     markOrderItemOpStarted();
     try {
       await deleteOrderItemById(itemId, {
@@ -2957,7 +3209,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
       delete optimisticTempItemQuantitiesRef.current[itemId];
 
       updateOrderTotal(selectedMesa.current_order_id, nextOrderItems, { skipMesaState: true }).catch(() => {});
-    } catch {
+    } catch (error) {
       setError('❌ No se pudo eliminar el producto. Por favor, intenta de nuevo.');
       // Revertir solo los items si se puede consultar remoto.
       try {
@@ -2979,7 +3231,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
     } finally {
       markOrderItemOpFinished();
     }
-  }, [selectedMesa, updateOrderTotal, setPendingQuantityUpdatesSafe, businessId, markOrderItemOpStarted, markOrderItemOpFinished]);
+  }, [selectedMesa, isOfflineFirstRuntime, updateOrderTotal, setPendingQuantityUpdatesSafe, businessId, markOrderItemOpStarted, markOrderItemOpFinished]);
 
   const handleRefreshOrder = useCallback(async () => {
     if (!selectedMesa) return;
@@ -3125,6 +3377,17 @@ function Mesas({ businessId, userRole = 'admin' }) {
     try {
       if (!selectedMesa?.current_order_id) return;
 
+      const currentOrderId = String(selectedMesa?.current_order_id || '');
+      const isLocalOnlyOrder = (
+        String(selectedMesa?.orders?.__localOnly || '').toLowerCase() === 'true'
+        || currentOrderId.startsWith('offline-order-')
+      );
+      const shouldUseLocalItemFlow = isLocalOnlyOrder || isOfflineFirstRuntime || isOfflineMode();
+      const itemDebugTag = (stage, err = null) => {
+        const msg = String(err?.message || err || '').replace(/\s+/g, ' ').slice(0, 80);
+        return `MESA_ITEM_DBG|stage=${stage}|order=${currentOrderId || 'na'}|localFlow=${shouldUseLocalItemFlow ? '1' : '0'}|msg=${msg || 'na'}`;
+      };
+
       const itemType = catalogItem?.item_type || ORDER_ITEM_TYPE.PRODUCT;
       const isCombo = itemType === ORDER_ITEM_TYPE.COMBO;
       const itemId = isCombo
@@ -3188,12 +3451,19 @@ function Mesas({ businessId, userRole = 'admin' }) {
         orderItemsRef.current = nextOrderItems;
         setOrderItems(nextOrderItems);
         orderItemsChanged = true;
-        if (isOptimisticExistingItem) {
+        if (isOptimisticExistingItem || shouldUseLocalItemFlow) {
           optimisticTempItemQuantitiesRef.current[existingItem.id] = nextQuantity;
           setPendingQuantityUpdatesSafe((prev) => ({
             ...(prev || {}),
             [existingItem.id]: nextQuantity
           }));
+          if (shouldUseLocalItemFlow) {
+            setPendingQuantityUpdatesSafe((prev) => {
+              const next = { ...(prev || {}) };
+              delete next[existingItem.id];
+              return next;
+            });
+          }
         } else {
           markOrderItemOpStarted();
           enqueueOrderItemWrite(existingItem.id, () => (
@@ -3252,93 +3522,140 @@ function Mesas({ businessId, userRole = 'admin' }) {
             nombre: itemName
           } : null
         };
-        optimisticTempItemQuantitiesRef.current[tempId] = optimisticQuantity;
-        nextOrderItems = [optimisticItem, ...currentOrderItems];
-        orderItemsDirtyRef.current = true;
-        orderItemsRef.current = nextOrderItems;
-        setOrderItems(nextOrderItems);
-        orderItemsChanged = true;
-        markOrderItemOpStarted();
-
-        insertOrderItem({
-          row: {
-            order_id: selectedMesa.current_order_id,
-            product_id: isCombo ? null : itemId,
-            combo_id: isCombo ? itemId : null,
-            quantity: qty,
-            price: parseFloat(precio)
-            // subtotal se calcula automáticamente con trigger
-          },
-          selectSql: 'id',
-          businessId
-        }).then((newItem) => {
-          if (!newItem?.id) {
-            delete optimisticTempItemQuantitiesRef.current[tempId];
-            return;
-          }
-
-          const latestTempItem = (Array.isArray(orderItemsRef.current) ? orderItemsRef.current : [])
-            .find((item) => item.id === tempId);
-          const trackedTempQuantity = toFiniteNumber(
-            optimisticTempItemQuantitiesRef.current?.[tempId],
-            NaN
-          );
-          const resolvedQuantity = (
-            Number.isFinite(trackedTempQuantity) && trackedTempQuantity > 0
-          )
-            ? trackedTempQuantity
-            : toFiniteNumber(latestTempItem?.quantity, optimisticQuantity);
-          const resolvedPrice = toFiniteNumber(latestTempItem?.price, optimisticPrice);
-          const pendingTempQuantity = toFiniteNumber(
-            pendingQuantityUpdatesRef.current?.[tempId],
-            NaN
-          );
-          const quantityToPersist = (
-            Number.isFinite(pendingTempQuantity) && pendingTempQuantity > 0
-          ) ? pendingTempQuantity : resolvedQuantity;
-          const shouldPersistResolvedQuantity = Math.abs(quantityToPersist - optimisticQuantity) > 0.0001;
-
-          setOrderItems((prevItems) => prevItems.map((item) => (
-            item.id === tempId
-              ? {
-                ...item,
-                id: newItem.id,
-                quantity: resolvedQuantity,
-                subtotal: resolvedQuantity * resolvedPrice
-              }
-              : item
-          )));
-
+        if (shouldUseLocalItemFlow) {
+          const localItemId = `offline-item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          const localItem = {
+            ...optimisticItem,
+            id: localItemId,
+            __localOnly: true,
+            pending_sync: true
+          };
+          nextOrderItems = [localItem, ...currentOrderItems];
+          orderItemsDirtyRef.current = true;
+          orderItemsRef.current = nextOrderItems;
+          setOrderItems(nextOrderItems);
           setPendingQuantityUpdatesSafe((prev) => {
             const next = { ...(prev || {}) };
             delete next[tempId];
-            if (shouldPersistResolvedQuantity) {
-              next[newItem.id] = quantityToPersist;
-            } else {
-              delete next[newItem.id];
-            }
             return next;
           });
-          delete optimisticTempItemQuantitiesRef.current[tempId];
-
-          if (!shouldPersistResolvedQuantity) return;
-
+          orderItemsChanged = true;
+        } else {
+          optimisticTempItemQuantitiesRef.current[tempId] = optimisticQuantity;
+          nextOrderItems = [optimisticItem, ...currentOrderItems];
+          orderItemsDirtyRef.current = true;
+          orderItemsRef.current = nextOrderItems;
+          setOrderItems(nextOrderItems);
+          orderItemsChanged = true;
           markOrderItemOpStarted();
-          enqueueOrderItemWrite(newItem.id, () => (
-            updateOrderItemQuantityById({
-              itemId: newItem.id,
-              quantity: quantityToPersist,
-              businessId,
-              orderId: selectedMesa.current_order_id
-            })
-          )).then(() => {
+
+          insertOrderItem({
+            row: {
+              order_id: selectedMesa.current_order_id,
+              product_id: isCombo ? null : itemId,
+              combo_id: isCombo ? itemId : null,
+              quantity: qty,
+              price: parseFloat(precio)
+              // subtotal se calcula automáticamente con trigger
+            },
+            selectSql: 'id',
+            businessId
+          }).then((newItem) => {
+            if (!newItem?.id) {
+              delete optimisticTempItemQuantitiesRef.current[tempId];
+              return;
+            }
+
+            const latestTempItem = (Array.isArray(orderItemsRef.current) ? orderItemsRef.current : [])
+              .find((item) => item.id === tempId);
+            const trackedTempQuantity = toFiniteNumber(
+              optimisticTempItemQuantitiesRef.current?.[tempId],
+              NaN
+            );
+            const resolvedQuantity = (
+              Number.isFinite(trackedTempQuantity) && trackedTempQuantity > 0
+            )
+              ? trackedTempQuantity
+              : toFiniteNumber(latestTempItem?.quantity, optimisticQuantity);
+            const resolvedPrice = toFiniteNumber(latestTempItem?.price, optimisticPrice);
+            const pendingTempQuantity = toFiniteNumber(
+              pendingQuantityUpdatesRef.current?.[tempId],
+              NaN
+            );
+            const quantityToPersist = (
+              Number.isFinite(pendingTempQuantity) && pendingTempQuantity > 0
+            ) ? pendingTempQuantity : resolvedQuantity;
+            const shouldPersistResolvedQuantity = Math.abs(quantityToPersist - optimisticQuantity) > 0.0001;
+
+            setOrderItems((prevItems) => prevItems.map((item) => (
+              item.id === tempId
+                ? {
+                  ...item,
+                  id: newItem.id,
+                  quantity: resolvedQuantity,
+                  subtotal: resolvedQuantity * resolvedPrice
+                }
+                : item
+            )));
+
             setPendingQuantityUpdatesSafe((prev) => {
               const next = { ...(prev || {}) };
-              delete next[newItem.id];
+              delete next[tempId];
+              if (shouldPersistResolvedQuantity) {
+                next[newItem.id] = quantityToPersist;
+              } else {
+                delete next[newItem.id];
+              }
               return next;
             });
+            delete optimisticTempItemQuantitiesRef.current[tempId];
+
+            if (!shouldPersistResolvedQuantity) return;
+
+            markOrderItemOpStarted();
+            enqueueOrderItemWrite(newItem.id, () => (
+              updateOrderItemQuantityById({
+                itemId: newItem.id,
+                quantity: quantityToPersist,
+                businessId,
+                orderId: selectedMesa.current_order_id
+              })
+            )).then(() => {
+              setPendingQuantityUpdatesSafe((prev) => {
+                const next = { ...(prev || {}) };
+                delete next[newItem.id];
+                return next;
+              });
+            }).catch(async () => {
+              setError(`❌ No se pudo sincronizar la cantidad del item. Por favor, intenta guardar la orden. [${itemDebugTag('quantity-sync-failed')}]`);
+              try {
+                const freshItems = await getOrderItemsByOrderId({
+                  orderId: selectedMesa.current_order_id,
+                  selectSql: ORDER_ITEMS_SELECT
+                });
+                if (Array.isArray(freshItems)) {
+                  setOrderItems((prevItems) =>
+                    mergeOrderItemsPreservingPosition(
+                      prevItems,
+                      applyPendingQuantities(freshItems, pendingQuantityUpdatesRef.current)
+                    )
+                  );
+                }
+              } catch {
+                // no-op
+              }
+            }).finally(() => {
+              markOrderItemOpFinished();
+            });
           }).catch(async () => {
-            setError('❌ No se pudo sincronizar la cantidad del item. Por favor, intenta guardar la orden.');
+            setError(`❌ No se pudo agregar el item. Por favor, intenta de nuevo. [${itemDebugTag('insert-catch')}]`);
+            delete optimisticTempItemQuantitiesRef.current[tempId];
+            setOrderItems((prevItems) => prevItems.filter((item) => item.id !== tempId));
+            setPendingQuantityUpdatesSafe((prev) => {
+              const next = { ...(prev || {}) };
+              delete next[tempId];
+              return next;
+            });
             try {
               const freshItems = await getOrderItemsByOrderId({
                 orderId: selectedMesa.current_order_id,
@@ -3358,34 +3675,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
           }).finally(() => {
             markOrderItemOpFinished();
           });
-        }).catch(async () => {
-          setError('❌ No se pudo agregar el item. Por favor, intenta de nuevo.');
-          delete optimisticTempItemQuantitiesRef.current[tempId];
-          setOrderItems((prevItems) => prevItems.filter((item) => item.id !== tempId));
-          setPendingQuantityUpdatesSafe((prev) => {
-            const next = { ...(prev || {}) };
-            delete next[tempId];
-            return next;
-          });
-          try {
-            const freshItems = await getOrderItemsByOrderId({
-              orderId: selectedMesa.current_order_id,
-              selectSql: ORDER_ITEMS_SELECT
-            });
-            if (Array.isArray(freshItems)) {
-              setOrderItems((prevItems) =>
-                mergeOrderItemsPreservingPosition(
-                  prevItems,
-                  applyPendingQuantities(freshItems, pendingQuantityUpdatesRef.current)
-                )
-              );
-            }
-          } catch {
-            // no-op
-          }
-        }).finally(() => {
-          markOrderItemOpFinished();
-        });
+        }
       }
 
       // Actualizar el total de forma optimista
@@ -3394,8 +3684,8 @@ function Mesas({ businessId, userRole = 'admin' }) {
       }
       setSearchProduct('');
       setQuantityToAdd(1); // Resetear cantidad
-    } catch {
-      setError('❌ No se pudo agregar el item. Por favor, intenta de nuevo.');
+    } catch (error) {
+      setError(`❌ No se pudo agregar el item. Por favor, intenta de nuevo. [MESA_ITEM_DBG|stage=outer-catch|msg=${String(error?.message || error || 'unknown').replace(/\s+/g, ' ').slice(0, 80)}]`);
       // Revertir solo los items si se puede consultar remoto.
       try {
         const freshItems = await getOrderItemsByOrderId({
@@ -3452,21 +3742,34 @@ function Mesas({ businessId, userRole = 'admin' }) {
       }
     } catch {
       setError('❌ No se pudo actualizar la cantidad. Por favor, intenta de nuevo.');
-      const freshItems = await getOrderItemsByOrderId({
-        orderId: selectedMesa.current_order_id,
-        selectSql: ORDER_ITEMS_SELECT
-      });
-      if (freshItems?.length) {
-        setOrderItems((prevItems) =>
-          mergeOrderItemsPreservingPosition(
-            prevItems,
-            applyPendingQuantities(freshItems, pendingQuantityUpdatesRef.current)
-          )
+      try {
+        const currentOrderId = String(selectedMesa?.current_order_id || '');
+        const isLocalOnlyOrder = (
+          String(selectedMesa?.orders?.__localOnly || '').toLowerCase() === 'true'
+          || currentOrderId.startsWith('offline-order-')
         );
+        const shouldSkipRemoteRefresh = isLocalOnlyOrder || isOfflineFirstRuntime || isOfflineMode();
+
+        if (!shouldSkipRemoteRefresh) {
+          const freshItems = await getOrderItemsByOrderId({
+            orderId: selectedMesa.current_order_id,
+            selectSql: ORDER_ITEMS_SELECT
+          });
+          if (freshItems?.length) {
+            setOrderItems((prevItems) =>
+              mergeOrderItemsPreservingPosition(
+                prevItems,
+                applyPendingQuantities(freshItems, pendingQuantityUpdatesRef.current)
+              )
+            );
+          }
+        }
+      } catch {
+        // no-op
       }
       setPendingQuantityUpdatesSafe({});
     }
-  }, [selectedMesa, removeItem, setPendingQuantityUpdatesSafe]);
+  }, [selectedMesa, isOfflineFirstRuntime, removeItem, setPendingQuantityUpdatesSafe]);
 
   const handleCloseModal = () => {
     // Capturar snapshot para uso en background o rollback
@@ -3590,6 +3893,217 @@ function Mesas({ businessId, userRole = 'admin' }) {
     setShowSplitBillModal(true);
   };
 
+  const mapOrderItemsToPrintDetails = useCallback((items = []) => {
+    const source = Array.isArray(items) ? items : [];
+
+    return source
+      .map((item) => {
+        const quantity = toFiniteNumber(item?.quantity, 0);
+        if (quantity <= 0) return null;
+
+        const unitPrice = toFiniteNumber(item?.unit_price ?? item?.price, 0);
+        const subtotalValue = Number(item?.subtotal);
+        const subtotal = Number.isFinite(subtotalValue)
+          ? subtotalValue
+          : (quantity * unitPrice);
+
+        const productName = String(
+          item?.products?.name
+          || item?.product_name
+          || item?.name
+          || ''
+        ).trim();
+        const comboName = String(
+          item?.combos?.nombre
+          || item?.combos?.name
+          || item?.combo_name
+          || ''
+        ).trim();
+
+        return {
+          quantity,
+          unit_price: unitPrice,
+          subtotal,
+          products: productName ? { name: productName } : null,
+          combos: comboName ? { nombre: comboName } : null,
+          product_name: productName || comboName || 'Item'
+        };
+      })
+      .filter(Boolean);
+  }, []);
+
+  const buildLocalPrintBundle = useCallback(({
+    saleId,
+    total,
+    paymentMethod,
+    createdAt,
+    amountReceived,
+    changeBreakdown,
+    orderItems,
+    sellerName = 'Venta offline'
+  }) => {
+    const normalizedSaleId = String(saleId || '').trim();
+    const saleDetails = mapOrderItemsToPrintDetails(orderItems);
+    if (saleDetails.length === 0) return null;
+
+    const fallbackSaleId = normalizedSaleId || `offline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    return {
+      saleId: fallbackSaleId,
+      saleRow: {
+        id: fallbackSaleId,
+        total: toFiniteNumber(total, 0),
+        payment_method: paymentMethod || 'cash',
+        created_at: createdAt || new Date().toISOString(),
+        seller_name: sellerName,
+        amount_received: Number.isFinite(Number(amountReceived)) ? Number(amountReceived) : null,
+        change_breakdown: Array.isArray(changeBreakdown) ? changeBreakdown : []
+      },
+      saleDetails
+    };
+  }, [mapOrderItemsToPrintDetails]);
+
+  const buildLocalSplitPrintBundles = useCallback(({ saleIds = [], sales = [], subAccounts = [] }) => {
+    const normalizedSaleIds = Array.isArray(saleIds) ? saleIds : [];
+    const normalizedSales = Array.isArray(sales) ? sales : [];
+    const normalizedSubAccounts = Array.isArray(subAccounts) ? subAccounts : [];
+
+    return normalizedSubAccounts
+      .map((subAccount, index) => {
+        const items = Array.isArray(subAccount?.items) ? subAccount.items : [];
+        if (items.length === 0) return null;
+
+        const saleMeta = normalizedSales[index] || {};
+        const resolvedSaleId = normalizedSaleIds[index] || saleMeta?.id || null;
+        const saleTotalFromMeta = Number(saleMeta?.total);
+        const saleTotal = Number.isFinite(saleTotalFromMeta)
+          ? saleTotalFromMeta
+          : items.reduce((sum, item) => {
+            const quantity = toFiniteNumber(item?.quantity, 0);
+            const unitPrice = toFiniteNumber(item?.unit_price ?? item?.price, 0);
+            return sum + (quantity * unitPrice);
+          }, 0);
+
+        return buildLocalPrintBundle({
+          saleId: resolvedSaleId,
+          total: saleTotal,
+          paymentMethod: saleMeta?.payment_method || subAccount?.paymentMethod || subAccount?.payment_method || 'cash',
+          createdAt: saleMeta?.created_at || new Date().toISOString(),
+          amountReceived: saleMeta?.amount_received ?? subAccount?.amountReceived ?? subAccount?.amount_received,
+          changeBreakdown: saleMeta?.change_breakdown ?? subAccount?.changeBreakdown ?? subAccount?.change_breakdown ?? [],
+          orderItems: items,
+          sellerName: 'Venta offline'
+        });
+      })
+      .filter(Boolean);
+  }, [buildLocalPrintBundle]);
+
+  const askReceiptPrintConfirmation = useCallback(async (saleIds = [], localPrintDataList = []) => {
+    const normalizedSaleIds = Array.isArray(saleIds)
+      ? saleIds.map((saleId) => String(saleId || '').trim()).filter(Boolean)
+      : [];
+    const normalizedLocalPrintDataList = Array.isArray(localPrintDataList)
+      ? localPrintDataList.filter((entry) => entry?.saleRow && Array.isArray(entry?.saleDetails) && entry.saleDetails.length > 0)
+      : [];
+
+    // Preparar datos para impresión
+    if (normalizedSaleIds.length === 0 && normalizedLocalPrintDataList.length === 0) return false;
+
+    try {
+      const saleDataList = [];
+      const appendedSaleIds = new Set();
+      const localById = new Map(
+        normalizedLocalPrintDataList.map((entry) => {
+          const entrySaleId = String(entry?.saleId || entry?.saleRow?.id || '').trim();
+          return [entrySaleId, entry];
+        }).filter(([entrySaleId]) => Boolean(entrySaleId))
+      );
+
+      const appendCandidate = (candidate) => {
+        if (!candidate?.saleRow || !Array.isArray(candidate?.saleDetails) || candidate.saleDetails.length === 0) return;
+        const candidateSaleId = String(candidate?.saleId || candidate?.saleRow?.id || '').trim();
+        if (!candidateSaleId || appendedSaleIds.has(candidateSaleId)) return;
+
+        saleDataList.push({
+          saleId: candidateSaleId,
+          saleRow: candidate.saleRow,
+          saleDetails: candidate.saleDetails
+        });
+        appendedSaleIds.add(candidateSaleId);
+      };
+
+      for (const saleId of normalizedSaleIds) {
+        let wasAdded = false;
+
+        try {
+          const { saleRow, saleDetails } = await getSalePrintBundle({
+            businessId,
+            saleId
+          });
+
+          if (saleRow && Array.isArray(saleDetails) && saleDetails.length > 0) {
+            appendCandidate({ saleId, saleRow, saleDetails });
+            wasAdded = appendedSaleIds.has(String(saleId || '').trim());
+          }
+        } catch {
+          // no-op
+        }
+
+        if (!wasAdded) {
+          appendCandidate(localById.get(saleId));
+        }
+      }
+
+      if (saleDataList.length === 0) {
+        normalizedLocalPrintDataList.forEach((entry) => appendCandidate(entry));
+      }
+
+      if (saleDataList.length === 0) return false;
+
+      // Guardar datos y mostrar modal
+      setPrintSaleIds(saleDataList.map((entry) => entry.saleId));
+      setPrintSaleDataList(saleDataList);
+      setShowPrintModal(true);
+
+      return true;
+    } catch {
+      return false;
+    }
+  }, [businessId]);
+
+  const handlePrintConfirm = useCallback(async () => {
+    setIsPrintingReceipt(true);
+    try {
+      for (const { saleRow, saleDetails } of printSaleDataList) {
+        try {
+          const printResult = printSaleReceipt({
+            sale: saleRow,
+            saleDetails,
+            sellerName: saleRow?.seller_name || 'Empleado'
+          });
+
+          if (!printResult.ok) {
+            setError('⚠️ No se pudo imprimir alguno de los comprobantes.');
+          }
+        } catch {
+          setError('⚠️ No se pudo imprimir alguno de los comprobantes.');
+        }
+      }
+    } catch {
+      setError('⚠️ No se pudo imprimir los comprobantes.');
+    } finally {
+      setIsPrintingReceipt(false);
+      setShowPrintModal(false);
+      setPrintSaleIds([]);
+      setPrintSaleDataList([]);
+    }
+  }, [printSaleDataList]);
+
+  const handlePrintCancel = useCallback(() => {
+    setShowPrintModal(false);
+    setPrintSaleIds([]);
+    setPrintSaleDataList([]);
+  }, []);
+
   const tryAutoPrintReceiptBySaleId = useCallback(async (saleId) => {
     if (!isAutoPrintReceiptEnabled() || !saleId) return;
 
@@ -3615,8 +4129,137 @@ function Mesas({ businessId, userRole = 'admin' }) {
     }
   }, [businessId]);
 
+  const buildStockConsumptionFromItems = useCallback((items = []) => {
+    const consumptionByProduct = new Map();
+    const source = Array.isArray(items) ? items : [];
+
+    source.forEach((item) => {
+      const quantity = Number(item?.quantity || 0);
+      if (!Number.isFinite(quantity) || quantity <= 0) return;
+
+      const productId = normalizeEntityId(item?.product_id || item?.products?.id);
+      const comboId = normalizeEntityId(item?.combo_id || item?.combos?.id);
+
+      if (productId) {
+        const current = Number(consumptionByProduct.get(productId) || 0);
+        consumptionByProduct.set(productId, current + quantity);
+        return;
+      }
+
+      if (!comboId) return;
+      const combo = comboCatalogByIdRef.current.get(comboId);
+      if (!combo) return;
+
+      (combo.combo_items || []).forEach((component) => {
+        const componentProductId = normalizeEntityId(component?.producto_id);
+        if (!componentProductId) return;
+
+        const componentQuantity = Number(component?.cantidad || 0);
+        if (!Number.isFinite(componentQuantity) || componentQuantity <= 0) return;
+
+        const current = Number(consumptionByProduct.get(componentProductId) || 0);
+        consumptionByProduct.set(componentProductId, current + (quantity * componentQuantity));
+      });
+    });
+
+    return consumptionByProduct;
+  }, []);
+
+  const applyLocalStockConsumption = useCallback((consumptionByProduct, { mode = 'consume' } = {}) => {
+    if (!(consumptionByProduct instanceof Map) || consumptionByProduct.size === 0) return;
+    const shouldRestore = mode === 'restore';
+
+    setProductos((prevProducts) => {
+      const source = Array.isArray(prevProducts) ? prevProducts : [];
+      const nextProducts = source.map((product) => {
+        if (product?.manage_stock === false) return product;
+
+        const productId = normalizeEntityId(product?.id);
+        if (!productId) return product;
+
+        const consumed = Number(consumptionByProduct.get(productId) || 0);
+        if (!Number.isFinite(consumed) || consumed <= 0) return product;
+
+        const currentStock = Number(product?.stock || 0);
+        const safeCurrentStock = Number.isFinite(currentStock) ? currentStock : 0;
+
+        const nextStock = shouldRestore
+          ? safeCurrentStock + consumed
+          : Math.max(0, safeCurrentStock - consumed);
+
+        return {
+          ...product,
+          stock: nextStock
+        };
+      });
+
+      if (businessId) {
+        saveOfflineSnapshot(`mesas.productos:${businessId}`, nextProducts);
+        saveOfflineSnapshot(`ventas.productos:${businessId}`, nextProducts);
+        saveOfflineSnapshot(`inventario.productos:${businessId}`, nextProducts);
+      }
+
+      return nextProducts;
+    });
+  }, [businessId]);
+
+  const appendPendingSalesToVentasSnapshot = useCallback((pendingSales = []) => {
+    if (!businessId || !Array.isArray(pendingSales) || pendingSales.length === 0) return;
+
+    const snapshotKey = `ventas.list:${businessId}`;
+    const currentSnapshot = readOfflineSnapshot(snapshotKey, []);
+    const currentList = Array.isArray(currentSnapshot) ? currentSnapshot : [];
+
+    const normalizedPendingSales = pendingSales
+      .map((sale) => {
+        const saleId = String(sale?.id || '').trim();
+        if (!saleId) return null;
+
+        const total = Number(sale?.total || 0);
+        const amountReceived = Number(sale?.amount_received);
+        const resolvedAmountReceived = Number.isFinite(amountReceived) ? amountReceived : null;
+        const changeBreakdown = Array.isArray(sale?.change_breakdown) ? sale.change_breakdown : [];
+        const changeFromBreakdown = changeBreakdown.reduce((sum, entry) => {
+          const denomination = Number(entry?.denomination || 0);
+          const count = Number(entry?.count || 0);
+          if (!Number.isFinite(denomination) || !Number.isFinite(count) || count <= 0) return sum;
+          return sum + (denomination * count);
+        }, 0);
+        const changeAmount = changeFromBreakdown > 0
+          ? changeFromBreakdown
+          : (resolvedAmountReceived !== null ? Math.max(resolvedAmountReceived - total, 0) : null);
+
+        return {
+          id: saleId,
+          business_id: businessId,
+          user_id: null,
+          seller_name: 'Venta offline',
+          payment_method: sale?.payment_method || 'cash',
+          total,
+          created_at: sale?.created_at || new Date().toISOString(),
+          notes: 'Pendiente de sincronización',
+          pending_sync: true,
+          amount_received: resolvedAmountReceived,
+          change_amount: changeAmount,
+          change_breakdown: changeBreakdown,
+          employees: { full_name: 'Pendiente sync', role: 'employee' }
+        };
+      })
+      .filter(Boolean);
+
+    if (normalizedPendingSales.length === 0) return;
+
+    const existingIds = new Set(currentList.map((sale) => String(sale?.id || '').trim()).filter(Boolean));
+    const newItems = normalizedPendingSales.filter((sale) => !existingIds.has(String(sale.id || '').trim()));
+    if (newItems.length === 0) return;
+
+    saveOfflineSnapshot(snapshotKey, [...newItems, ...currentList]);
+  }, [businessId]);
+
   const processSplitPaymentAndClose = async ({ subAccounts }) => {
     if (isClosingOrder) return;
+
+    let splitCloseLockKey = null;
 
     if (insufficientItems.length > 0) {
       const firstShortage = insufficientItems[0];
@@ -3647,10 +4290,22 @@ function Mesas({ businessId, userRole = 'admin' }) {
       setIsClosingOrder(false);
       return;
     }
+
+    splitCloseLockKey = `split:${businessId}:${mesaSnapshot.id}:${mesaSnapshot.current_order_id}`;
+    if (!acquireCloseOrderLock(splitCloseLockKey)) {
+      setError('⏳ Esta orden ya se está cerrando. Espera un momento.');
+      setIsGeneratingSplitSales(false);
+      setIsClosingOrder(false);
+      return;
+    }
+
     const optimisticSplitTotal = (subAccounts || []).reduce(
       (sum, sub) => sum + Number(sub?.total || 0),
       0
     );
+    const splitItemsSnapshot = (Array.isArray(subAccounts) ? subAccounts : [])
+      .flatMap((sub) => (Array.isArray(sub?.items) ? sub.items : []));
+    const splitConsumptionByProduct = buildStockConsumptionFromItems(splitItemsSnapshot);
 
     // Cierre optimista inmediato (igual que cierre normal): no bloquear UX.
     setMesas((prevMesas) =>
@@ -3676,6 +4331,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
     orderItemsRef.current = [];
     setOrderItems([]);
     setPendingQuantityUpdatesSafe({});
+    applyLocalStockConsumption(splitConsumptionByProduct);
     setIsGeneratingSplitSales(false);
     setIsClosingOrder(false);
     setSuccessDetails([
@@ -3698,9 +4354,24 @@ function Mesas({ businessId, userRole = 'admin' }) {
         saleIds = []
       } = closeResult || {};
 
-      for (const saleId of saleIds) {
-        // best-effort: no bloquear cierre si falla la impresión de alguno
-        await tryAutoPrintReceiptBySaleId(saleId);
+      if (closeResult?.pending_sync && Array.isArray(closeResult?.sales)) {
+        appendPendingSalesToVentasSnapshot(closeResult.sales);
+      }
+
+      const localSplitPrintBundles = closeResult?.pending_sync
+        ? buildLocalSplitPrintBundles({
+          saleIds,
+          sales: closeResult?.sales || [],
+          subAccounts
+        })
+        : [];
+
+      const shouldPrintReceipts = isAutoPrintReceiptEnabled()
+        ? (await askReceiptPrintConfirmation(saleIds, localSplitPrintBundles))
+        : false;
+
+      if (!shouldPrintReceipts) {
+        // Usuario canceló la impresión o auto-print deshabilitado
       }
 
       loadMesas().catch(() => {});
@@ -3709,19 +4380,23 @@ function Mesas({ businessId, userRole = 'admin' }) {
         justCompletedSaleRef.current = false;
         setCanShowOrderModal(true);
       }, MODAL_REOPEN_GUARD_MS);
-      } catch (error) {
-        setError(buildDiagnosticAlertMessage(error, 'No se pudo cerrar la orden. Revirtiendo estado.'));
-        try { await loadMesas(); } catch { /* no-op */ }
-        try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch { /* no-op */ }
-      } finally {
-        setIsGeneratingSplitSales(false);
-        setIsClosingOrder(false);
+    } catch (error) {
+      applyLocalStockConsumption(splitConsumptionByProduct, { mode: 'restore' });
+      setError(buildDiagnosticAlertMessage(error, 'No se pudo cerrar la orden. Revirtiendo estado.'));
+      try { await loadMesas(); } catch { /* no-op */ }
+      try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch { /* no-op */ }
+    } finally {
+      releaseCloseOrderLock(splitCloseLockKey);
+      setIsGeneratingSplitSales(false);
+      setIsClosingOrder(false);
     }
   };
 
   const processPaymentAndClose = async () => {
     // Prevenir doble click
     if (isClosingOrder) return;
+
+    let closeLockKey = null;
 
     if (insufficientItems.length > 0) {
       const firstShortage = insufficientItems[0];
@@ -3762,8 +4437,22 @@ function Mesas({ businessId, userRole = 'admin' }) {
 
     // Snapshot
     const mesaSnapshot = selectedMesa ? { ...selectedMesa } : null;
+    if (!mesaSnapshot?.id || !mesaSnapshot?.current_order_id) {
+      setError('❌ No se encontró una orden activa para cerrar.');
+      setIsClosingOrder(false);
+      return;
+    }
+
+    closeLockKey = `single:${businessId}:${mesaSnapshot.id}:${mesaSnapshot.current_order_id}`;
+    if (!acquireCloseOrderLock(closeLockKey)) {
+      setError('⏳ Esta orden ya se está cerrando. Espera un momento.');
+      setIsClosingOrder(false);
+      return;
+    }
+
     const orderItemsSnapshot = Array.isArray(orderItemsRef.current) ? [...orderItemsRef.current] : [];
     const optimisticSaleTotal = calculateOrderItemsTotal(orderItemsSnapshot);
+    const orderConsumptionByProduct = buildStockConsumptionFromItems(orderItemsSnapshot);
 
     // Optimistic UI: mark mesa available and close modal immediately
     if (mesaSnapshot) {
@@ -3785,6 +4474,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
     orderItemsRef.current = [];
     setOrderItems([]);
     setPendingQuantityUpdatesSafe({});
+    applyLocalStockConsumption(orderConsumptionByProduct);
     setPaymentMethod('cash');
     setAmountReceived('');
     setAmountReceivedError('');
@@ -3817,8 +4507,39 @@ function Mesas({ businessId, userRole = 'admin' }) {
         });
         const { saleId } = closeResult || {};
 
-        if (saleId) {
-          await tryAutoPrintReceiptBySaleId(saleId);
+        if (closeResult?.pending_sync && saleId) {
+          appendPendingSalesToVentasSnapshot([{
+            id: saleId,
+            payment_method: paymentSnapshot,
+            total: optimisticSaleTotal,
+            amount_received: paymentSnapshot === 'cash' ? normalizedAmountReceived : null,
+            change_breakdown: paymentSnapshot === 'cash' ? (cashChangeData?.breakdown || []) : [],
+            created_at: closeResult?.created_at || new Date().toISOString()
+          }]);
+        }
+
+        const localSinglePrintBundle = closeResult?.pending_sync
+          ? buildLocalPrintBundle({
+            saleId,
+            total: optimisticSaleTotal,
+            paymentMethod: paymentSnapshot,
+            createdAt: closeResult?.created_at || new Date().toISOString(),
+            amountReceived: paymentSnapshot === 'cash' ? normalizedAmountReceived : null,
+            changeBreakdown: paymentSnapshot === 'cash' ? (cashChangeData?.breakdown || []) : [],
+            orderItems: orderItemsSnapshot,
+            sellerName: 'Venta offline'
+          })
+          : null;
+
+        const shouldPrintReceipt = isAutoPrintReceiptEnabled()
+          ? (await askReceiptPrintConfirmation(
+            [saleId],
+            localSinglePrintBundle ? [localSinglePrintBundle] : []
+          ))
+          : false;
+
+        if (!shouldPrintReceipt) {
+          // Usuario canceló la impresión o auto-print deshabilitado
         }
 
         loadMesas().catch(() => {});
@@ -3828,10 +4549,12 @@ function Mesas({ businessId, userRole = 'admin' }) {
           setCanShowOrderModal(true);
         }, MODAL_REOPEN_GUARD_MS);
       } catch (error) {
+        applyLocalStockConsumption(orderConsumptionByProduct, { mode: 'restore' });
         setError(buildDiagnosticAlertMessage(error, 'No se pudo cerrar la orden. Revirtiendo estado.'));
         try { await loadMesas(); } catch { /* no-op */ }
         try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch { /* no-op */ }
       } finally {
+        releaseCloseOrderLock(closeLockKey);
         setIsClosingOrder(false);
       }
     })();
@@ -3845,11 +4568,22 @@ function Mesas({ businessId, userRole = 'admin' }) {
       return;
     }
 
-    // Filtrar solo productos que van a cocina (solo Platos)
-    const categoriasParaCocina = ['Platos'];
-    const itemsParaCocina = orderItems.filter(item => 
-      item.combo_id || categoriasParaCocina.includes(item.products?.category)
-    );
+    // Filtrar productos que van a cocina.
+    // Soporta variaciones de categoría por mayúsculas, acentos o espacios.
+    const normalizeCategory = (value) => String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase();
+
+    const categoriasParaCocina = new Set(['plato', 'platos', 'cocina', 'comida']);
+    const itemsParaCocina = orderItems.filter((item) => {
+      if (item?.combo_id) return true;
+      const category = normalizeCategory(item?.products?.category || item?.category || '');
+      return categoriasParaCocina.has(category)
+        || category.startsWith('plato')
+        || category.includes('plato');
+    });
 
     // Si no hay nada para cocina, mostrar mensaje
     if (itemsParaCocina.length === 0) {
@@ -3867,6 +4601,15 @@ function Mesas({ businessId, userRole = 'admin' }) {
         <meta charset="UTF-8">
         <title>Orden Mesa ${selectedMesa.table_number}</title>
         <style>
+          * {
+            color: #000 !important;
+            -webkit-text-fill-color: #000 !important;
+            text-shadow: none !important;
+            box-shadow: none !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+
           @media print {
             @page {
               size: ${printerWidthMm}mm auto;
@@ -3886,8 +4629,10 @@ function Mesas({ businessId, userRole = 'admin' }) {
           
           body {
             font-family: 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.4;
+            font-size: 18px;
+            line-height: 1.65;
+            font-weight: 700;
+            color: #000 !important;
             width: ${printerWidthMm}mm;
             max-width: ${printerWidthMm}mm;
             box-sizing: border-box;
@@ -3909,26 +4654,30 @@ function Mesas({ businessId, userRole = 'admin' }) {
             border-bottom: 2px dashed #000;
             padding-bottom: 10px;
             margin-bottom: 10px;
+            color: #000;
           }
           
           .header h1 {
-            font-size: 20px;
+            font-size: 30px;
             margin: 0 0 5px 0;
-            font-weight: bold;
+            font-weight: 900;
+            letter-spacing: 0.5px;
           }
           
           .header p {
             margin: 2px 0;
-            font-size: 11px;
+            font-size: 18px;
+            font-weight: 700;
           }
           
           .info {
             margin: 10px 0;
-            font-size: 13px;
+            font-size: 20px;
+            font-weight: 700;
           }
           
           .info strong {
-            font-weight: bold;
+            font-weight: 900;
           }
           
           .items {
@@ -3945,15 +4694,19 @@ function Mesas({ businessId, userRole = 'admin' }) {
           
           .item-name {
             flex: 1;
-            font-weight: bold;
-            font-size: 13px;
+            font-weight: 900;
+            font-size: 21px;
+            line-height: 1.35;
+            color: #000;
           }
           
           .item-qty {
-            width: 60px;
+            width: 88px;
             text-align: right;
-            font-size: 13px;
-            font-weight: bold;
+            font-size: 21px;
+            font-weight: 900;
+            font-variant-numeric: tabular-nums;
+            color: #000;
           }
           
           .total {
@@ -3965,7 +4718,8 @@ function Mesas({ businessId, userRole = 'admin' }) {
             margin-top: 20px;
             padding-top: 10px;
             border-top: 2px dashed #000;
-            font-size: 11px;
+            font-size: 15px;
+            font-weight: 800;
           }
           
           .separator {
@@ -4020,15 +4774,56 @@ function Mesas({ businessId, userRole = 'admin' }) {
       </html>
     `;
 
-    // Abrir ventana de impresión
+    const printWithIframeFallback = () => {
+      try {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.setAttribute('aria-hidden', 'true');
+
+        const cleanup = () => {
+          try {
+            iframe.remove();
+          } catch {
+            // no-op
+          }
+        };
+
+        iframe.onload = () => {
+          try {
+            const frameWindow = iframe.contentWindow;
+            if (!frameWindow) throw new Error('No se pudo acceder al frame de impresión');
+            frameWindow.focus();
+            frameWindow.print();
+            setTimeout(cleanup, 800);
+          } catch {
+            cleanup();
+            setError('No se pudo imprimir. Revisa la configuración de impresión del navegador.');
+            setTimeout(() => setError(null), 3000);
+          }
+        };
+
+        iframe.srcdoc = printContent;
+        document.body.appendChild(iframe);
+      } catch {
+        setError('No se pudo imprimir. Revisa la configuración de impresión del navegador.');
+        setTimeout(() => setError(null), 3000);
+      }
+    };
+
+    // Intentar popup clásico; si está bloqueado, usar fallback por iframe oculto.
     const printWindow = window.open('', '_blank', 'width=300,height=600');
     if (printWindow) {
       printWindow.document.write(printContent);
       printWindow.document.close();
-    } else {
-      setError('No se pudo abrir la ventana de impresión. Verifica los permisos del navegador.');
-      setTimeout(() => setError(null), 3000);
+      return;
     }
+
+    printWithIframeFallback();
   };
 
   const handleDeleteTable = async (mesaId) => {
@@ -4359,6 +5154,13 @@ function Mesas({ businessId, userRole = 'admin' }) {
               message={error || ''}
               details={[]}
               duration={7000}
+            />
+            <PrintReceiptConfirmModal
+              key="print-receipt-confirm"
+              isOpen={showPrintModal}
+              onConfirm={handlePrintConfirm}
+              onCancel={handlePrintCancel}
+              isLoading={isPrintingReceipt}
             />
           </AnimatePresence>
 
@@ -4824,22 +5626,16 @@ function Mesas({ businessId, userRole = 'admin' }) {
                         <label className="block text-sm font-semibold text-primary-700 mb-1.5">
                           Método de Pago *
                         </label>
-                        <select
+                        <PaymentMethodSelect
                           value={paymentMethod}
-                          onChange={(e) => {
-                            const nextMethod = e.target.value;
+                          onChange={(nextMethod) => {
                             setPaymentMethod(nextMethod);
                             if (nextMethod !== 'cash') {
                               setAmountReceivedError('');
                             }
                           }}
-                          className="w-full h-11 px-3 rounded-xl border-2 border-accent-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
-                        >
-                          <option value="cash">💵 Efectivo</option>
-                          <option value="card">💳 Tarjeta</option>
-                          <option value="transfer">🏦 Transferencia</option>
-                          <option value="mixed">🔄 Mixto</option>
-                        </select>
+                          className="w-full"
+                        />
                       </div>
 
                       <div>
