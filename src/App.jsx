@@ -5,6 +5,13 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import { Loader2, AlertCircle, X } from 'lucide-react';
 import OfflineBanner from './components/OfflineBanner.jsx';
 import { isBraveBrowser } from './utils/braveDetection';
+import { isOfflinePersistenceEnabled } from './utils/offlineSnapshot.js';
+import { startSalesOutboxAutoSync } from './data/commands/salesCommands.js';
+import { supabaseAdapter } from './data/adapters/supabaseAdapter.js';
+import {
+  getWebPushSupportStatus,
+  registerPwaPushSubscription,
+} from './services/pwaPushNotificationsService.js';
 
 // Lazy loading de páginas para optimizar carga inicial
 const Home = lazy(() => import('./pages/Home.jsx'));
@@ -47,6 +54,7 @@ function App() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isOfflinePersistenceEnabled()) return;
     try {
       const keysToDelete = [];
       for (let i = 0; i < (window.localStorage?.length || 0); i += 1) {
@@ -62,6 +70,46 @@ function App() {
     } catch {
       // no-op
     }
+  }, []);
+
+  useEffect(() => {
+    if (!isOfflinePersistenceEnabled()) return undefined;
+    return startSalesOutboxAutoSync();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const support = getWebPushSupportStatus();
+    if (!support.supported) return undefined;
+
+    const tryRegister = async () => {
+      try {
+        const sessionResult = await supabaseAdapter.getCurrentSession();
+        const hasSession = Boolean(sessionResult?.data?.session?.access_token);
+        if (!hasSession || cancelled) return;
+        await registerPwaPushSubscription({ askPermission: false });
+      } catch {
+        // no-op: solo registro silencioso best-effort
+      }
+    };
+
+    void tryRegister();
+
+    const {
+      data: { subscription },
+    } = supabaseAdapter.onAuthStateChange((event, nextSession) => {
+      if (cancelled) return;
+      const hasSession = Boolean(nextSession?.access_token);
+      if (!hasSession) return;
+      if (event !== 'SIGNED_IN' && event !== 'TOKEN_REFRESHED') return;
+      void registerPwaPushSubscription({ askPermission: false });
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   return (
