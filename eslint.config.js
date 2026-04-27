@@ -12,6 +12,8 @@ export default defineConfig([
     'test-sale-creation.js',
     'src/utils/reactOptimizations.jsx',
     'src/hooks/optimized.js',
+    'public/pwa/sw-push.js',
+    'scripts/perf/*.mjs',
   ]),
   {
     files: ['**/*.{js,jsx}'],
@@ -52,6 +54,8 @@ export default defineConfig([
       'vite.config.js',
       'apps/mobile/metro.config.js',
       'apps/mobile/plugins/withFirebaseAppInit.js',
+      'src/config/localSync.js',
+      'src/sync/shapeRegistry.js',
     ],
     languageOptions: {
       globals: {
