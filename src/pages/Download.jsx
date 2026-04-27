@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Download, ShieldCheck, Smartphone, AlertTriangle, Monitor, BellRing, Share, PlusSquare, AppWindow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,9 +22,13 @@ function DownloadPage() {
   const [testingPush, setTestingPush] = useState(false);
   const [pushFeedback, setPushFeedback] = useState('');
   const [showIOsSteps, setShowIOsSteps] = useState(false);
-  const support = useMemo(() => getWebPushSupportStatus(), []);
+  const [support, setSupport] = useState({ supported: false, reason: 'loading', permission: 'default' });
   const userIsOnIOs = isIOs();
   const userInStandalone = isStandalone();
+
+  useEffect(() => {
+    getWebPushSupportStatus().then(setSupport);
+  }, []);
 
   const handleEnableNotifications = async () => {
     setEnablingPush(true);
