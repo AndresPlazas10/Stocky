@@ -30,9 +30,8 @@ import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -455,18 +454,10 @@ public class MainActivity extends Activity {
                 @Override
                 public void run() {
                 try {
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                    String requestLine = reader.readLine();
-                    String token = "";
-                    int length = 0;
-                    String line;
-                    while ((line = reader.readLine()) != null && !line.isEmpty()) {
-                        String lower = line.toLowerCase();
-                        if (lower.startsWith("x-stocky-bridge-token:")) token = line.substring(line.indexOf(':') + 1).trim();
-                        if (lower.startsWith("content-length:")) length = parseInt(line.substring(line.indexOf(':') + 1), 0);
-                    }
-                    char[] bodyChars = new char[length];
-                    if (length > 0) reader.read(bodyChars);
+                    socket.setSoTimeout(2500);
+                    HttpRequest request = readRequest(socket);
+                    String requestLine = request.requestLine;
+                    String token = request.header("x-stocky-bridge-token");
 
                     if (requestLine != null && requestLine.startsWith("OPTIONS ")) {
                         respond(socket, 204, "");
@@ -494,7 +485,7 @@ public class MainActivity extends Activity {
                         return;
                     }
 
-                    String body = new String(bodyChars);
+                    String body = request.body;
                     JSONObject payload = new JSONObject(body);
                     String payloadToken = payload.optString("token", token);
 
@@ -515,6 +506,90 @@ public class MainActivity extends Activity {
                 }
                 }
             }).start();
+        }
+
+        private HttpRequest readRequest(Socket socket) throws Exception {
+            InputStream input = socket.getInputStream();
+            ByteArrayOutputStream raw = new ByteArrayOutputStream();
+            byte[] buffer = new byte[1024];
+            int headerEnd = -1;
+            int contentLength = 0;
+            byte[] separator = "\r\n\r\n".getBytes("UTF-8");
+
+            while (true) {
+                int count = input.read(buffer);
+                if (count < 0) break;
+                raw.write(buffer, 0, count);
+
+                byte[] data = raw.toByteArray();
+                if (headerEnd < 0) {
+                    headerEnd = indexOf(data, separator);
+                    if (headerEnd >= 0) {
+                        String headers = new String(data, 0, headerEnd, "UTF-8");
+                        contentLength = parseContentLength(headers);
+                    }
+                }
+
+                if (headerEnd >= 0 && data.length >= headerEnd + separator.length + contentLength) {
+                    break;
+                }
+            }
+
+            byte[] data = raw.toByteArray();
+            if (headerEnd < 0) throw new Exception("Solicitud HTTP incompleta");
+
+            String headers = new String(data, 0, headerEnd, "UTF-8");
+            int bodyStart = headerEnd + separator.length;
+            int bodyLength = Math.max(0, Math.min(contentLength, data.length - bodyStart));
+            String body = bodyLength > 0 ? new String(data, bodyStart, bodyLength, "UTF-8") : "";
+            return new HttpRequest(headers, body);
+        }
+
+        private int parseContentLength(String headers) {
+            String[] lines = headers.split("\\r?\\n");
+            for (String line : lines) {
+                String lower = line.toLowerCase();
+                if (lower.startsWith("content-length:")) {
+                    return parseInt(line.substring(line.indexOf(':') + 1), 0);
+                }
+            }
+            return 0;
+        }
+
+        private int indexOf(byte[] data, byte[] pattern) {
+            outer:
+            for (int i = 0; i <= data.length - pattern.length; i++) {
+                for (int j = 0; j < pattern.length; j++) {
+                    if (data[i + j] != pattern[j]) continue outer;
+                }
+                return i;
+            }
+            return -1;
+        }
+
+        private class HttpRequest {
+            final String requestLine;
+            final String headers;
+            final String body;
+
+            HttpRequest(String headers, String body) {
+                this.headers = headers;
+                this.body = body;
+                int lineEnd = headers.indexOf("\r\n");
+                if (lineEnd < 0) lineEnd = headers.indexOf("\n");
+                this.requestLine = lineEnd >= 0 ? headers.substring(0, lineEnd) : headers;
+            }
+
+            String header(String name) {
+                String target = name.toLowerCase() + ":";
+                String[] lines = headers.split("\\r?\\n");
+                for (String line : lines) {
+                    if (line.toLowerCase().startsWith(target)) {
+                        return line.substring(line.indexOf(':') + 1).trim();
+                    }
+                }
+                return "";
+            }
         }
 
         private void respond(Socket socket, int status, String body) throws Exception {
