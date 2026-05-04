@@ -472,6 +472,11 @@ public class MainActivity extends Activity {
                     char[] bodyChars = new char[length];
                     if (length > 0) reader.read(bodyChars);
 
+                    if (requestLine != null && requestLine.startsWith("OPTIONS ")) {
+                        respond(socket, 204, "");
+                        return;
+                    }
+
                     if (requestLine != null && requestLine.startsWith("GET /v1/status")) {
                         respond(socket, 200, "{\"ok\":true,\"platform\":\"android\"}");
                         return;
@@ -504,11 +509,14 @@ public class MainActivity extends Activity {
 
         private void respond(Socket socket, int status, String body) throws Exception {
             OutputStream output = socket.getOutputStream();
-            String statusText = status == 200 ? "OK" : "ERROR";
+            String statusText = status == 200 ? "OK" : status == 204 ? "No Content" : "ERROR";
             byte[] bytes = body.getBytes("UTF-8");
             String headers = "HTTP/1.1 " + status + " " + statusText + "\r\n"
                     + "Content-Type: application/json\r\n"
                     + "Access-Control-Allow-Origin: *\r\n"
+                    + "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
+                    + "Access-Control-Allow-Headers: Content-Type, X-Stocky-Bridge-Token, X-Stocky-Origin\r\n"
+                    + "Access-Control-Allow-Private-Network: true\r\n"
                     + "Content-Length: " + bytes.length + "\r\n\r\n";
             output.write(headers.getBytes("UTF-8"));
             output.write(bytes);

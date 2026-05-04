@@ -49,6 +49,13 @@ export async function printSaleReceipt({
     return bridgeResult;
   }
 
+  if (!bridgeResult.fallback) {
+    return {
+      ok: false,
+      error: `No se pudo conectar con Stocky Print Bridge (${bridgeResult.reason || 'bridge_error'}).`,
+    };
+  }
+
   const printContent = `
     <!DOCTYPE html>
     <html>
