@@ -287,7 +287,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
     setIsPrintingReceipt(true);
     try {
-      const printResult = printSaleReceipt({
+      const printResult = await printSaleReceipt({
         sale: printSaleData,
         saleDetails: printSaleDetails,
         sellerName: printSaleData.seller_name || getVendedorName(printSaleData)
@@ -1113,7 +1113,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       return;
     }
 
-    const printResult = printSaleReceipt({
+    const printResult = await printSaleReceipt({
       sale: venta,
       saleDetails,
       sellerName: getVendedorName(venta)

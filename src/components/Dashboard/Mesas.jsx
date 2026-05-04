@@ -4075,7 +4075,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
     try {
       for (const { saleRow, saleDetails } of printSaleDataList) {
         try {
-          const printResult = printSaleReceipt({
+          const printResult = await printSaleReceipt({
             sale: saleRow,
             saleDetails,
             sellerName: saleRow?.seller_name || 'Empleado'
@@ -4115,7 +4115,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
 
       if (!saleRow || !Array.isArray(saleDetails) || saleDetails.length === 0) return;
 
-      const printResult = printSaleReceipt({
+      const printResult = await printSaleReceipt({
         sale: saleRow,
         saleDetails,
         sellerName: saleRow.seller_name || 'Empleado'

@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Printer, X } from 'lucide-react';
 import { Button } from './button';
+import { getBridgePrinterLabel } from '../../utils/printBridgeClient.js';
 
 export function PrintReceiptConfirmModal({
   isOpen,
@@ -8,6 +9,8 @@ export function PrintReceiptConfirmModal({
   onCancel,
   isLoading = false
 }) {
+  const bridgePrinterLabel = getBridgePrinterLabel();
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -58,6 +61,12 @@ export function PrintReceiptConfirmModal({
                 <p className="text-sm text-accent-600">
                   Se enviará el comprobante a la impresora térmica configurada.
                 </p>
+                {bridgePrinterLabel && (
+                  <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase text-indigo-500">Impresora principal</p>
+                    <p className="mt-1 text-sm font-bold text-indigo-950">{bridgePrinterLabel}</p>
+                  </div>
+                )}
               </div>
 
               {/* Footer */}

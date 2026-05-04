@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stocky Print Bridge</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Stocky Print Bridge</p>
+          <h1>Impresora térmica local</h1>
+          <p class="subtitle">Conecta Stocky con una impresora Bluetooth ESC/POS emparejada en Windows.</p>
+        </div>
+        <div class="status" id="serverStatus">Iniciando...</div>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <div class="panel-header">
+            <h2>Conexión</h2>
+            <button id="refreshPrinters" class="button secondary">Escanear</button>
+          </div>
+
+          <label>
+            Impresora / puerto COM
+            <select id="printerPort"></select>
+          </label>
+
+          <label>
+            Nombre visible
+            <input id="printerName" placeholder="DigitalPOS 80mm" />
+          </label>
+
+          <div class="row">
+            <label>
+              Papel
+              <select id="paperWidth">
+                <option value="58">58mm</option>
+                <option value="80">80mm</option>
+                <option value="104">104mm</option>
+              </select>
+            </label>
+            <label>
+              Baud rate
+              <select id="baudRate">
+                <option value="9600">9600</option>
+                <option value="19200">19200</option>
+                <option value="38400">38400</option>
+                <option value="115200">115200</option>
+              </select>
+            </label>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <h2>Integración Stocky</h2>
+          </div>
+
+          <label class="check">
+            <input id="serverEnabled" type="checkbox" />
+            Permitir impresión desde Stocky Web/Desktop
+          </label>
+
+          <label>
+            Endpoint local
+            <input id="endpoint" readonly />
+          </label>
+
+          <label>
+            Token de emparejamiento
+            <input id="token" readonly />
+          </label>
+
+          <p class="hint">Copia este token en Stocky > Configuración > Impresora térmica.</p>
+        </article>
+
+        <article class="panel wide">
+          <div class="panel-header">
+            <h2>Recibo</h2>
+          </div>
+
+          <div class="row">
+            <label>
+              Nombre del negocio
+              <input id="businessName" placeholder="Sistema Stocky" />
+            </label>
+            <label>
+              Mensaje final
+              <input id="footerMessage" placeholder="Gracias por su compra" />
+            </label>
+          </div>
+
+          <div class="row">
+            <label class="check">
+              <input id="showVoluntaryTip" type="checkbox" />
+              Mostrar propina voluntaria
+            </label>
+            <label>
+              Valor de propina
+              <input id="voluntaryTipValue" type="number" min="0" step="100" />
+            </label>
+          </div>
+        </article>
+      </section>
+
+      <footer class="actions">
+        <p id="feedback" class="feedback"></p>
+        <div>
+          <button id="testPrint" class="button secondary">Imprimir prueba</button>
+          <button id="saveConfig" class="button primary">Guardar configuración</button>
+        </div>
+      </footer>
+    </main>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>
