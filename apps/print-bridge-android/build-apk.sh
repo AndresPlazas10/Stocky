@@ -25,7 +25,7 @@ DEX_DIR="$BUILD_DIR/dex"
 RES_ZIP="$BUILD_DIR/resources.zip"
 UNSIGNED_APK="$BUILD_DIR/stocky-print-bridge-unsigned.apk"
 ALIGNED_APK="$BUILD_DIR/stocky-print-bridge-aligned.apk"
-KEYSTORE="$BUILD_DIR/debug.keystore"
+KEYSTORE="$ROOT_DIR/debug.keystore"
 FINAL_APK="$DIST_DIR/stocky-print-bridge-debug.apk"
 
 rm -rf "$BUILD_DIR" "$DIST_DIR"
@@ -61,15 +61,17 @@ cd "$ROOT_DIR"
 
 "$ZIPALIGN" -f 4 "$UNSIGNED_APK" "$ALIGNED_APK"
 
-"${JAVA_HOME:-}/bin/keytool" -genkeypair \
-  -keystore "$KEYSTORE" \
-  -storepass android \
-  -keypass android \
-  -alias androiddebugkey \
-  -keyalg RSA \
-  -keysize 2048 \
-  -validity 10000 \
-  -dname "CN=Android Debug,O=Stocky,C=CO" >/dev/null
+if [[ ! -f "$KEYSTORE" ]]; then
+  "${JAVA_HOME:-}/bin/keytool" -genkeypair \
+    -keystore "$KEYSTORE" \
+    -storepass android \
+    -keypass android \
+    -alias androiddebugkey \
+    -keyalg RSA \
+    -keysize 2048 \
+    -validity 10000 \
+    -dname "CN=Android Debug,O=Stocky,C=CO" >/dev/null
+fi
 
 "$APKSIGNER" sign \
   --ks "$KEYSTORE" \
