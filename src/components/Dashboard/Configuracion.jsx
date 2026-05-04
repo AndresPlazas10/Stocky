@@ -35,7 +35,15 @@ import {
   getThermalPaperWidthMm,
   setThermalPaperWidthMm,
   isAutoPrintReceiptEnabled,
-  setAutoPrintReceiptEnabled
+  setAutoPrintReceiptEnabled,
+  isPrintBridgeEnabled,
+  setPrintBridgeEnabled,
+  getPrintBridgeEndpoint,
+  setPrintBridgeEndpoint,
+  getPrintBridgeToken,
+  setPrintBridgeToken,
+  getConfiguredPrinterName,
+  setConfiguredPrinterName,
 } from '../../utils/printer.js';
 
 function Configuracion({ user, business, onBusinessUpdate }) {
@@ -48,6 +56,10 @@ function Configuracion({ user, business, onBusinessUpdate }) {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [printerPaperWidth, setPrinterPaperWidth] = useState(() => getThermalPaperWidthMm());
   const [autoPrintReceipt, setAutoPrintReceipt] = useState(() => isAutoPrintReceiptEnabled());
+  const [printBridgeEnabled, setPrintBridgeEnabledState] = useState(() => isPrintBridgeEnabled());
+  const [printBridgeEndpoint, setPrintBridgeEndpointState] = useState(() => getPrintBridgeEndpoint());
+  const [printBridgeToken, setPrintBridgeTokenState] = useState(() => getPrintBridgeToken());
+  const [configuredPrinterName, setConfiguredPrinterNameState] = useState(() => getConfiguredPrinterName());
 
   const [businessData, setBusinessData] = useState({
     name: '',
@@ -180,6 +192,32 @@ function Configuracion({ user, business, onBusinessUpdate }) {
       setError('❌ No se pudo guardar la configuración de autoimpresión');
     }
   }, []);
+
+  const handlePrintBridgeEnabledChange = useCallback((e) => {
+    const nextValue = Boolean(e?.target?.checked);
+    const saved = setPrintBridgeEnabled(nextValue);
+    if (saved) {
+      setPrintBridgeEnabledState(nextValue);
+      setSuccess(nextValue ? 'Stocky Print Bridge activado' : 'Stocky Print Bridge desactivado');
+    } else {
+      setError('❌ No se pudo guardar la configuración del puente de impresión');
+    }
+  }, []);
+
+  const handlePrintBridgeSave = useCallback(() => {
+    const savedEndpoint = setPrintBridgeEndpoint(printBridgeEndpoint);
+    const savedToken = setPrintBridgeToken(printBridgeToken);
+    const savedPrinter = setConfiguredPrinterName(configuredPrinterName);
+
+    if (savedEndpoint && savedToken && savedPrinter) {
+      setPrintBridgeEndpointState(getPrintBridgeEndpoint());
+      setPrintBridgeTokenState(getPrintBridgeToken());
+      setConfiguredPrinterNameState(getConfiguredPrinterName());
+      setSuccess('Configuración de Stocky Print Bridge guardada');
+    } else {
+      setError('❌ No se pudo guardar la configuración del puente de impresión');
+    }
+  }, [configuredPrinterName, printBridgeEndpoint, printBridgeToken]);
 
   useEffect(() => {
     let errorTimer, successTimer;
@@ -546,6 +584,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                   >
                     <option value={58}>58mm</option>
                     <option value={80}>80mm</option>
+                    <option value={104}>104mm</option>
                   </select>
                   <label className="mt-3 inline-flex items-center gap-2 text-sm text-amber-900 font-medium">
                     <input
@@ -556,6 +595,58 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                     />
                     Imprimir recibo automáticamente al cerrar venta
                   </label>
+                  <div className="mt-4 rounded-xl border border-indigo-100 bg-white/80 p-4">
+                    <label className="inline-flex items-center gap-2 text-sm text-indigo-950 font-semibold">
+                      <input
+                        type="checkbox"
+                        checked={printBridgeEnabled}
+                        onChange={handlePrintBridgeEnabledChange}
+                        className="h-4 w-4 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-300"
+                      />
+                      Usar Stocky Print Bridge
+                    </label>
+                    <p className="mt-1 text-xs text-slate-600">
+                      Cuando esté activo, Stocky intentará imprimir primero con la impresora configurada en el puente local.
+                    </p>
+                    <div className="mt-3 grid gap-3 md:grid-cols-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Impresora</label>
+                        <input
+                          value={configuredPrinterName}
+                          onChange={(e) => setConfiguredPrinterNameState(e.target.value)}
+                          className="w-full h-10 px-3 border border-indigo-100 rounded-lg bg-white text-slate-900 text-sm focus:ring-2 focus:ring-indigo-200 focus:border-transparent"
+                          placeholder="DigitalPOS"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Endpoint local</label>
+                        <input
+                          value={printBridgeEndpoint}
+                          onChange={(e) => setPrintBridgeEndpointState(e.target.value)}
+                          className="w-full h-10 px-3 border border-indigo-100 rounded-lg bg-white text-slate-900 text-sm focus:ring-2 focus:ring-indigo-200 focus:border-transparent"
+                          placeholder="http://127.0.0.1:41780"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Token</label>
+                        <input
+                          value={printBridgeToken}
+                          onChange={(e) => setPrintBridgeTokenState(e.target.value)}
+                          className="w-full h-10 px-3 border border-indigo-100 rounded-lg bg-white text-slate-900 text-sm focus:ring-2 focus:ring-indigo-200 focus:border-transparent"
+                          placeholder="Token de emparejamiento"
+                          type="password"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handlePrintBridgeSave}
+                      className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all text-sm"
+                    >
+                      <Save className="w-4 h-4" />
+                      Guardar puente
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

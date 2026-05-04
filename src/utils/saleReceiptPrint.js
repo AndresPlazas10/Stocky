@@ -1,28 +1,22 @@
-import { formatDateTimeTicket, formatPrice } from './formatters.js';
 import { getThermalPaperWidthMm } from './printer.js';
+import { sendReceiptToPrintBridge } from './printBridgeClient.js';
+import { buildSaleReceiptTemplate, validateSaleReceiptTemplate } from './receiptTemplate.js';
 
-const getPaymentMethodLabel = (method) => {
-  if (method === 'cash') return '💵 Efectivo';
-  if (method === 'card') return '💳 Tarjeta';
-  if (method === 'transfer') return '🏦 Transferencia';
-  if (method === 'mixed') return '🔀 Mixto';
-  if (method === 'nequi') return '🏦 Nequi';
-  if (method === 'bancolombia') return '🏦 Bancolombia';
-  if (method === 'banco_bogota') return '🏦 Banco de Bogotá';
-  if (method === 'nu') return '🏦 Nu';
-  if (method === 'davivienda') return '🏦 Davivienda';
-  return String(method || 'No especificado');
-};
+const escapeHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#039;');
 
-const getSaleDetailDisplayName = (detail) => (
-  detail?.products?.name
-  || detail?.combos?.nombre
-  || detail?.combos?.name
-  || detail?.product_name
-  || 'Item'
-);
-
-export function printSaleReceipt({ sale, saleDetails = [], sellerName = 'Empleado' }) {
+export async function printSaleReceipt({
+  sale,
+  saleDetails = [],
+  sellerName = 'Empleado',
+  businessName = 'Sistema Stocky',
+  footerMessage = 'Gracias por su compra',
+  voluntaryTip = null,
+}) {
   if (!sale?.id) {
     return { ok: false, error: 'No se pudo imprimir: venta sin id.' };
   }
@@ -32,6 +26,29 @@ export function printSaleReceipt({ sale, saleDetails = [], sellerName = 'Emplead
   }
 
   const printerWidthMm = getThermalPaperWidthMm();
+  const receipt = buildSaleReceiptTemplate({
+    sale,
+    saleDetails,
+    sellerName,
+    businessName,
+    footerMessage,
+    voluntaryTip,
+  });
+  const validation = validateSaleReceiptTemplate(receipt);
+
+  if (!validation.ok) {
+    return validation;
+  }
+
+  const bridgeResult = await sendReceiptToPrintBridge({
+    receipt,
+    paperWidthMm: printerWidthMm,
+  });
+
+  if (bridgeResult.ok) {
+    return bridgeResult;
+  }
+
   const printContent = `
     <!DOCTYPE html>
     <html>
@@ -150,14 +167,14 @@ export function printSaleReceipt({ sale, saleDetails = [], sellerName = 'Emplead
     <body>
       <div class="receipt">
         <div class="header">
-          <h1>COMPROBANTE DE VENTA</h1>
-          <p>Sistema Stocky</p>
-          <p>${formatDateTimeTicket(sale.created_at || new Date())}</p>
+          <h1>${escapeHtml(receipt.header.title)}</h1>
+          <p>${escapeHtml(receipt.header.businessName)}</p>
+          <p>${escapeHtml(receipt.header.dateText)}</p>
         </div>
 
-        <div class="row"><span><strong>Comprobante:</strong></span><span>CPV-${String(sale.id).substring(0, 8).toUpperCase()}</span></div>
-        <div class="row"><span><strong>Vendedor:</strong></span><span>${String(sellerName || 'Empleado')}</span></div>
-        <div class="row"><span><strong>Cliente:</strong></span><span>Venta general</span></div>
+        ${receipt.metadata.map((row) => `
+          <div class="row"><span><strong>${escapeHtml(row.label)}:</strong></span><span>${escapeHtml(row.value)}</span></div>
+        `).join('')}
 
         <div class="separator"></div>
 
@@ -167,22 +184,26 @@ export function printSaleReceipt({ sale, saleDetails = [], sellerName = 'Emplead
           <span class="item-price">Total</span>
         </div>
 
-        ${saleDetails.map((item) => `
+        ${receipt.items.map((item) => `
           <div class="item">
-            <div class="item-name">${getSaleDetailDisplayName(item)}</div>
-            <div class="item-qty">x${Number(item?.quantity || 0)}</div>
-            <div class="item-price">${formatPrice(item?.subtotal ?? ((Number(item?.quantity || 0) * Number(item?.unit_price || 0)) || 0))}</div>
+            <div class="item-name">${escapeHtml(item.name)}</div>
+            <div class="item-qty">x${Number(item.quantity || 0)}</div>
+            <div class="item-price">${escapeHtml(item.subtotalText)}</div>
           </div>
         `).join('')}
 
+        ${Number(receipt.totals.voluntaryTip || 0) > 0 ? `
+          <div class="row"><span><strong>Propina voluntaria:</strong></span><span>${escapeHtml(receipt.totals.voluntaryTipText)}</span></div>
+        ` : ''}
+
         <div class="total">
           <span>TOTAL:</span>
-          <span>${formatPrice(Number(sale.total || 0))}</span>
+          <span>${escapeHtml(receipt.totals.totalText)}</span>
         </div>
 
         <div class="footer">
-          <p><strong>Método:</strong> ${getPaymentMethodLabel(sale.payment_method)}</p>
-          <p>¡Gracias por su compra!</p>
+          <p><strong>Método:</strong> ${escapeHtml(receipt.payment.methodText)}</p>
+          <p>${escapeHtml(receipt.footer.message)}</p>
         </div>
       </div>
 
