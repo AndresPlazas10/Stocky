@@ -42,12 +42,11 @@ export const sendReceiptToPrintBridge = async ({ receipt, paperWidthMm }) => {
       method: 'POST',
       signal,
       headers: {
-        'Content-Type': 'application/json',
-        'X-Stocky-Bridge-Token': settings.token,
-        'X-Stocky-Origin': window.location.origin,
+        'Content-Type': 'text/plain',
       },
       body: JSON.stringify({
         source: 'stocky',
+        token: settings.token,
         paperWidthMm: Number(paperWidthMm || settings.paperWidthMm || 80),
         receipt,
       }),
@@ -80,9 +79,6 @@ export const checkPrintBridgeStatus = async () => {
     const response = await withTimeout((signal) => fetch(`${endpoint}/v1/status`, {
       method: 'GET',
       signal,
-      headers: {
-        'X-Stocky-Origin': window.location.origin,
-      },
     }), 2500);
 
     const data = await response.json().catch(() => ({}));

@@ -30,6 +30,34 @@ import { isIOs, isStandalone } from '../utils/deviceDetection.js';
 
 const _motionLintUsage = motion;
 
+const getBridgeDiagnosticMessage = (result) => {
+  if (result?.reason === 'bridge_disabled') {
+    return 'Activa "Usar Stocky Print Bridge" y guarda la configuración.';
+  }
+
+  if (result?.reason === 'missing_bridge_endpoint') {
+    return 'Falta el endpoint. En Android usa http://127.0.0.1:41781.';
+  }
+
+  if (result?.reason === 'missing_bridge_token') {
+    return 'Falta el token del APK. Copia el token desde Stocky Print Bridge.';
+  }
+
+  if (result?.reason === 'bridge_unavailable') {
+    return 'No se pudo abrir el bridge. Deja el APK abierto, activa "Permitir impresión desde Stocky Web/Mobile", toca Guardar y usa http://127.0.0.1:41781.';
+  }
+
+  if (result?.reason === 'bridge_timeout') {
+    return 'El bridge no respondió a tiempo. Reabre el APK, guarda la configuración e intenta de nuevo.';
+  }
+
+  if (String(result?.reason || '').startsWith('bridge_http_')) {
+    return `El bridge respondió con error ${String(result.reason).replace('bridge_http_', '')}. Revisa el token y que la integración esté activa en el APK.`;
+  }
+
+  return result?.error || result?.reason || 'Error desconocido probando el bridge.';
+};
+
 function DownloadPage() {
   const apkUrl = getApkDownloadUrl();
   const windowsUrl = getWindowsDownloadUrl();
@@ -131,7 +159,7 @@ function DownloadPage() {
       return;
     }
 
-    setBridgeFeedback(`No se pudo conectar al bridge: ${result.reason || result.error || 'error desconocido'}. Revisa endpoint, token y que el APK esté abierto.`);
+    setBridgeFeedback(`No se pudo conectar al bridge: ${getBridgeDiagnosticMessage(result)}`);
   };
 
   return (
