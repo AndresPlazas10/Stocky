@@ -1,0 +1,44 @@
+{
+  "name": "stocky-print-bridge-windows",
+  "version": "0.1.0",
+  "description": "Stocky Print Bridge para impresoras termicas Bluetooth ESC/POS en Windows",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "dev": "electron .",
+    "build": "electron-builder --win nsis --x64",
+    "pack": "electron-builder --win --x64 --dir"
+  },
+  "dependencies": {
+    "@serialport/parser-readline": "^12.0.0",
+    "serialport": "^12.0.0"
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.stocky.printbridge",
+    "productName": "Stocky Print Bridge",
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "src/**/*",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "artifactName": "Stocky-Print-Bridge-Setup-${version}-x64.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
