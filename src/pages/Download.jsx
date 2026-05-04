@@ -8,6 +8,7 @@ import {
   getPrintBridgeApkDownloadUrl,
   getPrintBridgeWindowsDownloadUrl,
 } from '../utils/printBridgeDownload.js';
+import { checkPrintBridgeStatus } from '../utils/printBridgeClient.js';
 import {
   getConfiguredPrinterName,
   getPrintBridgeEndpoint,
@@ -118,6 +119,19 @@ function DownloadPage() {
     setBridgeFeedback(ok
       ? 'Configuración guardada. Ahora vuelve a Stocky e imprime el recibo.'
       : 'No se pudo guardar la configuración del puente.');
+  };
+
+  const handleTestBridgeConfig = async () => {
+    handleSaveBridgeConfig();
+    setBridgeFeedback('Probando conexión con Stocky Print Bridge...');
+
+    const result = await checkPrintBridgeStatus();
+    if (result.ok) {
+      setBridgeFeedback('Conexión correcta. El navegador ya ve el APK.');
+      return;
+    }
+
+    setBridgeFeedback(`No se pudo conectar al bridge: ${result.reason || result.error || 'error desconocido'}. Revisa endpoint, token y que el APK esté abierto.`);
   };
 
   return (
@@ -279,6 +293,14 @@ function DownloadPage() {
                   className="mt-4 h-10 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 font-semibold text-slate-50 hover:opacity-90"
                 >
                   Guardar configuración del puente
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleTestBridgeConfig}
+                  variant="outline"
+                  className="ml-2 mt-4 h-10 rounded-xl border-indigo-200 bg-white px-5 font-semibold text-indigo-700 hover:bg-indigo-50"
+                >
+                  Probar conexión
                 </Button>
                 {bridgeFeedback && (
                   <p className="mt-3 text-xs font-semibold text-indigo-900">{bridgeFeedback}</p>
