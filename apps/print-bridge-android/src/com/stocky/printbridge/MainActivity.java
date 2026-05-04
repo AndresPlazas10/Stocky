@@ -325,13 +325,9 @@ public class MainActivity extends Activity {
     }
 
     private void syncServer() {
-        boolean enabled = prefs.getBoolean("webBridge", false);
-        if (enabled && localServer == null) {
+        if (localServer == null) {
             localServer = new LocalPrintServer();
             localServer.start();
-        } else if (!enabled && localServer != null) {
-            localServer.stopServerSocket();
-            localServer = null;
         }
     }
 
@@ -478,7 +474,13 @@ public class MainActivity extends Activity {
                     }
 
                     if (requestLine != null && requestLine.startsWith("GET /v1/status")) {
-                        respond(socket, 200, "{\"ok\":true,\"platform\":\"android\"}");
+                        JSONObject status = new JSONObject();
+                        status.put("ok", true);
+                        status.put("platform", "android");
+                        status.put("serverEnabled", prefs.getBoolean("webBridge", false));
+                        status.put("printerName", prefs.getString("deviceName", ""));
+                        status.put("paperWidthMm", parseInt(prefs.getString("paper", "80"), 80));
+                        respond(socket, 200, status.toString());
                         return;
                     }
 
@@ -487,12 +489,20 @@ public class MainActivity extends Activity {
                         return;
                     }
 
-                    if (!prefs.getString("token", "").equals(token)) {
+                    if (!prefs.getBoolean("webBridge", false)) {
+                        respond(socket, 503, "{\"ok\":false,\"error\":\"webBridgeDisabled\"}");
+                        return;
+                    }
+
+                    String body = new String(bodyChars);
+                    JSONObject payload = new JSONObject(body);
+                    String payloadToken = payload.optString("token", token);
+
+                    if (!prefs.getString("token", "").equals(payloadToken)) {
                         respond(socket, 401, "{\"ok\":false,\"error\":\"token\"}");
                         return;
                     }
 
-                    JSONObject payload = new JSONObject(new String(bodyChars));
                     JSONObject receipt = payload.getJSONObject("receipt");
                     applyReceiptConfig(receipt);
                     printReceipt(receipt);
