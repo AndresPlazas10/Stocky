@@ -45,7 +45,6 @@ public class MainActivity extends Activity {
     private TextView statusText;
     private EditText headerInput;
     private EditText footerInput;
-    private EditText tokenInput;
     private PrintBridgeHttpServer httpServer;
 
     @Override
@@ -134,11 +133,6 @@ public class MainActivity extends Activity {
         footerInput = input("Gracias por su compra", false);
         root.addView(footerInput);
 
-        root.addView(label("Token de integracion"));
-        tokenInput = input("Generado automaticamente", false);
-        tokenInput.setEnabled(false);
-        root.addView(tokenInput);
-
         LinearLayout actions = row();
         Button testButton = button("Imprimir prueba", false);
         testButton.setOnClickListener(new View.OnClickListener() {
@@ -219,13 +213,6 @@ public class MainActivity extends Activity {
         cashDrawerCheck.setChecked(prefs.getBoolean("cashDrawer", false));
         headerInput.setText(prefs.getString("header", "RECIBO"));
         footerInput.setText(prefs.getString("footer", "Gracias por su compra"));
-
-        String token = prefs.getString("token", "");
-        if (token.isEmpty()) {
-            token = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-            prefs.edit().putString("token", token).apply();
-        }
-        tokenInput.setText(token);
     }
 
     private void saveSettings() {
@@ -245,7 +232,6 @@ public class MainActivity extends Activity {
                 .putBoolean("cashDrawer", cashDrawerCheck.isChecked())
                 .putString("header", headerInput.getText().toString().trim())
                 .putString("footer", footerInput.getText().toString().trim())
-                .putString("token", tokenInput.getText().toString().trim())
                 .commit();
 
         setStatus(address.isEmpty() ? "Guarda una impresora emparejada" : "Configuracion guardada");

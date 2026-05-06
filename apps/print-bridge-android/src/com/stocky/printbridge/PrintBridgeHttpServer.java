@@ -158,14 +158,6 @@ public class PrintBridgeHttpServer {
     }
 
     private void handlePrint(OutputStream output, Map<String, String> headers, String body) throws Exception {
-        String token = headers.get("x-stocky-bridge-token");
-        String savedToken = prefs.getString("token", "");
-        if (savedToken.isEmpty() || token == null || token.isEmpty() || !token.equals(savedToken)) {
-            Log.w(TAG, "Token mismatch. Received: " + (token != null ? token.substring(0, Math.min(8, token.length())) : "null") + "... Expected length: " + savedToken.length());
-            sendCorsResponse(output, 401, "{\"ok\":false,\"error\":\"Token invalido\"}");
-            return;
-        }
-
         JSONObject payload;
         try {
             payload = new JSONObject(body);

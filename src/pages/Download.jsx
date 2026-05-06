@@ -44,7 +44,7 @@ const getBridgeDiagnosticMessage = (result) => {
   }
 
   if (result?.reason === 'bridge_unavailable') {
-    return 'No se pudo abrir el bridge. Deja el APK abierto, activa "Permitir impresión desde Stocky Web/Mobile", toca Guardar y usa http://127.0.0.1:41781.';
+    return 'No se pudo abrir el bridge. Deja el APK abierto, guarda la configuración y usa http://127.0.0.1:41781. El token es opcional en Android.';
   }
 
   if (result?.reason === 'bridge_timeout') {

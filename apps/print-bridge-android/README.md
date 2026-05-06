@@ -35,19 +35,18 @@ dist/stocky-print-bridge-debug.apk
 4. Selecciona la impresora.
 5. Elige papel `58mm` o `80mm`.
 6. Activa Abrir caja si aplica.
-7. Copia el **Token de integracion** que aparece en pantalla.
-8. Guarda.
-9. Usa Imprimir prueba para verificar que la impresora funciona.
+7. Guarda.
+8. Usa Imprimir prueba para verificar que la impresora funciona.
 
 ## Integracion con Stocky Web
 
-El APK expone un servidor HTTP en `http://127.0.0.1:41781`.
+El APK expone un servidor HTTP en `http://127.0.0.1:41781` sin autenticacion — cualquier app en el dispositivo puede enviar trabajos de impresion.
 
 1. Deja el APK abierto (el servidor se inicia automaticamente al guardar).
 2. En Stocky Web, ve a **Configuracion > Impresora termica**.
 3. Activa **Usar Stocky Print Bridge**.
 4. En **Endpoint del bridge** ingresa `http://127.0.0.1:41781`.
-5. Pega el **Token de integracion** que copiaste del APK.
+5. Deja el campo **Token** vacio.
 6. Guarda la configuracion y prueba **Verificar conexion**.
 
 ### Impresion desde Android
