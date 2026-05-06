@@ -36,7 +36,7 @@ mkdir -p "$GEN_DIR" "$CLASSES_DIR" "$DEX_DIR" "$DIST_DIR"
   -I "$ANDROID_JAR" \
   --manifest "$ROOT_DIR/AndroidManifest.xml" \
   --java "$GEN_DIR" \
-  --min-sdk-version 23 \
+  --min-sdk-version 26 \
   --target-sdk-version 36 \
   -o "$UNSIGNED_APK" \
   "$RES_ZIP"
@@ -51,7 +51,7 @@ mkdir -p "$GEN_DIR" "$CLASSES_DIR" "$DEX_DIR" "$DIST_DIR"
 
 "$D8" \
   --lib "$ANDROID_JAR" \
-  --min-api 23 \
+  --min-api 26 \
   --output "$DEX_DIR" \
   $(find "$CLASSES_DIR" -name '*.class' | sort)
 

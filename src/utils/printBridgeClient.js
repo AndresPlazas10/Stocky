@@ -42,11 +42,11 @@ export const sendReceiptToPrintBridge = async ({ receipt, paperWidthMm }) => {
       method: 'POST',
       signal,
       headers: {
-        'Content-Type': 'text/plain',
+        'Content-Type': 'application/json',
+        'X-Stocky-Bridge-Token': settings.token,
       },
       body: JSON.stringify({
         source: 'stocky',
-        token: settings.token,
         paperWidthMm: Number(paperWidthMm || settings.paperWidthMm || 80),
         receipt,
       }),

@@ -4,8 +4,6 @@ import android.Manifest;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothSocket;
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -16,7 +14,6 @@ import android.provider.Settings;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -27,27 +24,14 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
 public class MainActivity extends Activity {
     private static final String PREFS = "stocky_print_bridge";
-    private static final String SPP_UUID = "00001101-0000-1000-8000-00805F9B34FB";
-    private static final int INDIGO = Color.rgb(79, 70, 229);
-    private static final int PURPLE = Color.rgb(124, 58, 237);
-    private static final int BG = Color.rgb(238, 242, 255);
+    private static final int INDIGO = Color.rgb(67, 56, 202);
+    private static final int BG = Color.rgb(241, 245, 249);
     private static final int TEXT = Color.rgb(15, 23, 42);
     private static final int MUTED = Color.rgb(100, 116, 139);
 
@@ -57,33 +41,29 @@ public class MainActivity extends Activity {
     private ArrayAdapter<String> deviceAdapter;
     private Spinner deviceSpinner;
     private Spinner paperSpinner;
-    private CheckBox webBridgeCheck;
-    private CheckBox voluntaryTipCheck;
-    private EditText businessNameInput;
-    private EditText footerInput;
-    private EditText tipInput;
-    private TextView tokenText;
+    private CheckBox cashDrawerCheck;
     private TextView statusText;
-    private LocalPrintServer localServer;
+    private EditText headerInput;
+    private EditText footerInput;
+    private EditText tokenInput;
+    private PrintBridgeHttpServer httpServer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-
-        ensureToken();
         requestBluetoothPermissions();
         buildUi();
         loadSettings();
         refreshBondedDevices();
-        syncServer();
+        startHttpServerIfConfigured();
     }
 
     @Override
     protected void onDestroy() {
-        if (localServer != null) localServer.stopServerSocket();
         super.onDestroy();
+        stopHttpServer();
     }
 
     private void buildUi() {
@@ -95,17 +75,17 @@ public class MainActivity extends Activity {
         root.setPadding(dp(18), dp(24), dp(18), dp(24));
         scroll.addView(root);
 
-        TextView eyebrow = text("Stocky Print Bridge", 13, PURPLE, true);
+        TextView eyebrow = text("Stocky print", 13, INDIGO, true);
         root.addView(eyebrow);
 
-        TextView title = text("Impresora termica Bluetooth", 27, TEXT, true);
+        TextView title = text("Bridge de impresion ESC/POS", 26, TEXT, true);
         title.setPadding(0, dp(4), 0, dp(6));
         root.addView(title);
 
-        TextView subtitle = text("Configura una impresora ESC/POS emparejada y prueba la impresion desde Android.", 14, MUTED, false);
+        TextView subtitle = text("Selecciona una impresora Bluetooth y usa Imprimir desde cualquier app.", 14, MUTED, false);
         root.addView(subtitle);
 
-        statusText = pill("Iniciando...");
+        statusText = pill("Listo para configurar");
         root.addView(statusText);
 
         root.addView(sectionTitle("Conexion"));
@@ -137,51 +117,41 @@ public class MainActivity extends Activity {
         root.addView(sectionTitle("Configuracion"));
         root.addView(label("Tamano de papel"));
         paperSpinner = new Spinner(this);
-        ArrayAdapter<String> paperAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new String[]{"58mm", "80mm", "104mm"});
+        ArrayAdapter<String> paperAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new String[]{"58mm", "80mm"});
         paperSpinner.setAdapter(paperAdapter);
         root.addView(paperSpinner);
 
-        webBridgeCheck = new CheckBox(this);
-        webBridgeCheck.setText("Permitir impresion desde Stocky Web/Mobile");
-        webBridgeCheck.setTextColor(TEXT);
-        webBridgeCheck.setPadding(0, dp(10), 0, dp(10));
-        root.addView(webBridgeCheck);
+        cashDrawerCheck = new CheckBox(this);
+        cashDrawerCheck.setText("Abrir caja al finalizar");
+        cashDrawerCheck.setTextColor(TEXT);
+        root.addView(cashDrawerCheck);
 
-        root.addView(label("Token de emparejamiento"));
-        tokenText = pill(prefs.getString("token", ""));
-        root.addView(tokenText);
-
-        root.addView(sectionTitle("Recibo"));
-        root.addView(label("Nombre del negocio"));
-        businessNameInput = input("Sistema Stocky", false);
-        root.addView(businessNameInput);
+        root.addView(label("Titulo del recibo"));
+        headerInput = input("RECIBO", false);
+        root.addView(headerInput);
 
         root.addView(label("Mensaje final"));
         footerInput = input("Gracias por su compra", false);
         root.addView(footerInput);
 
-        voluntaryTipCheck = new CheckBox(this);
-        voluntaryTipCheck.setText("Agregar propina voluntaria");
-        voluntaryTipCheck.setTextColor(TEXT);
-        root.addView(voluntaryTipCheck);
-
-        root.addView(label("Valor de propina"));
-        tipInput = input("0", true);
-        root.addView(tipInput);
+        root.addView(label("Token de integracion"));
+        tokenInput = input("Generado automaticamente", false);
+        tokenInput.setEnabled(false);
+        root.addView(tokenInput);
 
         LinearLayout actions = row();
-        Button saveButton = button("Guardar", true);
-        saveButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                saveSettings();
-            }
-        });
         Button testButton = button("Imprimir prueba", false);
         testButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 printTest();
+            }
+        });
+        Button saveButton = button("Guardar", true);
+        saveButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                saveSettings();
             }
         });
         actions.addView(testButton, weightParams());
@@ -245,94 +215,59 @@ public class MainActivity extends Activity {
 
     private void loadSettings() {
         String paper = prefs.getString("paper", "80");
-        if ("58".equals(paper)) paperSpinner.setSelection(0);
-        else if ("104".equals(paper)) paperSpinner.setSelection(2);
-        else paperSpinner.setSelection(1);
-        webBridgeCheck.setChecked(prefs.getBoolean("webBridge", false));
-        voluntaryTipCheck.setChecked(prefs.getBoolean("tipEnabled", false));
-        businessNameInput.setText(prefs.getString("businessName", "Sistema Stocky"));
+        paperSpinner.setSelection("58".equals(paper) ? 0 : 1);
+        cashDrawerCheck.setChecked(prefs.getBoolean("cashDrawer", false));
+        headerInput.setText(prefs.getString("header", "RECIBO"));
         footerInput.setText(prefs.getString("footer", "Gracias por su compra"));
-        tipInput.setText(String.valueOf(prefs.getInt("tipValue", 0)));
-        tokenText.setText(prefs.getString("token", ""));
+
+        String token = prefs.getString("token", "");
+        if (token.isEmpty()) {
+            token = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+            prefs.edit().putString("token", token).apply();
+        }
+        tokenInput.setText(token);
     }
 
     private void saveSettings() {
         int selected = deviceSpinner.getSelectedItemPosition();
-        String address = selected >= 0 && selected < devices.size() ? devices.get(selected).getAddress() : "";
-        String name = selected >= 0 && selected < devices.size() ? safeDeviceName(devices.get(selected)) : "";
+        String address = prefs.getString("deviceAddress", "");
+        String name = prefs.getString("deviceName", "");
+        if (selected >= 0 && selected < devices.size()) {
+            address = devices.get(selected).getAddress();
+            name = safeDeviceName(devices.get(selected));
+        }
         String paper = paperSpinner.getSelectedItem().toString().replace("mm", "");
-        int tip = parseInt(tipInput.getText().toString(), 0);
 
-        prefs.edit()
+        boolean saved = prefs.edit()
                 .putString("deviceAddress", address)
                 .putString("deviceName", name)
                 .putString("paper", paper)
-                .putBoolean("webBridge", webBridgeCheck.isChecked())
-                .putString("businessName", businessNameInput.getText().toString().trim())
+                .putBoolean("cashDrawer", cashDrawerCheck.isChecked())
+                .putString("header", headerInput.getText().toString().trim())
                 .putString("footer", footerInput.getText().toString().trim())
-                .putBoolean("tipEnabled", voluntaryTipCheck.isChecked())
-                .putInt("tipValue", tip)
-                .apply();
+                .putString("token", tokenInput.getText().toString().trim())
+                .commit();
 
-        syncServer();
         setStatus(address.isEmpty() ? "Guarda una impresora emparejada" : "Configuracion guardada");
-        toast("Configuracion guardada");
+        toast(saved ? "Configuracion guardada" : "No se pudo guardar");
+        startHttpServerIfConfigured();
     }
 
     private void printTest() {
         saveSettings();
         try {
-            JSONObject receipt = new JSONObject();
-            JSONObject header = new JSONObject();
-            header.put("title", "PRUEBA STOCKY");
-            header.put("businessName", prefs.getString("businessName", "Sistema Stocky"));
-            header.put("dateText", new java.util.Date().toString());
-            header.put("alignment", "center");
-            receipt.put("type", "sale");
-            receipt.put("header", header);
-            receipt.put("metadata", new JSONArray()
-                    .put(new JSONObject().put("label", "Bridge").put("value", "Android"))
-                    .put(new JSONObject().put("label", "Impresora").put("value", prefs.getString("deviceName", ""))));
-            receipt.put("items", new JSONArray().put(new JSONObject()
-                    .put("name", "Impresion de prueba")
-                    .put("quantity", 1)
-                    .put("subtotalText", "0 COP")));
-            receipt.put("totals", new JSONObject().put("totalText", "0 COP").put("total", 0));
-            receipt.put("payment", new JSONObject().put("methodText", "Prueba"));
-            receipt.put("footer", new JSONObject().put("message", prefs.getString("footer", "Gracias por su compra")).put("alignment", "center"));
-            printReceipt(receipt);
+            PrintJobData job = new PrintJobData();
+            job.header = prefs.getString("header", "RECIBO");
+            job.footer = prefs.getString("footer", "Gracias por su compra");
+            job.paperWidthMm = parseInt(prefs.getString("paper", "80"), 80);
+            job.openCashDrawer = prefs.getBoolean("cashDrawer", false);
+            job.rawText = "Impresion de prueba\nStocky print\n\n";
+            BluetoothPrinter.print(job, bluetoothAdapter, prefs);
             setStatus("Prueba enviada");
         } catch (Exception err) {
             setStatus("Error imprimiendo");
             toast(err.getMessage());
         }
-    }
-
-    private void printReceipt(JSONObject receipt) throws Exception {
-        String address = prefs.getString("deviceAddress", "");
-        if (address.isEmpty()) throw new Exception("Selecciona y guarda una impresora");
-        if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) throw new Exception("Bluetooth apagado");
-
-        BluetoothDevice device = bluetoothAdapter.getRemoteDevice(address);
-        BluetoothSocket socket = device.createRfcommSocketToServiceRecord(UUID.fromString(SPP_UUID));
-        bluetoothAdapter.cancelDiscovery();
-        socket.connect();
-        OutputStream output = socket.getOutputStream();
-        output.write(EscPos.serialize(receipt, parseInt(prefs.getString("paper", "80"), 80)));
-        output.flush();
-        socket.close();
-    }
-
-    private void syncServer() {
-        if (localServer == null) {
-            localServer = new LocalPrintServer();
-            localServer.start();
-        }
-    }
-
-    private void ensureToken() {
-        if (!prefs.getString("token", "").isEmpty()) return;
-        prefs.edit().putString("token", UUID.randomUUID().toString().replace("-", "")).apply();
     }
 
     private String safeDeviceName(BluetoothDevice device) {
@@ -425,318 +360,19 @@ public class MainActivity extends Activity {
         }
     }
 
-    private class LocalPrintServer extends Thread {
-        private ServerSocket serverSocket;
-        private volatile boolean running = true;
-
-        @Override
-        public void run() {
-            try {
-                serverSocket = new ServerSocket(41781, 8, InetAddress.getByName("127.0.0.1"));
-                while (running) {
-                    Socket socket = serverSocket.accept();
-                    handle(socket);
-                }
-            } catch (Exception ignored) {
-            }
-        }
-
-        void stopServerSocket() {
-            running = false;
-            try {
-                if (serverSocket != null) serverSocket.close();
-            } catch (Exception ignored) {
-            }
-        }
-
-        private void handle(Socket socket) {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                try {
-                    socket.setSoTimeout(2500);
-                    HttpRequest request = readRequest(socket);
-                    String requestLine = request.requestLine;
-                    String token = request.header("x-stocky-bridge-token");
-
-                    if (requestLine != null && requestLine.startsWith("OPTIONS ")) {
-                        respond(socket, 204, "");
-                        return;
-                    }
-
-                    if (requestLine != null && requestLine.startsWith("GET /v1/status")) {
-                        JSONObject status = new JSONObject();
-                        status.put("ok", true);
-                        status.put("platform", "android");
-                        status.put("serverEnabled", prefs.getBoolean("webBridge", false));
-                        status.put("printerName", prefs.getString("deviceName", ""));
-                        status.put("paperWidthMm", parseInt(prefs.getString("paper", "80"), 80));
-                        respond(socket, 200, status.toString());
-                        return;
-                    }
-
-                    if (requestLine == null || !requestLine.startsWith("POST /v1/print")) {
-                        respond(socket, 404, "{\"ok\":false}");
-                        return;
-                    }
-
-                    if (!prefs.getBoolean("webBridge", false)) {
-                        respond(socket, 503, "{\"ok\":false,\"error\":\"webBridgeDisabled\"}");
-                        return;
-                    }
-
-                    String body = request.body;
-                    JSONObject payload = new JSONObject(body);
-                    String payloadToken = payload.optString("token", token);
-
-                    if (!prefs.getString("token", "").equals(payloadToken)) {
-                        respond(socket, 401, "{\"ok\":false,\"error\":\"token\"}");
-                        return;
-                    }
-
-                    JSONObject receipt = payload.getJSONObject("receipt");
-                    applyReceiptConfig(receipt);
-                    printReceipt(receipt);
-                    respond(socket, 200, "{\"ok\":true}");
-                } catch (Exception err) {
-                    try {
-                        respond(socket, 500, "{\"ok\":false,\"error\":\"" + sanitize(err.getMessage()) + "\"}");
-                    } catch (Exception ignored) {
-                    }
-                }
-                }
-            }).start();
-        }
-
-        private HttpRequest readRequest(Socket socket) throws Exception {
-            InputStream input = socket.getInputStream();
-            ByteArrayOutputStream raw = new ByteArrayOutputStream();
-            byte[] buffer = new byte[1024];
-            int headerEnd = -1;
-            int contentLength = 0;
-            byte[] separator = "\r\n\r\n".getBytes("UTF-8");
-
-            while (true) {
-                int count = input.read(buffer);
-                if (count < 0) break;
-                raw.write(buffer, 0, count);
-
-                byte[] data = raw.toByteArray();
-                if (headerEnd < 0) {
-                    headerEnd = indexOf(data, separator);
-                    if (headerEnd >= 0) {
-                        String headers = new String(data, 0, headerEnd, "UTF-8");
-                        contentLength = parseContentLength(headers);
-                    }
-                }
-
-                if (headerEnd >= 0 && data.length >= headerEnd + separator.length + contentLength) {
-                    break;
-                }
-            }
-
-            byte[] data = raw.toByteArray();
-            if (headerEnd < 0) throw new Exception("Solicitud HTTP incompleta");
-
-            String headers = new String(data, 0, headerEnd, "UTF-8");
-            int bodyStart = headerEnd + separator.length;
-            int bodyLength = Math.max(0, Math.min(contentLength, data.length - bodyStart));
-            String body = bodyLength > 0 ? new String(data, bodyStart, bodyLength, "UTF-8") : "";
-            return new HttpRequest(headers, body);
-        }
-
-        private int parseContentLength(String headers) {
-            String[] lines = headers.split("\\r?\\n");
-            for (String line : lines) {
-                String lower = line.toLowerCase();
-                if (lower.startsWith("content-length:")) {
-                    return parseInt(line.substring(line.indexOf(':') + 1), 0);
-                }
-            }
-            return 0;
-        }
-
-        private int indexOf(byte[] data, byte[] pattern) {
-            outer:
-            for (int i = 0; i <= data.length - pattern.length; i++) {
-                for (int j = 0; j < pattern.length; j++) {
-                    if (data[i + j] != pattern[j]) continue outer;
-                }
-                return i;
-            }
-            return -1;
-        }
-
-        private class HttpRequest {
-            final String requestLine;
-            final String headers;
-            final String body;
-
-            HttpRequest(String headers, String body) {
-                this.headers = headers;
-                this.body = body;
-                int lineEnd = headers.indexOf("\r\n");
-                if (lineEnd < 0) lineEnd = headers.indexOf("\n");
-                this.requestLine = lineEnd >= 0 ? headers.substring(0, lineEnd) : headers;
-            }
-
-            String header(String name) {
-                String target = name.toLowerCase() + ":";
-                String[] lines = headers.split("\\r?\\n");
-                for (String line : lines) {
-                    if (line.toLowerCase().startsWith(target)) {
-                        return line.substring(line.indexOf(':') + 1).trim();
-                    }
-                }
-                return "";
-            }
-        }
-
-        private void respond(Socket socket, int status, String body) throws Exception {
-            OutputStream output = socket.getOutputStream();
-            String statusText = status == 200 ? "OK" : status == 204 ? "No Content" : "ERROR";
-            byte[] bytes = body.getBytes("UTF-8");
-            String headers = "HTTP/1.1 " + status + " " + statusText + "\r\n"
-                    + "Content-Type: application/json\r\n"
-                    + "Access-Control-Allow-Origin: *\r\n"
-                    + "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
-                    + "Access-Control-Allow-Headers: Content-Type, X-Stocky-Bridge-Token, X-Stocky-Origin\r\n"
-                    + "Access-Control-Allow-Private-Network: true\r\n"
-                    + "Content-Length: " + bytes.length + "\r\n\r\n";
-            output.write(headers.getBytes("UTF-8"));
-            output.write(bytes);
-            output.flush();
-            socket.close();
-        }
+    private synchronized void startHttpServerIfConfigured() {
+        String address = prefs.getString("deviceAddress", "");
+        if (address.isEmpty()) return;
+        if (httpServer != null) return;
+        httpServer = new PrintBridgeHttpServer(bluetoothAdapter, prefs);
+        httpServer.start();
+        setStatus("Servidor HTTP iniciado en :41781");
     }
 
-    private void applyReceiptConfig(JSONObject receipt) throws Exception {
-        JSONObject header = receipt.optJSONObject("header");
-        if (header != null) header.put("businessName", prefs.getString("businessName", "Sistema Stocky"));
-        JSONObject footer = receipt.optJSONObject("footer");
-        if (footer != null) footer.put("message", prefs.getString("footer", "Gracias por su compra"));
-        if (prefs.getBoolean("tipEnabled", false)) {
-            JSONObject totals = receipt.optJSONObject("totals");
-            if (totals != null) {
-                int tip = prefs.getInt("tipValue", 0);
-                int base = totals.optInt("subtotal", totals.optInt("total", 0));
-                totals.put("voluntaryTip", tip);
-                totals.put("voluntaryTipText", tip + " COP");
-                totals.put("total", base + tip);
-                totals.put("totalText", (base + tip) + " COP");
-            }
-        }
-    }
-
-    private String sanitize(String value) {
-        return value == null ? "error" : value.replace("\"", "'");
-    }
-
-    public static class EscPos {
-        private static final int ESC = 0x1b;
-        private static final int GS = 0x1d;
-
-        static byte[] serialize(JSONObject receipt, int paperWidth) throws Exception {
-            int columns = paperWidth == 58 ? 32 : paperWidth == 104 ? 64 : 48;
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            cmd(out, ESC, 0x40);
-            align(out, 1);
-            bold(out, true);
-            size(out, true);
-            writeLine(out, receipt.optJSONObject("header").optString("title", "COMPROBANTE"));
-            size(out, false);
-            writeLine(out, receipt.optJSONObject("header").optString("businessName", "Sistema Stocky"));
-            bold(out, false);
-            writeLine(out, receipt.optJSONObject("header").optString("dateText", ""));
-            align(out, 0);
-            sep(out, columns);
-
-            JSONArray metadata = receipt.optJSONArray("metadata");
-            if (metadata != null) {
-                for (int i = 0; i < metadata.length(); i++) {
-                    JSONObject row = metadata.getJSONObject(i);
-                    twoCols(out, row.optString("label") + ":", row.optString("value"), columns);
-                }
-            }
-            sep(out, columns);
-            bold(out, true);
-            writeLine(out, "Producto");
-            bold(out, false);
-
-            JSONArray items = receipt.optJSONArray("items");
-            if (items != null) {
-                for (int i = 0; i < items.length(); i++) {
-                    JSONObject item = items.getJSONObject(i);
-                    String right = "x" + item.optInt("quantity", 0) + " " + item.optString("subtotalText", "");
-                    twoCols(out, item.optString("name", "Item"), right, columns);
-                }
-            }
-
-            sep(out, columns);
-            JSONObject totals = receipt.optJSONObject("totals");
-            if (totals != null && totals.optInt("voluntaryTip", 0) > 0) {
-                twoCols(out, "Propina voluntaria:", totals.optString("voluntaryTipText"), columns);
-            }
-            bold(out, true);
-            twoCols(out, "TOTAL:", totals == null ? "" : totals.optString("totalText", ""), columns);
-            bold(out, false);
-            sep(out, columns);
-            JSONObject payment = receipt.optJSONObject("payment");
-            twoCols(out, "Metodo:", payment == null ? "No especificado" : payment.optString("methodText", "No especificado"), columns);
-            align(out, 1);
-            JSONObject footer = receipt.optJSONObject("footer");
-            writeLine(out, footer == null ? "Gracias por su compra" : footer.optString("message", "Gracias por su compra"));
-            align(out, 0);
-            cmd(out, ESC, 0x64, 0x03);
-            cmd(out, GS, 0x56, 0x42, 0x00);
-            return out.toByteArray();
-        }
-
-        private static void cmd(ByteArrayOutputStream out, int... bytes) {
-            for (int b : bytes) out.write(b);
-        }
-
-        private static void align(ByteArrayOutputStream out, int mode) {
-            cmd(out, ESC, 0x61, mode);
-        }
-
-        private static void bold(ByteArrayOutputStream out, boolean enabled) {
-            cmd(out, ESC, 0x45, enabled ? 1 : 0);
-        }
-
-        private static void size(ByteArrayOutputStream out, boolean large) {
-            cmd(out, GS, 0x21, large ? 0x11 : 0x00);
-        }
-
-        private static void sep(ByteArrayOutputStream out, int columns) throws Exception {
-            writeLine(out, repeat("-", columns));
-        }
-
-        private static void twoCols(ByteArrayOutputStream out, String left, String right, int columns) throws Exception {
-            left = clean(left);
-            right = clean(right);
-            int spaces = Math.max(1, columns - left.length() - right.length());
-            if (left.length() + right.length() + spaces <= columns) {
-                writeLine(out, left + repeat(" ", spaces) + right);
-            } else {
-                writeLine(out, left);
-                writeLine(out, right);
-            }
-        }
-
-        private static void writeLine(ByteArrayOutputStream out, String value) throws Exception {
-            out.write((clean(value) + "\n").getBytes("US-ASCII"));
-        }
-
-        private static String clean(String value) {
-            String normalized = Normalizer.normalize(value == null ? "" : value, Normalizer.Form.NFD);
-            return normalized.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "").replaceAll("[^\\x20-\\x7E]", "");
-        }
-
-        private static String repeat(String value, int count) {
-            StringBuilder builder = new StringBuilder();
-            for (int i = 0; i < count; i++) builder.append(value);
-            return builder.toString();
+    private synchronized void stopHttpServer() {
+        if (httpServer != null) {
+            httpServer.stop();
+            httpServer = null;
         }
     }
 }
