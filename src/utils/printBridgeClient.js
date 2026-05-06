@@ -28,10 +28,6 @@ export const sendReceiptToPrintBridge = async ({ receipt, paperWidthMm }) => {
     return { ok: false, fallback: true, reason: 'bridge_disabled' };
   }
 
-  if (!settings.token) {
-    return { ok: false, fallback: false, reason: 'missing_bridge_token' };
-  }
-
   const endpoint = String(settings.endpoint || '').replace(/\/+$/, '');
   if (!endpoint) {
     return { ok: false, fallback: false, reason: 'missing_bridge_endpoint' };
@@ -43,7 +39,7 @@ export const sendReceiptToPrintBridge = async ({ receipt, paperWidthMm }) => {
       signal,
       headers: {
         'Content-Type': 'application/json',
-        'X-Stocky-Bridge-Token': settings.token,
+        ...(settings.token ? { 'X-Stocky-Bridge-Token': settings.token } : {}),
       },
       body: JSON.stringify({
         source: 'stocky',
