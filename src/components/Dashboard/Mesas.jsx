@@ -4613,7 +4613,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
           @media print {
             @page {
               size: ${printerWidthMm}mm auto;
-              margin: 2mm;
+              margin: 1mm;
             }
             html, body {
               width: ${printerWidthMm}mm !important;
@@ -4630,7 +4630,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
           body {
             font-family: 'Courier New', monospace;
             font-size: 18px;
-            line-height: 1.65;
+            line-height: 1.4;
             font-weight: 700;
             color: #000 !important;
             width: ${printerWidthMm}mm;
@@ -4645,33 +4645,33 @@ function Mesas({ businessId, userRole = 'admin' }) {
             display: block;
             width: 100%;
             margin: 0;
-            padding: 2mm;
+            padding: 1mm;
             box-sizing: border-box;
           }
           
           .header {
             text-align: center;
             border-bottom: 2px dashed #000;
-            padding-bottom: 10px;
-            margin-bottom: 10px;
+            padding-bottom: 6px;
+            margin-bottom: 6px;
             color: #000;
           }
           
           .header h1 {
             font-size: 30px;
-            margin: 0 0 5px 0;
+            margin: 0 0 3px 0;
             font-weight: 900;
             letter-spacing: 0.5px;
           }
           
           .header p {
-            margin: 2px 0;
+            margin: 1px 0;
             font-size: 18px;
             font-weight: 700;
           }
           
           .info {
-            margin: 10px 0;
+            margin: 6px 0;
             font-size: 20px;
             font-weight: 700;
           }
@@ -4681,14 +4681,14 @@ function Mesas({ businessId, userRole = 'admin' }) {
           }
           
           .items {
-            margin: 15px 0;
+            margin: 10px 0;
           }
           
           .item {
             display: flex;
             justify-content: space-between;
-            margin: 8px 0;
-            padding: 5px 0;
+            margin: 4px 0;
+            padding: 2px 0;
             border-bottom: 1px dashed #ccc;
           }
           
@@ -4715,8 +4715,8 @@ function Mesas({ businessId, userRole = 'admin' }) {
           
           .footer {
             text-align: center;
-            margin-top: 20px;
-            padding-top: 10px;
+            margin-top: 12px;
+            padding-top: 6px;
             border-top: 2px dashed #000;
             font-size: 15px;
             font-weight: 800;
@@ -4724,7 +4724,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
           
           .separator {
             border-top: 2px dashed #000;
-            margin: 10px 0;
+            margin: 8px 0;
           }
         </style>
       </head>
@@ -4761,69 +4761,22 @@ function Mesas({ businessId, userRole = 'admin' }) {
           <p>Sistema Stocky</p>
         </div>
         </div>
-        
-        <script>
-          window.onload = function() {
-            window.print();
-            setTimeout(function() {
-              window.close();
-            }, 100);
-          };
-        </script>
       </body>
       </html>
     `;
 
-    const printWithIframeFallback = () => {
-      try {
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.right = '0';
-        iframe.style.bottom = '0';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        iframe.setAttribute('aria-hidden', 'true');
-
-        const cleanup = () => {
-          try {
-            iframe.remove();
-          } catch {
-            // no-op
-          }
-        };
-
-        iframe.onload = () => {
-          try {
-            const frameWindow = iframe.contentWindow;
-            if (!frameWindow) throw new Error('No se pudo acceder al frame de impresión');
-            frameWindow.focus();
-            frameWindow.print();
-            setTimeout(cleanup, 800);
-          } catch {
-            cleanup();
-            setError('No se pudo imprimir. Revisa la configuración de impresión del navegador.');
-            setTimeout(() => setError(null), 3000);
-          }
-        };
-
-        iframe.srcdoc = printContent;
-        document.body.appendChild(iframe);
-      } catch {
-        setError('No se pudo imprimir. Revisa la configuración de impresión del navegador.');
-        setTimeout(() => setError(null), 3000);
-      }
-    };
-
-    // Intentar popup clásico; si está bloqueado, usar fallback por iframe oculto.
+    // Intentar popup clásico; si está bloqueado, mostrar error.
     const printWindow = window.open('', '_blank', 'width=300,height=600');
     if (printWindow) {
       printWindow.document.write(printContent);
       printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
       return;
     }
 
-    printWithIframeFallback();
+    setError('El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para este sitio.');
+    setTimeout(() => setError(null), 3000);
   };
 
   const handleDeleteTable = async (mesaId) => {
