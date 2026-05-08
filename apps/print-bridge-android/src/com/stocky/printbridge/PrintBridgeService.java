@@ -95,11 +95,11 @@ public class PrintBridgeService extends PrintService {
                     }
 
                     Log.d(TAG, "Job completed successfully");
-                    // Remember last paper width for next print dialog default
-                    prefs.edit().putString("lastPaperWidth", String.valueOf(paperWidthMm)).apply();
+                    final int usedWidth = paperWidthMm;
                     mainHandler.post(new Runnable() {
                         @Override
                         public void run() {
+                            prefs.edit().putString("lastPaperWidth", String.valueOf(usedWidth)).apply();
                             printJob.complete();
                         }
                     });
