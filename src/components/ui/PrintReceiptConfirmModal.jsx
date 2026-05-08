@@ -6,7 +6,9 @@ export function PrintReceiptConfirmModal({
   isOpen,
   onConfirm,
   onCancel,
-  isLoading = false
+  isLoading = false,
+  customerName = 'Venta general',
+  onCustomerNameChange,
 }) {
   return (
     <AnimatePresence>
@@ -55,9 +57,22 @@ export function PrintReceiptConfirmModal({
                 <p className="text-primary-700 font-medium mb-2">
                   ¿Deseas imprimir el comprobante de venta?
                 </p>
-                <p className="text-sm text-accent-600">
+                <p className="text-sm text-accent-600 mb-4">
                   Se enviará el comprobante a la impresora térmica configurada.
                 </p>
+                <div>
+                  <label className="block text-xs font-semibold text-accent-600 mb-1 uppercase tracking-wide">
+                    Cliente (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={customerName}
+                    onChange={(e) => onCustomerNameChange?.(e.target.value)}
+                    placeholder="Venta general"
+                    disabled={isLoading}
+                    className="w-full px-4 py-3 border border-accent-200 rounded-xl focus:ring-2 focus:ring-primary-300 focus:border-transparent text-primary-900 placeholder-accent-400 transition-all"
+                  />
+                </div>
               </div>
 
               {/* Footer */}

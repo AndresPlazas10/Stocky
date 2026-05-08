@@ -5,6 +5,7 @@ import {
   View,
   Pressable,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StockyModal } from './StockyModal';
@@ -15,6 +16,8 @@ type Props = PropsWithChildren<{
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
+  customerName?: string;
+  onCustomerNameChange?: (name: string) => void;
 }>;
 
 export function PrintReceiptConfirmModal({
@@ -22,6 +25,8 @@ export function PrintReceiptConfirmModal({
   onConfirm,
   onCancel,
   isLoading = false,
+  customerName = 'Venta general',
+  onCustomerNameChange,
 }: Props) {
   const handleConfirm = async () => {
     try {
@@ -82,6 +87,15 @@ export function PrintReceiptConfirmModal({
       <Text style={styles.description}>
         Se enviará el comprobante a la impresora térmica configurada.
       </Text>
+      <Text style={styles.fieldLabel}>Cliente (opcional)</Text>
+      <TextInput
+        style={styles.customerInput}
+        value={customerName}
+        onChangeText={onCustomerNameChange}
+        placeholder="Venta general"
+        placeholderTextColor={STOCKY_COLORS.textMuted}
+        editable={!isLoading}
+      />
     </StockyModal>
   );
 }
@@ -152,6 +166,26 @@ const styles = StyleSheet.create({
   },
   buttonIcon: {
     marginRight: 4,
+  },
+  fieldLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: STOCKY_COLORS.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    marginTop: 20,
+  },
+  customerInput: {
+    borderWidth: 1,
+    borderColor: STOCKY_COLORS.borderSoft,
+    borderRadius: STOCKY_RADIUS.md,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 14,
+    fontWeight: '600',
+    color: STOCKY_COLORS.textPrimary,
+    backgroundColor: STOCKY_COLORS.surface,
   },
 });
 

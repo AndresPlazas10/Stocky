@@ -555,6 +555,7 @@ export function MesasPanel({ session, businessContext }: Props) {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printSalesData, setPrintSalesData] = useState<Array<{ saleRecord: VentaRecord; saleDetails: any[] }>>([]);
   const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
+  const [printCustomerName, setPrintCustomerName] = useState('Venta general');
   const [isPrintInProgress, setIsPrintInProgress] = useState(false);
   const printInFlightRef = useRef(false);
 
@@ -3310,6 +3311,7 @@ export function MesasPanel({ session, businessContext }: Props) {
             saleDetails,
             sellerName: saleRecord.seller_name,
             printerWidthMm,
+            customerName: printCustomerName,
           });
 
           await Print.printAsync({ html });
@@ -3324,12 +3326,14 @@ export function MesasPanel({ session, businessContext }: Props) {
       setIsPrintingReceipt(false);
       setShowPrintModal(false);
       setPrintSalesData([]);
+      setPrintCustomerName('Venta general');
     }
-  }, [beginPrintFlow, endPrintFlow, printSalesData]);
+  }, [beginPrintFlow, endPrintFlow, printSalesData, printCustomerName]);
 
   const handlePrintCancel = useCallback(() => {
     setShowPrintModal(false);
     setPrintSalesData([]);
+    setPrintCustomerName('Venta general');
   }, []);
 
   const tryAutoPrintReceiptBySaleId = useCallback(async ({
@@ -3399,6 +3403,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         saleDetails: details,
         sellerName: saleForPrint.seller_name,
         printerWidthMm,
+        customerName: 'Venta general',
       });
 
       await Print.printAsync({ html });
@@ -4371,6 +4376,8 @@ export function MesasPanel({ session, businessContext }: Props) {
         onConfirm={handlePrintConfirm}
         onCancel={handlePrintCancel}
         isLoading={isPrintingReceipt}
+        customerName={printCustomerName}
+        onCustomerNameChange={setPrintCustomerName}
       />
     </>
   );

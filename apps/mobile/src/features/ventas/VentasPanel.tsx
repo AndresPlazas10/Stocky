@@ -295,6 +295,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
   const [printSaleDetails, setPrintSaleDetails] = useState<VentaDetailRecord[]>([]);
   const [printSaleRecord, setPrintSaleRecord] = useState<VentaRecord | null>(null);
   const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
+  const [printCustomerName, setPrintCustomerName] = useState('Venta general');
 
   const [dayFilter, setDayFilter] = useState('all');
   const [sellerFilter, setSellerFilter] = useState('all');
@@ -939,6 +940,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         saleDetails: printSaleDetails,
         sellerName: printSaleRecord.seller_name,
         printerWidthMm,
+        customerName: printCustomerName,
       });
       await Print.printAsync({ html });
     } catch (err) {
@@ -948,13 +950,15 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
       setShowPrintModal(false);
       setPrintSaleRecord(null);
       setPrintSaleDetails([]);
+      setPrintCustomerName('Venta general');
     }
-  }, [printSaleRecord, printSaleDetails]);
+  }, [printSaleRecord, printSaleDetails, printCustomerName]);
 
   const handlePrintCancel = useCallback(() => {
     setShowPrintModal(false);
     setPrintSaleRecord(null);
     setPrintSaleDetails([]);
+    setPrintCustomerName('Venta general');
   }, []);
 
   const selectedDayLabel = useMemo(() => formatDayLabelFromKey(dayFilter), [dayFilter]);
@@ -1785,6 +1789,8 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         onConfirm={handlePrintConfirm}
         onCancel={handlePrintCancel}
         isLoading={isPrintingReceipt}
+        customerName={printCustomerName}
+        onCustomerNameChange={setPrintCustomerName}
       />
     </>
   );
