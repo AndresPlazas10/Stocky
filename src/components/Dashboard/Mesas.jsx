@@ -717,6 +717,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
   const [printSaleIds, setPrintSaleIds] = useState([]);
   const [printSaleDataList, setPrintSaleDataList] = useState([]);
   const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
+  const [printCustomerName, setPrintCustomerName] = useState('Venta general');
 
   const lowMotionMode = useLowMotionMode();
   const enqueueRealtimeUpdate = useRafBatchedQueue({ useTransition: false });
@@ -4081,6 +4082,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
             saleDetails,
             sellerName: saleRow?.seller_name || 'Empleado',
             businessName: await getBusinessNameById(businessId),
+            customerName: printCustomerName,
           });
 
           if (!printResult.ok) {
@@ -4097,13 +4099,15 @@ function Mesas({ businessId, userRole = 'admin' }) {
       setShowPrintModal(false);
       setPrintSaleIds([]);
       setPrintSaleDataList([]);
+      setPrintCustomerName('Venta general');
     }
-  }, [printSaleDataList]);
+  }, [printSaleDataList, printCustomerName]);
 
   const handlePrintCancel = useCallback(() => {
     setShowPrintModal(false);
     setPrintSaleIds([]);
     setPrintSaleDataList([]);
+    setPrintCustomerName('Venta general');
   }, []);
 
   const tryAutoPrintReceiptBySaleId = useCallback(async (saleId) => {
@@ -4122,6 +4126,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
         saleDetails,
         sellerName: saleRow.seller_name || 'Empleado',
         businessName: await getBusinessNameById(businessId),
+        customerName: 'Venta general',
       });
 
       if (!printResult.ok) {
@@ -5117,6 +5122,8 @@ function Mesas({ businessId, userRole = 'admin' }) {
               onConfirm={handlePrintConfirm}
               onCancel={handlePrintCancel}
               isLoading={isPrintingReceipt}
+              customerName={printCustomerName}
+              onCustomerNameChange={setPrintCustomerName}
             />
           </AnimatePresence>
 

@@ -268,6 +268,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [printSaleData, setPrintSaleData] = useState(null);
   const [printSaleDetails, setPrintSaleDetails] = useState([]);
   const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
+  const [printCustomerName, setPrintCustomerName] = useState('Venta general');
 
   const closeSaleModal = useCallback(() => {
     setShowSaleModal(false);
@@ -292,6 +293,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
         saleDetails: printSaleDetails,
         sellerName: printSaleData.seller_name || getVendedorName(printSaleData),
         businessName: await getBusinessNameById(businessId),
+        customerName: printCustomerName,
       });
 
       if (!printResult.ok) {
@@ -307,12 +309,13 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setPrintSaleData(null);
       setPrintSaleDetails([]);
     }
-  }, [printSaleData, printSaleDetails]);
+  }, [printSaleData, printSaleDetails, printCustomerName]);
 
   const handlePrintCancel = useCallback(() => {
     setShowPrintModal(false);
     setPrintSaleData(null);
     setPrintSaleDetails([]);
+    setPrintCustomerName('Venta general');
   }, []);
 
   // Funciones de carga memoizadas SIN cache para evitar problemas de actualización
@@ -1388,6 +1391,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
           onConfirm={handlePrintConfirm}
           onCancel={handlePrintCancel}
           isLoading={isPrintingReceipt}
+          customerName={printCustomerName}
+          onCustomerNameChange={setPrintCustomerName}
         />
       </AnimatePresence>
 
