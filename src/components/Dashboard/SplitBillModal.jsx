@@ -12,10 +12,9 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { X, Plus, Trash2, CheckCircle2, CreditCard, DollarSign } from 'lucide-react';
 import { formatPrice } from '../../utils/formatters.js';
-import { calcularCambio, parseCopAmount } from '../../utils/cambio.js';
+import { calcularCambio } from '../../utils/cambio.js';
 
 const MAX_SUB_ACCOUNTS = 10;
-// parseCopAmount and calcularCambio now imported from ../../utils/cambio.js
 
 const PAYMENT_OPTIONS = [
   { value: 'cash', label: '💵 Efectivo', icon: DollarSign },

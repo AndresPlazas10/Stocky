@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { readAdapter } from '../data/adapters/localAdapter.js';
 import { logger } from '../utils/logger.js';
 

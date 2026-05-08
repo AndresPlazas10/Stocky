@@ -28,7 +28,7 @@ import {
   isEmployeeInBusiness as isEmployeeInBusinessForOrders
 } from '../../data/queries/authQueries.js';
 import { isAdminRole } from '../../utils/roles.js';
-import { formatPrice, formatDateTimeTicket } from '../../utils/formatters.js';
+import { formatPrice } from '../../utils/formatters.js';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -60,7 +60,7 @@ import SplitBillModal from './SplitBillModal';
 import { closeModalImmediate } from '../../utils/closeModalImmediate';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { normalizeTableRecord } from '../../utils/tableStatus.js';
-import { getThermalPaperWidthMm, isAutoPrintReceiptEnabled } from '../../utils/printer.js';
+import { isAutoPrintReceiptEnabled } from '../../utils/printer.js';
 import { printSaleReceipt } from '../../utils/saleReceiptPrint.js';
 import { isOfflineMode, isOfflinePersistenceEnabled, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
 import { invalidateOrderCache } from '../../data/adapters/cacheInvalidation.js';
@@ -589,9 +589,9 @@ function Mesas({ businessId, userRole = 'admin' }) {
   const [searchProduct, setSearchProduct] = useState('');
   const debouncedSearch = useDebounce(searchProduct, 200);
 
-  const { closeOrderInFlightRef, acquireCloseOrderLock, releaseCloseOrderLock } = useCloseOrderLocks();
+  const { acquireCloseOrderLock, releaseCloseOrderLock } = useCloseOrderLocks();
 
-  const { loadProductos, loadCombos, ensureCatalogWarmup } = useMesaCatalog({
+  const { loadCombos, ensureCatalogWarmup } = useMesaCatalog({
     businessId, setProductos, setCombos, setError,
   });
   const [currentUser, setCurrentUser] = useState(null);
@@ -635,6 +635,13 @@ function Mesas({ businessId, userRole = 'admin' }) {
   const mesasSnapshotTimerRef = useRef(null);
   const mesaOpenDebugRef = useRef({ stage: 'idle', ts: null });
 
+  const mesaSyncBroadcastChannelRef = useRef(null);
+  const mesaSyncBroadcastReadyRef = useRef(false);
+  const mesaSyncClientIdRef = useRef(typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'cl-' + Date.now().toString(36));
+  const activeMesaBroadcastRef = useRef(null);
+  const heldMesaLockRef = useRef(null);
+  const mesaLockHeartbeatTimerRef = useRef(null);
+
   // Ref para prevenir que el modal se reabra después de completar una venta
   const justCompletedSaleRef = useRef(false);
   
@@ -644,7 +651,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
 
   // Estados para modal de impresión
   const [showPrintModal, setShowPrintModal] = useState(false);
-  const [printSaleIds, setPrintSaleIds] = useState([]);
+  const [_printSaleIds, setPrintSaleIds] = useState([]);
   const [printSaleDataList, setPrintSaleDataList] = useState([]);
   const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
   const [printCustomerName, setPrintCustomerName] = useState('Venta general');

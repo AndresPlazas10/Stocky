@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Download, ShieldCheck, Smartphone, AlertTriangle, Monitor, BellRing, Share, PlusSquare, AppWindow } from 'lucide-react';
 import { Button } from '@/components/ui/button';

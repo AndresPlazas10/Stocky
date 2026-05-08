@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
-import { getPaymentMethodLogoCandidates, isBankPaymentMethod } from '../../utils/paymentMethodBranding.js';
+import { isBankPaymentMethod } from '../../utils/paymentMethodBranding.js';
 import { PaymentMethodBankLogo } from '../ui/PaymentMethodBankLogo';
 
 const _motionLintUsage = motion;

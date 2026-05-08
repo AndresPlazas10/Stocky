@@ -43,10 +43,6 @@ async function fetchWebPushPublicKey() {
   return '';
 }
 
-function resolveWebPushPublicKey() {
-  return String(import.meta.env?.VITE_WEB_PUSH_PUBLIC_KEY || '').trim();
-}
-
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding)
