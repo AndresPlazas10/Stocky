@@ -290,7 +290,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
       const printResult = await printSaleReceipt({
         sale: printSaleData,
         saleDetails: printSaleDetails,
-        sellerName: printSaleData.seller_name || getVendedorName(printSaleData)
+        sellerName: printSaleData.seller_name || getVendedorName(printSaleData),
+        businessName: await getBusinessNameById(businessId),
       });
 
       if (!printResult.ok) {
@@ -1116,7 +1117,8 @@ function Ventas({ businessId, userRole = 'admin' }) {
     const printResult = await printSaleReceipt({
       sale: venta,
       saleDetails,
-      sellerName: getVendedorName(venta)
+      sellerName: getVendedorName(venta),
+      businessName: await getBusinessNameById(businessId),
     });
 
     if (!printResult.ok) {

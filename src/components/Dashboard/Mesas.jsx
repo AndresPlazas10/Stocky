@@ -22,6 +22,7 @@ import {
   getSalePrintBundle,
   getTablesWithCurrentOrderByBusiness
 } from '../../data/queries/ordersQueries.js';
+import { getBusinessNameById } from '../../data/queries/salesQueries.js';
 import {
   getAuthenticatedUser as getAuthenticatedUserFromOrders,
   getEmployeeRoleInBusiness as getEmployeeRoleInBusinessForOrders,
@@ -4078,7 +4079,8 @@ function Mesas({ businessId, userRole = 'admin' }) {
           const printResult = await printSaleReceipt({
             sale: saleRow,
             saleDetails,
-            sellerName: saleRow?.seller_name || 'Empleado'
+            sellerName: saleRow?.seller_name || 'Empleado',
+            businessName: await getBusinessNameById(businessId),
           });
 
           if (!printResult.ok) {
@@ -4118,7 +4120,8 @@ function Mesas({ businessId, userRole = 'admin' }) {
       const printResult = await printSaleReceipt({
         sale: saleRow,
         saleDetails,
-        sellerName: saleRow.seller_name || 'Empleado'
+        sellerName: saleRow.seller_name || 'Empleado',
+        businessName: await getBusinessNameById(businessId),
       });
 
       if (!printResult.ok) {
