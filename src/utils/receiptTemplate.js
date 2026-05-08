@@ -28,6 +28,7 @@ export const buildSaleReceiptTemplate = ({
   businessName = 'Sistema Stocky',
   footerMessage = 'Gracias por su compra',
   voluntaryTip = null,
+  customerName = 'Venta general',
 }) => {
   const subtotal = Number(sale?.total || 0);
   const tipAmount = voluntaryTip?.enabled ? Number(voluntaryTip?.amount || 0) : 0;
@@ -45,7 +46,7 @@ export const buildSaleReceiptTemplate = ({
     },
     metadata: [
       { label: 'Vendedor', value: String(sellerName || 'Empleado') },
-      { label: 'Cliente', value: 'Venta general' },
+      { label: 'Cliente', value: String(customerName || 'Venta general') },
     ],
     items: saleDetails.map((item) => {
       const quantity = Number(item?.quantity || 0);

@@ -86,11 +86,13 @@ export function buildSaleReceiptHtml({
   saleDetails,
   sellerName,
   printerWidthMm = DEFAULT_PRINTER_WIDTH_MM,
+  customerName = 'Venta general',
 }: {
   sale: VentaRecord;
   saleDetails: VentaDetailRecord[];
   sellerName?: string | null;
   printerWidthMm?: number;
+  customerName?: string;
 }) {
   const safeSeller = String(sellerName || 'Empleado');
   const printableItems = Array.isArray(saleDetails) ? saleDetails : [];
@@ -229,7 +231,7 @@ export function buildSaleReceiptHtml({
 
         <div class="row"><span><strong>Comprobante:</strong></span><span>CPV-${String(sale.id).substring(0, 8).toUpperCase()}</span></div>
         <div class="row"><span><strong>Vendedor:</strong></span><span>${safeSeller}</span></div>
-        <div class="row"><span><strong>Cliente:</strong></span><span>Venta general</span></div>
+        <div class="row"><span><strong>Cliente:</strong></span><span>${String(customerName || 'Venta general')}</span></div>
 
         <div class="separator"></div>
 

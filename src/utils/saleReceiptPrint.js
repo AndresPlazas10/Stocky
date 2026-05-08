@@ -75,6 +75,7 @@ export async function printSaleReceipt({
   businessName = 'Sistema Stocky',
   footerMessage = 'Gracias por su compra',
   voluntaryTip = null,
+  customerName = 'Venta general',
 }) {
   if (!sale?.id) {
     return { ok: false, error: 'No se pudo imprimir: venta sin id.' };
@@ -85,7 +86,7 @@ export async function printSaleReceipt({
 
   const printerWidthMm = getThermalPaperWidthMm();
   const receipt = buildSaleReceiptTemplate({
-    sale, saleDetails, sellerName, businessName, footerMessage, voluntaryTip,
+    sale, saleDetails, sellerName, businessName, footerMessage, voluntaryTip, customerName,
   });
   const validation = validateSaleReceiptTemplate(receipt);
   if (!validation.ok) return validation;
