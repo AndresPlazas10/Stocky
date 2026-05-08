@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { closeOrderAsSplit, closeOrderSingle } from '../../services/ordersService.js';
-import { fetchComboCatalog } from '../../services/combosService.js';
 import {
   createOrderAndOccupyTable,
   createTable,
@@ -18,7 +17,6 @@ import {
   getOrderForRealtimeById,
   getOrderItemsByOrderId,
   getOrderWithItemsById,
-  getProductsForOrdersByBusiness,
   getSalePrintBundle,
   getTablesWithCurrentOrderByBusiness
 } from '../../data/queries/ordersQueries.js';
@@ -67,6 +65,7 @@ import { useProgressiveList } from '../../hooks/useProgressiveList.js';
 import { useRafBatchedQueue } from '../../hooks/useRafBatchedQueue.js';
 import { useDebounce } from '../../hooks/optimized.js';
 import { useCloseOrderLocks } from '../../hooks/useCloseOrderLocks.js';
+import { useMesaCatalog } from '../../hooks/useMesaCatalog.js';
 import { supabase } from '../../supabase/Client.jsx';
 
 const getPaymentMethodLabel = (method) => {
@@ -654,6 +653,10 @@ function Mesas({ businessId, userRole = 'admin' }) {
   const debouncedSearch = useDebounce(searchProduct, 200);
 
   const { closeOrderInFlightRef, acquireCloseOrderLock, releaseCloseOrderLock } = useCloseOrderLocks();
+
+  const { loadProductos, loadCombos, ensureCatalogWarmup } = useMesaCatalog({
+    businessId, setProductos, setCombos, setError,
+  });
   const [currentUser, setCurrentUser] = useState(null);
   const [quantityToAdd, setQuantityToAdd] = useState(1);
 
@@ -692,14 +695,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
   const optimisticTempItemQuantitiesRef = useRef({});
   const pendingOrderItemOpsRef = useRef(0);
   const orderItemWriteQueueRef = useRef({});
-  const catalogWarmupPromiseRef = useRef(null);
   const mesasSnapshotTimerRef = useRef(null);
-  const mesaSyncBroadcastChannelRef = useRef(null);
-  const mesaSyncBroadcastReadyRef = useRef(false);
-  const mesaSyncClientIdRef = useRef(`web-mesas-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
-  const activeMesaBroadcastRef = useRef(null);
-  const heldMesaLockRef = useRef(null);
-  const mesaLockHeartbeatTimerRef = useRef(null);
   const mesaOpenDebugRef = useRef({ stage: 'idle', ts: null });
 
   // Ref para prevenir que el modal se reabra después de completar una venta
@@ -1556,102 +1552,14 @@ function Mesas({ businessId, userRole = 'admin' }) {
     });
   }, [businessId]);
 
-  const loadProductos = useCallback(async () => {
-    const offline = isOfflineMode();
-    const offlineSnapshotKey = `mesas.productos:${businessId}`;
-    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
-
-    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
-      setProductos(offlineSnapshot);
-    }
-
-    try {
-      const data = await getProductsForOrdersByBusiness(businessId);
-      const normalizedData = Array.isArray(data) ? data : [];
-      const hasLocalData = normalizedData.length > 0;
-
-      if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
-        setProductos(offlineSnapshot);
-        return;
-      }
-
-      // Removido el filtro de stock para permitir ventas incluso con stock negativo
-      setProductos(normalizedData);
-      if (!offline || hasLocalData) {
-        saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
-      }
-    } catch {
-      const cached = readOfflineSnapshot(offlineSnapshotKey, []);
-      if (Array.isArray(cached) && cached.length > 0) {
-        setProductos(cached);
-        return;
-      }
-
-      if (offline) {
-        setProductos([]);
-      } else {
-        setError('No se pudo cargar los productos. Revisa tu conexión e intenta de nuevo.');
-      }
-    }
-  }, [businessId]);
-
-  const loadCombos = useCallback(async () => {
-    const offline = isOfflineMode();
-    const offlineSnapshotKey = `mesas.combos:${businessId}`;
-    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
-
-    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
-      setCombos(offlineSnapshot);
-    }
-
-    try {
-      const data = await fetchComboCatalog(businessId);
-      const normalizedData = Array.isArray(data) ? data : [];
-      const hasLocalData = normalizedData.length > 0;
-
-      if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
-        setCombos(offlineSnapshot);
-        return;
-      }
-
-      setCombos(normalizedData);
-      if (!offline || hasLocalData) {
-        saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
-      }
-    } catch {
-      const cached = readOfflineSnapshot(offlineSnapshotKey, []);
-      if (Array.isArray(cached) && cached.length > 0) {
-        setCombos(cached);
-        return;
-      }
-
-      if (offline) {
-        setCombos([]);
-      } else {
-        setError('No se pudo cargar los combos. Revisa tu conexión e intenta de nuevo.');
-      }
-    }
-  }, [businessId]);
+  /* ===== catalog loading extracted to useMesaCatalog ===== */
 
   const loadClientes = useCallback(async () => {
     // Tabla customers eliminada - no hacer nada
     setClientes([]);
   }, []);
 
-  const ensureCatalogWarmup = useCallback(async () => {
-    if (catalogWarmupPromiseRef.current) {
-      return catalogWarmupPromiseRef.current;
-    }
-
-    catalogWarmupPromiseRef.current = Promise.allSettled([
-      loadProductos(),
-      loadCombos()
-    ]).finally(() => {
-      catalogWarmupPromiseRef.current = null;
-    });
-
-    return catalogWarmupPromiseRef.current;
-  }, [loadProductos, loadCombos]);
+  /* ===== ensureCatalogWarmup extracted to useMesaCatalog ===== */
 
   const loadData = useCallback(async () => {
     try {
