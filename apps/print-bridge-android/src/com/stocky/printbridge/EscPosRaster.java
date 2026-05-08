@@ -1,7 +1,6 @@
 package com.stocky.printbridge;
 
 import android.graphics.Bitmap;
-import android.graphics.Color;
 
 import java.io.ByteArrayOutputStream;
 
