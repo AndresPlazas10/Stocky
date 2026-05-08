@@ -35,6 +35,7 @@ public class PrintBridgeHttpServer {
     public synchronized void start() {
         if (running) return;
         running = true;
+        ensureToken();
 
         serverThread = new Thread(new Runnable() {
             @Override
@@ -169,6 +170,11 @@ public class PrintBridgeHttpServer {
     }
 
     private void handlePrint(OutputStream output, Map<String, String> headers, String body) throws Exception {
+        if (!validateToken(headers)) {
+            sendCorsResponse(output, 401, "{\"ok\":false,\"error\":\"Token invalido\"}");
+            return;
+        }
+
         JSONObject payload;
         try {
             payload = new JSONObject(body);
@@ -259,5 +265,19 @@ public class PrintBridgeHttpServer {
         } catch (Exception e) {
             return fallback;
         }
+    }
+
+    private void ensureToken() {
+        if (!prefs.getString("bridgeToken", "").trim().isEmpty()) return;
+        String token = java.util.UUID.randomUUID().toString().replace("-", "");
+        prefs.edit().putString("bridgeToken", token).apply();
+        Log.i(TAG, "Generated bridge token: " + token);
+    }
+
+    private boolean validateToken(Map<String, String> headers) {
+        String token = headers.get("x-stocky-bridge-token");
+        if (token == null) token = "";
+        String saved = prefs.getString("bridgeToken", "");
+        return saved.equals(token.trim());
     }
 }

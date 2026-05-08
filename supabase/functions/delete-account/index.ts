@@ -9,6 +9,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
+const ALLOWED_ORIGINS = ['https://www.stockypos.app', 'http://localhost:5173', 'http://localhost:5174'];
+
+function resolveAllowedOrigin(requestOrigin: string | null): string {
+  if (requestOrigin && ALLOWED_ORIGINS.includes(requestOrigin)) return requestOrigin
+  return ALLOWED_ORIGINS[0]
+}
+
 const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: {
     persistSession: false,
@@ -16,13 +23,13 @@ const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   },
 });
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
 serve(async (req) => {
+  const origin = req.headers.get('origin')
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': resolveAllowedOrigin(origin),
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
