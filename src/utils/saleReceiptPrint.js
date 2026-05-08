@@ -113,12 +113,11 @@ export async function printSaleReceipt({
     overlay.innerHTML = receiptHtml;
     document.body.appendChild(overlay);
 
-    // Force full render before printing
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        window.print();
-      });
-    });
+    // Force synchronous layout so the overlay is painted before print
+    void overlay.offsetHeight;
+
+    // Called directly within user gesture
+    window.print();
 
     const cleanup = () => {
       const el = document.getElementById('__stocky_print_overlay__');
