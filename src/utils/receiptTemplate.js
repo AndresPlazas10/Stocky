@@ -44,7 +44,6 @@ export const buildSaleReceiptTemplate = ({
       alignment: 'center',
     },
     metadata: [
-      { label: 'Comprobante', value: `CPV-${String(sale?.id || '').substring(0, 8).toUpperCase()}` },
       { label: 'Vendedor', value: String(sellerName || 'Empleado') },
       { label: 'Cliente', value: 'Venta general' },
     ],
