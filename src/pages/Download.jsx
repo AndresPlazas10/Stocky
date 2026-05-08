@@ -5,23 +5,6 @@ import { Button } from '@/components/ui/button';
 import { getApkDownloadUrl } from '../utils/apkDownload.js';
 import { getWindowsDownloadUrl } from '../utils/windowsDownload.js';
 import {
-  getPrintBridgeApkDownloadUrl,
-  getPrintBridgeWindowsDownloadUrl,
-} from '../utils/printBridgeDownload.js';
-import { checkPrintBridgeStatus } from '../utils/printBridgeClient.js';
-import {
-  getConfiguredPrinterName,
-  getPrintBridgeEndpoint,
-  getPrintBridgeToken,
-  getThermalPaperWidthMm,
-  isPrintBridgeEnabled,
-  setConfiguredPrinterName,
-  setPrintBridgeEnabled,
-  setPrintBridgeEndpoint,
-  setPrintBridgeToken,
-  setThermalPaperWidthMm,
-} from '../utils/printer.js';
-import {
   getWebPushSupportStatus,
   registerPwaPushSubscription,
   sendPwaPushTestNotification,
@@ -30,51 +13,14 @@ import { isIOs, isStandalone } from '../utils/deviceDetection.js';
 
 const _motionLintUsage = motion;
 
-const getBridgeDiagnosticMessage = (result) => {
-  if (result?.reason === 'bridge_disabled') {
-    return 'Activa "Usar Stocky Print Bridge" y guarda la configuración.';
-  }
-
-  if (result?.reason === 'missing_bridge_endpoint') {
-    return 'Falta el endpoint. En Android usa http://127.0.0.1:41781.';
-  }
-
-  if (result?.reason === 'missing_bridge_token') {
-    return 'Falta el token del APK. Copia el token desde Stocky Print Bridge.';
-  }
-
-  if (result?.reason === 'bridge_unavailable') {
-    return 'No se pudo abrir el bridge. Deja el APK abierto, guarda la configuración y usa http://127.0.0.1:41781. El token es opcional en Android.';
-  }
-
-  if (result?.reason === 'bridge_timeout') {
-    return 'El bridge no respondió a tiempo. Reabre el APK, guarda la configuración e intenta de nuevo.';
-  }
-
-  if (String(result?.reason || '').startsWith('bridge_http_')) {
-    return `El bridge respondió con error ${String(result.reason).replace('bridge_http_', '')}. Revisa el token y que la integración esté activa en el APK.`;
-  }
-
-  return result?.error || result?.reason || 'Error desconocido probando el bridge.';
-};
-
 function DownloadPage() {
   const apkUrl = getApkDownloadUrl();
   const windowsUrl = getWindowsDownloadUrl();
-  const printBridgeApkUrl = getPrintBridgeApkDownloadUrl();
-  const printBridgeWindowsUrl = getPrintBridgeWindowsDownloadUrl();
   const apkVersion = String(import.meta.env?.VITE_APK_VERSION || '').trim();
   const windowsVersion = String(import.meta.env?.VITE_WINDOWS_VERSION || '').trim();
-  const printBridgeVersion = String(import.meta.env?.VITE_PRINT_BRIDGE_VERSION || '').trim();
   const [enablingPush, setEnablingPush] = useState(false);
   const [testingPush, setTestingPush] = useState(false);
   const [pushFeedback, setPushFeedback] = useState('');
-  const [bridgeFeedback, setBridgeFeedback] = useState('');
-  const [bridgeEnabled, setBridgeEnabled] = useState(() => isPrintBridgeEnabled());
-  const [bridgeEndpoint, setBridgeEndpoint] = useState(() => getPrintBridgeEndpoint());
-  const [bridgeToken, setBridgeToken] = useState(() => getPrintBridgeToken());
-  const [bridgePrinterName, setBridgePrinterName] = useState(() => getConfiguredPrinterName());
-  const [bridgePaperWidth, setBridgePaperWidth] = useState(() => getThermalPaperWidthMm());
   const [showIOsSteps, setShowIOsSteps] = useState(false);
   const [support, setSupport] = useState({ supported: false, reason: 'loading', permission: 'default' });
   const userIsOnIOs = isIOs();
@@ -133,33 +79,6 @@ function DownloadPage() {
     } finally {
       setTestingPush(false);
     }
-  };
-
-  const handleSaveBridgeConfig = () => {
-    const ok = [
-      setPrintBridgeEnabled(bridgeEnabled),
-      setPrintBridgeEndpoint(bridgeEndpoint),
-      setPrintBridgeToken(bridgeToken),
-      setConfiguredPrinterName(bridgePrinterName),
-      setThermalPaperWidthMm(bridgePaperWidth),
-    ].every(Boolean);
-
-    setBridgeFeedback(ok
-      ? 'Configuración guardada. Ahora vuelve a Stocky e imprime el recibo.'
-      : 'No se pudo guardar la configuración del puente.');
-  };
-
-  const handleTestBridgeConfig = async () => {
-    handleSaveBridgeConfig();
-    setBridgeFeedback('Probando conexión con Stocky Print Bridge...');
-
-    const result = await checkPrintBridgeStatus();
-    if (result.ok) {
-      setBridgeFeedback('Conexión correcta. El navegador ya ve el APK.');
-      return;
-    }
-
-    setBridgeFeedback(`No se pudo conectar al bridge: ${getBridgeDiagnosticMessage(result)}`);
   };
 
   return (
@@ -225,117 +144,6 @@ function DownloadPage() {
               </Button>
             </div>
 
-            <div className="rounded-2xl border border-indigo-200/80 bg-white/90 p-5 text-sm shadow-sm">
-              <div className="mb-4 flex items-start gap-3">
-                <div className="rounded-full bg-indigo-100 p-2 text-indigo-700">
-                  <Monitor className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="font-bold text-indigo-950">Stocky Print Bridge</p>
-                  <p className="text-slate-700">
-                    Puente para impresoras térmicas Bluetooth ESC/POS.
-                    {printBridgeVersion ? ` Versión ${printBridgeVersion}.` : ''}
-                  </p>
-                </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Button
-                  size="lg"
-                  onClick={() => window.open(printBridgeApkUrl, '_blank', 'noopener')}
-                  className="h-12 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 font-semibold text-slate-50 hover:opacity-90"
-                >
-                  <Smartphone className="mr-2 h-4 w-4" />
-                  Descargar Bridge Android
-                </Button>
-                <Button
-                  size="lg"
-                  onClick={() => window.open(printBridgeWindowsUrl, '_blank', 'noopener')}
-                  className="h-12 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 px-6 font-semibold text-slate-50 hover:opacity-90"
-                >
-                  <Monitor className="mr-2 h-4 w-4" />
-                  Descargar Bridge Windows
-                </Button>
-              </div>
-
-              <div className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50/80 p-4">
-                <p className="font-bold text-indigo-950">Configurar puente en este navegador</p>
-                <p className="mt-1 text-xs text-slate-700">
-                  Guarda estos datos aquí para que Stocky Web envíe los recibos directo al APK, sin abrir RawBT.
-                </p>
-
-                <label className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-indigo-950">
-                  <input
-                    type="checkbox"
-                    checked={bridgeEnabled}
-                    onChange={(event) => setBridgeEnabled(Boolean(event.target.checked))}
-                    className="h-4 w-4 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-300"
-                  />
-                  Usar Stocky Print Bridge
-                </label>
-
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Endpoint Android
-                    <input
-                      value={bridgeEndpoint}
-                      onChange={(event) => setBridgeEndpoint(event.target.value)}
-                      className="mt-1 h-10 w-full rounded-lg border border-indigo-100 bg-white px-3 text-sm text-slate-900 focus:border-transparent focus:ring-2 focus:ring-indigo-200"
-                      placeholder="http://127.0.0.1:41781"
-                    />
-                  </label>
-                  <label className="text-xs font-semibold text-slate-700">
-                    Token del APK
-                    <input
-                      value={bridgeToken}
-                      onChange={(event) => setBridgeToken(event.target.value)}
-                      className="mt-1 h-10 w-full rounded-lg border border-indigo-100 bg-white px-3 text-sm text-slate-900 focus:border-transparent focus:ring-2 focus:ring-indigo-200"
-                      placeholder="Pega el token del Bridge"
-                    />
-                  </label>
-                  <label className="text-xs font-semibold text-slate-700">
-                    Nombre visible
-                    <input
-                      value={bridgePrinterName}
-                      onChange={(event) => setBridgePrinterName(event.target.value)}
-                      className="mt-1 h-10 w-full rounded-lg border border-indigo-100 bg-white px-3 text-sm text-slate-900 focus:border-transparent focus:ring-2 focus:ring-indigo-200"
-                      placeholder="Impresora Android"
-                    />
-                  </label>
-                  <label className="text-xs font-semibold text-slate-700">
-                    Papel
-                    <select
-                      value={bridgePaperWidth}
-                      onChange={(event) => setBridgePaperWidth(Number(event.target.value))}
-                      className="mt-1 h-10 w-full rounded-lg border border-indigo-100 bg-white px-3 text-sm text-slate-900 focus:border-transparent focus:ring-2 focus:ring-indigo-200"
-                    >
-                      <option value={58}>58mm</option>
-                      <option value={80}>80mm</option>
-                      <option value={104}>104mm</option>
-                    </select>
-                  </label>
-                </div>
-
-                <Button
-                  type="button"
-                  onClick={handleSaveBridgeConfig}
-                  className="mt-4 h-10 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 font-semibold text-slate-50 hover:opacity-90"
-                >
-                  Guardar configuración del puente
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleTestBridgeConfig}
-                  variant="outline"
-                  className="ml-2 mt-4 h-10 rounded-xl border-indigo-200 bg-white px-5 font-semibold text-indigo-700 hover:bg-indigo-50"
-                >
-                  Probar conexión
-                </Button>
-                {bridgeFeedback && (
-                  <p className="mt-3 text-xs font-semibold text-indigo-900">{bridgeFeedback}</p>
-                )}
-              </div>
-            </div>
-
             {/* Sección iPhone PWA */}
             <div className="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50/90 to-cyan-50/90 p-5 text-sm text-sky-950 shadow-sm">
               <div className="mb-4 flex items-center gap-2">
@@ -348,7 +156,6 @@ function DownloadPage() {
                 </div>
               </div>
 
-              {/* Estado: Ya instalada */}
               {userInStandalone && (
                 <div className="mb-4 rounded-xl border border-green-300 bg-green-50 p-3">
                   <div className="flex items-center gap-2 text-green-800">
@@ -361,7 +168,6 @@ function DownloadPage() {
                 </div>
               )}
 
-              {/* Estado: En Safari pero no instalada */}
               {userIsOnIOs && !userInStandalone && (
                 <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3">
                   <p className="text-xs text-amber-800">
@@ -370,7 +176,6 @@ function DownloadPage() {
                 </div>
               )}
 
-              {/* Botón mostrar/ocultar pasos */}
               <Button
                 variant="outline"
                 size="sm"
@@ -380,7 +185,6 @@ function DownloadPage() {
                 {showIOsSteps ? 'Ocultar pasos de instalación' : 'Ver pasos de instalación en iPhone'}
               </Button>
 
-              {/* Pasos de instalación iOS */}
               {showIOsSteps && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
@@ -389,7 +193,6 @@ function DownloadPage() {
                 >
                   <div className="rounded-xl border border-sky-200 bg-white/80 p-4">
                     <p className="mb-3 font-semibold text-sky-900">Instalación paso a paso:</p>
-
                     <div className="space-y-3">
                       <div className="flex gap-3">
                         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white">1</div>
@@ -398,7 +201,6 @@ function DownloadPage() {
                           <p className="text-xs text-sky-700">Usa Safari (no Chrome ni otros navegadores)</p>
                         </div>
                       </div>
-
                       <div className="flex gap-3">
                         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white">2</div>
                         <div>
@@ -409,7 +211,6 @@ function DownloadPage() {
                           </div>
                         </div>
                       </div>
-
                       <div className="flex gap-3">
                         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white">3</div>
                         <div>
@@ -420,7 +221,6 @@ function DownloadPage() {
                           </div>
                         </div>
                       </div>
-
                       <div className="flex gap-3">
                         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white">4</div>
                         <div>
@@ -430,17 +230,14 @@ function DownloadPage() {
                       </div>
                     </div>
                   </div>
-
                   <div className="rounded-lg border border-sky-200 bg-sky-100/50 p-3 text-xs text-sky-800">
                     <strong>Nota:</strong> Después de instalar, abre la app desde tu pantalla de inicio y luego activa las notificaciones.
                   </div>
                 </motion.div>
               )}
 
-              {/* Controles de notificaciones */}
               <div className="rounded-xl border border-sky-200 bg-white/80 p-4">
                 <p className="mb-3 font-semibold text-sky-900">Notificaciones push:</p>
-
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Button
                     size="sm"
@@ -485,8 +282,7 @@ function DownloadPage() {
                 <li>1. Android: instala el APK y habilita instalación de apps desconocidas.</li>
                 <li>2. iPhone: abre en Safari, añade a pantalla de inicio y activa notificaciones.</li>
                 <li>3. Windows: descarga el instalador y ejecútalo como instalación normal.</li>
-                <li>4. Print Bridge: instala el puente si vas a usar impresoras térmicas Bluetooth ESC/POS.</li>
-                <li>5. Si SmartScreen aparece en Windows, usa "Más información" y luego "Ejecutar de todas formas".</li>
+                <li>4. Si SmartScreen aparece en Windows, usa "Más información" y luego "Ejecutar de todas formas".</li>
               </ul>
             </div>
 

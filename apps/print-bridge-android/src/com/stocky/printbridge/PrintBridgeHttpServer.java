@@ -39,20 +39,34 @@ public class PrintBridgeHttpServer {
         serverThread = new Thread(new Runnable() {
             @Override
             public void run() {
+                ServerSocket localSocket = null;
                 try {
-                    serverSocket = new ServerSocket(DEFAULT_PORT, 4, InetAddress.getByName("127.0.0.1"));
+                    if (!running) return;
+                    localSocket = new ServerSocket(DEFAULT_PORT, 8, InetAddress.getByName("127.0.0.1"));
+                    serverSocket = localSocket;
                     Log.i(TAG, "HTTP server started on 127.0.0.1:" + DEFAULT_PORT);
 
                     while (running) {
+                        Socket client = null;
                         try {
-                            Socket client = serverSocket.accept();
+                            client = localSocket.accept();
                             handleClient(client);
                         } catch (Exception e) {
                             if (running) Log.e(TAG, "Client error", e);
+                        } finally {
+                            if (client != null) try { client.close(); } catch (Exception ignored) {}
                         }
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "Server start failed", e);
+                    if (running) {
+                        Log.e(TAG, "Server start failed", e);
+                        running = false;
+                    }
+                } finally {
+                    if (localSocket != null) {
+                        try { localSocket.close(); } catch (Exception ignored) {}
+                    }
+                    serverSocket = null;
                 }
             }
         }, "PrintBridgeHttp");
@@ -62,12 +76,12 @@ public class PrintBridgeHttpServer {
 
     public synchronized void stop() {
         running = false;
-        try {
-            if (serverSocket != null) {
+        if (serverSocket != null) {
+            try {
                 serverSocket.close();
+            } catch (Exception e) {
+                Log.e(TAG, "Server close error", e);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Server close error", e);
         }
         serverSocket = null;
         serverThread = null;
@@ -93,7 +107,6 @@ public class PrintBridgeHttpServer {
 
             String method = parts[0];
             String path = parts[1];
-            Log.i(TAG, "Request: " + method + " " + path);
 
             Map<String, String> headers = new HashMap<>();
             String headerLine;
@@ -111,7 +124,7 @@ public class PrintBridgeHttpServer {
             if (contentLengthStr != null) {
                 try {
                     int contentLength = Integer.parseInt(contentLengthStr.trim());
-                    if (contentLength > 512 * 1024) {
+                    if (contentLength < 0 || contentLength > 512 * 1024) {
                         sendResponse(output, 413, "{\"ok\":false,\"error\":\"Payload demasiado grande\"}");
                         client.close();
                         return;
@@ -123,13 +136,11 @@ public class PrintBridgeHttpServer {
                         if (n < 0) break;
                         read += n;
                     }
-                    body = new String(bodyBytes, "UTF-8");
+                    body = new String(bodyBytes, 0, read, "UTF-8");
                 } catch (NumberFormatException e) {
                     Log.e(TAG, "Invalid Content-Length: " + contentLengthStr);
                 }
             }
-
-            Log.i(TAG, "Dispatching " + method + " " + path);
 
             if ("OPTIONS".equals(method)) {
                 sendCorsResponse(output, 204, "{}");
@@ -162,45 +173,38 @@ public class PrintBridgeHttpServer {
         try {
             payload = new JSONObject(body);
         } catch (Exception e) {
-            Log.e(TAG, "Invalid JSON: " + e.getMessage());
             sendCorsResponse(output, 400, "{\"ok\":false,\"error\":\"JSON invalido\"}");
             return;
         }
 
         JSONObject receipt = payload.optJSONObject("receipt");
         if (receipt == null || !"sale".equals(receipt.optString("type"))) {
-            Log.w(TAG, "Invalid receipt type: " + (receipt != null ? receipt.optString("type") : "null"));
             sendCorsResponse(output, 422, "{\"ok\":false,\"error\":\"Tipo de recibo no soportado\"}");
             return;
         }
 
         JSONArray itemsArray = receipt.optJSONArray("items");
+        JSONObject totals = receipt.optJSONObject("totals");
         if (itemsArray == null || itemsArray.length() == 0) {
             sendCorsResponse(output, 422, "{\"ok\":false,\"error\":\"El recibo no tiene items\"}");
             return;
         }
-
-        JSONObject totals = receipt.optJSONObject("totals");
-        if (totals == null || !receipt.optJSONObject("totals").has("totalText")) {
+        if (totals == null || !totals.has("totalText")) {
             sendCorsResponse(output, 422, "{\"ok\":false,\"error\":\"El recibo no tiene total\"}");
             return;
         }
 
         int paperWidthMm = payload.optInt("paperWidthMm", parseInt(prefs.getString("paper", "80"), 80));
 
-        Log.i(TAG, "Printing receipt with " + itemsArray.length() + " items, " + paperWidthMm + "mm");
-
         try {
             byte[] escposData = ReceiptSerializer.serialize(receipt, paperWidthMm);
-            Log.i(TAG, "Serialized to " + escposData.length + " bytes");
             boolean openCashDrawer = prefs.getBoolean("cashDrawer", false);
             BluetoothPrinter.printBytes(escposData, openCashDrawer, bluetoothAdapter, prefs);
-            Log.i(TAG, "Print sent successfully");
-
             sendCorsResponse(output, 200, "{\"ok\":true}");
         } catch (Exception e) {
             Log.e(TAG, "Print failed", e);
-            sendCorsResponse(output, 500, "{\"ok\":false,\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
+            String errorMsg = e.getMessage() != null ? e.getMessage() : "Error desconocido";
+            sendCorsResponse(output, 500, "{\"ok\":false,\"error\":" + JSONObject.quote(errorMsg) + "}");
         }
     }
 
@@ -247,11 +251,6 @@ public class PrintBridgeHttpServer {
             case 503: return "Service Unavailable";
             default: return "Unknown";
         }
-    }
-
-    private String escapeJson(String value) {
-        if (value == null) return "";
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     private int parseInt(String value, int fallback) {

@@ -18,29 +18,23 @@ public class ReceiptSerializer {
 
         cmd(out, ESC, 0x40);
         cmd(out, ESC, 0x74, 0x10);
+        cmd(out, ESC, 0x33, 0x2A);
 
-        String headerAlign = receipt.optJSONObject("header") != null
-                ? receipt.optJSONObject("header").optString("alignment", "center")
-                : "center";
+        JSONObject header = receipt.optJSONObject("header");
+        String headerAlign = header != null ? header.optString("alignment", "center") : "center";
         align(out, "center".equals(headerAlign) ? 1 : ("right".equals(headerAlign) ? 2 : 0));
 
         bold(out, true);
         size(out, true);
-        String title = receipt.optJSONObject("header") != null
-                ? receipt.optJSONObject("header").optString("title", "COMPROBANTE")
-                : "COMPROBANTE";
+        String title = header != null ? header.optString("title", "COMPROBANTE") : "COMPROBANTE";
         writeLine(out, title);
         size(out, false);
 
-        String businessName = receipt.optJSONObject("header") != null
-                ? receipt.optJSONObject("header").optString("businessName", "Sistema Stocky")
-                : "Sistema Stocky";
+        String businessName = header != null ? header.optString("businessName", "Sistema Stocky") : "Sistema Stocky";
         writeLine(out, businessName);
         bold(out, false);
 
-        String dateText = receipt.optJSONObject("header") != null
-                ? receipt.optJSONObject("header").optString("dateText", "")
-                : "";
+        String dateText = header != null ? header.optString("dateText", "") : "";
         if (!dateText.isEmpty()) {
             writeLine(out, dateText);
         }
@@ -50,6 +44,8 @@ public class ReceiptSerializer {
 
         JSONArray metadata = receipt.optJSONArray("metadata");
         if (metadata != null) {
+            size(out, false);
+            bold(out, true);
             for (int i = 0; i < metadata.length(); i++) {
                 JSONObject row = metadata.optJSONObject(i);
                 if (row == null) continue;
@@ -57,20 +53,26 @@ public class ReceiptSerializer {
                 String value = row.optString("value", "");
                 twoColumns(out, label + ":", value, columns);
             }
+            bold(out, false);
         }
 
         separator(out, columns);
         bold(out, true);
-        writeLine(out, "Producto");
+        size(out, true);
+        writeLine(out, "PRODUCTO");
+        size(out, false);
         bold(out, false);
 
         JSONArray items = receipt.optJSONArray("items");
         if (items != null) {
+            size(out, false);
+            bold(out, true);
             for (int i = 0; i < items.length(); i++) {
                 JSONObject item = items.optJSONObject(i);
                 if (item == null) continue;
                 itemLines(out, item, columns);
             }
+            bold(out, false);
         }
 
         separator(out, columns);
@@ -79,13 +81,17 @@ public class ReceiptSerializer {
         if (totals != null) {
             double voluntaryTip = totals.optDouble("voluntaryTip", 0);
             if (voluntaryTip > 0) {
+                bold(out, true);
                 String tipText = totals.optString("voluntaryTipText", String.valueOf(voluntaryTip));
-                twoColumns(out, "Propina voluntaria:", tipText, columns);
+                twoColumns(out, "Propina:", tipText, columns);
+                bold(out, false);
             }
 
             bold(out, true);
+            size(out, true);
             String totalText = totals.optString("totalText", "");
             twoColumns(out, "TOTAL:", totalText, columns);
+            size(out, false);
             bold(out, false);
         }
 
@@ -93,19 +99,20 @@ public class ReceiptSerializer {
 
         JSONObject payment = receipt.optJSONObject("payment");
         String methodText = payment != null ? payment.optString("methodText", "No especificado") : "No especificado";
+        bold(out, true);
         twoColumns(out, "Metodo:", methodText, columns);
+        bold(out, false);
 
-        feed(out, 1);
+        feed(out, 2);
 
-        String footerAlign = receipt.optJSONObject("footer") != null
-                ? receipt.optJSONObject("footer").optString("alignment", "center")
-                : "center";
+        JSONObject ft = receipt.optJSONObject("footer");
+        String footerAlign = ft != null ? ft.optString("alignment", "center") : "center";
         align(out, "center".equals(footerAlign) ? 1 : ("right".equals(footerAlign) ? 2 : 0));
 
-        String footerMessage = receipt.optJSONObject("footer") != null
-                ? receipt.optJSONObject("footer").optString("message", "Gracias por su compra")
-                : "Gracias por su compra";
+        bold(out, true);
+        String footerMessage = ft != null ? ft.optString("message", "Gracias por su compra") : "Gracias por su compra";
         writeLine(out, footerMessage);
+        bold(out, false);
 
         align(out, 0);
 
@@ -147,7 +154,7 @@ public class ReceiptSerializer {
     private static void twoColumns(ByteArrayOutputStream out, String left, String right, int columns) throws Exception {
         String cleanRight = clean(right);
         int rightWidth = Math.min(cleanRight.length(), (int) (columns * 0.45));
-        int leftWidth = columns - rightWidth - 1;
+        int leftWidth = Math.max(1, columns - rightWidth - 1);
         List<String> leftLines = wrapText(left, leftWidth);
 
         for (int i = 0; i < leftLines.size(); i++) {

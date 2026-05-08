@@ -1,5 +1,3 @@
 <resources>
     <string name="app_name">Stocky print</string>
-    <string name="http_server_started">Servidor HTTP iniciado en :41781</string>
-    <string name="http_server_stopped">Servidor HTTP detenido</string>
 </resources>

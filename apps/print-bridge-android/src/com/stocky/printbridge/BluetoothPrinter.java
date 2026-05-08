@@ -11,22 +11,16 @@ import java.text.Normalizer;
 import java.util.UUID;
 
 public class BluetoothPrinter {
-    private static final String SPP_UUID = "00001101-0000-1000-8000-00805F9B34FB";
+    private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+    private static final int CONNECT_TIMEOUT_MS = 8000;
 
     public static void print(PrintJobData job, BluetoothAdapter adapter, SharedPreferences prefs) throws Exception {
-        String address = prefs.getString("deviceAddress", "");
-        if (address == null || address.isEmpty()) throw new Exception("Selecciona y guarda una impresora");
-        if (adapter == null || !adapter.isEnabled()) throw new Exception("Bluetooth apagado");
+        byte[] data = serialize(job);
+        sendRaw(data, job.openCashDrawer, adapter, prefs);
+    }
 
-        BluetoothDevice device = adapter.getRemoteDevice(address);
-        BluetoothSocket socket = device.createRfcommSocketToServiceRecord(UUID.fromString(SPP_UUID));
-        adapter.cancelDiscovery();
-        socket.connect();
-
-        OutputStream output = socket.getOutputStream();
-        output.write(serialize(job));
-        output.flush();
-        socket.close();
+    public static void sendRaw(byte[] data, boolean openCashDrawer, BluetoothAdapter adapter, SharedPreferences prefs) throws Exception {
+        printBytes(data, openCashDrawer, adapter, prefs);
     }
 
     public static void printBytes(byte[] data, boolean openCashDrawer, BluetoothAdapter adapter, SharedPreferences prefs) throws Exception {
@@ -35,20 +29,26 @@ public class BluetoothPrinter {
         if (adapter == null || !adapter.isEnabled()) throw new Exception("Bluetooth apagado");
 
         BluetoothDevice device = adapter.getRemoteDevice(address);
-        BluetoothSocket socket = device.createRfcommSocketToServiceRecord(UUID.fromString(SPP_UUID));
-        adapter.cancelDiscovery();
-        socket.connect();
-
-        OutputStream output = socket.getOutputStream();
-        output.write(data);
-        EscPos.feed(output, 3);
-        EscPos.cut(output);
-        if (openCashDrawer) EscPos.openCashDrawer(output);
-        output.flush();
-        socket.close();
+        BluetoothSocket socket = null;
+        try {
+            socket = device.createRfcommSocketToServiceRecord(SPP_UUID);
+            adapter.cancelDiscovery();
+            try { Thread.sleep(300); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            socket.connect();
+            OutputStream output = socket.getOutputStream();
+            output.write(data);
+            EscPos.feed(output, 1);
+            EscPos.cut(output);
+            if (openCashDrawer) EscPos.openCashDrawer(output);
+            output.flush();
+        } finally {
+            if (socket != null) {
+                try { socket.close(); } catch (Exception ignored) {}
+            }
+        }
     }
 
-    private static byte[] serialize(PrintJobData job) throws Exception {
+    public static byte[] serialize(PrintJobData job) throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         EscPos.init(out);
         EscPos.align(out, 1);
