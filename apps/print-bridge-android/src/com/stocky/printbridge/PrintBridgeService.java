@@ -4,6 +4,7 @@ import android.bluetooth.BluetoothAdapter;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.ParcelFileDescriptor;
 import android.print.PrintAttributes;
 import android.print.PrinterCapabilitiesInfo;
 import android.print.PrinterId;
@@ -13,9 +14,8 @@ import android.printservice.PrintService;
 import android.printservice.PrinterDiscoverySession;
 import android.util.Log;
 
-import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
+import java.io.InputStream;
 
 public class PrintBridgeService extends PrintService {
     private static final String TAG = "PrintBridge";
@@ -48,8 +48,9 @@ public class PrintBridgeService extends PrintService {
         final byte[] documentData;
         try {
             documentData = readDocument(printJob);
-        } catch (Exception e) {
-            printJob.fail(e.getMessage() != null ? e.getMessage() : "Error de impresion");
+        } catch (Throwable e) {
+            Log.e(TAG, "Failed to read document", e);
+            printJob.fail(safeError(e));
             return;
         }
 
@@ -62,61 +63,56 @@ public class PrintBridgeService extends PrintService {
 
         final BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
         final boolean openCashDrawer = prefs.getBoolean("cashDrawer", false);
-        final boolean[] cancelled = new boolean[1];
 
         printJob.start();
 
-        Thread worker = new Thread(new Runnable() {
+        new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    if (cancelled[0]) return;
-                    byte[] raster;
+                    Log.d(TAG, "Processing job: size=" + documentData.length + " isPdf=" + isPdf(documentData));
+                    byte[] output;
+
                     if (documentData.length == 0 || isPdf(documentData)) {
-                        if (cancelled[0]) return;
                         if (documentData.length == 0) {
+                            Log.d(TAG, "Empty document - printing test receipt");
                             PrintJobData job = new PrintJobData();
                             job.rawText = "";
                             job.paperWidthMm = paperWidthMm;
                             job.header = prefs.getString("header", "RECIBO");
                             job.footer = prefs.getString("footer", "Gracias por su compra");
                             job.openCashDrawer = openCashDrawer;
-                            raster = BluetoothPrinter.serialize(job);
+                            output = BluetoothPrinter.serialize(job);
                         } else {
-                            raster = PdfRasterizer.renderToEscPos(documentData, paperWidthMm);
+                            Log.d(TAG, "Rasterizing PDF: " + documentData.length + " bytes, " + paperWidthMm + "mm");
+                            output = PdfRasterizer.renderToEscPos(documentData, paperWidthMm);
+                            Log.d(TAG, "Rasterized to " + output.length + " bytes");
                         }
-                        if (cancelled[0]) return;
-                        BluetoothPrinter.sendRaw(raster, openCashDrawer, adapter, prefs);
+                        BluetoothPrinter.sendRaw(output, openCashDrawer, adapter, prefs);
                     } else {
-                        if (cancelled[0]) return;
+                        Log.d(TAG, "Sending raw data: " + documentData.length + " bytes");
                         BluetoothPrinter.sendRaw(documentData, openCashDrawer, adapter, prefs);
                     }
 
-                    if (!cancelled[0]) {
-                        mainHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                printJob.complete();
-                            }
-                        });
-                    }
-                } catch (final Exception err) {
+                    Log.d(TAG, "Job completed successfully");
+                    mainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            printJob.complete();
+                        }
+                    });
+                } catch (final Throwable err) {
                     Log.e(TAG, "Print failed", err);
-                    if (!cancelled[0]) {
-                        mainHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                printJob.fail(err.getMessage() != null ? err.getMessage() : "Error de impresion");
-                            }
-                        });
-                    }
+                    final String msg = safeError(err);
+                    mainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            printJob.fail(msg);
+                        }
+                    });
                 }
             }
-        });
-        worker.start();
-
-        printJob.setTag("cancel_flag");
-        cancelled[0] = false;
+        }).start();
     }
 
     @Override
@@ -136,24 +132,33 @@ public class PrintBridgeService extends PrintService {
 
     private byte[] readDocument(PrintJob printJob) throws Exception {
         android.printservice.PrintDocument doc = printJob.getDocument();
-        if (doc == null) return new byte[0];
+        if (doc == null) {
+            Log.w(TAG, "PrintDocument is null");
+            return new byte[0];
+        }
 
-        FileInputStream fis = null;
-        BufferedInputStream bis = null;
+        ParcelFileDescriptor pfd = doc.getData();
+        if (pfd == null) {
+            Log.w(TAG, "ParcelFileDescriptor is null");
+            return new byte[0];
+        }
+
+        InputStream input = null;
         try {
-            fis = new FileInputStream(doc.getData().getFileDescriptor());
-            bis = new BufferedInputStream(fis);
+            input = new ParcelFileDescriptor.AutoCloseInputStream(pfd);
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            byte[] buf = new byte[4096];
+            byte[] buf = new byte[8192];
             int n;
-            while ((n = bis.read(buf)) > 0) {
+            while ((n = input.read(buf)) != -1) {
                 bos.write(buf, 0, n);
             }
-            return bos.toByteArray();
+            byte[] result = bos.toByteArray();
+            Log.d(TAG, "Read " + result.length + " bytes from document");
+            return result;
         } finally {
-            if (bis != null) try { bis.close(); } catch (Exception ignored) {}
-            if (fis != null) try { fis.close(); } catch (Exception ignored) {}
-            try { doc.getData().close(); } catch (Exception ignored) {}
+            if (input != null) {
+                try { input.close(); } catch (Exception ignored) {}
+            }
         }
     }
 
@@ -161,26 +166,42 @@ public class PrintBridgeService extends PrintService {
         return data.length >= 5 && data[0] == '%' && data[1] == 'P' && data[2] == 'D' && data[3] == 'F' && data[4] == '-';
     }
 
-    private PrinterInfo buildPrinterInfo(PrinterId id) {
-        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        boolean hasPrinter = prefs.getString("deviceAddress", "").trim().length() > 0;
-        int status = hasPrinter ? PrinterInfo.STATUS_IDLE : PrinterInfo.STATUS_UNAVAILABLE;
-        boolean is58 = "58".equals(prefs.getString("paper", "80"));
+    private static String safeError(Throwable e) {
+        if (e == null) return "Error de impresion";
+        String msg = e.getMessage();
+        if (msg != null && !msg.trim().isEmpty()) return msg;
+        String name = e.getClass().getSimpleName();
+        if (name != null && !name.isEmpty()) return name;
+        return "Error de impresion";
+    }
 
+    private PrinterInfo buildPrinterInfo(PrinterId id) {
         PrinterCapabilitiesInfo.Builder caps = new PrinterCapabilitiesInfo.Builder(id);
-        caps.addMediaSize(
-            new android.print.PrintAttributes.MediaSize("ROLL_58", "Roll 58mm", 2280, 10000), is58);
-        caps.addMediaSize(
-            new android.print.PrintAttributes.MediaSize("ROLL_80", "Roll 80mm", 3150, 10000), !is58);
+
+        android.print.PrintAttributes.MediaSize roll58 =
+            new android.print.PrintAttributes.MediaSize("ROLL_58", "Rollo 58mm", 2280, 2280);
+        android.print.PrintAttributes.MediaSize roll80 =
+            new android.print.PrintAttributes.MediaSize("ROLL_80", "Rollo 80mm", 3150, 3150);
+        android.print.PrintAttributes.MediaSize isoA4 = android.print.PrintAttributes.MediaSize.ISO_A4;
+        android.print.PrintAttributes.MediaSize naLetter = android.print.PrintAttributes.MediaSize.NA_LETTER;
+
+        caps.addMediaSize(roll80, true);
+        caps.addMediaSize(roll58, false);
+        caps.addMediaSize(isoA4, false);
+        caps.addMediaSize(naLetter, false);
+
         caps.addResolution(
             new android.print.PrintAttributes.Resolution("THERMAL", "Thermal", 203, 203), true);
+        caps.addResolution(
+            new android.print.PrintAttributes.Resolution("DRAFT", "Draft", 100, 100), false);
+
         caps.setMinMargins(new android.print.PrintAttributes.Margins(0, 0, 0, 0));
         caps.setColorModes(
-            android.print.PrintAttributes.COLOR_MODE_MONOCHROME,
+            android.print.PrintAttributes.COLOR_MODE_MONOCHROME | android.print.PrintAttributes.COLOR_MODE_COLOR,
             android.print.PrintAttributes.COLOR_MODE_MONOCHROME);
 
-        return new PrinterInfo.Builder(id, "Stocky print", status)
-                .setDescription("Bluetooth ESC/POS")
+        return new PrinterInfo.Builder(id, "Stocky print", PrinterInfo.STATUS_IDLE)
+                .setDescription("Impresora termica Bluetooth ESC/POS")
                 .setCapabilities(caps.build())
                 .build();
     }
