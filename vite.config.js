@@ -77,8 +77,8 @@ export default defineConfig(({ mode }) => {
                 cacheName: 'supabase-runtime',
                 networkTimeoutSeconds: 8,
                 expiration: {
-                  maxEntries: 40,
-                  maxAgeSeconds: 60 * 60,
+                  maxEntries: 10,
+                  maxAgeSeconds: 60,
                 },
                 cacheableResponse: {
                   statuses: [0, 200],
@@ -92,8 +92,8 @@ export default defineConfig(({ mode }) => {
                 cacheName: 'api-runtime',
                 networkTimeoutSeconds: 8,
                 expiration: {
-                  maxEntries: 30,
-                  maxAgeSeconds: 60 * 30,
+                  maxEntries: 10,
+                  maxAgeSeconds: 60,
                 },
                 cacheableResponse: {
                   statuses: [0, 200],

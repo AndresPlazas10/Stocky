@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Keystore and certificate files (never commit)
+*.keystore
+*.jks
+*.p12
+*.pfx
+*.pem
+
 # Environment variables
 .env
 .env.local
