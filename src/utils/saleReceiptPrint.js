@@ -8,76 +8,65 @@ const escapeHtml = (value) => String(value ?? '')
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#039;');
 
-const buildReceiptBody = (receipt, printerWidthMm) => `
-<style id="__stocky_print_styles__">
-  @page { size: ${printerWidthMm}mm auto; margin: 2mm; }
+const buildReceiptHtml = (receipt, printerWidthMm) => `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Comprobante</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; color:#000 !important; border-color:#000 !important; }
   @media print {
-    html, body, #root, #__stocky_print_overlay__ * {
-      color: #000 !important;
-      border-color: #000 !important;
-      background: #fff !important;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-    #__stocky_print_overlay__ {
-      position: static !important;
-      z-index: auto !important;
-    }
+    @page { size:${printerWidthMm}mm auto; margin:2mm; }
+    html,body { width:${printerWidthMm}mm !important; margin:0; padding:0; background:#fff !important; }
   }
-</style>
-<div style="
-  width: ${printerWidthMm}mm;
-  max-width: ${printerWidthMm}mm;
-  margin: 0 auto;
-  padding: 2mm;
-  font-family: 'Courier New', monospace;
-  font-size: 18px;
-  line-height: 1.6;
-  font-weight: 700;
-  color: #000;
-  background: #fff;
-">
-  <div style="text-align:center; border-bottom:2px dashed #000; padding-bottom:10px; margin-bottom:10px;">
-    <h1 style="font-size:28px; font-weight:900; margin:0 0 4px;">${escapeHtml(receipt.header.title)}</h1>
-    <p style="font-size:18px; font-weight:700; margin:2px 0;">${escapeHtml(receipt.header.businessName)}</p>
-    <p style="font-size:16px; margin:2px 0;">${escapeHtml(receipt.header.dateText)}</p>
+  body {
+    width:${printerWidthMm}mm; max-width:${printerWidthMm}mm; margin:0 auto; padding:2mm;
+    font-family:'Courier New',monospace; font-size:18px; line-height:1.6; font-weight:700;
+    background:#fff; color:#000;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  .hdr { text-align:center; border-bottom:2px dashed #000; padding-bottom:10px; margin-bottom:10px; }
+  .hdr h1 { font-size:28px; font-weight:900; margin-bottom:4px; }
+  .hdr p { font-size:18px; font-weight:700; margin:2px 0; }
+  .row { display:flex; justify-content:space-between; margin:2px 0; font-size:17px; font-weight:700; }
+  .sep { border-top:2px dashed #000; margin:12px 0; }
+  .items-hdr { display:flex; justify-content:space-between; font-weight:900; border-bottom:1px solid #000; padding:4px 0; font-size:18px; }
+  .item { display:flex; justify-content:space-between; margin:6px 0; padding:3px 0; border-bottom:1px dashed #ccc; }
+  .item-name { flex:1; padding-right:4px; font-weight:800; }
+  .item-qty { width:50px; text-align:center; font-weight:800; }
+  .item-price { width:100px; text-align:right; font-weight:800; }
+  .total { margin-top:12px; border-top:2px solid #000; padding-top:12px; font-size:24px; font-weight:900; display:flex; justify-content:space-between; }
+  .ftr { text-align:center; margin-top:16px; padding-top:10px; border-top:2px dashed #000; font-size:15px; font-weight:800; }
+</style></head>
+<body>
+  <div class="hdr">
+    <h1>${escapeHtml(receipt.header.title)}</h1>
+    <p>${escapeHtml(receipt.header.businessName)}</p>
+    <p style="font-size:16px;">${escapeHtml(receipt.header.dateText)}</p>
   </div>
   ${receipt.metadata.map((row) => `
-    <div style="display:flex; justify-content:space-between; margin:2px 0; font-size:17px; font-weight:700;">
-      <span><strong>${escapeHtml(row.label)}:</strong></span>
-      <span>${escapeHtml(row.value)}</span>
-    </div>
+    <div class="row"><span><strong>${escapeHtml(row.label)}:</strong></span><span>${escapeHtml(row.value)}</span></div>
   `).join('')}
-  <div style="border-top:2px dashed #000; margin:12px 0;"></div>
-  <div style="display:flex; justify-content:space-between; font-weight:900; border-bottom:1px solid #000; padding:4px 0; font-size:18px;">
-    <span style="flex:1">Producto</span>
-    <span style="width:50px; text-align:center;">Cant.</span>
-    <span style="width:100px; text-align:right;">Total</span>
+  <div class="sep"></div>
+  <div class="items-hdr">
+    <span style="flex:1">Producto</span><span class="item-qty">Cant.</span><span class="item-price">Total</span>
   </div>
   ${receipt.items.map((item) => `
-    <div style="display:flex; justify-content:space-between; margin:6px 0; padding:3px 0; border-bottom:1px dashed #ccc;">
-      <div style="flex:1; padding-right:4px; font-weight:800; font-size:18px;">${escapeHtml(item.name)}</div>
-      <div style="width:50px; text-align:center; font-size:18px; font-weight:800;">x${Number(item.quantity || 0)}</div>
-      <div style="width:100px; text-align:right; font-size:18px; font-weight:800;">${escapeHtml(item.subtotalText)}</div>
+    <div class="item">
+      <div class="item-name">${escapeHtml(item.name)}</div>
+      <div class="item-qty">x${Number(item.quantity || 0)}</div>
+      <div class="item-price">${escapeHtml(item.subtotalText)}</div>
     </div>
   `).join('')}
   ${Number(receipt.totals.voluntaryTip || 0) > 0 ? `
-    <div style="display:flex; justify-content:space-between; margin:2px 0; font-size:17px; font-weight:700;">
-      <span><strong>Propina voluntaria:</strong></span>
-      <span>${escapeHtml(receipt.totals.voluntaryTipText)}</span>
-    </div>
+    <div class="row"><span><strong>Propina voluntaria:</strong></span><span>${escapeHtml(receipt.totals.voluntaryTipText)}</span></div>
   ` : ''}
-  <div style="margin-top:12px; border-top:2px solid #000; padding-top:12px; font-size:24px; font-weight:900; display:flex; justify-content:space-between;">
-    <span>TOTAL:</span>
-    <span>${escapeHtml(receipt.totals.totalText)}</span>
+  <div class="total"><span>TOTAL:</span><span>${escapeHtml(receipt.totals.totalText)}</span></div>
+  <div class="sep"></div>
+  <div class="ftr">
+    <p><strong>Método:</strong> ${escapeHtml(receipt.payment.methodText)}</p>
+    <p style="margin-top:3px;">${escapeHtml(receipt.footer.message)}</p>
   </div>
-  <div style="border-top:2px dashed #000; margin:12px 0;"></div>
-  <div style="text-align:center; margin-top:16px; padding-top:10px; border-top:2px dashed #000; font-size:15px; font-weight:800;">
-    <p style="margin:0;"><strong>Método:</strong> ${escapeHtml(receipt.payment.methodText)}</p>
-    <p style="margin:3px 0 0;">${escapeHtml(receipt.footer.message)}</p>
-  </div>
-</div>
-`;
+</body>
+</html>`;
 
 export async function printSaleReceipt({
   sale,
@@ -101,33 +90,30 @@ export async function printSaleReceipt({
   const validation = validateSaleReceiptTemplate(receipt);
   if (!validation.ok) return validation;
 
-  const receiptHtml = buildReceiptBody(receipt, printerWidthMm);
+  const html = buildReceiptHtml(receipt, printerWidthMm);
 
   return new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.id = '__stocky_print_overlay__';
-    overlay.style.cssText = `
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      z-index: 2147483647; background: #fff; overflow-y: auto;
-    `;
-    overlay.innerHTML = receiptHtml;
-    document.body.appendChild(overlay);
+    const win = window.open('', '_blank');
+    if (!win) {
+      resolve({ ok: false, error: 'El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para este sitio.' });
+      return;
+    }
 
-    // Force synchronous layout so the overlay is painted before print
-    void overlay.offsetHeight;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
 
-    // Called directly within user gesture
-    window.print();
+    // Called from main window's click handler — preserves user gesture
+    win.print();
 
-    const cleanup = () => {
-      const el = document.getElementById('__stocky_print_overlay__');
-      if (el) el.remove();
-      const style = document.getElementById('__stocky_print_styles__');
-      if (style) style.remove();
-      resolve({ ok: true });
-    };
-
-    window.addEventListener('afterprint', cleanup, { once: true });
-    setTimeout(cleanup, 120000);
+    const done = () => resolve({ ok: true });
+    const timer = setInterval(() => {
+      if (win.closed) { clearInterval(timer); done(); }
+    }, 500);
+    setTimeout(() => {
+      clearInterval(timer);
+      if (!win.closed) try { win.close(); } catch (e) { /* ignore */ }
+      done();
+    }, 120000);
   });
 }
