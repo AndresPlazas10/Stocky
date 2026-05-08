@@ -39,7 +39,7 @@ function formatDateTimeTicket(timestamp: string | Date | null | undefined) {
 
 function formatPrice(value: number | null | undefined, includeCurrency = true) {
   if (value === null || value === undefined || Number.isNaN(value)) {
-    return includeCurrency ? '0 COP' : '0';
+    return includeCurrency ? '$0' : '0';
   }
 
   const numValue = Number(value);
@@ -61,7 +61,7 @@ function formatPrice(value: number | null | undefined, includeCurrency = true) {
     formattedNumber = `${formattedInteger},${decimalPart}`;
   }
 
-  return includeCurrency ? `${formattedNumber} COP` : formattedNumber;
+  return includeCurrency ? `$${formattedNumber}` : formattedNumber;
 }
 
 function getPaymentMethodLabel(method?: string | null) {

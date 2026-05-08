@@ -38,7 +38,7 @@ function getPaymentOptionLabel(method: PaymentMethod) {
 }
 
 function formatCopAmount(value: number) {
-  return `$ ${new Intl.NumberFormat('es-CO').format(Math.max(0, Math.round(Number(value) || 0)))} COP`;
+  return `$ ${new Intl.NumberFormat('es-CO').format(Math.max(0, Math.round(Number(value) || 0)))}`;
 }
 
 type AccountState = {

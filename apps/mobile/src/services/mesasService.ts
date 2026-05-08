@@ -1812,5 +1812,5 @@ export function formatCopAmount(value: number | null | undefined): string {
 }
 
 export function formatCop(value: number | null | undefined): string {
-  return `${formatCopAmount(value)} COP`;
+  return formatCopAmount(value);
 }
