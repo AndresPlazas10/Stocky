@@ -297,7 +297,7 @@ export default function TermsAndConditions() {
                     y Obligaciones Fiscales</strong>.
                   </p>
                   <p className="text-primary-700 text-xs mt-3">
-                    Para preguntas o aclaraciones, contáctenos en: <strong>soporte@stockly.com</strong>
+                    Para preguntas o aclaraciones, contáctenos en: <strong>soporte@stockypos.app</strong>
                   </p>
                 </div>
               </div>

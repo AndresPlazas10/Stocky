@@ -40,7 +40,7 @@ const predefinedAvatars = [
 
 export const Navbar = React.memo(function Navbar({
   userName = "Admin",
-  userEmail = "admin@stockly.com",
+  userEmail = "admin@stockypos.app",
   userRole = "Administrador",
   businessId,
   onSignOut,
