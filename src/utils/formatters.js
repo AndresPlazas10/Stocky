@@ -3,16 +3,16 @@
  * Miles: punto (2.000)
  * Millones: apóstrofe (1'000.000)
  * Decimales: solo si no son .00
- * Ejemplo: 1200000 -> 1'200.000 COP
- * Ejemplo: 2000 -> 2.000 COP
- * Ejemplo: 1500.50 -> 1.500,50 COP
+ * Ejemplo: 1200000 -> $1'200.000
+ * Ejemplo: 2000 -> $2.000
+ * Ejemplo: 1500.50 -> $1.500,50
  * @param {number} value - El valor numérico a formatear
- * @param {boolean} includeCurrency - Si incluir "COP" al final (default: true)
+ * @param {boolean} includeCurrency - Si incluir "$" al inicio (default: true)
  * @returns {string} - El precio formateado
  */
 export const formatPrice = (value, includeCurrency = true) => {
   if (value === null || value === undefined || isNaN(value)) {
-    return includeCurrency ? '0 COP' : '0';
+    return includeCurrency ? '$0' : '0';
   }
 
   const numValue = Number(value);
@@ -47,7 +47,7 @@ export const formatPrice = (value, includeCurrency = true) => {
     formattedNumber = `${formattedInteger},${decimalPart}`;
   }
   
-  return includeCurrency ? `${formattedNumber} COP` : formattedNumber;
+  return includeCurrency ? `$${formattedNumber}` : formattedNumber;
 };
 
 /**
