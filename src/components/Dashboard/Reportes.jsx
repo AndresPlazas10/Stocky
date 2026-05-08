@@ -21,39 +21,9 @@ import {
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
 import { getPaymentMethodLogoCandidates, isBankPaymentMethod } from '../../utils/paymentMethodBranding.js';
+import { PaymentMethodBankLogo } from '../ui/PaymentMethodBankLogo';
 
 const _motionLintUsage = motion;
-
-function PaymentMethodSummaryIcon({ method, fallback }) {
-  const [logoIndex, setLogoIndex] = useState(0);
-  const normalizedMethod = String(method || '').trim().toLowerCase();
-  const isBankMethod = isBankPaymentMethod(normalizedMethod);
-  const logoCandidates = getPaymentMethodLogoCandidates(normalizedMethod);
-
-  useEffect(() => {
-    setLogoIndex(0);
-  }, [normalizedMethod]);
-
-  if (!isBankMethod) {
-    return fallback;
-  }
-
-  if (!Array.isArray(logoCandidates) || logoCandidates.length === 0 || logoIndex < 0) {
-    return fallback;
-  }
-
-  return (
-    <img
-      src={logoCandidates[logoIndex]}
-      alt={`Logo ${normalizedMethod}`}
-      className="h-6 w-auto object-contain"
-      loading="lazy"
-      onError={() => {
-        setLogoIndex((current) => (current + 1 < logoCandidates.length ? current + 1 : -1));
-      }}
-    />
-  );
-}
 
 function Reportes({ businessId }) {
   const [loading, setLoading] = useState(true);
@@ -675,8 +645,9 @@ function Reportes({ businessId }) {
                           <div className="flex items-center gap-3">
                             {isBankMethodForSummary(metodo.method) ? (
                               <div className="h-10 w-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center shadow-sm">
-                                <PaymentMethodSummaryIcon
+                                <PaymentMethodBankLogo
                                   method={metodo.method}
+                                  sizeClass="h-6"
                                   fallback={<Building2 className="w-5 h-5 text-gray-600" />}
                                 />
                               </div>

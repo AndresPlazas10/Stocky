@@ -76,9 +76,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Sobrescribir texto blanco (#ffffff) a gris claro (#c7c7c7) con sombra negra */
-.text-white {
-  color: #c7c7c7 !important;
+/* Clase para texto blanco suave con sombra (uso controlado) */
+.text-soft-white {
+  color: #c7c7c7;
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
 }
 

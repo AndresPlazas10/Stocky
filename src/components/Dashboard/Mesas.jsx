@@ -63,6 +63,7 @@ import { invalidateOrderCache } from '../../data/adapters/cacheInvalidation.js';
 import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
 import { useProgressiveList } from '../../hooks/useProgressiveList.js';
 import { useRafBatchedQueue } from '../../hooks/useRafBatchedQueue.js';
+import { useDebounce } from '../../hooks/optimized.js';
 import {
   DEFAULT_CLOSE_ORDER_LOCK_TTL_MS,
   isCloseOrderLockActive,
@@ -656,6 +657,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
   const [productos, setProductos] = useState([]);
   const [combos, setCombos] = useState([]);
   const [searchProduct, setSearchProduct] = useState('');
+  const debouncedSearch = useDebounce(searchProduct, 200);
   const [currentUser, setCurrentUser] = useState(null);
   const [quantityToAdd, setQuantityToAdd] = useState(1);
 
@@ -4882,14 +4884,14 @@ function Mesas({ businessId, userRole = 'admin' }) {
   }, [productos, combos]);
 
   const filteredCatalog = useMemo(() => {
-    if (!searchProduct.trim()) return [];
-    const search = searchProduct.toLowerCase();
+    if (!debouncedSearch.trim()) return [];
+    const search = debouncedSearch.toLowerCase();
     return catalogItems
       .filter((item) =>
         item.name.toLowerCase().includes(search) ||
         item.code.toLowerCase().includes(search)
       );
-  }, [searchProduct, catalogItems]);
+  }, [debouncedSearch, catalogItems]);
 
   const {
     visibleItems: visibleFilteredCatalog,

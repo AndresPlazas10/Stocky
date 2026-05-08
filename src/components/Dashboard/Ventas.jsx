@@ -45,6 +45,7 @@ import Pagination from '../Pagination';
 import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
 import { useProgressiveList } from '../../hooks/useProgressiveList.js';
 import { useRafBatchedQueue } from '../../hooks/useRafBatchedQueue.js';
+import { useDebounce } from '../../hooks/optimized.js';
 import { 
   ShoppingCart, 
   Plus, 
@@ -65,7 +66,7 @@ import {
 } from 'lucide-react';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
-import { getPaymentMethodLogoCandidates, isBankPaymentMethod } from '../../utils/paymentMethodBranding.js';
+import { PaymentMethodBankLogo, getPaymentMethodLabel } from '../ui/PaymentMethodBankLogo';
 import {
   applyOfflineStockConsumption,
   buildCartConsumptionByProduct,
@@ -91,46 +92,6 @@ const getVendedorName = (venta) => {
   if (venta.employees.role === 'owner' || venta.employees.role === 'admin') return 'Administrador';
   return venta.employees.full_name || 'Empleado';
 };
-
-const getPaymentMethodLabel = (method) => {
-  if (method === 'cash') return 'Efectivo';
-  if (method === 'card') return 'Tarjeta';
-  if (method === 'transfer') return 'Transferencia';
-  if (method === 'mixed') return 'Mixto';
-  if (method === 'nequi') return 'Nequi';
-  if (method === 'bancolombia') return 'Bancolombia';
-  if (method === 'banco_bogota') return 'Banco de Bogotá';
-  if (method === 'nu') return 'Nu';
-  if (method === 'davivienda') return 'Davivienda';
-  return method || '-';
-};
-
-function PaymentMethodBankLogo({ method, sizeClass = 'h-4' }) {
-  const [index, setIndex] = useState(0);
-  const normalizedMethod = String(method || '').trim().toLowerCase();
-  const candidates = getPaymentMethodLogoCandidates(normalizedMethod);
-
-  useEffect(() => {
-    setIndex(0);
-  }, [normalizedMethod]);
-
-  if (!isBankPaymentMethod(normalizedMethod)) return null;
-  if (!Array.isArray(candidates) || candidates.length === 0 || index < 0) {
-    return <span className="text-sm">🏦</span>;
-  }
-
-  return (
-    <img
-      src={candidates[index]}
-      alt={`Logo ${getPaymentMethodLabel(normalizedMethod)}`}
-      className={`${sizeClass} w-auto object-contain`}
-      loading="lazy"
-      onError={() => {
-        setIndex((current) => (current + 1 < candidates.length ? current + 1 : -1));
-      }}
-    />
-  );
-}
 
 const isConnectivityError = (errorLike) => {
   const message = String(errorLike?.message || errorLike || '').toLowerCase();
@@ -243,6 +204,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [searchProduct, setSearchProduct] = useState('');
+  const debouncedSearch = useDebounce(searchProduct, 200);
   const [saleModalPanel, setSaleModalPanel] = useState('catalog');
   const lowMotionMode = useLowMotionMode();
   const enqueueRealtimeUpdate = useRafBatchedQueue();
@@ -526,7 +488,13 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setSalesOutboxState(snapshot);
     });
 
-    const timer = setInterval(syncState, 5000);
+    const timer = setInterval(() => {
+      const snapshot = getSalesOutboxSnapshot();
+      setSalesOutboxState((prev) => {
+        if (JSON.stringify(prev) === JSON.stringify(snapshot)) return prev;
+        return snapshot;
+      });
+    }, 5000);
 
     return () => {
       unsubscribe();
@@ -1137,14 +1105,14 @@ function Ventas({ businessId, userRole = 'admin' }) {
 
   // Memoizar catálogo filtrado (productos + combos)
   const filteredCatalog = useMemo(() => {
-    if (!searchProduct.trim()) return catalogItems;
+    if (!debouncedSearch.trim()) return catalogItems;
 
-    const search = searchProduct.toLowerCase();
+    const search = debouncedSearch.toLowerCase();
     return catalogItems.filter((item) =>
       item.name.toLowerCase().includes(search) ||
       item.code?.toLowerCase().includes(search)
     );
-  }, [catalogItems, searchProduct]);
+  }, [catalogItems, debouncedSearch]);
 
   const {
     visibleItems: visibleFilteredCatalog,

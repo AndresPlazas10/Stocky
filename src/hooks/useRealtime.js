@@ -60,7 +60,15 @@ export function useRealtimeSubscription(table, options = {}) {
 
   const handlersRef = useRef({ onInsert, onUpdate, onDelete });
   const pollRef = useRef(onPoll);
-  const filterKey = useMemo(() => JSON.stringify(filter || {}), [filter]);
+
+  const prevFilterRef = useRef(null);
+  const filterKeyRef = useRef(JSON.stringify(filter || {}));
+
+  if (filter !== prevFilterRef.current) {
+    prevFilterRef.current = filter;
+    filterKeyRef.current = JSON.stringify(filter || {});
+  }
+  const filterKey = filterKeyRef.current;
 
   useEffect(() => {
     handlersRef.current = { onInsert, onUpdate, onDelete };

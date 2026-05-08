@@ -65,7 +65,7 @@ export function ModernTable({ columns, data, onRowClick, loading, emptyMessage =
         <tbody className="bg-white divide-y divide-accent/10">
           {data.map((row, rowIdx) => (
             <motion.tr
-              key={rowIdx}
+              key={row.id || rowIdx}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: rowIdx * 0.05 }}
