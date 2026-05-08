@@ -363,6 +363,15 @@ export function usePagination(
 
 export function useRealtime(tableName, filters = {}, onUpdate) {
   const channelRef = useRef(null);
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
+  const filtersRef = useRef(null);
+  const filtersKeyRef = useRef(JSON.stringify(filters || {}));
+  if (filters !== filtersRef.current) {
+    filtersRef.current = filters;
+    filtersKeyRef.current = JSON.stringify(filters || {});
+  }
+  const filtersKey = filtersKeyRef.current;
 
   useEffect(() => {
     // Construir filtro para realtime
@@ -391,7 +400,7 @@ export function useRealtime(tableName, filters = {}, onUpdate) {
         readAdapter.removeRealtimeChannel(channelRef.current);
       }
     };
-  }, [tableName, JSON.stringify(filters), onUpdate]);
+  }, [tableName, filtersKey]);
 }
 
 // =====================================================

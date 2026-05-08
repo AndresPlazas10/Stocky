@@ -122,11 +122,20 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 500,
       sourcemap: false,
       minify: 'terser',
       target: 'es2020',
       rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-animation': ['framer-motion'],
+            'vendor-icons': ['lucide-react'],
+            'vendor-supabase': ['@supabase/supabase-js'],
+            'vendor-radix': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-avatar'],
+          },
+        },
         onwarn(warning, warn) {
           const message = String(warning?.message || '')
           const id = String(warning?.id || '')
