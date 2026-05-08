@@ -12,9 +12,10 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { X, Plus, Trash2, CheckCircle2, CreditCard, DollarSign } from 'lucide-react';
 import { formatPrice } from '../../utils/formatters.js';
+import { calcularCambio, parseCopAmount } from '../../utils/cambio.js';
 
 const MAX_SUB_ACCOUNTS = 10;
-const COLOMBIAN_DENOMINATIONS = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50];
+// parseCopAmount and calcularCambio now imported from ../../utils/cambio.js
 
 const PAYMENT_OPTIONS = [
   { value: 'cash', label: '💵 Efectivo', icon: DollarSign },
@@ -27,54 +28,6 @@ const PAYMENT_OPTIONS = [
   { value: 'nu', label: '🏦 Nu', icon: CreditCard },
   { value: 'davivienda', label: '🏦 Davivienda', icon: CreditCard },
 ];
-
-const parseCopAmount = (value) => {
-  if (value === null || value === undefined) return NaN;
-  if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value) : NaN;
-
-  const raw = String(value).trim().replace(/\s/g, '').replace(/\$/g, '');
-  if (!raw) return NaN;
-
-  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(raw)) {
-    const parsed = Number(raw.replace(/\./g, '').replace(',', '.'));
-    return Number.isFinite(parsed) ? Math.round(parsed) : NaN;
-  }
-
-  if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(raw)) {
-    const parsed = Number(raw.replace(/,/g, ''));
-    return Number.isFinite(parsed) ? Math.round(parsed) : NaN;
-  }
-
-  const simpleParsed = Number(raw.replace(',', '.'));
-  if (Number.isFinite(simpleParsed)) return Math.round(simpleParsed);
-
-  const digitsOnly = raw.replace(/[^\d]/g, '');
-  if (!digitsOnly) return NaN;
-  const digitsParsed = Number(digitsOnly);
-  return Number.isFinite(digitsParsed) ? Math.round(digitsParsed) : NaN;
-};
-
-const calcularCambio = (total, pagado) => {
-  const normalizedTotal = Math.round(Number(total) || 0);
-  const normalizedPaid = parseCopAmount(pagado);
-
-  if (normalizedTotal <= 0) return { isValid: false, change: 0, breakdown: [] };
-  if (!Number.isFinite(normalizedPaid) || normalizedPaid < normalizedTotal) {
-    return { isValid: false, change: 0, breakdown: [] };
-  }
-
-  let remaining = normalizedPaid - normalizedTotal;
-  const breakdown = [];
-  for (const denomination of COLOMBIAN_DENOMINATIONS) {
-    const count = Math.floor(remaining / denomination);
-    if (count > 0) {
-      breakdown.push({ denomination, count });
-      remaining -= count * denomination;
-    }
-  }
-
-  return { isValid: true, change: normalizedPaid - normalizedTotal, breakdown, paid: normalizedPaid };
-};
 
 const getOrderItemName = (item) => (
   item?.products?.name
