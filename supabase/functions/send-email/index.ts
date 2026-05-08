@@ -4,18 +4,50 @@
 // Ubicación: supabase/functions/send-email/index.ts
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 const SUPPORT_EMAIL = 'soporte@stockypos.app'
 const SUPPORT_FROM = `Stocky <${SUPPORT_EMAIL}>`
 const APP_ORIGIN = Deno.env.get('VITE_APP_URL') || 'https://www.stockypos.app'
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+
+const ALLOWED_ORIGINS = ['https://www.stockypos.app', 'http://localhost:5173', 'http://localhost:5174']
+
+function resolveAllowedOrigin(requestOrigin: string | null): string {
+  if (requestOrigin && ALLOWED_ORIGINS.includes(requestOrigin)) return requestOrigin
+  return ALLOWED_ORIGINS[0]
+}
+
+function escapeHtml(value: unknown): string {
+  const str = String(value ?? '')
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+function getBearerToken(req: Request): string | null {
+  const auth = req.headers.get('authorization')
+  if (!auth) return null
+  const parts = auth.split(' ')
+  if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer') return null
+  return parts[1] || null
+}
 
 serve(async (req) => {
-  // Permitir CORS
+  const origin = req.headers.get('origin')
+  const allowedOrigin = resolveAllowedOrigin(origin)
+
+  // Permitir CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
+      status: 204,
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': allowedOrigin,
         'Access-Control-Allow-Methods': 'POST',
         'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
       }
@@ -23,22 +55,41 @@ serve(async (req) => {
   }
 
   try {
+    // Auth validation
+    const token = getBearerToken(req)
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'Missing bearer token' }), {
+        status: 401,
+        headers: { 'Access-Control-Allow-Origin': allowedOrigin, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    const { data: { user }, error: authError } = await adminClient.auth.getUser(token)
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401,
+        headers: { 'Access-Control-Allow-Origin': allowedOrigin, 'Content-Type': 'application/json' },
+      })
+    }
     const { email, invoiceNumber, customerName, total, items, businessName } = await req.json()
-    const safeBusinessName = businessName || 'Stocky'
-    const safeCustomerName = customerName || 'Cliente'
-    const safeInvoiceNumber = invoiceNumber || 'N/A'
+    const safeBusinessName = escapeHtml(businessName || 'Stocky')
+    const safeCustomerName = escapeHtml(customerName || 'Cliente')
+    const safeInvoiceNumber = escapeHtml(invoiceNumber || 'N/A')
     const numericTotal = Number(total || 0)
     const brandLogoUrl = `${APP_ORIGIN}/branding/logoStocky.png`
 
-    // Formatear items HTML
-    const itemsHTML = items.map((item: any) => `
+    // Formatear items HTML (con escape de contenido dinámico)
+    const itemsHTML = items.map((item: any) => {
+      const productName = escapeHtml(item.product_name || item.name || 'Item')
+      return `
       <tr>
-        <td style="padding: 12px 10px; border-bottom: 1px solid #e6e8ef; color: #111827;">${item.product_name || item.name}</td>
-        <td style="padding: 12px 10px; border-bottom: 1px solid #e6e8ef; text-align: center; color: #374151;">${item.quantity}</td>
-        <td style="padding: 12px 10px; border-bottom: 1px solid #e6e8ef; text-align: right; color: #374151;">$${item.unit_price.toLocaleString('es-CO')}</td>
-        <td style="padding: 12px 10px; border-bottom: 1px solid #e6e8ef; text-align: right; font-weight: 700; color: #0f172a;">$${(item.quantity * item.unit_price).toLocaleString('es-CO')}</td>
+        <td style="padding: 12px 10px; border-bottom: 1px solid #e6e8ef; color: #111827;">${productName}</td>
+        <td style="padding: 12px 10px; border-bottom: 1px solid #e6e8ef; text-align: center; color: #374151;">${Number(item.quantity || 0)}</td>
+        <td style="padding: 12px 10px; border-bottom: 1px solid #e6e8ef; text-align: right; color: #374151;">$${Number(item.unit_price || 0).toLocaleString('es-CO')}</td>
+        <td style="padding: 12px 10px; border-bottom: 1px solid #e6e8ef; text-align: right; font-weight: 700; color: #0f172a;">$${(Number(item.quantity || 0) * Number(item.unit_price || 0)).toLocaleString('es-CO')}</td>
       </tr>
-    `).join('')
+    `}).join('')
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -142,7 +193,7 @@ serve(async (req) => {
       {
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Origin': allowedOrigin,
         },
       },
     )
@@ -153,7 +204,7 @@ serve(async (req) => {
         status: 400,
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Origin': allowedOrigin,
         },
       },
     )
