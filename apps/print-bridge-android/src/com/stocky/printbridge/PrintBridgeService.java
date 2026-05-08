@@ -55,7 +55,7 @@ public class PrintBridgeService extends PrintService {
         }
 
         PrintAttributes attrs = printJob.getInfo().getAttributes();
-        int w = "58".equals(prefs.getString("paper", "80")) ? 58 : 80;
+        int w = "58".equals(prefs.getString("lastPaperWidth", prefs.getString("paper", "58"))) ? 58 : 80;
         if (attrs != null && attrs.getMediaSize() != null) {
             w = attrs.getMediaSize().getWidthMils() <= 2600 ? 58 : 80;
         }
@@ -95,6 +95,8 @@ public class PrintBridgeService extends PrintService {
                     }
 
                     Log.d(TAG, "Job completed successfully");
+                    // Remember last paper width for next print dialog default
+                    prefs.edit().putString("lastPaperWidth", String.valueOf(paperWidthMm)).apply();
                     mainHandler.post(new Runnable() {
                         @Override
                         public void run() {
@@ -177,7 +179,8 @@ public class PrintBridgeService extends PrintService {
 
     private PrinterInfo buildPrinterInfo(PrinterId id) {
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        boolean is58 = "58".equals(prefs.getString("paper", "58"));
+        String lastPaper = prefs.getString("lastPaperWidth", prefs.getString("paper", "58"));
+        boolean is58 = "58".equals(lastPaper);
 
         PrinterCapabilitiesInfo.Builder caps = new PrinterCapabilitiesInfo.Builder(id);
 
