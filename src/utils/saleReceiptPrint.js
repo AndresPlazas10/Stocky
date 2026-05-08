@@ -14,27 +14,27 @@ const buildReceiptHtml = (receipt, printerWidthMm) => `<!DOCTYPE html>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; color:#000 !important; border-color:#000 !important; }
   @media print {
-    @page { size:${printerWidthMm}mm auto; margin:2mm; }
+    @page { size:${printerWidthMm}mm auto; margin:1mm; }
     html,body { width:${printerWidthMm}mm !important; margin:0; padding:0; background:#fff !important; }
   }
   body {
-    width:${printerWidthMm}mm; max-width:${printerWidthMm}mm; margin:0 auto; padding:2mm;
-    font-family:'Courier New',monospace; font-size:18px; line-height:1.6; font-weight:700;
+    width:${printerWidthMm}mm; max-width:${printerWidthMm}mm; margin:0 auto; padding:1mm;
+    font-family:'Courier New',monospace; font-size:18px; line-height:1.4; font-weight:700;
     background:#fff; color:#000;
     -webkit-print-color-adjust:exact; print-color-adjust:exact;
   }
-  .hdr { text-align:center; border-bottom:2px dashed #000; padding-bottom:10px; margin-bottom:10px; }
+  .hdr { text-align:center; border-bottom:2px dashed #000; padding-bottom:6px; margin-bottom:6px; }
   .hdr h1 { font-size:28px; font-weight:900; margin-bottom:4px; }
   .hdr p { font-size:18px; font-weight:700; margin:2px 0; }
   .row { display:flex; justify-content:space-between; margin:2px 0; font-size:17px; font-weight:700; }
-  .sep { border-top:2px dashed #000; margin:12px 0; }
+  .sep { border-top:2px dashed #000; margin:8px 0; }
   .items-hdr { display:flex; justify-content:space-between; font-weight:900; border-bottom:1px solid #000; padding:4px 0; font-size:18px; }
-  .item { display:flex; justify-content:space-between; margin:6px 0; padding:3px 0; border-bottom:1px dashed #ccc; }
+  .item { display:flex; justify-content:space-between; margin:4px 0; padding:2px 0; border-bottom:1px dashed #ccc; }
   .item-name { flex:1; padding-right:4px; font-weight:800; }
   .item-qty { width:50px; text-align:center; font-weight:800; }
   .item-price { width:100px; text-align:right; font-weight:800; }
-  .total { margin-top:12px; border-top:2px solid #000; padding-top:12px; font-size:24px; font-weight:900; display:flex; justify-content:space-between; }
-  .ftr { text-align:center; margin-top:16px; padding-top:10px; border-top:2px dashed #000; font-size:15px; font-weight:800; }
+  .total { margin-top:8px; border-top:2px solid #000; padding-top:8px; font-size:24px; font-weight:900; display:flex; justify-content:space-between; }
+  .ftr { text-align:center; margin-top:12px; padding-top:8px; border-top:2px dashed #000; font-size:15px; font-weight:800; }
 </style></head>
 <body>
   <div class="hdr">
