@@ -58,7 +58,7 @@ export default function TermsAndConditions() {
               </p>
               <p className="mt-3">
                 Stocky es un software como servicio (SaaS) de gestión de punto de venta desarrollado por 
-                [Nombre de la Empresa], destinado a facilitar operaciones comerciales de pequeños y medianos negocios.
+                Stocky, destinado a facilitar operaciones comerciales de pequeños y medianos negocios.
               </p>
             </Section>
 
