@@ -113,7 +113,7 @@ export async function printSaleReceipt({
     }, 500);
     setTimeout(() => {
       clearInterval(timer);
-      if (!win.closed) try { win.close(); } catch (e) { /* ignore */ }
+      if (!win.closed) try { win.close(); } catch (_e) { /* ignore */ }
       done();
     }, 120000);
   });
