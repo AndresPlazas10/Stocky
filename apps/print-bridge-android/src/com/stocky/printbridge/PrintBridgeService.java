@@ -176,6 +176,9 @@ public class PrintBridgeService extends PrintService {
     }
 
     private PrinterInfo buildPrinterInfo(PrinterId id) {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        boolean is58 = "58".equals(prefs.getString("paper", "58"));
+
         PrinterCapabilitiesInfo.Builder caps = new PrinterCapabilitiesInfo.Builder(id);
 
         android.print.PrintAttributes.MediaSize roll58 =
@@ -185,8 +188,8 @@ public class PrintBridgeService extends PrintService {
         android.print.PrintAttributes.MediaSize isoA4 = android.print.PrintAttributes.MediaSize.ISO_A4;
         android.print.PrintAttributes.MediaSize naLetter = android.print.PrintAttributes.MediaSize.NA_LETTER;
 
-        caps.addMediaSize(roll80, true);
-        caps.addMediaSize(roll58, false);
+        caps.addMediaSize(roll58, is58);
+        caps.addMediaSize(roll80, !is58);
         caps.addMediaSize(isoA4, false);
         caps.addMediaSize(naLetter, false);
 

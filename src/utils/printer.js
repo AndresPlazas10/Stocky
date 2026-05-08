@@ -1,7 +1,7 @@
 const PRINTER_WIDTH_KEY = 'stocky_printer_paper_width_mm';
 const AUTO_PRINT_RECEIPT_KEY = 'stocky_auto_print_receipt_enabled';
 const ALLOWED_WIDTHS = new Set([58, 80, 104]);
-const DEFAULT_WIDTH = 80;
+const DEFAULT_WIDTH = 58;
 
 export const getThermalPaperWidthMm = () => {
   try {
