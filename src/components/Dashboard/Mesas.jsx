@@ -41,6 +41,9 @@ import { SaleUpdateAlert } from '../ui/SaleUpdateAlert';
 import { PrintReceiptConfirmModal } from '../ui/PrintReceiptConfirmModal';
 import { MesaPaymentModal } from './MesaPaymentModal';
 import { MesaDeleteModal } from './MesaDeleteModal';
+import { MesaOrderFooter } from './MesaOrderFooter';
+import { MesaCatalogSearch } from './MesaCatalogSearch';
+import { MesaOrderItemsGrid } from './MesaOrderItemsGrid';
 import { 
   Plus, 
   Layers, 
@@ -4851,208 +4854,44 @@ function Mesas({ businessId, userRole = 'admin' }) {
 
                 <CardContent className="pt-6 overflow-y-auto flex-1">
                   {/* Buscar producto o combo */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-semibold text-primary-700 mb-3">
-                      <Search className="w-4 h-4 inline mr-2" />
-                      Agregar Producto o Combo
-                    </label>
-                    <Input
-                      type="text"
-                      placeholder="Buscar por nombre..."
-                      value={searchProduct}
-                      onChange={(e) => setSearchProduct(e.target.value)}
-                      className="h-12 border-accent-300"
-                    />
-                    
-                    <AnimatePresence>
-                      {searchProduct && filteredCatalog.length > 0 && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          className="mt-2 border-2 border-accent-200 rounded-2xl overflow-hidden max-h-60 overflow-y-auto shadow-lg"
-                        >
-                          {visibleFilteredCatalog.map((catalogItem, index) => (
-                            <motion.div
-                              key={`${catalogItem.item_type}:${catalogItem.id}`}
-                              initial={lowMotionMode ? false : { opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              transition={lowMotionMode ? { duration: 0 } : { duration: 0.15, delay: index * 0.01 }}
-                              onClick={() => {
-                                addCatalogItemToOrder(catalogItem);
-                              }}
-                              className="p-4 border-b border-accent-100 last:border-0 transition-colors flex cursor-pointer justify-between items-center hover:bg-accent-50"
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="font-semibold text-primary-900 truncate">
-                                  {catalogItem.name}
-                                </span>
-                                {catalogItem.item_type === ORDER_ITEM_TYPE.COMBO && (
-                                  <Badge className="bg-blue-100 text-blue-700">Combo</Badge>
-                                )}
-                              </div>
-                              <span className="text-lg font-bold text-green-600">
-                                {formatPrice(catalogItem.sale_price || 0)}
-                              </span>
-                            </motion.div>
-                          ))}
-                          {hasMoreFilteredCatalog && (
-                            <div className="border-t border-accent-100 p-2.5 bg-white">
-                              <div ref={filteredCatalogSentinelRef} className="h-2 w-full" aria-hidden="true" />
-                              <Button
-                                type="button"
-                                onClick={loadMoreFilteredCatalog}
-                                variant="outline"
-                                className="mt-2 w-full h-9 text-xs"
-                              >
-                                Cargar mas resultados ({visibleFilteredCatalog.length}/{totalFilteredCatalog})
-                              </Button>
-                            </div>
-                          )}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
+                  <MesaCatalogSearch
+                    searchProduct={searchProduct}
+                    onSearchChange={setSearchProduct}
+                    filteredCatalog={filteredCatalog}
+                    visibleFilteredCatalog={visibleFilteredCatalog}
+                    hasMoreFilteredCatalog={hasMoreFilteredCatalog}
+                    totalFilteredCatalog={totalFilteredCatalog}
+                    filteredCatalogSentinelRef={filteredCatalogSentinelRef}
+                    lowMotionMode={lowMotionMode}
+                    onAddItem={addCatalogItemToOrder}
+                    onLoadMore={loadMoreFilteredCatalog}
+                  />
 
                   {/* Items de la orden */}
-                  <div className="mb-6">
-                    <h3 className="text-lg font-bold text-primary-900 mb-4">Items en la orden</h3>
-                    {orderItems.length === 0 ? (
-                      <div className="text-center py-12">
-                        <div className="w-16 h-16 rounded-full bg-accent-100 flex items-center justify-center mx-auto mb-3">
-                          <ShoppingCart className="w-8 h-8 text-accent-600" />
-                        </div>
-                        <p className="text-accent-600">No hay items en esta orden</p>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                          {visibleOrderItems.map((item, index) => (
-                            <motion.div
-                              key={getOrderItemRenderKey(item, index)}
-                              initial={lowMotionMode ? false : { opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={lowMotionMode ? { duration: 0 } : { duration: 0.2, delay: index * 0.02 }}
-                            >
-                              <Card className="border-accent-200 hover:shadow-md transition-shadow">
-                                <CardContent className="pt-4">
-                                  <div className="flex flex-col gap-3">
-                                    <div className="flex items-start justify-between gap-3">
-                                      <div className="flex-1 min-w-0">
-                                        <h4 className="font-semibold text-primary-900 text-sm sm:text-base leading-tight">
-                                          {getOrderItemName(item)}
-                                        </h4>
-                                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
-                                          {item.combo_id && (
-                                            <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 font-medium">
-                                              Combo
-                                            </span>
-                                          )}
-                                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium">
-                                            {formatPrice(parseFloat(item.price))} por unidad
-                                          </span>
-                                        </div>
-                                      </div>
-                                      <div className="text-right shrink-0">
-                                        <p className="text-lg font-bold text-primary-900">
-                                          {formatPrice(parseFloat(item.subtotal))}
-                                        </p>
-                                        <p className="text-[11px] text-accent-600">Subtotal</p>
-                                      </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between pt-2 border-t border-accent-100">
-                                      <div className="inline-flex items-center gap-1.5 rounded-xl border border-accent-200 bg-white p-1">
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => updateItemQuantity(item.id, toFiniteNumber(item.quantity, 0) - 1)}
-                                          disabled={isOrderItemsSyncing}
-                                          className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                          -
-                                        </Button>
-                                        <span className="w-10 text-center font-bold text-primary-900">
-                                          {item.quantity}
-                                        </span>
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => updateItemQuantity(item.id, toFiniteNumber(item.quantity, 0) + 1)}
-                                          disabled={isOrderItemsSyncing}
-                                          className="h-8 w-8 p-0 border-green-300 text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                          +
-                                        </Button>
-                                      </div>
-
-                                    </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            </motion.div>
-                          ))}
-                        </div>
-                        {hasMoreOrderItems && (
-                          <div className="mt-3 flex flex-col items-center gap-2">
-                            <p className="text-xs text-accent-600">
-                              Mostrando {visibleOrderItems.length} de {totalOrderItems} items
-                            </p>
-                            <div ref={orderItemsSentinelRef} className="h-2 w-full" aria-hidden="true" />
-                            <Button
-                              type="button"
-                              onClick={loadMoreOrderItems}
-                              variant="outline"
-                              className="rounded-xl"
-                            >
-                              Cargar mas items
-                            </Button>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
+                  <MesaOrderItemsGrid
+                    orderItems={orderItems}
+                    visibleOrderItems={visibleOrderItems}
+                    hasMoreOrderItems={hasMoreOrderItems}
+                    totalOrderItems={totalOrderItems}
+                    orderItemsSentinelRef={orderItemsSentinelRef}
+                    lowMotionMode={lowMotionMode}
+                    isOrderItemsSyncing={isOrderItemsSyncing}
+                    getOrderItemRenderKey={getOrderItemRenderKey}
+                    getOrderItemName={getOrderItemName}
+                    onUpdateQuantity={updateItemQuantity}
+                    onLoadMore={loadMoreOrderItems}
+                  />
                 </CardContent>
 
                 {/* Total y acciones */}
-                <div className="border-t-2 border-accent-200 bg-accent-50/30 p-4 sm:p-6 shrink-0">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                      <p className="text-sm text-primary-600 mb-1">Total a pagar</p>
-                      <h3 className="text-2xl sm:text-3xl font-bold text-primary-900">
-                        {formatPrice(orderTotal)}
-                      </h3>
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                      <Button
-                        onClick={handleRefreshOrder}
-                        variant="outline"
-                        disabled={isOrderItemsSyncing}
-                        className="border-2 border-accent-300 text-accent-700 hover:bg-accent-50 h-12 px-6 w-full sm:w-auto"
-                      >
-                        <Save className="w-5 h-5 mr-2" />
-                        {isOrderItemsSyncing ? 'Sincronizando...' : 'Guardar'}
-                      </Button>
-                      <Button
-                        onClick={handlePrintOrder}
-                        variant="outline"
-                        className="border-2 border-blue-300 text-blue-700 hover:bg-blue-50 h-12 px-6 w-full sm:w-auto"
-                        disabled={orderItems.length === 0}
-                      >
-                        <Printer className="w-5 h-5 mr-2" />
-                        Imprimir para cocina
-                      </Button>
-                      <Button
-                        onClick={handleCloseOrder}
-                        disabled={orderItems.length === 0}
-                        className="gradient-primary text-white hover:opacity-90 h-12 px-8 text-lg w-full sm:w-auto"
-                      >
-                        <CheckCircle2 className="w-5 h-5 mr-2" />
-                        Cerrar Orden
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                <MesaOrderFooter
+                  orderTotal={orderTotal}
+                  orderItemsCount={orderItems.length}
+                  isOrderItemsSyncing={isOrderItemsSyncing}
+                  onSave={handleRefreshOrder}
+                  onPrintKitchen={handlePrintOrder}
+                  onCloseOrder={handleCloseOrder}
+                />
               </Card>
             </motion.div>
           </motion.div>
