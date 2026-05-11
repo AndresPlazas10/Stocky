@@ -123,7 +123,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       chunkSizeWarningLimit: 500,
-      sourcemap: false,
+      sourcemap: 'hidden',
       minify: 'terser',
       target: 'es2020',
       rollupOptions: {
