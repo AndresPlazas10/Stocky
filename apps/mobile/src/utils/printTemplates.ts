@@ -87,12 +87,14 @@ export function buildSaleReceiptHtml({
   sellerName,
   printerWidthMm = DEFAULT_PRINTER_WIDTH_MM,
   customerName = 'Venta general',
+  businessName = 'Sistema Stocky',
 }: {
   sale: VentaRecord;
   saleDetails: VentaDetailRecord[];
   sellerName?: string | null;
   printerWidthMm?: number;
   customerName?: string;
+  businessName?: string;
 }) {
   const safeSeller = String(sellerName || 'Empleado');
   const printableItems = Array.isArray(saleDetails) ? saleDetails : [];
@@ -225,7 +227,7 @@ export function buildSaleReceiptHtml({
       <div class="receipt">
         <div class="header">
           <h1>COMPROBANTE DE VENTA</h1>
-          <p>Sistema Stocky</p>
+          <p>${String(businessName || 'Sistema Stocky')}</p>
           <p>${formatDateTimeTicket(sale.created_at || new Date())}</p>
         </div>
 
