@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Download, ShieldCheck, Smartphone, AlertTriangle, Monitor, BellRing, Share, PlusSquare, AppWindow } from 'lucide-react';
+import { Download, ShieldCheck, Smartphone, AlertTriangle, Monitor, BellRing, Share, PlusSquare, AppWindow, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getApkDownloadUrl } from '../utils/apkDownload.js';
 import { getWindowsDownloadUrl } from '../utils/windowsDownload.js';
@@ -100,7 +100,7 @@ function DownloadPage() {
 
             <div className="space-y-3">
               <h1 className="text-3xl font-black tracking-tight text-violet-950 sm:text-4xl">
-                Descarga Stocky para Android y Windows
+                Descarga Stocky para Android, Windows y impresoras
               </h1>
               <p className="text-base text-slate-700 sm:text-lg">
                 Elige tu plataforma y descarga la versión correspondiente.
@@ -142,6 +142,36 @@ function DownloadPage() {
                 <Monitor className="mr-2 h-4 w-4" />
                 Descargar Windows
               </Button>
+            </div>
+
+            {/* Print Bridge APK */}
+            <div className="rounded-2xl border border-teal-200/80 bg-gradient-to-br from-teal-50/90 to-emerald-50/90 p-5 text-sm text-teal-950 shadow-sm">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="rounded-full bg-teal-100 p-2 text-teal-700">
+                  <Printer className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="font-bold text-teal-900">Stocky print — Bridge de impresión</p>
+                  <p className="text-xs text-teal-700 mt-1">
+                    APK para conectar impresoras térmicas Bluetooth ESC/POS con cualquier app o página web.
+                    Compatible con papel 58mm y 80mm. Abierto y sin licencia.
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-teal-200 bg-white/80 p-4">
+                <p className="text-xs text-teal-800 mb-3">
+                  <strong>Instalación:</strong> Descarga el APK, instálalo en Android, y actívalo en Ajustes → Impresión → Stocky print.
+                  Luego imprime desde cualquier app seleccionando "Stocky print" como impresora.
+                </p>
+                <Button
+                  size="lg"
+                  onClick={() => window.open('/apk/stocky-print-bridge.apk', '_blank', 'noopener')}
+                  className="h-12 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 px-6 font-semibold text-slate-50 hover:opacity-90 w-full sm:w-auto"
+                >
+                  <Smartphone className="mr-2 h-4 w-4" />
+                  Descargar Stocky print (APK)
+                </Button>
+              </div>
             </div>
 
             {/* Sección iPhone PWA */}

@@ -49,6 +49,7 @@ dist-ssr
 
 # APK artifacts
 /public/apk/*.apk
+!/public/apk/stocky-print-bridge.apk
 /apps/mobile/*.apk
 /apps/mobile/*.aab
 
