@@ -8,7 +8,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./testing/setup.js'],
-    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}', 'testing/cambio.test.js', 'testing/formatters.test.js', 'testing/receiptTemplate.test.js', 'testing/printTemplates.test.js'],
+    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}', 'testing/cambio.test.js', 'testing/formatters.test.js', 'testing/receiptTemplate.test.js', 'testing/printTemplates.test.js', 'testing/useDebounce.test.js', 'testing/useCloseOrderLocks.test.js', 'testing/usePermissions.test.js'],
     exclude: ['node_modules', 'dist', 'testing/k6', 'testing/sql', 'testing/perf'],
     coverage: {
       provider: 'v8',
@@ -17,6 +17,11 @@ export default defineConfig({
       exclude: ['src/main.jsx', 'src/**/*.test.*', 'src/**/*.spec.*'],
     },
     css: false,
+    env: {
+      VITE_SUPABASE_URL: 'https://test.supabase.co',
+      VITE_SUPABASE_ANON_KEY: 'test-anon-key',
+      VITE_APP_URL: 'http://localhost:5173',
+    },
   },
   resolve: {
     alias: {
