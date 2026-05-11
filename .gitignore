@@ -65,3 +65,7 @@ Stocky_windows/
 stocky_play/
 release/win-unpacked/
 release/win-arm64-unpacked/
+
+# Playwright test artifacts
+playwright-report/
+test-results/
