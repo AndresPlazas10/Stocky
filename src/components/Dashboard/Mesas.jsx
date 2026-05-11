@@ -3880,7 +3880,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
     setPrintCustomerName('Venta general');
   }, []);
 
-  const tryAutoPrintReceiptBySaleId = useCallback(async (saleId) => {
+  const _tryAutoPrintReceiptBySaleId = useCallback(async (saleId) => {
     if (!isAutoPrintReceiptEnabled() || !saleId) return;
 
     try {

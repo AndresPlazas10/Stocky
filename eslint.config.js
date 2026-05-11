@@ -33,7 +33,7 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['warn', {
-        varsIgnorePattern: '^[A-Z_]',
+        varsIgnorePattern: '^[A-Z_]|^motion$',
         argsIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_',
       }],
@@ -52,6 +52,8 @@ export default defineConfig([
     files: [
       'api/**/*.js',
       'vite.config.js',
+      'playwright.config.js',
+      'vitest.config.js',
       'apps/mobile/metro.config.js',
       'apps/mobile/plugins/withFirebaseAppInit.js',
       'src/config/localSync.js',
