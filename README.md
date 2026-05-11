@@ -2,6 +2,18 @@
 
 Sistema POS multi-tenant con inventario, ventas, compras, mesas, proveedores, empleados, reportes y facturacion operativa para negocios de retail/restaurante.
 
+![CI](https://github.com/AndresPlazas10/Stocky/workflows/CI/badge.svg)
+
+## Testing
+
+```bash
+npm run test:unit     # 98 tests (Vitest + React Testing Library)
+npm run test:e2e      # E2E tests (Playwright)
+npm test              # Legacy tests (Node.js)
+```
+
+[Documentación de testing →](docs/TESTING.md)
+
 ## Estado actual
 
 - Frontend: React 19 + Vite 7.
