@@ -10,7 +10,7 @@
       "destination": "/legal/:path*"
     },
     {
-      "source": "/:path((?!api|assets).*)",
+      "source": "/:path((?!api|assets|apk).*)",
       "destination": "/index.html"
     }
   ],
