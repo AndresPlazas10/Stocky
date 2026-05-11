@@ -8,7 +8,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./testing/setup.js'],
-    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}', 'testing/cambio.test.js', 'testing/formatters.test.js', 'testing/receiptTemplate.test.js', 'testing/printTemplates.test.js', 'testing/useDebounce.test.js', 'testing/useCloseOrderLocks.test.js', 'testing/usePermissions.test.js'],
+    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}', 'testing/cambio.test.js', 'testing/formatters.test.js', 'testing/receiptTemplate.test.js', 'testing/printTemplates.test.js', 'testing/useDebounce.test.js', 'testing/useCloseOrderLocks.test.js', 'testing/usePermissions.test.js', 'testing/MesaDeleteModal.test.jsx', 'testing/PrintReceiptConfirmModal.test.jsx', 'testing/MesaOrderFooter.test.jsx'],
     exclude: ['node_modules', 'dist', 'testing/k6', 'testing/sql', 'testing/perf'],
     coverage: {
       provider: 'v8',
