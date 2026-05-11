@@ -163,14 +163,20 @@ function DownloadPage() {
                   <strong>Instalación:</strong> Descarga el APK, instálalo en Android, y actívalo en Ajustes → Impresión → Stocky print.
                   Luego imprime desde cualquier app seleccionando "Stocky print" como impresora.
                 </p>
-                <Button
-                  size="lg"
-                  onClick={() => window.open('/apk/stocky-print-bridge.apk', '_blank', 'noopener')}
-                  className="h-12 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 px-6 font-semibold text-slate-50 hover:opacity-90 w-full sm:w-auto"
+                <a
+                  href="/apk/stocky-print-bridge.apk"
+                  download="stocky-print-bridge.apk"
+                  className="inline-flex items-center justify-center h-12 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 px-6 font-semibold text-slate-50 hover:opacity-90 w-full sm:w-auto text-sm"
                 >
                   <Smartphone className="mr-2 h-4 w-4" />
                   Descargar Stocky print (APK)
-                </Button>
+                </a>
+                <p className="mt-2 text-xs text-teal-700">
+                  ¿No descarga? Usa este{' '}
+                  <a href="/apk/stocky-print-bridge.apk" className="underline font-semibold hover:text-teal-900">
+                    enlace directo
+                  </a>.
+                </p>
               </div>
             </div>
 
