@@ -941,6 +941,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         sellerName: printSaleRecord.seller_name,
         printerWidthMm,
         customerName: printCustomerName,
+        businessName: businessName ?? 'Sistema Stocky',
       });
       await Print.printAsync({ html });
     } catch (err) {
@@ -1016,6 +1017,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         saleDetails: details,
         sellerName: venta.seller_name || 'Empleado',
         printerWidthMm,
+        businessName: businessName ?? 'Sistema Stocky',
       });
 
       await Print.printAsync({ html });
