@@ -55,6 +55,7 @@ export default defineConfig([
       'playwright.config.js',
       'vitest.config.js',
       'apps/mobile/metro.config.js',
+      'apps/mobile/app.config.js',
       'apps/mobile/plugins/withFirebaseAppInit.js',
       'src/config/localSync.js',
       'src/sync/shapeRegistry.js',

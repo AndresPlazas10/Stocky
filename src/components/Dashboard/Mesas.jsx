@@ -2981,7 +2981,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
       delete optimisticTempItemQuantitiesRef.current[itemId];
 
       updateOrderTotal(selectedMesa.current_order_id, nextOrderItems, { skipMesaState: true }).catch(() => {});
-    } catch (error) {
+    } catch (_error) {
       setError('❌ No se pudo eliminar el producto. Por favor, intenta de nuevo.');
       // Revertir solo los items si se puede consultar remoto.
       try {
@@ -3476,7 +3476,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
         // no-op
       }
     }
-  }, [selectedMesa, quantityToAdd, updateOrderTotal, setPendingQuantityUpdatesSafe, businessId, markOrderItemOpStarted, markOrderItemOpFinished, enqueueOrderItemWrite]);
+  }, [selectedMesa, quantityToAdd, updateOrderTotal, setPendingQuantityUpdatesSafe, businessId, isOfflineFirstRuntime, markOrderItemOpStarted, markOrderItemOpFinished, enqueueOrderItemWrite]);
 
   const updateItemQuantity = useCallback(async (itemId, newQuantity) => {
     try {
@@ -3871,7 +3871,7 @@ function Mesas({ businessId, userRole = 'admin' }) {
       setPrintSaleDataList([]);
       setPrintCustomerName('Venta general');
     }
-  }, [printSaleDataList, printCustomerName]);
+  }, [printSaleDataList, printCustomerName, businessId]);
 
   const handlePrintCancel = useCallback(() => {
     setShowPrintModal(false);
