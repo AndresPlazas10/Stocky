@@ -77,48 +77,13 @@ function Home() {
     'Una experiencia limpia y potente para controlar todo tu negocio',
     'Vende, controla y crece sin complicaciones',
   ];
-  const [typedTitle, setTypedTitle] = useState('');
-  const [cursorVisible, setCursorVisible] = useState(true);
+  const [phraseIndex, setPhraseIndex] = useState(0);
 
   useEffect(() => {
-    let phraseIndex = 0;
-    let charIndex = 0;
-    let isDeleting = false;
-    let timeout;
-
-    const tick = () => {
-      const currentPhrase = phrases[phraseIndex];
-
-      if (!isDeleting) {
-        charIndex++;
-        setTypedTitle(currentPhrase.slice(0, charIndex));
-
-        if (charIndex === currentPhrase.length) {
-          timeout = setTimeout(() => { isDeleting = true; tick(); }, 5000);
-          return;
-        }
-        timeout = setTimeout(tick, 90);
-      } else {
-        charIndex--;
-        setTypedTitle(currentPhrase.slice(0, charIndex));
-
-        if (charIndex === 0) {
-          isDeleting = false;
-          phraseIndex = (phraseIndex + 1) % phrases.length;
-          timeout = setTimeout(tick, 800);
-          return;
-        }
-        timeout = setTimeout(tick, 44);
-      }
-    };
-
-    timeout = setTimeout(tick, 800);
-    return () => clearTimeout(timeout);
-  }, []);
-
-  useEffect(() => {
-    const blink = setInterval(() => setCursorVisible((v) => !v), 530);
-    return () => clearInterval(blink);
+    const interval = setInterval(() => {
+      setPhraseIndex((prev) => (prev + 1) % phrases.length);
+    }, 4500);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -341,9 +306,18 @@ function Home() {
               <span className="invisible" aria-hidden="true">
                 {phrases[0]}
               </span>
-              <span className="absolute inset-0">
-                {typedTitle}
-                <span className={`inline-block w-[0.05em] h-[0.85em] bg-neutral-900 align-middle ml-0.5 -mb-0.5 transition-opacity duration-100 ${cursorVisible ? 'opacity-100' : 'opacity-0'}`} />
+              <span className="absolute inset-0 flex items-center">
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={phraseIndex}
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 1.03 }}
+                    transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+                  >
+                    {phrases[phraseIndex]}
+                  </motion.span>
+                </AnimatePresence>
               </span>
             </h1>
 
