@@ -398,13 +398,13 @@ export default function IncidentesSync({ businessId }) {
 
   const auditTotalPages = useMemo(() => {
     return Math.max(1, Math.ceil(filteredAlertAuditRows.length / auditPageSize));
-  }, [filteredAlertAuditRows.length]);
+  }, [filteredAlertAuditRows.length, auditPageSize]);
 
   const paginatedAlertAuditRows = useMemo(() => {
     const safePage = Math.min(Math.max(1, auditPage), auditTotalPages);
     const start = (safePage - 1) * auditPageSize;
     return filteredAlertAuditRows.slice(start, start + auditPageSize);
-  }, [auditPage, auditTotalPages, filteredAlertAuditRows]);
+  }, [auditPage, auditTotalPages, filteredAlertAuditRows, auditPageSize]);
 
   useEffect(() => {
     setAuditPage(1);

@@ -271,7 +271,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setPrintSaleData(null);
       setPrintSaleDetails([]);
     }
-  }, [printSaleData, printSaleDetails, printCustomerName]);
+  }, [printSaleData, printSaleDetails, printCustomerName, businessId]);
 
   const handlePrintCancel = useCallback(() => {
     setShowPrintModal(false);
@@ -1096,7 +1096,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       setError('No se pudo abrir la ventana de impresión. Verifica los permisos del navegador.');
       setTimeout(() => setError(null), 3000);
     }
-  }, [fetchSaleDetails]);
+  }, [fetchSaleDetails, businessId]);
 
   const cancelDelete = () => {
     setShowDeleteModal(false);
