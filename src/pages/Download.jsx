@@ -10,7 +10,7 @@ import {
   registerPwaPushSubscription,
   sendPwaPushTestNotification,
 } from '../services/pwaPushNotificationsService.js';
-import { isIOs, isStandalone } from '../utils/deviceDetection.js';
+import { isAndroid, isIOs, isStandalone } from '../utils/deviceDetection.js';
 
 const _motionLintUsage = motion;
 
@@ -87,6 +87,7 @@ function DownloadPage() {
   const [support, setSupport] = useState({ supported: false, reason: 'loading', permission: 'default' });
 
   const userIsOnIOs = useMemo(() => isIOs(), []);
+  const userIsAndroid = useMemo(() => isAndroid(), []);
   const userInStandalone = useMemo(() => isStandalone(), []);
 
   // ── Inyectar keyframes una sola vez ──
@@ -166,6 +167,7 @@ function DownloadPage() {
       description: 'Compatible con Android 7.0 o superior.',
       href: apkUrl,
       label: 'Descargar',
+      apkOnly: true,
     },
     {
       icon: Monitor,
@@ -185,6 +187,7 @@ function DownloadPage() {
       download: 'stocky-print-bridge.apk',
       label: 'Descargar',
       note: 'Después de instalar actívalo en Ajustes → Impresión → Stocky print.',
+      apkOnly: true,
     },
   ], [apkVersion, windowsVersion, apkUrl, windowsUrl]);
 
@@ -229,7 +232,11 @@ function DownloadPage() {
             </motion.h1>
 
             <motion.p {...fadeInUpMore} transition={heroTransitionP} className="mt-3 max-w-xl text-sm text-neutral-500 sm:text-lg">
-              Android, Windows y iPhone. Elige tu plataforma y empieza en minutos.
+              {userIsOnIOs
+                ? 'Estás en iPhone. Instala Stocky como PWA o descarga para tus otros dispositivos.'
+                : userIsAndroid
+                  ? 'Estás en Android. Descarga el APK o usa la versión web.'
+                  : 'Android, Windows y iPhone. Elige tu plataforma y empieza en minutos.'}
             </motion.p>
           </div>
         </section>
@@ -238,22 +245,35 @@ function DownloadPage() {
         <section className="px-4 pb-10 sm:px-6 sm:pb-14 lg:px-8 lg:pb-20">
           <div className="mx-auto max-w-5xl">
             <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {downloads.map((item, index) => (
+              {downloads.map((item, index) => {
+                const isBlockedOnIOs = userIsOnIOs && item.apkOnly;
+
+                return (
                 <motion.article
                   key={item.title}
                   {...fadeInUpCard}
                   transition={{ duration: 0.35, delay: 0.1 + index * 0.08 }}
-                  className="group relative flex flex-col rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-sm transition-shadow sm:hover:shadow-md sm:p-7"
+                  className={`group relative flex flex-col rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-sm transition-shadow sm:p-7 ${
+                    isBlockedOnIOs ? 'opacity-50' : 'sm:hover:shadow-md'
+                  }`}
                 >
+                  {isBlockedOnIOs && (
+                    <span className="absolute top-3 right-3 rounded-full bg-neutral-100 border border-neutral-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+                      Solo Android
+                    </span>
+                  )}
+
                   <div
-                    className="mb-4 sm:mb-5 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-neutral-100 text-neutral-600 transition-colors sm:group-hover:bg-neutral-200 sm:group-hover:text-neutral-900"
-                    style={{ animation: `bob ${index === 1 ? 3 : 3.5}s ease-in-out infinite`, animationDelay: `${index * 0.5}s`, willChange: 'transform' }}
+                    className={`mb-4 sm:mb-5 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-neutral-100 transition-colors ${
+                      isBlockedOnIOs ? 'text-neutral-400' : 'text-neutral-600 sm:group-hover:bg-neutral-200 sm:group-hover:text-neutral-900'
+                    }`}
+                    style={isBlockedOnIOs ? {} : { animation: `bob ${index === 1 ? 3 : 3.5}s ease-in-out infinite`, animationDelay: `${index * 0.5}s`, willChange: 'transform' }}
                   >
                     <item.icon className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
 
                   <div className="mb-3 sm:mb-4">
-                    <h3 className="text-base font-bold text-neutral-900 sm:text-lg">{item.title}</h3>
+                    <h3 className={`text-base font-bold sm:text-lg ${isBlockedOnIOs ? 'text-neutral-400' : 'text-neutral-900'}`}>{item.title}</h3>
                     <p className="text-xs text-neutral-400">{item.subtitle}</p>
                   </div>
 
@@ -265,19 +285,29 @@ function DownloadPage() {
 
                   {item.download ? (
                     <a
-                      href={item.href}
-                      download={item.download}
-                      className="inline-flex h-10 sm:h-11 w-full items-center justify-center gap-2 rounded-xl bg-neutral-900 px-4 text-sm font-semibold text-white transition-all touch-manipulation sm:hover:bg-neutral-800 active:scale-[0.98] no-underline"
+                      href={isBlockedOnIOs ? undefined : item.href}
+                      download={isBlockedOnIOs ? undefined : item.download}
+                      className={`inline-flex h-10 sm:h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition-all touch-manipulation active:scale-[0.98] no-underline ${
+                        isBlockedOnIOs
+                          ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed pointer-events-none'
+                          : 'bg-neutral-900 text-white sm:hover:bg-neutral-800'
+                      }`}
+                      aria-disabled={isBlockedOnIOs}
                     >
                       <Download className="h-4 w-4" />
                       {item.label}
                     </a>
                   ) : (
                     <a
-                      href={item.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex h-10 sm:h-11 w-full items-center justify-center gap-2 rounded-xl bg-neutral-900 px-4 text-sm font-semibold text-white transition-all touch-manipulation sm:hover:bg-neutral-800 active:scale-[0.98] no-underline"
+                      href={isBlockedOnIOs ? undefined : item.href}
+                      target={isBlockedOnIOs ? undefined : '_blank'}
+                      rel={isBlockedOnIOs ? undefined : 'noopener noreferrer'}
+                      className={`inline-flex h-10 sm:h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition-all touch-manipulation active:scale-[0.98] no-underline ${
+                        isBlockedOnIOs
+                          ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed pointer-events-none'
+                          : 'bg-neutral-900 text-white sm:hover:bg-neutral-800'
+                      }`}
+                      aria-disabled={isBlockedOnIOs}
                     >
                       <Download className="h-4 w-4" />
                       {item.label}
@@ -285,13 +315,13 @@ function DownloadPage() {
                   )}
 
                   {/* Windows card subtle accent */}
-                  {item.title === 'Windows' && (
+                  {item.title === 'Windows' && !isBlockedOnIOs && (
                     <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl opacity-0 transition-opacity duration-500 sm:group-hover:opacity-100" aria-hidden="true">
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent" style={{ willChange: 'opacity' }} />
                     </div>
                   )}
                 </motion.article>
-              ))}
+              )})}
             </div>
           </div>
         </section>
