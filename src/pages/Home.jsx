@@ -68,20 +68,21 @@ const process = [
   'Revisa resultados y mejora.',
 ];
 
+const PHRASES = [
+  'Una experiencia limpia y potente para controlar todo tu negocio',
+  'Vende, controla y crece sin complicaciones',
+];
+
 function Home() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showIosBanner, setShowIosBanner] = useState(false);
 
-  const phrases = [
-    'Una experiencia limpia y potente para controlar todo tu negocio',
-    'Vende, controla y crece sin complicaciones',
-  ];
   const [phraseIndex, setPhraseIndex] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setPhraseIndex((prev) => (prev + 1) % phrases.length);
+      setPhraseIndex((prev) => (prev + 1) % PHRASES.length);
     }, 4500);
     return () => clearInterval(interval);
   }, []);
@@ -304,7 +305,7 @@ function Home() {
 
             <h1 className="mt-8 max-w-4xl relative text-4xl font-bold leading-[1.08] tracking-tight text-neutral-900 sm:text-5xl lg:text-6xl">
               <span className="invisible" aria-hidden="true">
-                {phrases[0]}
+                {PHRASES[0]}
               </span>
               <span className="absolute inset-0 flex items-center">
                 <AnimatePresence mode="wait">
@@ -315,7 +316,7 @@ function Home() {
                     exit={{ opacity: 0, scale: 1.03 }}
                     transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
                   >
-                    {phrases[phraseIndex]}
+                    {PHRASES[phraseIndex]}
                   </motion.span>
                 </AnimatePresence>
               </span>
