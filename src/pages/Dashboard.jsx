@@ -37,7 +37,6 @@ const Combos = lazy(() => import('../components/Dashboard/Combos.jsx'));
 const Proveedores = lazy(() => import('../components/Dashboard/Proveedores.jsx'));
 const Empleados = lazy(() => import('../components/Dashboard/Empleados.jsx'));
 const Facturas = lazy(() => import('../components/Dashboard/Facturas.jsx'));
-const Clientes = lazy(() => import('../components/Dashboard/Clientes.jsx'));
 const Reportes = lazy(() => import('../components/Dashboard/Reportes.jsx'));
 const Configuracion = lazy(() => import('../components/Dashboard/Configuracion.jsx'));
 const IncidentesSync = lazy(() => import('../components/Dashboard/IncidentesSync.jsx'));
@@ -322,9 +321,6 @@ function Dashboard() {
       
       case 'facturas':
         return <Facturas key="facturas" userRole="admin" businessId={business?.id} />;
-      
-      case 'clientes':
-        return <Clientes key="clientes" businessId={business?.id} />;
       
       case 'reportes':
         return <Reportes key="reportes" businessId={business?.id} />;
