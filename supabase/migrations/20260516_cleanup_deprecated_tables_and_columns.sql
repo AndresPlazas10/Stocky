@@ -30,7 +30,14 @@ DROP VIEW IF EXISTS sales_receipts;
 DROP TABLE IF EXISTS dane_cities CASCADE;
 
 -- ============================================================
--- BLOQUE 2A: Columnas deprecadas en sales
+-- BLOQUE 2A: Limpiar triggers/funciones que referencian columnas deprecadas
+-- ============================================================
+DROP TRIGGER IF EXISTS ensure_receipt_only_trigger ON sales;
+DROP FUNCTION IF EXISTS validate_sale_before_insert();
+ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_is_electronic_invoice_check;
+
+-- ============================================================
+-- BLOQUE 2B: Columnas deprecadas en sales
 -- ============================================================
 ALTER TABLE sales 
   DROP COLUMN IF EXISTS electronic_invoice_id,
