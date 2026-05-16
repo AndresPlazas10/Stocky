@@ -33,13 +33,6 @@ export function buildShapeRegistry({ businessId } = {}) {
       enabled: true
     },
     {
-      key: 'customers',
-      table: 'customers',
-      businessId: normalizedBusinessId,
-      mode: 'full',
-      enabled: true
-    },
-    {
       key: 'suppliers',
       table: 'suppliers',
       businessId: normalizedBusinessId,
