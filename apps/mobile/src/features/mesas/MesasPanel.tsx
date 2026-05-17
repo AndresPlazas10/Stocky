@@ -2686,6 +2686,14 @@ export function MesasPanel({ session, businessContext }: Props) {
     const previousOrderId = String(mesa.current_order_id || '').trim() || null;
     const actionVersion = bumpMesaActionVersion(mesa.id);
 
+    if (action === 'open') {
+      const lockAcquired = await acquireMesaLockForEdition(mesa);
+      if (!lockAcquired) {
+        setActingMesaId(null);
+        return;
+      }
+    }
+
     const optimisticMesa: MesaRecord = action === 'open'
       ? {
           ...mesa,
