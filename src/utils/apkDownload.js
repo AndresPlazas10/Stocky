@@ -1,5 +1,5 @@
 const FALLBACK_APK_URL =
-  'https://expo.dev/artifacts/eas/gmXrkZSbggQg3Tvgmu8awp.apk';
+  'https://github.com/AndresPlazas10/Stocky/releases/latest/download/stocky-latest.apk';
 
 export function getApkDownloadUrl() {
   const envUrl = String(import.meta.env?.VITE_APK_URL || '').trim();
