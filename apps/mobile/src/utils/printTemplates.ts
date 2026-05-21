@@ -118,7 +118,7 @@ export function buildSaleReceiptHtml({
         @media print {
           @page {
             size: ${printerWidthMm}mm auto;
-            margin: 2mm;
+            margin: 0;
           }
           html, body {
             width: ${printerWidthMm}mm !important;
@@ -151,7 +151,7 @@ export function buildSaleReceiptHtml({
 
         .receipt {
           width: 100%;
-          padding: 2mm;
+          padding: 1mm 0;
           box-sizing: border-box;
         }
 
@@ -299,7 +299,7 @@ export function buildKitchenOrderHtml({
         @media print {
           @page {
             size: ${printerWidthMm}mm auto;
-            margin: 2mm;
+            margin: 0;
           }
           html, body {
             width: ${printerWidthMm}mm !important;
@@ -331,7 +331,7 @@ export function buildKitchenOrderHtml({
           display: block;
           width: 100%;
           margin: 0;
-          padding: 2mm;
+          padding: 1mm 0;
           box-sizing: border-box;
         }
         
