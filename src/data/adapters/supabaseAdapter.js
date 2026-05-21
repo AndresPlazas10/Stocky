@@ -1391,6 +1391,14 @@ export const supabaseAdapter = {
       .eq('id', productId);
   },
 
+  async checkProductCanDelete(productId) {
+    const { data, error } = await supabase.rpc('check_product_can_delete', {
+      p_product_id: productId
+    });
+    if (error) throw error;
+    return data;
+  },
+
   async getInvoicesWithItemsByBusiness({
     businessId,
     invoiceColumns,

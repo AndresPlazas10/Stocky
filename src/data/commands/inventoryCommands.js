@@ -178,6 +178,11 @@ export async function updateProductById({ productId, businessId = null, payload 
   return data || null;
 }
 
+export async function checkProductCanDelete(productId) {
+  const data = await supabaseAdapter.checkProductCanDelete(productId);
+  return data;
+}
+
 export async function deleteProductById({ productId, businessId = null }) {
   const { error } = await supabaseAdapter.deleteProductById(productId);
   if (error) {
