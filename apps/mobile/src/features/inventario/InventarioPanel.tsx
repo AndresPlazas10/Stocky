@@ -18,6 +18,7 @@ import {
   deleteInventoryProductById,
   listInventoryProducts,
   listInventorySuppliers,
+  checkInventoryProductCanDelete,
   setInventoryProductActiveStatus,
   updateInventoryProductById,
   type InventoryProductRecord,
@@ -184,6 +185,12 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [productTarget, setProductTarget] = useState<InventoryProductRecord | null>(null);
+  const [deleteCheckResult, setDeleteCheckResult] = useState<{
+    has_sales: boolean;
+    has_purchases: boolean;
+    sales_count: number;
+    purchases_count: number;
+  } | null>(null);
   const suppliersRef = useRef<InventorySupplierRecord[]>([]);
   const inventoryRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inventorySuppliersRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -586,10 +593,23 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
     }
   };
 
-  const askDeleteProduct = (product: InventoryProductRecord) => {
+  const askDeleteProduct = async (product: InventoryProductRecord) => {
     setProductTarget(product);
-    setShowDeleteModal(true);
-    setShowDeactivateModal(false);
+    try {
+      const checkResult = await checkInventoryProductCanDelete(product.id);
+      setDeleteCheckResult(checkResult);
+      if (checkResult?.has_sales || checkResult?.has_purchases) {
+        setShowDeactivateModal(true);
+        setShowDeleteModal(false);
+      } else {
+        setShowDeleteModal(true);
+        setShowDeactivateModal(false);
+      }
+    } catch {
+      setShowDeleteModal(true);
+      setShowDeactivateModal(false);
+      setDeleteCheckResult(null);
+    }
   };
 
   const askDeactivateProduct = (product: InventoryProductRecord) => {
@@ -618,15 +638,10 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
       invalidateCatalogItemsCache(businessId);
       await refreshProducts();
     } catch (err: any) {
-      if (String(err?.code || '').trim() === '23503') {
-        setShowDeleteModal(false);
-        setShowDeactivateModal(true);
-        return;
-      }
-
       setError(err instanceof Error ? err.message : 'No se pudo eliminar el producto.');
     } finally {
       setDeleting(false);
+      setDeleteCheckResult(null);
     }
   };
 
@@ -645,6 +660,7 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
       setSuccess('Producto desactivado.');
       setShowDeactivateModal(false);
       setProductTarget(null);
+      setDeleteCheckResult(null);
       invalidateCatalogItemsCache(businessId);
       await refreshProducts();
     } catch (err) {
@@ -1196,7 +1212,7 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
         visible={showDeleteModal}
         title="Eliminar producto"
         message={`¿Seguro que quieres eliminar ${productTarget?.name || 'este producto'}?`}
-        warning="Si tiene historial en ventas/compras, se te ofrecerá desactivarlo en su lugar."
+        warning="Esta acción no se puede deshacer."
         itemLabel={productTarget?.name || null}
         loading={deleting}
         onCancel={() => {
@@ -1209,18 +1225,20 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
       <StockyModal
         visible={showDeactivateModal}
         title="Desactivar producto"
-        onClose={() => {
-          setShowDeactivateModal(false);
-          setProductTarget(null);
-        }}
-        footer={(
-          <View style={styles.modalFooterRow}>
-            <StockyButton
-              variant="ghost"
-              onPress={() => {
-                setShowDeactivateModal(false);
-                setProductTarget(null);
-              }}
+          onClose={() => {
+            setShowDeactivateModal(false);
+            setProductTarget(null);
+            setDeleteCheckResult(null);
+          }}
+          footer={(
+            <View style={styles.modalFooterRow}>
+              <StockyButton
+                variant="ghost"
+                onPress={() => {
+                  setShowDeactivateModal(false);
+                  setProductTarget(null);
+                  setDeleteCheckResult(null);
+                }}
               disabled={deleting}
             >
               Cancelar
@@ -1232,7 +1250,12 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
         )}
       >
         <Text style={styles.modalText}>
-          {productTarget?.name || 'Este producto'} no se puede eliminar por historial.
+          {deleteCheckResult?.has_sales && deleteCheckResult?.has_purchases
+            ? `${productTarget?.name || 'Este producto'} tiene ${deleteCheckResult.sales_count} ventas y ${deleteCheckResult.purchases_count} compras registradas. No se puede eliminar.`
+            : deleteCheckResult?.has_sales
+              ? `${productTarget?.name || 'Este producto'} tiene ${deleteCheckResult.sales_count} ventas registradas. No se puede eliminar.`
+              : `${productTarget?.name || 'Este producto'} tiene ${deleteCheckResult?.purchases_count || 0} compras registradas. No se puede eliminar.`
+          }
         </Text>
         <Text style={styles.modalSubText}>Puedes desactivarlo para ocultarlo del catálogo activo.</Text>
       </StockyModal>

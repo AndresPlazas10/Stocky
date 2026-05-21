@@ -29,6 +29,7 @@ import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import {
   createProductWithFallback,
   deleteProductById,
+  checkProductCanDelete,
   setProductActiveStatus,
   updateProductById
 } from '../../data/commands/inventoryCommands.js';
@@ -67,6 +68,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
+  const [deleteCheckResult, setDeleteCheckResult] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   
@@ -503,7 +505,18 @@ function Inventario({ businessId, userRole = 'admin' }) {
 
   const handleDelete = useCallback(async (productId) => {
     setProductToDelete(productId);
-    setShowDeleteModal(true);
+    try {
+      const checkResult = await checkProductCanDelete(productId);
+      setDeleteCheckResult(checkResult);
+      if (checkResult?.has_sales || checkResult?.has_purchases) {
+        setShowDeactivateModal(true);
+      } else {
+        setShowDeleteModal(true);
+      }
+    } catch {
+      setShowDeleteModal(true);
+      setDeleteCheckResult(null);
+    }
   }, []);
 
   const confirmDelete = useCallback(async () => {
@@ -535,14 +548,10 @@ function Inventario({ businessId, userRole = 'admin' }) {
         await loadProductos();
       }
     } catch (error) {
-      if (error?.code === '23503') {
-        setShowDeleteModal(false);
-        setShowDeactivateModal(true);
-        return;
-      }
       setError('❌ Error al eliminar el producto');
       setShowDeleteModal(false);
       setProductToDelete(null);
+      setDeleteCheckResult(null);
     }
   }, [productToDelete, loadProductos, businessId, setProductosWithSnapshot, hasAdminPrivileges, isEmployee]);
 
@@ -572,10 +581,12 @@ function Inventario({ businessId, userRole = 'admin' }) {
       }
       setShowDeactivateModal(false);
       setProductToDelete(null);
+      setDeleteCheckResult(null);
     } catch {
       setError('❌ Error al desactivar el producto');
       setShowDeactivateModal(false);
       setProductToDelete(null);
+      setDeleteCheckResult(null);
     }
   }, [productToDelete, loadProductos, businessId, setProductosWithSnapshot]);
 
@@ -583,6 +594,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
     setShowDeleteModal(false);
     setShowDeactivateModal(false);
     setProductToDelete(null);
+    setDeleteCheckResult(null);
   }, []);
 
   const toggleActive = useCallback(async (productId, currentStatus) => {
@@ -1309,14 +1321,19 @@ function Inventario({ businessId, userRole = 'admin' }) {
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold">No se puede eliminar</h2>
-                      <p className="text-orange-100 mt-1">Producto con historial de ventas</p>
+                      <p className="text-orange-100 mt-1">Producto con historial</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="p-6 space-y-4">
                   <p className="text-gray-700 text-lg">
-                    Este producto tiene pedidos o ventas asociados y no puede eliminarse.
+                    {deleteCheckResult?.has_sales && deleteCheckResult?.has_purchases
+                      ? `Este producto tiene ${deleteCheckResult.sales_count} ventas y ${deleteCheckResult.purchases_count} compras registradas. No se puede eliminar.`
+                      : deleteCheckResult?.has_sales
+                        ? `Este producto tiene ${deleteCheckResult.sales_count} ventas registradas. No se puede eliminar.`
+                        : `Este producto tiene ${deleteCheckResult?.purchases_count || 0} compras registradas. No se puede eliminar.`
+                    }
                   </p>
                   
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
