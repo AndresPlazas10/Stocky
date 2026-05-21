@@ -524,6 +524,20 @@ export async function updateInventoryProductById({
   }
 }
 
+export async function checkInventoryProductCanDelete(productId: string): Promise<{
+  has_sales: boolean;
+  has_purchases: boolean;
+  sales_count: number;
+  purchases_count: number;
+}> {
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('check_product_can_delete', {
+    p_product_id: productId,
+  });
+  if (error) throw new Error(error.message || 'No se pudo verificar el producto.');
+  return (data as any) || { has_sales: false, has_purchases: false, sales_count: 0, purchases_count: 0 };
+}
+
 export async function deleteInventoryProductById({
   businessId,
   productId,
