@@ -154,6 +154,10 @@ BEGIN
     UPDATE public.orders
     SET status = 'closed', closed_at = timezone('utc', now())
     WHERE id = p_order_id;
+
+    -- Limpiar order_items para no bloquear eliminación de productos
+    DELETE FROM public.order_items
+    WHERE order_id = p_order_id;
   END IF;
 
   IF p_table_id IS NOT NULL THEN
