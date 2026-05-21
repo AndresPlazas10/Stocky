@@ -5,6 +5,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { EXPO_CONFIG } from './src/config/env';
 import { useAuthSession } from './src/auth/useAuthSession';
 import { useMobileNotifications } from './src/notifications/useMobileNotifications';
+import { useAppUpdateNotice } from './src/hooks/useAppUpdateNotice';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { DashboardApp } from './src/screens/dashboard/DashboardApp';
 import { StockyBackground } from './src/ui/StockyBackground';
@@ -18,6 +19,7 @@ const APP_BOOT_STARTED_AT = Date.now();
 export default function App() {
   const auth = useAuthSession();
   useMobileNotifications(auth.session);
+  const { updateNotice, dismissUpdateNotice } = useAppUpdateNotice(auth.session);
   const hasSupabase = Boolean(EXPO_CONFIG.supabaseUrl && EXPO_CONFIG.supabaseAnonKey);
   const mountLoggedRef = useRef(false);
   const authReadyLoggedRef = useRef(false);
@@ -99,7 +101,15 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StockyErrorBoundary>
-        {auth.session ? <DashboardApp session={auth.session} /> : <AuthScreen />}
+        {auth.session ? (
+          <DashboardApp
+            session={auth.session}
+            updateNotice={updateNotice}
+            dismissUpdateNotice={dismissUpdateNotice}
+          />
+        ) : (
+          <AuthScreen />
+        )}
         <StatusBar style="dark" translucent backgroundColor="transparent" />
       </StockyErrorBoundary>
     </SafeAreaProvider>
