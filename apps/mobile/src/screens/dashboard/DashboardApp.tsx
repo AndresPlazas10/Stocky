@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import {
   Animated,
   Linking,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -23,7 +24,8 @@ export function DashboardApp({
   updateNotice: AppUpdateNotice | null;
   dismissUpdateNotice: () => void;
 }) {
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     perfMark('dashboard_app_mounted', {
@@ -33,16 +35,24 @@ export function DashboardApp({
 
   useEffect(() => {
     if (updateNotice) {
-      Animated.spring(slideAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-        tension: 120,
-        friction: 12,
-      }).start();
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 150,
+          friction: 14,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start();
     } else {
-      slideAnim.setValue(0);
+      scaleAnim.setValue(0.9);
+      fadeAnim.setValue(0);
     }
-  }, [updateNotice, slideAnim]);
+  }, [updateNotice, scaleAnim, fadeAnim]);
 
   const handleDownload = () => {
     if (updateNotice?.ctaUrl) {
@@ -52,110 +62,127 @@ export function DashboardApp({
 
   return (
     <DashboardProvider session={session}>
-      {updateNotice ? (
-        <Animated.View
-          style={[
-            styles.updateBanner,
-            {
-              transform: [{ translateY: slideAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [-120, 0],
-              })}],
-              opacity: slideAnim,
-            },
-          ]}
-        >
-          <View style={styles.updateBannerContent}>
-            <View style={styles.updateBannerText}>
-              <Text style={styles.updateTitle}>
-                Actualización disponible
-              </Text>
-              <Text style={styles.updateMessage} numberOfLines={2}>
-                {updateNotice.message}
-              </Text>
-              <Text style={styles.updateVersion}>
-                v{updateNotice.latestVersion}
-              </Text>
+      <AppNavigator />
+      <Modal
+        visible={Boolean(updateNotice)}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+      >
+        <View style={styles.overlay}>
+          <Animated.View
+            style={[
+              styles.card,
+              {
+                transform: [{ scale: scaleAnim }],
+                opacity: fadeAnim,
+              },
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <Text style={styles.title}>Actualización disponible</Text>
+              <Text style={styles.version}>v{updateNotice?.latestVersion}</Text>
             </View>
-            <View style={styles.updateBannerActions}>
+
+            <Text style={styles.message}>
+              {updateNotice?.message}
+            </Text>
+
+            <View style={styles.actions}>
               <Pressable
-                style={styles.updateDownloadBtn}
+                style={styles.downloadBtn}
                 onPress={handleDownload}
               >
-                <Text style={styles.updateDownloadText}>Descargar</Text>
+                <Text style={styles.downloadText}>Descargar</Text>
               </Pressable>
               <Pressable
-                style={styles.updateDismissBtn}
+                style={styles.dismissBtn}
                 onPress={dismissUpdateNotice}
               >
-                <Text style={styles.updateDismissText}>Ahora no</Text>
+                <Text style={styles.dismissText}>Ahora no</Text>
               </Pressable>
             </View>
-          </View>
-        </Animated.View>
-      ) : null}
-      <AppNavigator />
+          </Animated.View>
+        </View>
+      </Modal>
     </DashboardProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  updateBanner: {
-    backgroundColor: STOCKY_COLORS.primary900,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.15)',
-  },
-  updateBannerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  updateBannerText: {
+  overlay: {
     flex: 1,
-    marginRight: 12,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
   },
-  updateTitle: {
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: STOCKY_RADIUS.xl,
+    width: '100%',
+    maxWidth: 360,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  cardHeader: {
+    backgroundColor: STOCKY_COLORS.primary900,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+  },
+  title: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  version: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  message: {
+    color: STOCKY_COLORS.textPrimary,
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 22,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    textAlign: 'center',
+  },
+  actions: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    gap: 12,
+  },
+  downloadBtn: {
+    flex: 1,
+    backgroundColor: STOCKY_COLORS.primary900,
+    paddingVertical: 14,
+    borderRadius: STOCKY_RADIUS.md,
+    alignItems: 'center',
+  },
+  downloadText: {
     color: '#fff',
     fontSize: 15,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  updateMessage: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 16,
-  },
-  updateVersion: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 3,
-  },
-  updateBannerActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  updateDownloadBtn: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: STOCKY_RADIUS.md,
-  },
-  updateDownloadText: {
-    color: STOCKY_COLORS.primary900,
-    fontSize: 13,
     fontWeight: '700',
   },
-  updateDismissBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+  dismissBtn: {
+    flex: 1,
+    backgroundColor: '#f3f4f6',
+    paddingVertical: 14,
+    borderRadius: STOCKY_RADIUS.md,
+    alignItems: 'center',
   },
-  updateDismissText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
+  dismissText: {
+    color: '#6b7280',
+    fontSize: 15,
     fontWeight: '600',
   },
 });
