@@ -3,6 +3,9 @@ import { BleManager, State } from 'react-native-ble-plx';
 
 const bleManager = new BleManager();
 
+export const BLUETOOTH_PRINT_REQUIRED_MESSAGE =
+  'Para imprimir necesitas activar el Bluetooth y conectar una impresora termica.';
+
 export async function isBluetoothEnabled(): Promise<boolean> {
   try {
     const state = await bleManager.state();
@@ -19,7 +22,7 @@ export async function ensureBluetoothEnabled(): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     Alert.alert(
       'Bluetooth desactivado',
-      'Para imprimir necesitas activar el Bluetooth y conectar una impresora térmica.',
+      BLUETOOTH_PRINT_REQUIRED_MESSAGE,
       [
         { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
         {
