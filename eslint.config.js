@@ -9,7 +9,7 @@ export default defineConfig([
     'dist',
     'docs/**',
     'testing/**',
-    'test-sale-creation.js',
+    'scripts/test-sale-creation.js',
     'src/utils/reactOptimizations.jsx',
     'src/hooks/optimized.js',
     'public/pwa/sw-push.js',
