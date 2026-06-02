@@ -9,6 +9,7 @@ import { formatCop } from '../../services/mesasService';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
 import { StockyMoneyText } from '../../ui/StockyMoneyText';
 import { getBankLogoSource, isBankPaymentMethod } from '../../utils/paymentMethodBranding';
+import { getPaymentMethodIcon } from '../../utils/paymentMethods';
 
 type Props = {
   businessId: string;
@@ -34,15 +35,6 @@ function formatShortDateTime(value: string) {
 
 function getPeriodLabel(period: ReportesPeriod) {
   return PERIOD_OPTIONS.find((item) => item.value === period)?.label || 'Todo';
-}
-
-function getPaymentMethodIcon(method: string): keyof typeof Ionicons.glyphMap {
-  if (method === 'cash') return 'cash-outline';
-  if (method === 'card') return 'card-outline';
-  if (method === 'transfer') return 'swap-horizontal-outline';
-  if (method === 'mixed') return 'wallet-outline';
-  if (['nequi', 'bancolombia', 'banco_bogota', 'nu', 'davivienda'].includes(method)) return 'business-outline';
-  return 'help-circle-outline';
 }
 
 export function ReportesPanel({ businessId, businessName, source }: Props) {

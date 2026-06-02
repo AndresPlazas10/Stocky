@@ -6,7 +6,6 @@ import { Navbar } from './Navbar';
 import { MobileHeader, MobileDrawer } from '../mobile';
 import { useViewport } from '../../hooks/useViewport';
 
-const _motionLintUsage = motion;
 
 export function DashboardLayout({ 
   children, 

@@ -46,7 +46,6 @@ import {
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
 
-const _motionLintUsage = motion;
 
 const getPaymentMethodLabel = (method) => {
   const value = String(method || '').toLowerCase();
@@ -101,7 +100,7 @@ function Compras({ businessId }) {
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [supplierId, setSupplierId] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('efectivo');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
   const [notes, setNotes] = useState('');
   const [cart, setCart] = useState([]);
   const [isCreatingPurchase, setIsCreatingPurchase] = useState(false);
@@ -564,7 +563,7 @@ function Compras({ businessId }) {
 
   const resetForm = () => {
     setSupplierId('');
-    setPaymentMethod('efectivo');
+    setPaymentMethod('cash');
     setNotes('');
     setCart([]);
   };
@@ -976,9 +975,9 @@ function Compras({ businessId }) {
                     onChange={(e) => setPaymentMethod(e.target.value)}
                     className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#edb886] focus:ring-1 focus:ring-[#edb886] outline-none"
                   >
-                    <option value="efectivo">Efectivo</option>
-                    <option value="tarjeta">Tarjeta</option>
-                    <option value="transferencia">Transferencia</option>
+                    <option value="cash">Efectivo</option>
+                    <option value="card">Tarjeta</option>
+                    <option value="transfer">Transferencia</option>
                   </select>
                 </div>
 

@@ -61,6 +61,8 @@ import { SplitBillModalRN } from './SplitBillModalRN';
 import { getSupabaseClient } from '../../lib/supabase';
 import { getBankLogoSource, isBankPaymentMethod } from '../../utils/paymentMethodBranding';
 import { getThermalPaperWidthMm, isAutoPrintReceiptEnabled } from '../../utils/printer';
+import { ensureBluetoothEnabled } from '../../utils/bluetooth';
+import { getPaymentMethodLabel, getPaymentMethodIcon } from '../../utils/paymentMethods';
 
 type Props = {
   session: Session;
@@ -201,28 +203,6 @@ function resolveSessionDisplayName(session: Session): string {
   }
 
   return 'Usuario';
-}
-
-function getPaymentMethodLabel(method: PaymentMethod) {
-  if (method === 'cash') return 'Efectivo';
-  if (method === 'card') return 'Tarjeta';
-  if (method === 'transfer') return 'Transferencia';
-  if (method === 'mixed') return 'Mixto';
-  if (method === 'nequi') return 'Nequi';
-  if (method === 'bancolombia') return 'Bancolombia';
-  if (method === 'banco_bogota') return 'Banco de Bogotá';
-  if (method === 'nu') return 'Nu';
-  if (method === 'davivienda') return 'Davivienda';
-  return method;
-}
-
-function getPaymentMethodIcon(method: PaymentMethod): keyof typeof Ionicons.glyphMap {
-  if (method === 'cash') return 'cash-outline';
-  if (method === 'card') return 'card-outline';
-  if (method === 'transfer') return 'swap-horizontal-outline';
-  if (method === 'mixed') return 'wallet-outline';
-  if (['nequi', 'bancolombia', 'banco_bogota', 'nu', 'davivienda'].includes(method)) return 'business-outline';
-  return 'help-circle-outline';
 }
 
 const PAYMENT_METHOD_OPTIONS: Array<{ value: PaymentMethod; label: string }> = [
@@ -3235,6 +3215,9 @@ export function MesasPanel({ session, businessContext }: Props) {
       return;
     }
 
+    const btReady = await ensureBluetoothEnabled();
+    if (!btReady) return;
+
     if (!beginPrintFlow()) {
       Alert.alert('Impresion de cocina', 'Ya hay una impresión en curso. Espera a que finalice.');
       return;
@@ -3303,6 +3286,14 @@ export function MesasPanel({ session, businessContext }: Props) {
   }, [context?.businessId, context?.source, paymentMethod]);
 
   const handlePrintConfirm = useCallback(async () => {
+    const btReady = await ensureBluetoothEnabled();
+    if (!btReady) {
+      setShowPrintModal(false);
+      setPrintSalesData([]);
+      setPrintCustomerName('Venta general');
+      return;
+    }
+
     if (!beginPrintFlow()) {
       setOrderModalError('Ya hay una impresión en curso. Espera a que finalice.');
       return;
@@ -3366,6 +3357,9 @@ export function MesasPanel({ session, businessContext }: Props) {
   }) => {
     const normalizedSaleId = String(saleId || '').trim();
     if (!normalizedSaleId || !context?.businessId) return;
+
+    const btReady = await ensureBluetoothEnabled();
+    if (!btReady) return;
 
     if (!beginPrintFlow()) return;
 

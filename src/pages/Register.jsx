@@ -25,7 +25,6 @@ import { SaleSuccessAlert } from '@/components/ui/SaleSuccessAlert';
 
 import { Store, Building2, MapPin, Phone, User, Lock, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
 
-const _motionLintUsage = motion;
 
 function Register() {
   const navigate = useNavigate();
@@ -185,7 +184,7 @@ function Register() {
       
       // Redirigir al dashboard
       setTimeout(() => {
-        window.location.href = '/dashboard';
+        navigate('/dashboard');
       }, 1500);
       
     } catch (err) {
@@ -211,7 +210,7 @@ function Register() {
         const business = ownedBusiness || emailBusiness || null;
         
         if (business) {
-          window.location.href = '/dashboard';
+          navigate('/dashboard');
         }
       }
     };

@@ -26,7 +26,6 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-const _motionLintUsage = motion;
 const EMPLOYEE_PAGE_SIZE = 50;
 
 function isOwnerRole(role) {

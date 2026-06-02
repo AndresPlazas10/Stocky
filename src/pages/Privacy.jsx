@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion';
 
-const _motionLintUsage = motion;
 
 export default function Privacy() {
   return (

@@ -52,7 +52,6 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel })
   const [accounts, setAccounts] = useState([
     { id: 1, name: 'Cuenta 1', paymentMethod: 'cash', amountReceived: '' },
   ]);
-  const _motionLintUsage = motion;
   const [itemAssignments, setItemAssignments] = useState(() =>
     getInitialAssignments(orderItems, 1)
   );

@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
 import { useEffect } from 'react';
 
-const _motionLintUsage = motion;
 
 /**
  * Modal optimizado para móvil

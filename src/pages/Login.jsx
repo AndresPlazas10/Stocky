@@ -12,7 +12,6 @@ import { SaleErrorAlert } from '@/components/ui/SaleErrorAlert';
 import { User, Lock, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import logoStocky from '../assets/logoStocky.png';
 
-const _motionLintUsage = motion;
 
 function Login() {
   const navigate = useNavigate();

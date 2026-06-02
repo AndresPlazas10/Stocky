@@ -1,7 +1,6 @@
 import { Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-const _motionLintUsage = motion;
 
 /**
  * Floating Action Button (FAB) para móvil

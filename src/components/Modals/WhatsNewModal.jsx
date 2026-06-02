@@ -8,7 +8,6 @@ import logoViejo from '../../assets/logoViejo.png';
 import nuevoLogo from '../../assets/nuevoLogo.png';
 import { getApkDownloadUrl } from '../../utils/apkDownload.js';
 
-const _motionLintUsage = motion;
 
 export default function WhatsNewModal() {
   const [isOpen, setIsOpen] = useState(false);

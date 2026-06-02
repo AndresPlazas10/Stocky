@@ -6,6 +6,7 @@
 // =====================================================
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { readAdapter } from '../data/adapters/localAdapter.js';
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 
@@ -14,6 +15,7 @@ import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 // =====================================================
 
 export function useAuth() {
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
@@ -50,7 +52,7 @@ export function useAuth() {
       if (_event === 'SIGNED_OUT') {
         localStorage.clear();
         sessionStorage.clear();
-        window.location.href = '/login';
+        navigate('/login');
       }
 
       if (_event === 'TOKEN_REFRESHED') {

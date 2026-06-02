@@ -2,7 +2,6 @@ import { motion } from 'framer-motion';
 
 import { Loader2 } from 'lucide-react';
 
-const _motionLintUsage = motion;
 
 export const LoadingSpinner = ({ size = 'md', text = 'Cargando...' }) => {
   const sizes = {

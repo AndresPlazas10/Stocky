@@ -27,7 +27,6 @@ import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../u
 import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
 import { useProgressiveList } from '../../hooks/useProgressiveList.js';
 
-const _motionLintUsage = motion;
 const SUPPLIERS_PAGE_SIZE = 50;
 
 function Proveedores({ businessId }) {

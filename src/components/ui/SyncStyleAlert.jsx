@@ -4,7 +4,6 @@ import { createPortal } from 'react-dom';
 import { AlertCircle, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 
 export const ALERT_AUTO_CLOSE_MS = 1000;
-const _motionLintUsage = motion;
 
 const TONE_CONFIG = {
   success: {

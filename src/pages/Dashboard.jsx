@@ -1,4 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../components/layout/DashboardLayout.jsx';
 import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
 import WhatsNewModal from '../components/Modals/WhatsNewModal.jsx';
@@ -48,6 +49,7 @@ const SectionLoader = () => (
 );
 
 function Dashboard() {
+  const navigate = useNavigate();
   const [business, setBusiness] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -116,7 +118,7 @@ function Dashboard() {
           return;
         }
 
-        window.location.href = '/login';
+        navigate('/login');
         return;
       }
 
@@ -159,7 +161,7 @@ function Dashboard() {
           setError('⚠️ Sin internet no se puede validar el contexto de empleado. Intenta de nuevo con conexión.');
           return;
         }
-        window.location.href = '/employee-dashboard';
+        navigate('/employee-dashboard');
         return;
       }
 
@@ -178,7 +180,7 @@ function Dashboard() {
           setError('⚠️ Sin internet y no se encontró negocio local cacheado para este usuario.');
           return;
         }
-        window.location.href = '/register';
+        navigate('/register');
         return;
       }
 
@@ -268,11 +270,11 @@ function Dashboard() {
       await signOutGlobalSession();
       
       // Redirigir siempre, incluso si hay error
-      window.location.href = '/login';
+      navigate('/login');
     } catch {
       // Error inesperado al cerrar sesión
       // Forzar redirección de todas formas
-      window.location.href = '/login';
+      navigate('/login');
     }
   };
 

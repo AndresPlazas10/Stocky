@@ -12,7 +12,6 @@ import {
 } from '../services/pwaPushNotificationsService.js';
 import { isAndroid, isIOs, isStandalone } from '../utils/deviceDetection.js';
 
-const _motionLintUsage = motion;
 
 // ── Animation variants (creados una sola vez) ──
 const fadeInUp = { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 } };

@@ -29,7 +29,6 @@ const createInitialForm = () => ({
 });
 
 // eslint helper: `no-unused-vars` no detecta consistentemente `<motion.* />` en esta config.
-const _motionLintUsage = motion;
 
 function getComboDisplayProducts(combo) {
   const items = Array.isArray(combo?.combo_items) ? combo.combo_items : [];

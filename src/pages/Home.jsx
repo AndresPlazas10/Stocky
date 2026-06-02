@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 import logoStocky from '../assets/logoStocky.png';
 
-const _motionLintUsage = motion;
 
 const quickStats = [
   { value: 'Siempre activo', label: 'Funciona incluso sin internet' },

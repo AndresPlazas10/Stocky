@@ -1,0 +1,27 @@
+{
+  "extends": [
+    "expo",
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint"],
+  "rules": {
+    "no-unused-vars": "off",
+    "@typescript-eslint/no-unused-vars": ["warn", {
+      "varsIgnorePattern": "^[A-Z_]",
+      "argsIgnorePattern": "^_",
+      "caughtErrorsIgnorePattern": "^_"
+    }],
+    "no-empty": ["warn", { "allowEmptyCatch": true }],
+    "no-console": ["warn", { "allow": ["warn", "error"] }]
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    "android/",
+    "ios/",
+    ".expo/",
+    "dist/",
+    "build/"
+  ]
+}

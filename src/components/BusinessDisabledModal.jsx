@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { Lock, AlertTriangle } from 'lucide-react';
 import { Button } from './ui/button';
 
-const _motionLintUsage = motion;
 
 /**
  * Modal bloqueante para negocios deshabilitados

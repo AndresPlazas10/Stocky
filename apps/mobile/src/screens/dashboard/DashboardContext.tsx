@@ -109,7 +109,7 @@ export function DashboardProvider({ session, children }: PropsWithChildren<{ ses
     };
   }, [refreshBusinessContext, session.user.id]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await logSecurityEvent({
       businessId: businessContext?.businessId || null,
       userId: session.user.id,
@@ -125,7 +125,7 @@ export function DashboardProvider({ session, children }: PropsWithChildren<{ ses
       console.log('[notifications] failed to deactivate token on sign out', error);
     }
     await client.auth.signOut();
-  };
+  }, [businessContext?.businessId, session.user.id]);
 
   const value = useMemo<DashboardContextValue>(() => ({
     session,
@@ -134,7 +134,7 @@ export function DashboardProvider({ session, children }: PropsWithChildren<{ ses
     businessError,
     refreshBusinessContext,
     signOut,
-  }), [session, businessContext, loadingBusiness, businessError]);
+  }), [session, businessContext, loadingBusiness, businessError, refreshBusinessContext, signOut]);
 
   return (
     <DashboardContext.Provider value={value}>
