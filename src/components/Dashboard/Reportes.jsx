@@ -23,7 +23,6 @@ import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../u
 import { isBankPaymentMethod } from '../../utils/paymentMethodBranding.js';
 import { PaymentMethodBankLogo } from '../ui/PaymentMethodBankLogo';
 
-const _motionLintUsage = motion;
 
 function Reportes({ businessId }) {
   const [loading, setLoading] = useState(true);

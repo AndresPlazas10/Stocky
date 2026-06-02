@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
 
 // eslint helper: `no-unused-vars` no detecta consistentemente `<motion.* />` en esta config.
-const _motionLintUsage = motion;
 
 /**
  * Drawer lateral swipeable para móvil

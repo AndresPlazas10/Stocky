@@ -48,7 +48,6 @@ import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../u
 import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
 import { useProgressiveList } from '../../hooks/useProgressiveList.js';
 
-const _motionLintUsage = motion;
 const INVENTORY_PAGE_SIZE = 120;
 
 function Inventario({ businessId, userRole = 'admin' }) {

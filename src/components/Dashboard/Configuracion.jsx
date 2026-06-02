@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
@@ -39,7 +40,7 @@ import {
 } from '../../utils/printer.js';
 
 function Configuracion({ user, business, onBusinessUpdate }) {
-  const _motionLintUsage = motion;
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -121,7 +122,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
   const handleLogout = useCallback(async () => {
     try {
       await signOutSession();
-      window.location.href = '/';
+      navigate('/');
     } catch {
       setError('❌ No se pudo cerrar la sesión correctamente');
     }
@@ -146,7 +147,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
       } catch {
         // no-op: la cuenta ya fue eliminada
       }
-      window.location.href = '/';
+      navigate('/');
     }
 
     setDeletingAccount(false);

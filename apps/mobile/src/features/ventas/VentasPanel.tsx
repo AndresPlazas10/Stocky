@@ -11,7 +11,6 @@ import { StockyModal } from '../../ui/StockyModal';
 import { StockyStatusToast } from '../../ui/StockyStatusToast';
 import { PrintReceiptConfirmModal } from '../../ui/PrintReceiptConfirmModal';
 import { formatCop } from '../../services/mesasService';
-import type { PaymentMethod } from '../../services/mesaCheckoutService';
 import {
   calculateCashChange,
   evaluateOrderStockShortages,
@@ -34,6 +33,10 @@ import { getSupabaseClient } from '../../lib/supabase';
 import { buildSaleReceiptHtml } from '../../utils/printTemplates';
 import { getBankLogoSource, isBankPaymentMethod } from '../../utils/paymentMethodBranding';
 import { getThermalPaperWidthMm, isAutoPrintReceiptEnabled } from '../../utils/printer';
+import { ensureBluetoothEnabled } from '../../utils/bluetooth';
+import { startOfDay, startOfMonth, addMonths, formatDayKey, parseDayKey, clampDate, capitalizeLabel, formatDayLabelFromKey, formatDateTime, getRecordDayKey } from '../../utils/dateHelpers';
+import { getPaymentMethodLabel, getPaymentMethodTheme, type PaymentMethod } from '../../utils/paymentMethods';
+import { PaymentMethodSelector } from '../../ui/PaymentMethodSelector';
 
 type Props = {
   businessId: string;
@@ -43,146 +46,6 @@ type Props = {
 
 const PAGE_SIZE = 20;
 const WEEKDAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
-
-function getPaymentMethodLabel(method: PaymentMethod) {
-  if (method === 'cash') return 'Efectivo';
-  if (method === 'card') return 'Tarjeta';
-  if (method === 'transfer') return 'Transferencia';
-  if (method === 'mixed') return 'Mixto';
-  if (method === 'nequi') return 'Nequi';
-  if (method === 'bancolombia') return 'Bancolombia';
-  if (method === 'banco_bogota') return 'Banco de Bogotá';
-  if (method === 'nu') return 'Nu';
-  if (method === 'davivienda') return 'Davivienda';
-  return method;
-}
-
-function getPaymentMethodTheme(method: PaymentMethod): {
-  icon: keyof typeof Ionicons.glyphMap;
-  backgroundColor: string;
-  textColor: string;
-  iconColor: string;
-} {
-  if (method === 'card') {
-    return {
-      icon: 'card-outline',
-      backgroundColor: '#DBEAFE',
-      textColor: '#1D4ED8',
-      iconColor: '#2563EB',
-    };
-  }
-  if (method === 'transfer') {
-    return {
-      icon: 'swap-horizontal-outline',
-      backgroundColor: '#E0E7FF',
-      textColor: '#4338CA',
-      iconColor: '#4F46E5',
-    };
-  }
-  if (method === 'mixed') {
-    return {
-      icon: 'layers-outline',
-      backgroundColor: '#F3E8FF',
-      textColor: '#7E22CE',
-      iconColor: '#9333EA',
-    };
-  }
-  if (['nequi', 'bancolombia', 'banco_bogota', 'nu', 'davivienda'].includes(method)) {
-    return {
-      icon: 'business-outline',
-      backgroundColor: '#F3E8FF',
-      textColor: '#7E22CE',
-      iconColor: '#9333EA',
-    };
-  }
-  return {
-    icon: 'cash-outline',
-    backgroundColor: '#DCFCE7',
-    textColor: '#166534',
-    iconColor: '#16A34A',
-  };
-}
-
-function formatSaleDateTime(value: string | null) {
-  if (!value) return 'Sin fecha';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return 'Sin fecha';
-  return new Intl.DateTimeFormat('es-CO', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(parsed);
-}
-
-function getSaleDayKey(value: string | null) {
-  if (!value) return '';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return '';
-  const year = parsed.getFullYear();
-  const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
-  const day = `${parsed.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function formatDayLabelFromKey(key: string) {
-  if (!key || key === 'all') return 'Todos los días';
-  const parsed = new Date(`${key}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return key;
-  return new Intl.DateTimeFormat('es-CO', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(parsed);
-}
-
-function parseDayKey(key: string): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(key || ''))) return null;
-  const [yearRaw, monthRaw, dayRaw] = key.split('-');
-  const year = Number(yearRaw);
-  const month = Number(monthRaw);
-  const day = Number(dayRaw);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
-  const parsed = new Date(year, month - 1, day);
-  if (Number.isNaN(parsed.getTime())) return null;
-  if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) return null;
-  return parsed;
-}
-
-function startOfDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function startOfMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function addMonths(date: Date, delta: number) {
-  return new Date(date.getFullYear(), date.getMonth() + delta, 1);
-}
-
-function formatDayKey(date: Date) {
-  const base = startOfDay(date);
-  const year = base.getFullYear();
-  const month = `${base.getMonth() + 1}`.padStart(2, '0');
-  const day = `${base.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function clampDate(date: Date, minDate: Date, maxDate: Date) {
-  const ts = startOfDay(date).getTime();
-  const minTs = startOfDay(minDate).getTime();
-  const maxTs = startOfDay(maxDate).getTime();
-  if (ts < minTs) return startOfDay(minDate);
-  if (ts > maxTs) return startOfDay(maxDate);
-  return startOfDay(date);
-}
-
-function capitalizeLabel(value: string) {
-  if (!value) return value;
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
 
 function cartReferenceKey(item: { product_id?: string | null; combo_id?: string | null }) {
   if (item.combo_id) return `combo:${item.combo_id}`;
@@ -203,66 +66,6 @@ function buildCartItem(catalogItem: MesaOrderCatalogItem): VentaCartItem {
     unit_price: Number(catalogItem.sale_price || 0),
     subtotal: Number(catalogItem.sale_price || 0),
   };
-}
-
-function PaymentMethodSelector({
-  value,
-  onChange,
-  blockInteractions,
-  onBlockedInteraction,
-}: {
-  value: PaymentMethod;
-  onChange: (method: PaymentMethod) => void;
-  blockInteractions?: boolean;
-  onBlockedInteraction?: () => void;
-}) {
-  const options: Array<{ value: PaymentMethod; label: string }> = [
-    { value: 'cash', label: 'Efectivo' },
-    { value: 'card', label: 'Tarjeta' },
-    { value: 'transfer', label: 'Transferencia' },
-    { value: 'mixed', label: 'Mixto' },
-    { value: 'nequi', label: 'Nequi' },
-    { value: 'bancolombia', label: 'Bancolombia' },
-    { value: 'banco_bogota', label: 'Banco de Bogotá' },
-    { value: 'nu', label: 'Nu' },
-    { value: 'davivienda', label: 'Davivienda' },
-  ];
-
-  return (
-    <View style={styles.paymentMethodGrid}>
-      {options.map((option) => {
-        const selected = value === option.value;
-        return (
-          <Pressable
-            key={option.value}
-            style={[styles.paymentMethodOption, selected && styles.paymentMethodOptionSelected]}
-            onPress={() => {
-              if (blockInteractions) {
-                onBlockedInteraction?.();
-                return;
-              }
-              onChange(option.value);
-            }}
-          >
-            <View style={styles.paymentMethodOptionContent}>
-              {isBankPaymentMethod(option.value) ? (
-                <Image source={getBankLogoSource(option.value)!} style={styles.paymentMethodOptionLogo} resizeMode="contain" />
-              ) : (
-                <Ionicons
-                  name={getPaymentMethodTheme(option.value).icon}
-                  size={14}
-                  color={selected ? '#1D4ED8' : '#475569'}
-                />
-              )}
-              <Text style={[styles.paymentMethodOptionText, selected && styles.paymentMethodOptionTextSelected]}>
-                {option.label}
-              </Text>
-            </View>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
 }
 
 export function VentasPanel({ businessId, businessName, source }: Props) {
@@ -533,7 +336,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
     const unique = Array.from(
       new Set(
         ventas
-          .map((venta) => getSaleDayKey(venta.created_at))
+          .map((venta) => getRecordDayKey(venta.created_at))
           .filter((value) => Boolean(value)),
       ),
     ).sort((a, b) => a.localeCompare(b));
@@ -607,7 +410,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
 
   const filteredVentas = useMemo(() => {
     return ventas.filter((venta) => {
-      if (dayFilter !== 'all' && getSaleDayKey(venta.created_at) !== dayFilter) return false;
+      if (dayFilter !== 'all' && getRecordDayKey(venta.created_at) !== dayFilter) return false;
       if (sellerFilter !== 'all' && String(venta.seller_name || 'Administrador').trim() !== sellerFilter) return false;
       return true;
     });
@@ -845,7 +648,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
     try {
       const idempotencySeed = `${paymentMethod}:${cart.map((item) => `${cartReferenceKey(item)}:${item.quantity}`).sort().join('|')}`;
       const amount = paymentMethod === 'cash' ? Number(cashChangeData?.paid || 0) : null;
-      const breakdown = paymentMethod === 'cash' && cashChangeData?.isValid ? [] : [];
+      const breakdown: Array<{ denomination: number; count: number }> = [];
       const cartSnapshot = Array.isArray(cart) ? [...cart] : [];
       const createdAt = new Date().toISOString();
 
@@ -932,6 +735,16 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
 
   const handlePrintConfirm = useCallback(async () => {
     if (!printSaleRecord) return;
+
+    const btReady = await ensureBluetoothEnabled();
+    if (!btReady) {
+      setShowPrintModal(false);
+      setPrintSaleRecord(null);
+      setPrintSaleDetails([]);
+      setPrintCustomerName('Venta general');
+      return;
+    }
+
     setIsPrintingReceipt(true);
     try {
       const printerWidthMm = await getThermalPaperWidthMm();
@@ -1003,6 +816,9 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
     setError(null);
     setSuccess(null);
 
+    const btReady = await ensureBluetoothEnabled();
+    if (!btReady) return;
+
     try {
       const details = await listVentaDetails(venta.id);
       if (!Array.isArray(details) || details.length === 0) {
@@ -1032,7 +848,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
       <View key={venta.id} style={styles.saleCard}>
         <View style={styles.saleDateRow}>
           <Ionicons name="calendar-outline" size={26} color="#111827" />
-          <Text style={styles.saleDateText}>{formatSaleDateTime(venta.created_at)}</Text>
+          <Text style={styles.saleDateText}>{formatDateTime(venta.created_at)}</Text>
         </View>
 
         <View style={styles.saleInfoGrid}>
@@ -1447,7 +1263,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
           </View>
           <PaymentMethodSelector
             value={paymentMethod}
-            onChange={setPaymentMethod}
+            onChange={(m) => setPaymentMethod(m as PaymentMethod)}
             blockInteractions={isKeyboardVisible}
             onBlockedInteraction={() => Keyboard.dismiss()}
           />
@@ -1653,7 +1469,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
             <View style={styles.saleDetailsHeroMetaGrid}>
               <View style={styles.saleDetailsHeroMetaItem}>
                 <Ionicons name="calendar-outline" size={14} color="#64748B" />
-                <Text style={styles.saleDetailsHeroMetaText}>{formatSaleDateTime(selectedVenta.created_at)}</Text>
+                <Text style={styles.saleDetailsHeroMetaText}>{formatDateTime(selectedVenta.created_at)}</Text>
               </View>
               <View style={styles.saleDetailsHeroMetaItem}>
                 <Ionicons name="person-outline" size={14} color="#64748B" />

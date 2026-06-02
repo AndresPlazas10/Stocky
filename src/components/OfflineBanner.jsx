@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { WifiOff } from 'lucide-react';
 import { isOfflinePersistenceEnabled } from '../utils/offlineSnapshot.js';
 
-const _motionLintUsage = motion;
 
 export default function OfflineBanner() {
   const isOnline = useOnlineStatus();

@@ -14,7 +14,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.stocky.mobile",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "Stocky necesita acceso al Bluetooth para conectarse a impresoras térmicas y permitir la impresión de comprobantes.",
+        "NSBluetoothPeripheralUsageDescription": "Stocky necesita acceso al Bluetooth para conectarse a impresoras térmicas."
+      }
     },
     "android": {
       "package": "com.stocky.mobile",
@@ -26,7 +30,14 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT"
+      ]
     },
     "notification": {
       "icon": "./assets/android-icon-monochrome.png",
@@ -34,7 +45,14 @@
     },
     "plugins": [
       "expo-notifications",
-      "./plugins/withFirebaseAppInit"
+      "./plugins/withFirebaseAppInit",
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "modes": ["central"]
+        }
+      ]
     ],
     "web": {
       "favicon": "./assets/favicon.png"

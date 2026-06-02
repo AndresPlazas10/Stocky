@@ -2,7 +2,6 @@ import { motion } from 'framer-motion';
 import { ExternalLink, FileText, Info } from 'lucide-react';
 
 export default function InvoicingSection({ businessName = 'Tu negocio' }) {
-  const _motionLintUsage = motion;
 
   return (
     <motion.div

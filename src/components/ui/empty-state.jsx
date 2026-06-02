@@ -2,7 +2,6 @@ import { motion } from 'framer-motion';
 
 import { Package, FileText, Inbox } from 'lucide-react';
 
-const _motionLintUsage = motion;
 
 export const EmptyState = ({
   icon: _Icon = Inbox,

@@ -16,7 +16,6 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { parsePriceInput } from '../../utils/formatters.js';
 
-const _motionLintUsage = motion;
 
 export function ProductDialog({
   open,

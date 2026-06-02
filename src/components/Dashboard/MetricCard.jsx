@@ -5,7 +5,6 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
-const _motionLintUsage = motion;
 
 export function MetricCard({
   title,

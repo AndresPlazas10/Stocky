@@ -22,7 +22,6 @@ import { cn } from '@/lib/utils';
 import { useNotifications } from '../../hooks/useNotifications.js';
 import { WarmupStatusBadge } from '../WarmupStatusBadge.jsx';
 
-const _motionLintUsage = motion;
 
 // Avatares predefinidos
 const predefinedAvatars = [

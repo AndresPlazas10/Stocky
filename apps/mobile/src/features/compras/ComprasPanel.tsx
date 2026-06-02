@@ -23,6 +23,9 @@ import {
   type CompraSupplierRecord,
 } from '../../services/comprasService';
 import { getBankLogoSource, isBankPaymentMethod } from '../../utils/paymentMethodBranding';
+import { startOfDay, startOfMonth, addMonths, formatDayKey, parseDayKey, clampDate, capitalizeLabel, formatDayLabelFromKey, formatDateTime, getRecordDayKey } from '../../utils/dateHelpers';
+import { getPaymentMethodLabel, getPaymentMethodTheme } from '../../utils/paymentMethods';
+import { PaymentMethodSelector } from '../../ui/PaymentMethodSelector';
 
 type Props = {
   businessId: string;
@@ -33,201 +36,6 @@ type Props = {
 
 const PAGE_SIZE = 20;
 const WEEKDAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
-
-function getPaymentMethodLabel(method: string) {
-  const value = String(method || '').toLowerCase();
-  if (value === 'cash') return 'Efectivo';
-  if (value === 'card') return 'Tarjeta';
-  if (value === 'transfer') return 'Transferencia';
-  if (value === 'mixed') return 'Mixto';
-  if (value === 'nequi') return 'Nequi';
-  if (value === 'bancolombia') return 'Bancolombia';
-  if (value === 'banco_bogota') return 'Banco de Bogotá';
-  if (value === 'nu') return 'Nu';
-  if (value === 'davivienda') return 'Davivienda';
-  if (value === 'efectivo') return 'Efectivo';
-  if (value === 'tarjeta') return 'Tarjeta';
-  if (value === 'transferencia') return 'Transferencia';
-  return method || '-';
-}
-
-function getPurchasePaymentTheme(method: string): {
-  icon: keyof typeof Ionicons.glyphMap;
-  backgroundColor: string;
-  textColor: string;
-  iconColor: string;
-} {
-  const value = String(method || '').toLowerCase();
-  if (value === 'card' || value === 'tarjeta') {
-    return {
-      icon: 'card-outline',
-      backgroundColor: '#DBEAFE',
-      textColor: '#1D4ED8',
-      iconColor: '#2563EB',
-    };
-  }
-  if (value === 'transfer' || value === 'transferencia') {
-    return {
-      icon: 'swap-horizontal-outline',
-      backgroundColor: '#E0E7FF',
-      textColor: '#4338CA',
-      iconColor: '#4F46E5',
-    };
-  }
-  if (value === 'mixed' || value === 'mixto') {
-    return {
-      icon: 'layers-outline',
-      backgroundColor: '#F3E8FF',
-      textColor: '#7E22CE',
-      iconColor: '#9333EA',
-    };
-  }
-  if (value === 'nequi' || value === 'bancolombia' || value === 'banco_bogota' || value === 'nu' || value === 'davivienda') {
-    return {
-      icon: 'business-outline',
-      backgroundColor: '#F3E8FF',
-      textColor: '#7E22CE',
-      iconColor: '#9333EA',
-    };
-  }
-  return {
-    icon: 'cash-outline',
-    backgroundColor: '#DCFCE7',
-    textColor: '#166534',
-    iconColor: '#16A34A',
-  };
-}
-
-function formatDateTime(value: string | null) {
-  if (!value) return 'Sin fecha';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return 'Sin fecha';
-  return new Intl.DateTimeFormat('es-CO', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(parsed);
-}
-
-function getPurchaseDayKey(value: string | null) {
-  if (!value) return '';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return '';
-  const year = parsed.getFullYear();
-  const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
-  const day = `${parsed.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function formatDayLabelFromKey(key: string) {
-  if (!key || key === 'all') return 'Todos los dias';
-  const parsed = new Date(`${key}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return key;
-  return new Intl.DateTimeFormat('es-CO', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(parsed);
-}
-
-function parseDayKey(key: string): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(key || ''))) return null;
-  const [yearRaw, monthRaw, dayRaw] = key.split('-');
-  const year = Number(yearRaw);
-  const month = Number(monthRaw);
-  const day = Number(dayRaw);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
-  const parsed = new Date(year, month - 1, day);
-  if (Number.isNaN(parsed.getTime())) return null;
-  if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) return null;
-  return parsed;
-}
-
-function startOfDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function startOfMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function addMonths(date: Date, delta: number) {
-  return new Date(date.getFullYear(), date.getMonth() + delta, 1);
-}
-
-function formatDayKey(date: Date) {
-  const base = startOfDay(date);
-  const year = base.getFullYear();
-  const month = `${base.getMonth() + 1}`.padStart(2, '0');
-  const day = `${base.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function clampDate(date: Date, minDate: Date, maxDate: Date) {
-  const ts = startOfDay(date).getTime();
-  const minTs = startOfDay(minDate).getTime();
-  const maxTs = startOfDay(maxDate).getTime();
-  if (ts < minTs) return startOfDay(minDate);
-  if (ts > maxTs) return startOfDay(maxDate);
-  return startOfDay(date);
-}
-
-function capitalizeLabel(value: string) {
-  if (!value) return value;
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function PaymentMethodSelector({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const options: Array<{ value: string; label: string }> = [
-    { value: 'cash', label: 'Efectivo' },
-    { value: 'card', label: 'Tarjeta' },
-    { value: 'transfer', label: 'Transferencia' },
-    { value: 'mixed', label: 'Mixto' },
-    { value: 'nequi', label: 'Nequi' },
-    { value: 'bancolombia', label: 'Bancolombia' },
-    { value: 'banco_bogota', label: 'Banco de Bogotá' },
-    { value: 'nu', label: 'Nu' },
-    { value: 'davivienda', label: 'Davivienda' },
-  ];
-
-  return (
-    <View style={styles.paymentMethodGrid}>
-      {options.map((option) => {
-        const selected = String(value || '').toLowerCase() === option.value;
-        return (
-          <Pressable
-            key={option.value}
-            style={[styles.paymentMethodOption, selected && styles.paymentMethodOptionSelected]}
-            onPress={() => onChange(option.value)}
-          >
-            <View style={styles.paymentMethodOptionContent}>
-              {isBankPaymentMethod(option.value) ? (
-                <Image source={getBankLogoSource(option.value)!} style={styles.paymentMethodOptionLogo} resizeMode="contain" />
-              ) : (
-                <Ionicons
-                  name={getPurchasePaymentTheme(option.value).icon}
-                  size={14}
-                  color={selected ? '#1D4ED8' : '#475569'}
-                />
-              )}
-              <Text style={[styles.paymentMethodOptionText, selected && styles.paymentMethodOptionTextSelected]}>
-                {option.label}
-              </Text>
-            </View>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
 
 export function ComprasPanel({ businessId, businessName, userId, source }: Props) {
   const [loading, setLoading] = useState(true);
@@ -532,7 +340,7 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
     const unique = Array.from(
       new Set(
         purchases
-          .map((purchase) => getPurchaseDayKey(purchase.created_at))
+          .map((purchase) => getRecordDayKey(purchase.created_at))
           .filter((value) => Boolean(value)),
       ),
     ).sort((a, b) => a.localeCompare(b));
@@ -609,7 +417,7 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
 
   const filteredPurchases = useMemo(() => {
     return purchases.filter((purchase) => {
-      if (dayFilter !== 'all' && getPurchaseDayKey(purchase.created_at) !== dayFilter) return false;
+      if (dayFilter !== 'all' && getRecordDayKey(purchase.created_at) !== dayFilter) return false;
       if (supplierFilter !== 'all' && purchase.supplier_id !== supplierFilter) return false;
       return true;
     });
@@ -835,7 +643,7 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
     [selectedPurchaseDetails],
   );
   const selectedPurchasePaymentTheme = useMemo(
-    () => (selectedPurchase ? getPurchasePaymentTheme(selectedPurchase.payment_method) : null),
+    () => (selectedPurchase ? getPaymentMethodTheme(selectedPurchase.payment_method) : null),
     [selectedPurchase],
   );
 
@@ -1027,7 +835,7 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
                     {isBankPaymentMethod(purchase.payment_method) ? (
                       <Image source={getBankLogoSource(purchase.payment_method)!} style={styles.paymentIconLogo} resizeMode="contain" />
                     ) : (
-                      <Ionicons name={getPurchasePaymentTheme(purchase.payment_method).icon} size={13} color="#166534" style={styles.paymentIcon} />
+                      <Ionicons name={getPaymentMethodTheme(purchase.payment_method).icon} size={13} color="#166534" style={styles.paymentIcon} />
                     )}
                     <Text style={styles.paymentPillText}>{getPaymentMethodLabel(purchase.payment_method)}</Text>
                   </View>

@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion';
 
-const _motionLintUsage = motion;
 
 /**
  * Input optimizado para móvil

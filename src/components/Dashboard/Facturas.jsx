@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatDate } from '../../utils/formatters.js';
 import { AnimatePresence } from 'framer-motion';
@@ -53,6 +54,7 @@ const INVOICE_ITEM_LIST_COLUMNS = `
 const PRODUCT_INVOICE_COLUMNS = 'id, code, name, sale_price, stock, business_id, is_active';
 
 export default function Facturas({ userRole = 'admin', businessId: businessIdProp = null }) {
+  const navigate = useNavigate();
   const [facturas, setFacturas] = useState([]);
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -143,7 +145,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
     } catch (error) {
       if (error?.code === 'SESSION_EXPIRED') {
         setTimeout(() => {
-          window.location.href = '/login';
+          navigate('/login');
         }, 2000);
       }
       setError(error.message);
@@ -366,7 +368,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
       // Si es error de sesión, redirigir
       if (error?.code === 'SESSION_EXPIRED' || String(error?.message || '').includes('sesión ha expirado')) {
         setTimeout(() => {
-          window.location.href = '/login';
+          navigate('/login');
         }, 2000);
       }
       setError(error.message || 'Error desconocido al crear factura');
@@ -450,7 +452,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
     } catch (error) {
       if (error?.code === 'SESSION_EXPIRED' || String(error?.message || '').includes('sesión ha expirado')) {
         setTimeout(() => {
-          window.location.href = '/login';
+          navigate('/login');
         }, 2000);
       }
       // Error al enviar factura
@@ -509,7 +511,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
     } catch (error) {
       if (error?.code === 'SESSION_EXPIRED' || String(error?.message || '').includes('sesión ha expirado')) {
         setTimeout(() => {
-          window.location.href = '/login';
+          navigate('/login');
         }, 2000);
       }
       // Error al cancelar factura
@@ -560,7 +562,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
     } catch (error) {
       if (error?.code === 'SESSION_EXPIRED' || String(error?.message || '').includes('sesión ha expirado')) {
         setTimeout(() => {
-          window.location.href = '/login';
+          navigate('/login');
         }, 2000);
       }
       // Error al eliminar factura
