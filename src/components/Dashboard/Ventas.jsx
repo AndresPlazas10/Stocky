@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getFilteredSales } from '../../services/salesService';
 import { recordSaleCreationTime } from '../../services/salesServiceOptimized';
@@ -73,7 +74,6 @@ import {
   evaluateOfflineStockShortages
 } from '../../utils/offlineStockGuards.js';
 
-const _motionLintUsage = motion;
 
 // Función helper pura fuera del componente (no se recrea en renders)
 const getVendedorName = (venta) => {
@@ -177,6 +177,7 @@ const getSaleDetailDisplayName = (detail) => (
 );
 
 function Ventas({ businessId, userRole = 'admin' }) {
+  const navigate = useNavigate();
   const [ventas, setVentas] = useState([]);
   const [page, setPage] = useState(1);
   const [limit] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 768 ? 20 : 30));
@@ -453,7 +454,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
           setError('⚠️ Tu sesión ha expirado. Redirigiendo al login...');
           setLoading(false);
           setTimeout(() => {
-            window.location.href = '/login';
+            navigate('/login');
           }, 2000);
           return;
         }
@@ -983,7 +984,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
       // Si es error de sesión, redirigir a login
       if (String(error?.message || '').includes('sesión ha expirado') && (typeof navigator === 'undefined' || navigator.onLine)) {
         setTimeout(() => {
-          window.location.href = '/login';
+          navigate('/login');
         }, 2000);
       }
       setError(buildDiagnosticAlertMessage(error, 'No se pudo procesar la venta. Por favor, intenta de nuevo.'));

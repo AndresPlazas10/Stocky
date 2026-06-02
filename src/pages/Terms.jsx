@@ -7,7 +7,6 @@ import { motion } from 'framer-motion';
 import { Shield, FileText, AlertTriangle, CheckCircle2, Info, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-const _motionLintUsage = motion;
 
 export default function TermsAndConditions() {
   return (

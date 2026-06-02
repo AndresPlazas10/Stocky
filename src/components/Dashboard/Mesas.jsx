@@ -378,7 +378,6 @@ const compareTableIdentifiers = (left, right) => {
 };
 
 // eslint helper: `no-unused-vars` no detecta consistentemente `<motion.* />` en esta config.
-const _motionLintUsage = motion;
 
 const applyPendingQuantities = (items = [], pendingUpdates = {}) => {
   if (!Array.isArray(items) || items.length === 0) return [];

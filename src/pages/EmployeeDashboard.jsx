@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   getAuthenticatedUser,
@@ -29,9 +30,9 @@ import { notifyAdminEmployeeLoginWeb } from '../services/webNotificationsService
 import { logSecurityEvent } from '../services/securityAuditService.js';
 // import Facturas from '../components/Dashboard/Facturas.jsx'; // DESHABILITADO
 
-const _motionLintUsage = motion;
 
 function EmployeeDashboard() {
+  const navigate = useNavigate();
   const [employee, setEmployee] = useState(null);
   const [business, setBusiness] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -58,7 +59,7 @@ function EmployeeDashboard() {
       
       
       if (userError || !user) {
-        window.location.href = '/login';
+        navigate('/login');
         return;
       }
 
@@ -202,11 +203,11 @@ function EmployeeDashboard() {
       await signOutGlobalSession();
       
       // Redirigir siempre, incluso si hay error
-      window.location.href = '/';
+      navigate('/');
     } catch {
       // Error inesperado al cerrar sesión
       // Forzar redirección de todas formas
-      window.location.href = '/';
+      navigate('/');
     }
   };
 

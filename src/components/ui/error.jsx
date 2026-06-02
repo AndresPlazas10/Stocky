@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Home, ArrowLeft, RefreshCw } from 'lucide-react';
 import { Button } from './button';
 
-const _motionLintUsage = motion;
 
 export const ErrorMessage = ({ 
   title = 'Error',

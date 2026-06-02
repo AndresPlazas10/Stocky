@@ -20,7 +20,6 @@ import {
   Zap
 } from 'lucide-react'
 
-const _motionLintUsage = motion;
 
 export const DOCUMENT_TYPES = {
   RECEIPT: 'receipt',           // Comprobante de venta (sin validez fiscal)

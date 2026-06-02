@@ -21,7 +21,6 @@ import { cn } from '@/lib/utils';
 import logoStocky from '../../assets/logoStocky.png';
 
 // eslint helper: `no-unused-vars` no detecta consistentemente `<motion.* />` en esta config.
-const _motionLintUsage = motion;
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Inicio', section: 'home' },

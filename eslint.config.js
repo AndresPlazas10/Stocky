@@ -38,7 +38,7 @@ export default defineConfig([
         caughtErrorsIgnorePattern: '^_',
       }],
       'no-console': 'error',
-      'no-empty': 'off',
+      'no-empty': ['warn', { allowEmptyCatch: true }],
       'react-refresh/only-export-components': 'off',
     },
   },
