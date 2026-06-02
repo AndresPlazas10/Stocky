@@ -61,7 +61,7 @@ import { SplitBillModalRN } from './SplitBillModalRN';
 import { getSupabaseClient } from '../../lib/supabase';
 import { getBankLogoSource, isBankPaymentMethod } from '../../utils/paymentMethodBranding';
 import { getThermalPaperWidthMm, isAutoPrintReceiptEnabled } from '../../utils/printer';
-import { ensureBluetoothEnabled } from '../../utils/bluetooth';
+import { BLUETOOTH_PRINT_REQUIRED_MESSAGE, ensureBluetoothEnabled } from '../../utils/bluetooth';
 import { getPaymentMethodLabel, getPaymentMethodIcon } from '../../utils/paymentMethods';
 
 type Props = {
@@ -3216,7 +3216,10 @@ export function MesasPanel({ session, businessContext }: Props) {
     }
 
     const btReady = await ensureBluetoothEnabled();
-    if (!btReady) return;
+    if (!btReady) {
+      Alert.alert('Bluetooth desactivado', BLUETOOTH_PRINT_REQUIRED_MESSAGE);
+      return;
+    }
 
     if (!beginPrintFlow()) {
       Alert.alert('Impresion de cocina', 'Ya hay una impresión en curso. Espera a que finalice.');
@@ -3288,6 +3291,7 @@ export function MesasPanel({ session, businessContext }: Props) {
   const handlePrintConfirm = useCallback(async () => {
     const btReady = await ensureBluetoothEnabled();
     if (!btReady) {
+      setOrderModalError(BLUETOOTH_PRINT_REQUIRED_MESSAGE);
       setShowPrintModal(false);
       setPrintSalesData([]);
       setPrintCustomerName('Venta general');

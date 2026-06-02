@@ -33,7 +33,7 @@ import { getSupabaseClient } from '../../lib/supabase';
 import { buildSaleReceiptHtml } from '../../utils/printTemplates';
 import { getBankLogoSource, isBankPaymentMethod } from '../../utils/paymentMethodBranding';
 import { getThermalPaperWidthMm, isAutoPrintReceiptEnabled } from '../../utils/printer';
-import { ensureBluetoothEnabled } from '../../utils/bluetooth';
+import { BLUETOOTH_PRINT_REQUIRED_MESSAGE, ensureBluetoothEnabled } from '../../utils/bluetooth';
 import { startOfDay, startOfMonth, addMonths, formatDayKey, parseDayKey, clampDate, capitalizeLabel, formatDayLabelFromKey, formatDateTime, getRecordDayKey } from '../../utils/dateHelpers';
 import { getPaymentMethodLabel, getPaymentMethodTheme, type PaymentMethod } from '../../utils/paymentMethods';
 import { PaymentMethodSelector } from '../../ui/PaymentMethodSelector';
@@ -738,6 +738,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
 
     const btReady = await ensureBluetoothEnabled();
     if (!btReady) {
+      setError(BLUETOOTH_PRINT_REQUIRED_MESSAGE);
       setShowPrintModal(false);
       setPrintSaleRecord(null);
       setPrintSaleDetails([]);
@@ -817,7 +818,10 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
     setSuccess(null);
 
     const btReady = await ensureBluetoothEnabled();
-    if (!btReady) return;
+    if (!btReady) {
+      setError(BLUETOOTH_PRINT_REQUIRED_MESSAGE);
+      return;
+    }
 
     try {
       const details = await listVentaDetails(venta.id);
