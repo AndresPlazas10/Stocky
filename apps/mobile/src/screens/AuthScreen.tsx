@@ -297,72 +297,98 @@ export function AuthScreen() {
     }
 
     const client = getSupabaseClient();
-    const usernameCheck = await client
-      .from('businesses')
-      .select('id')
-      .eq('username', username)
-      .maybeSingle();
-
-    if (usernameCheck.error) {
-      throw usernameCheck.error;
-    }
-
-    if (usernameCheck.data?.id) {
-      throw new Error('❌ Este nombre de usuario ya está en uso');
-    }
-
     const { email } = normalizeUsernameToEmail(username);
 
-    const signUp = await client.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          username,
-          business_name: name,
-        },
-      },
-    });
+    const usernameController = new AbortController();
+    const usernameTimeoutId = setTimeout(() => usernameController.abort(), 5000);
 
-    if (signUp.error) {
-      throw mapSignUpError(signUp.error);
-    }
+    try {
+      const [isAvailable, authResult] = await Promise.all([
+        (async () => {
+          try {
+            const usernameCheck = await client
+              .from('businesses')
+              .select('id')
+              .eq('username', username)
+              .maybeSingle();
 
-    if (!signUp.data?.user?.id) {
-      throw new Error('❌ Error al crear la cuenta');
-    }
+            if (usernameCheck.error) {
+              throw usernameCheck.error;
+            }
 
-    if (!signUp.data?.session) {
-      await client.auth.signOut();
-      throw new Error('⚠️ Supabase requiere confirmación de email. Desactiva "Confirm email" para este flujo.');
-    }
+            if (usernameCheck.data?.id) {
+              throw new Error('❌ Este nombre de usuario ya está en uso');
+            }
 
-    const business = await createBusinessWithFallback({
-      userId: signUp.data.user.id,
-      name,
-      nit: signUpForm.nit,
-      address: signUpForm.address,
-      phone: signUpForm.phone,
-      email,
-      username,
-    });
-
-    const ownerInsert = await client
-      .from('employees')
-      .insert([
-        {
-          user_id: signUp.data.user.id,
-          business_id: business.id,
-          role: 'owner',
-          full_name: `${name} (Propietario)`,
-        },
+            return true;
+          } finally {
+            clearTimeout(usernameTimeoutId);
+          }
+        })(),
+        client.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              username,
+              business_name: name,
+            },
+          },
+        }),
       ]);
 
-    if (ownerInsert.error) {
-      throw new Error(`❌ Error al crear el propietario: ${ownerInsert.error.message || 'desconocido'}`);
-    }
+      if (!isAvailable) {
+        throw new Error('❌ Este nombre de usuario ya está en uso');
+      }
 
-    setMessage('Negocio registrado. Redirigiendo al dashboard...');
+      if (authResult.error) {
+        throw mapSignUpError(authResult.error);
+      }
+
+      if (!authResult.data?.user?.id) {
+        throw new Error('❌ Error al crear la cuenta');
+      }
+
+      if (!authResult.data?.session) {
+        throw new Error('⚠️ Supabase requiere confirmación de email. Desactiva "Confirm email" para este flujo.');
+      }
+
+      const userId = authResult.data.user.id;
+
+      setMessage('Cuenta creada correctamente.');
+
+      createBusinessWithFallback({
+        userId,
+        name,
+        nit: signUpForm.nit,
+        address: signUpForm.address,
+        phone: signUpForm.phone,
+        email,
+        username,
+      }).then((business) =>
+        client
+          .from('employees')
+          .insert([
+            {
+              user_id: userId,
+              business_id: business.id,
+              role: 'owner',
+              full_name: `${name} (Propietario)`,
+            },
+          ])
+      ).catch((err) => {
+        console.error('[Auth] Background setup failed', err);
+      });
+    } catch (err) {
+      try {
+        await client.auth.signOut();
+      } catch (_) {
+        // Ignore signOut errors during cleanup
+      }
+      throw err;
+    } finally {
+      clearTimeout(usernameTimeoutId);
+    }
   };
 
   const submit = async () => {

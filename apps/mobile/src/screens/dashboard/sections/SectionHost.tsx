@@ -8,50 +8,56 @@ import { CombosSection } from './CombosSection';
 import { ComprasSection } from './ComprasSection';
 import { ConfiguracionSection } from './ConfiguracionSection';
 import { EmpleadosSection } from './EmpleadosSection';
+import { ImpresionSection } from './ImpresionSection';
 import { InventarioSection } from './InventarioSection';
 import { ProveedoresSection } from './ProveedoresSection';
 import { ReportesSection } from './ReportesSection';
 import { VentasSection } from './VentasSection';
 import { SectionComingSoon } from './SectionComingSoon';
+import { StockyErrorBoundary } from '../../../ui/StockyErrorBoundary';
 
 export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   const navigation = useNavigation<DrawerNavigationProp<RootDrawerParamList>>();
   const enabled = isSectionEnabled(sectionId);
 
   if (sectionId === 'home') {
-    return <HomeSection />;
+    return <StockyErrorBoundary><HomeSection /></StockyErrorBoundary>;
   }
 
   if (sectionId === 'ventas' && enabled) {
-    return <VentasSection />;
+    return <StockyErrorBoundary><VentasSection /></StockyErrorBoundary>;
   }
 
   if (sectionId === 'compras' && enabled) {
-    return <ComprasSection />;
+    return <StockyErrorBoundary><ComprasSection /></StockyErrorBoundary>;
   }
 
   if (sectionId === 'inventario' && enabled) {
-    return <InventarioSection />;
+    return <StockyErrorBoundary><InventarioSection /></StockyErrorBoundary>;
   }
 
   if (sectionId === 'combos' && enabled) {
-    return <CombosSection />;
+    return <StockyErrorBoundary><CombosSection /></StockyErrorBoundary>;
   }
 
   if (sectionId === 'proveedores' && enabled) {
-    return <ProveedoresSection />;
+    return <StockyErrorBoundary><ProveedoresSection /></StockyErrorBoundary>;
   }
 
   if (sectionId === 'empleados' && enabled) {
-    return <EmpleadosSection />;
+    return <StockyErrorBoundary><EmpleadosSection /></StockyErrorBoundary>;
   }
 
   if (sectionId === 'reportes' && enabled) {
-    return <ReportesSection />;
+    return <StockyErrorBoundary><ReportesSection /></StockyErrorBoundary>;
   }
 
   if (sectionId === 'configuracion' && enabled) {
-    return <ConfiguracionSection />;
+    return <StockyErrorBoundary><ConfiguracionSection /></StockyErrorBoundary>;
+  }
+
+  if (sectionId === 'impresion' && enabled) {
+    return <StockyErrorBoundary><ImpresionSection /></StockyErrorBoundary>;
   }
 
   return (

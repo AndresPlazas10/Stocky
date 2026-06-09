@@ -41,7 +41,6 @@ function resolveActiveRouteName(state: any): string {
 }
 
 function Header({ navigation, route }: DrawerHeaderProps) {
-  void route;
   const insets = useSafeAreaInsets();
   const { businessContext } = useDashboardContext();
 
@@ -81,14 +80,14 @@ function DrawerContent({
       || 'Usuario',
   );
 
-  const grouped = sections.reduce<Record<SectionGroup, SectionMeta[]>>((acc, section) => {
+  const grouped = useMemo(() => sections.reduce<Record<SectionGroup, SectionMeta[]>>((acc, section) => {
     acc[section.group].push(section);
     return acc;
   }, {
     principal: [],
     gestion: [],
     sistema: [],
-  });
+  }), [sections]);
 
   const onNavigate = (sectionId: SectionId) => {
     navigation.navigate(sectionId as never);
@@ -236,9 +235,13 @@ export function AppNavigator() {
           }}
         >
           {allowedSections.map((section) => (
-            <Drawer.Screen key={section.id} name={section.id} options={{ title: section.label }}>
-              {() => <ScreenBySection sectionId={section.id} />}
-            </Drawer.Screen>
+            <Drawer.Screen
+              key={section.id}
+              name={section.id}
+              options={{ title: section.label }}
+              component={DashboardSectionScreen}
+              initialParams={{ sectionId: section.id } as any}
+            />
           ))}
         </Drawer.Navigator>
       </NavigationContainer>

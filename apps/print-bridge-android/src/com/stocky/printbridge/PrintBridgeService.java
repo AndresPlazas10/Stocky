@@ -43,13 +43,18 @@ public class PrintBridgeService extends PrintService {
 
     @Override
     protected void onPrintJobQueued(final PrintJob printJob) {
+        final String jobId = printJob.getId() != null ? printJob.getId().toString() : "unknown";
+        final String jobLabel = printJob.getInfo() != null ? String.valueOf(printJob.getInfo().getLabel()) : "unknown";
+        Log.i(TAG, "Job received: id=" + jobId + " label=" + jobLabel);
+
         final SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
 
         final byte[] documentData;
         try {
             documentData = readDocument(printJob);
+            Log.d(TAG, "Document read: " + documentData.length + " bytes");
         } catch (Throwable e) {
-            Log.e(TAG, "Failed to read document", e);
+            Log.e(TAG, "Failed to read document for job " + jobId, e);
             printJob.fail(safeError(e));
             return;
         }
@@ -60,22 +65,33 @@ public class PrintBridgeService extends PrintService {
             w = attrs.getMediaSize().getWidthMils() <= 2600 ? 58 : 80;
         }
         final int paperWidthMm = w;
+        Log.d(TAG, "Paper width: " + paperWidthMm + "mm for job " + jobId);
 
         final BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+        if (adapter == null) {
+            Log.e(TAG, "BluetoothAdapter is null on this device");
+            printJob.fail("Bluetooth no disponible en este dispositivo");
+            return;
+        }
+        Log.d(TAG, "Bluetooth adapter: " + (adapter.isEnabled() ? "enabled" : "disabled"));
+
         final boolean openCashDrawer = prefs.getBoolean("cashDrawer", false);
+        final String deviceAddr = prefs.getString("deviceAddress", "");
+        Log.d(TAG, "Target printer: " + deviceAddr + " openCashDrawer=" + openCashDrawer);
 
         printJob.start();
+        Log.d(TAG, "Job " + jobId + " started, launching processing thread");
 
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    Log.d(TAG, "Processing job: size=" + documentData.length + " isPdf=" + isPdf(documentData));
+                    Log.d(TAG, "Processing job " + jobId + ": size=" + documentData.length + " isPdf=" + isPdf(documentData));
                     byte[] output;
 
                     if (documentData.length == 0 || isPdf(documentData)) {
                         if (documentData.length == 0) {
-                            Log.d(TAG, "Empty document - printing test receipt");
+                            Log.d(TAG, "Empty document for job " + jobId + " - printing test receipt");
                             PrintJobData job = new PrintJobData();
                             job.rawText = "";
                             job.paperWidthMm = paperWidthMm;
@@ -84,37 +100,41 @@ public class PrintBridgeService extends PrintService {
                             job.openCashDrawer = openCashDrawer;
                             output = BluetoothPrinter.serialize(job);
                         } else {
-                            Log.d(TAG, "Rasterizing PDF: " + documentData.length + " bytes, " + paperWidthMm + "mm");
+                            Log.d(TAG, "Rasterizing PDF for job " + jobId + ": " + documentData.length + " bytes, " + paperWidthMm + "mm");
                             output = PdfRasterizer.renderToEscPos(documentData, paperWidthMm);
-                            Log.d(TAG, "Rasterized to " + output.length + " bytes");
+                            Log.d(TAG, "Rasterized job " + jobId + " to " + output.length + " bytes ESC/POS");
                         }
                         BluetoothPrinter.sendRaw(output, openCashDrawer, adapter, prefs);
+                        Log.i(TAG, "Job " + jobId + " sent to printer successfully via Bluetooth");
                     } else {
-                        Log.d(TAG, "Sending raw data: " + documentData.length + " bytes");
+                        Log.d(TAG, "Sending raw data for job " + jobId + ": " + documentData.length + " bytes");
                         BluetoothPrinter.sendRaw(documentData, openCashDrawer, adapter, prefs);
+                        Log.i(TAG, "Raw data for job " + jobId + " sent to printer");
                     }
 
-                    Log.d(TAG, "Job completed successfully");
+                    Log.d(TAG, "Job " + jobId + " completed successfully");
                     final int usedWidth = paperWidthMm;
                     mainHandler.post(new Runnable() {
                         @Override
                         public void run() {
                             prefs.edit().putString("lastPaperWidth", String.valueOf(usedWidth)).apply();
                             printJob.complete();
+                            Log.i(TAG, "Job " + jobId + " marked complete");
                         }
                     });
                 } catch (final Throwable err) {
-                    Log.e(TAG, "Print failed", err);
+                    Log.e(TAG, "Print failed for job " + jobId, err);
                     final String msg = safeError(err);
                     mainHandler.post(new Runnable() {
                         @Override
                         public void run() {
                             printJob.fail(msg);
+                            Log.e(TAG, "Job " + jobId + " marked failed: " + msg);
                         }
                     });
                 }
             }
-        }).start();
+        }, "PrintBridgeJob-" + jobId).start();
     }
 
     @Override

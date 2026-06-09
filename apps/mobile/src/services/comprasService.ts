@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '../lib/supabase';
+import type { SupabaseErrorLike } from '../types/errors';
 
 export type CompraSupplierRecord = {
   id: string;
@@ -125,7 +126,7 @@ function normalizePurchasePaymentMethod(value: unknown): string {
   return normalized;
 }
 
-function isMissingCreatePurchaseRpcError(errorLike: any) {
+function isMissingCreatePurchaseRpcError(errorLike: SupabaseErrorLike) {
   const code = normalizeText(errorLike?.code);
   const message = normalizeText(errorLike?.message).toLowerCase();
   return code === 'PGRST202'
@@ -133,7 +134,7 @@ function isMissingCreatePurchaseRpcError(errorLike: any) {
     || message.includes('create_purchase_complete');
 }
 
-function isMissingSupplierJoinRelationError(errorLike: any) {
+function isMissingSupplierJoinRelationError(errorLike: SupabaseErrorLike) {
   const code = normalizeText(errorLike?.code).toUpperCase();
   const message = normalizeText(errorLike?.message).toLowerCase();
   return code === 'PGRST200'
@@ -142,7 +143,7 @@ function isMissingSupplierJoinRelationError(errorLike: any) {
     || message.includes('purchases_supplier_id_fkey');
 }
 
-function isMissingListRecentPurchasesRpcError(errorLike: any) {
+function isMissingListRecentPurchasesRpcError(errorLike: SupabaseErrorLike) {
   const code = normalizeText(errorLike?.code).toUpperCase();
   const message = normalizeText(errorLike?.message).toLowerCase();
   return code === 'PGRST202'
@@ -152,7 +153,7 @@ function isMissingListRecentPurchasesRpcError(errorLike: any) {
     || message.includes('schema cache');
 }
 
-function isMissingListRecentPurchasesFastRpcError(errorLike: any) {
+function isMissingListRecentPurchasesFastRpcError(errorLike: SupabaseErrorLike) {
   const code = normalizeText(errorLike?.code).toUpperCase();
   const message = normalizeText(errorLike?.message).toLowerCase();
   return code === 'PGRST202'
@@ -326,25 +327,30 @@ async function createPurchaseLegacy({
     const productById = new Map((Array.isArray(productsResult.data) ? productsResult.data : []).map((row: any) => [String(row.id), row]));
     const cartByProductId = new Map((Array.isArray(cart) ? cart : []).map((item) => [item.product_id, item]));
 
-    for (const productId of productIds) {
-      const product = productById.get(productId);
-      const item = cartByProductId.get(productId);
-      if (!product || !item) continue;
+    const stockUpdates = productIds
+      .map((productId) => {
+        const product = productById.get(productId);
+        const item = cartByProductId.get(productId);
+        if (!product || !item) return null;
 
-      const currentStock = normalizeNumber(product.stock, 0);
-      const shouldManageStock = product.manage_stock !== false;
-      const nextStock = shouldManageStock ? currentStock + Number(item.quantity || 0) : currentStock;
+        const currentStock = normalizeNumber(product.stock, 0);
+        const shouldManageStock = product.manage_stock !== false;
+        const nextStock = shouldManageStock ? currentStock + Number(item.quantity || 0) : currentStock;
 
-      const update = await client
-        .from('products')
-        .update({
-          stock: nextStock,
-          purchase_price: Number(item.unit_price || 0),
-        })
-        .eq('id', productId)
-        .eq('business_id', businessId);
+        return client
+          .from('products')
+          .update({
+            stock: nextStock,
+            purchase_price: Number(item.unit_price || 0),
+          })
+          .eq('id', productId)
+          .eq('business_id', businessId);
+      })
+      .filter(Boolean);
 
-      if (update.error) throw update.error;
+    const results = await Promise.all(stockUpdates as any);
+    for (const result of results) {
+      if (result.error) throw result.error;
     }
   }
 
@@ -861,18 +867,23 @@ export async function deleteCompraWithStockFallback({
     });
 
     if (unchanged) {
-      for (const row of managedGrouped) {
-        const afterStock = afterMap.get(row.product_id)?.stock;
-        if (!Number.isFinite(afterStock)) continue;
-        const nextStock = Number(afterStock) - Number(row.quantity || 0);
+      const fallbackUpdates = managedGrouped
+        .map((row) => {
+          const afterStock = afterMap.get(row.product_id)?.stock;
+          if (!Number.isFinite(afterStock)) return null;
+          const nextStock = Number(afterStock) - Number(row.quantity || 0);
 
-        const update = await client
-          .from('products')
-          .update({ stock: nextStock })
-          .eq('id', row.product_id)
-          .eq('business_id', businessId);
+          return client
+            .from('products')
+            .update({ stock: nextStock })
+            .eq('id', row.product_id)
+            .eq('business_id', businessId);
+        })
+        .filter(Boolean);
 
-        if (update.error) throw update.error;
+      const fallbackResults = await Promise.all(fallbackUpdates as any);
+      for (const result of fallbackResults) {
+        if (result.error) throw result.error;
       }
       appliedManualFallback = true;
     }

@@ -18,6 +18,7 @@ export const SECTION_FEATURES: Record<SectionId, boolean> = {
   empleados: parseFlag(process.env.EXPO_PUBLIC_FEATURE_EMPLEADOS, false),
   reportes: parseFlag(process.env.EXPO_PUBLIC_FEATURE_REPORTES, false),
   configuracion: parseFlag(process.env.EXPO_PUBLIC_FEATURE_CONFIGURACION, false),
+  impresion: parseFlag(process.env.EXPO_PUBLIC_FEATURE_IMPRESION, true),
 };
 
 export function isSectionEnabled(sectionId: SectionId): boolean {

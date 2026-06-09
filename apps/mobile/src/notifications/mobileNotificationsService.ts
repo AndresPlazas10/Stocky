@@ -21,7 +21,7 @@ function getNotificationsModule() {
     notificationsModuleCache = require('expo-notifications') as typeof import('expo-notifications');
     return notificationsModuleCache;
   } catch (error) {
-    console.log('[notifications] expo-notifications unavailable in current runtime', error);
+    if (__DEV__) console.log('[notifications] expo-notifications unavailable in current runtime', error);
     return null;
   }
 }
@@ -99,7 +99,7 @@ export function configureMobileNotifications() {
       }),
     });
   } catch (error) {
-    console.log('[notifications] setNotificationHandler skipped', error);
+    if (__DEV__) console.log('[notifications] setNotificationHandler skipped', error);
     return;
   }
 
@@ -112,7 +112,7 @@ export function configureMobileNotifications() {
         lightColor: '#1D4ED8',
       });
     } catch (error) {
-      console.log('[notifications] setNotificationChannelAsync skipped', error);
+      if (__DEV__) console.log('[notifications] setNotificationChannelAsync skipped', error);
     }
   }
 }

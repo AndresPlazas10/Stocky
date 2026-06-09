@@ -11,6 +11,7 @@ import {
 import type { Session } from '@supabase/supabase-js';
 import { DashboardProvider } from './DashboardContext';
 import { AppNavigator } from '../../navigation/AppNavigator';
+import { StockyErrorBoundary } from '../../ui/StockyErrorBoundary';
 import { perfMark } from '../../utils/perfAudit';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
 import type { AppUpdateNotice } from '../../services/appUpdateService';
@@ -62,7 +63,9 @@ export function DashboardApp({
 
   return (
     <DashboardProvider session={session}>
-      <AppNavigator />
+      <StockyErrorBoundary>
+        <AppNavigator />
+      </StockyErrorBoundary>
       <Modal
         visible={Boolean(updateNotice)}
         transparent

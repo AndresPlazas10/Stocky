@@ -1,0 +1,114 @@
+import { useEffect, useRef } from 'react';
+import { getSupabaseClient } from '../lib/supabase';
+
+type TableSubscription = {
+  table: string;
+  filter?: string;
+  onEvent: (payload: any) => void;
+};
+
+type BroadcastSubscription = {
+  event: string;
+  onPayload: (payload: any) => void;
+};
+
+type Options = {
+  channelKey: string;
+  businessId: string | undefined | null;
+  userId?: string;
+  tables?: TableSubscription[];
+  broadcastEvents?: BroadcastSubscription[];
+  onSubscribed?: () => void;
+  pollIntervalMs?: number;
+  onPollTick?: () => void;
+  onCleanup?: () => void;
+  event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*';
+  schema?: string;
+};
+
+export function useSupabaseRealtime({
+  channelKey,
+  businessId,
+  userId,
+  tables = [],
+  broadcastEvents = [],
+  onSubscribed,
+  pollIntervalMs = 20000,
+  onPollTick,
+  onCleanup,
+  event = '*',
+  schema = 'public',
+}: Options) {
+  const onSubscribedRef = useRef(onSubscribed);
+  onSubscribedRef.current = onSubscribed;
+  const onPollTickRef = useRef(onPollTick);
+  onPollTickRef.current = onPollTick;
+  const onCleanupRef = useRef(onCleanup);
+  onCleanupRef.current = onCleanup;
+
+  useEffect(() => {
+    const normalizedBusinessId = String(businessId || '').trim();
+    if (!normalizedBusinessId) {
+      onCleanupRef.current?.();
+      return undefined;
+    }
+
+    let cancelled = false;
+    let fallbackTimer: ReturnType<typeof setInterval> | null = null;
+    let dbChannel: ReturnType<ReturnType<typeof getSupabaseClient>['channel']> | null = null;
+    let broadcastChannel: ReturnType<ReturnType<typeof getSupabaseClient>['channel']> | null = null;
+
+    let client;
+    try {
+      client = getSupabaseClient();
+    } catch {
+      return undefined;
+    }
+
+    const channelId = userId
+      ? `mobile-${channelKey}:${normalizedBusinessId}:${userId}`
+      : `mobile-${channelKey}:${normalizedBusinessId}`;
+
+    dbChannel = client.channel(channelId);
+
+    for (const sub of tables) {
+      const filterConfig = { event, schema, table: sub.table, ...(sub.filter ? { filter: sub.filter } : {}) };
+      dbChannel = (dbChannel as any).on('postgres_changes', filterConfig, (payload: any) => {
+        if (cancelled) return;
+        sub.onEvent(payload);
+      });
+    }
+
+    dbChannel?.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        onSubscribedRef.current?.();
+      }
+    });
+
+    if (broadcastEvents.length > 0) {
+      const broadcastChannelId = `private:mobile-${channelKey}-sync:${normalizedBusinessId}`;
+      broadcastChannel = client.channel(broadcastChannelId);
+      for (const be of broadcastEvents) {
+        broadcastChannel = broadcastChannel.on('broadcast', { event: be.event }, ({ payload }: any) => {
+          if (cancelled) return;
+          be.onPayload(payload);
+        });
+      }
+      broadcastChannel.subscribe();
+    }
+
+    if (pollIntervalMs > 0 && onPollTickRef.current) {
+      fallbackTimer = setInterval(() => {
+        onPollTickRef.current?.();
+      }, pollIntervalMs);
+    }
+
+    return () => {
+      cancelled = true;
+      if (fallbackTimer) clearInterval(fallbackTimer);
+      if (dbChannel) void client.removeChannel(dbChannel);
+      if (broadcastChannel) void client.removeChannel(broadcastChannel);
+      onCleanupRef.current?.();
+    };
+  }, [businessId, userId, channelKey, event, schema, pollIntervalMs]);
+}

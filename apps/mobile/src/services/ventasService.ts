@@ -6,6 +6,7 @@ import {
   type MesaOrderCatalogItem,
 } from './mesaOrderService';
 import type { CashChangeEntry, PaymentMethod } from './mesaCheckoutService';
+import type { SupabaseErrorLike } from '../types/errors';
 
 export type VentaRecord = {
   id: string;
@@ -97,7 +98,7 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isFunctionUnavailableError(errorLike: any, functionName: string) {
+function isFunctionUnavailableError(errorLike: SupabaseErrorLike, functionName: string) {
   const message = String(errorLike?.message || '').toLowerCase();
   if (!message) return false;
 
@@ -112,7 +113,7 @@ function isFunctionUnavailableError(errorLike: any, functionName: string) {
 }
 
 function isMissingColumnError(
-  errorLike: any,
+  errorLike: SupabaseErrorLike,
   { tableName, columnName }: { tableName: string; columnName: string },
 ) {
   const message = String(errorLike?.message || '').toLowerCase();
@@ -125,7 +126,7 @@ function isMissingColumnError(
   );
 }
 
-function isMissingListRecentSalesMobileRpcError(errorLike: any) {
+function isMissingListRecentSalesMobileRpcError(errorLike: SupabaseErrorLike) {
   const code = String(errorLike?.code || '').toLowerCase();
   const message = String(errorLike?.message || '').toLowerCase();
   return (

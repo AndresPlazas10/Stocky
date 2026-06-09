@@ -13,6 +13,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.InputType;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.Set;
 
 public class MainActivity extends Activity {
+    private static final String TAG = "PrintBridgeUI";
     private static final String PREFS = "stocky_print_bridge";
     private static final int PRIMARY = Color.rgb(99, 102, 241);
     private static final int PRIMARY_DARK = Color.rgb(79, 70, 229);
@@ -56,7 +58,8 @@ public class MainActivity extends Activity {
     private TextView statusDot;
     private EditText headerInput;
     private EditText footerInput;
-    private PrintBridgeHttpServer httpServer;
+    private TextView serverStatusText;
+    private TextView serverStatusDot;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,7 +70,7 @@ public class MainActivity extends Activity {
         buildUi();
         loadSettings();
         refreshBondedDevices();
-        startHttpServerIfConfigured();
+        startPrintBridgeForegroundService();
     }
 
     @Override
@@ -76,7 +79,8 @@ public class MainActivity extends Activity {
         if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
             refreshBondedDevices();
         }
-        startHttpServerIfConfigured();
+        startPrintBridgeForegroundService();
+        updateServerStatus();
     }
 
     @Override
@@ -97,12 +101,14 @@ public class MainActivity extends Activity {
                 toast("Concede los permisos Bluetooth para continuar");
             }
         }
+        if (requestCode == 12) {
+            Log.d(TAG, "Notification permission result received");
+        }
     }
 
     @Override
     protected void onDestroy() {
         saveSettings();
-        stopHttpServer();
         super.onDestroy();
     }
 
@@ -220,6 +226,30 @@ public class MainActivity extends Activity {
         btnRow.addView(btBtn, weightParams());
         connCard.addView(btnRow);
         content.addView(connCard);
+        content.addView(space(12));
+
+        // Server status card
+        LinearLayout serverStatusCard = card();
+        LinearLayout serverStatusRow = new LinearLayout(this);
+        serverStatusRow.setOrientation(LinearLayout.HORIZONTAL);
+        serverStatusRow.setGravity(Gravity.CENTER_VERTICAL);
+        serverStatusRow.setPadding(dp(16), dp(14), dp(16), dp(14));
+        serverStatusCard.addView(serverStatusRow);
+
+        serverStatusDot = new TextView(this);
+        serverStatusDot.setText("\u25CF");
+        serverStatusDot.setTextSize(10);
+        serverStatusDot.setTextColor(MUTED);
+        serverStatusDot.setPadding(0, 0, dp(8), 0);
+        serverStatusRow.addView(serverStatusDot);
+
+        serverStatusText = new TextView(this);
+        serverStatusText.setText("Servidor detenido");
+        serverStatusText.setTextSize(13);
+        serverStatusText.setTextColor(MUTED);
+        serverStatusText.setTypeface(null, 0);
+        serverStatusRow.addView(serverStatusText, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        content.addView(serverStatusCard);
         content.addView(space(16));
 
         // Settings card
@@ -434,6 +464,12 @@ public class MainActivity extends Activity {
         } else if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 11);
         }
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 12);
+            }
+        }
     }
 
     private void refreshBondedDevices() {
@@ -528,7 +564,8 @@ public class MainActivity extends Activity {
             setStatus("Configuracion guardada" + (name.isEmpty() ? "" : " \u2014 " + name), SUCCESS);
         }
         toast(saved ? "\u2714\uFE0F  Configuracion guardada" : "No se pudo guardar");
-        startHttpServerIfConfigured();
+        startPrintBridgeForegroundService();
+        updateServerStatus();
     }
 
     private void printTest() {
@@ -597,18 +634,32 @@ public class MainActivity extends Activity {
         }
     }
 
-    private synchronized void startHttpServerIfConfigured() {
-        String address = prefs.getString("deviceAddress", "");
-        if (address.isEmpty()) return;
-        if (httpServer != null) return;
-        httpServer = new PrintBridgeHttpServer(bluetoothAdapter, prefs);
-        httpServer.start();
+    private synchronized void startPrintBridgeForegroundService() {
+        Intent serviceIntent = new Intent(this, PrintBridgeForegroundService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
+        Log.i(TAG, "Foreground service start requested");
     }
 
-    private synchronized void stopHttpServer() {
-        if (httpServer != null) {
-            httpServer.stop();
-            httpServer = null;
+    private void updateServerStatus() {
+        String address = prefs.getString("deviceAddress", "");
+        if (address.isEmpty()) {
+            setServerStatus("Servidor detenido - configura una impresora", Color.rgb(245, 158, 11));
+        } else {
+            setServerStatus("Servidor activo en puerto 41781", SUCCESS);
+        }
+    }
+
+    private void setServerStatus(String value, int color) {
+        if (serverStatusText != null) {
+            serverStatusText.setText(value);
+            serverStatusText.setTextColor(color);
+        }
+        if (serverStatusDot != null) {
+            serverStatusDot.setTextColor(color);
         }
     }
 }

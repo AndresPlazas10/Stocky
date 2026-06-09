@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '../lib/supabase';
+import type { SupabaseErrorLike } from '../types/errors';
 
 const BASE_SUPPLIER_COLUMNS = 'id,business_id,business_name,contact_name,email,phone,address,notes,created_at';
 
@@ -81,7 +82,7 @@ function normalizeProveedor(row: any): ProveedorRecord {
   };
 }
 
-function wrapDbError(errorLike: any, fallbackMessage: string): Error & { code?: string } {
+function wrapDbError(errorLike: SupabaseErrorLike, fallbackMessage: string): Error & { code?: string } {
   const wrapped: Error & { code?: string } = new Error(errorLike?.message || fallbackMessage);
   wrapped.code = normalizeReference(errorLike?.code) || undefined;
   return wrapped;

@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '../lib/supabase';
+import type { SupabaseErrorLike } from '../types/errors';
 
 export type MesaOrderProduct = {
   id: string;
@@ -90,7 +91,7 @@ export type MesaOpenOrderSnapshot = {
   units: number;
 };
 
-const DEFAULT_CATALOG_CACHE_TTL_MS = 180_000;
+const DEFAULT_CATALOG_CACHE_TTL_MS = 60_000;
 const catalogCacheByBusinessId = new Map<string, {
   items: MesaOrderCatalogItem[];
   cachedAt: number;
@@ -162,7 +163,7 @@ function mergeCatalogByName(
   return merged;
 }
 
-function isMissingColumnError(errorLike: any, { tableName, columnName }: { tableName: string; columnName: string }) {
+function isMissingColumnError(errorLike: SupabaseErrorLike, { tableName, columnName }: { tableName: string; columnName: string }) {
   const message = String(errorLike?.message || '').toLowerCase();
   return (
     message.includes('column')
@@ -173,7 +174,7 @@ function isMissingColumnError(errorLike: any, { tableName, columnName }: { table
   );
 }
 
-function isFunctionUnavailableError(errorLike: any, functionName: string) {
+function isFunctionUnavailableError(errorLike: SupabaseErrorLike, functionName: string) {
   const code = String(errorLike?.code || '').toLowerCase();
   const message = String(errorLike?.message || '').toLowerCase();
   return (
@@ -191,11 +192,11 @@ function isFunctionUnavailableError(errorLike: any, functionName: string) {
   );
 }
 
-function isMissingListOpenOrderSnapshotRpcError(errorLike: any) {
+function isMissingListOpenOrderSnapshotRpcError(errorLike: SupabaseErrorLike) {
   return isFunctionUnavailableError(errorLike, 'list_open_order_snapshot');
 }
 
-function isMissingListOpenOrderSnapshotFastRpcError(errorLike: any) {
+function isMissingListOpenOrderSnapshotFastRpcError(errorLike: SupabaseErrorLike) {
   return isFunctionUnavailableError(errorLike, 'list_open_order_snapshot_fast');
 }
 
@@ -305,6 +306,83 @@ function calculateOrderUnits(items: MesaOrderItem[]): number {
     (sum, item) => sum + Math.max(0, Math.floor(normalizeNumber(item?.quantity, 0))),
     0,
   );
+}
+
+export function sumOrderItemsQuantity(items: MesaOrderItem[]) {
+  return (Array.isArray(items) ? items : []).reduce(
+    (sum, item) => sum + Math.max(0, Number(item.quantity || 0)),
+    0,
+  );
+}
+
+export function normalizeOrderReference(value: unknown): string {
+  return String(value || '').trim();
+}
+
+export function normalizeOrderItemQuantity(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.floor(parsed));
+}
+
+export function normalizeOrderItemSubtotal(row: any): number {
+  const subtotal = Number(row?.subtotal);
+  if (Number.isFinite(subtotal)) {
+    return Math.max(0, subtotal);
+  }
+  const quantity = normalizeOrderItemQuantity(row?.quantity);
+  const price = Number(row?.price);
+  const safePrice = Number.isFinite(price) ? price : 0;
+  return Math.max(0, quantity * safePrice);
+}
+
+export function reconcileOrderItemsFromServer(current: MesaOrderItem[], fromServer: MesaOrderItem[]) {
+  const local = Array.isArray(current) ? current : [];
+  const server = Array.isArray(fromServer) ? fromServer : [];
+
+  const serverById = new Map(server.map((item) => [String(item.id || ''), item]));
+  const serverByIdentity = new Map<string, MesaOrderItem>();
+  server.forEach((item) => {
+    const key = item.product_id ? `p:${item.product_id}` : item.combo_id ? `c:${item.combo_id}` : '';
+    if (!key) return;
+    if (!serverByIdentity.has(key)) {
+      serverByIdentity.set(key, item);
+    }
+  });
+
+  const usedServerIds = new Set<string>();
+
+  const merged = local.map((localItem) => {
+    const localId = String(localItem.id || '');
+    const exact = localId ? serverById.get(localId) : null;
+    if (exact) {
+      usedServerIds.add(String(exact.id || ''));
+      return exact;
+    }
+
+    const identityKey = localItem.product_id
+      ? `p:${localItem.product_id}`
+      : localItem.combo_id
+        ? `c:${localItem.combo_id}`
+        : '';
+    if (identityKey) {
+      const byIdentity = serverByIdentity.get(identityKey);
+      if (byIdentity) {
+        usedServerIds.add(String(byIdentity.id || ''));
+        return byIdentity;
+      }
+    }
+
+    return localItem;
+  });
+
+  server.forEach((serverItem) => {
+    const serverId = String(serverItem.id || '');
+    if (!serverId || usedServerIds.has(serverId)) return;
+    merged.push(serverItem);
+  });
+
+  return merged;
 }
 
 export function calculateCashChange(total: number, amountReceived: string | number | null | undefined) {

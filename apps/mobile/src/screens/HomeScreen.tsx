@@ -48,7 +48,7 @@ export function HomeScreen({ session }: Props) {
       try {
         await deactivatePushTokenForUser(session.user.id);
       } catch (error) {
-        console.log('[notifications] failed to deactivate token on sign out', error);
+        if (__DEV__) console.log('[notifications] failed to deactivate token on sign out', error);
       }
       await client.auth.signOut();
     } finally {
