@@ -63,6 +63,8 @@ import { getBankLogoSource, isBankPaymentMethod } from '../../utils/paymentMetho
 import { getThermalPaperWidthMm, isAutoPrintReceiptEnabled } from '../../utils/printer';
 import { BLUETOOTH_PRINT_REQUIRED_MESSAGE, ensureBluetoothEnabled } from '../../utils/bluetooth';
 import { getPaymentMethodLabel, getPaymentMethodIcon } from '../../utils/paymentMethods';
+import { useMesaToasts } from './hooks/useMesaToasts';
+import { useMesaOrderState } from './hooks/useMesaOrderState';
 
 type Props = {
   session: Session;
@@ -477,26 +479,6 @@ export function MesasPanel({ session, businessContext }: Props) {
   const [mesaToDelete, setMesaToDelete] = useState<MesaRecord | null>(null);
   const [isDeletingMesa, setIsDeletingMesa] = useState(false);
 
-  const [showOrderModal, setShowOrderModal] = useState(false);
-  const [selectedMesa, setSelectedMesa] = useState<MesaRecord | null>(null);
-  const [catalogItems, setCatalogItems] = useState<MesaOrderCatalogItem[]>([]);
-  const [isCatalogLoading, setIsCatalogLoading] = useState(false);
-  const [orderItems, setOrderItems] = useState<MesaOrderItem[]>([]);
-  const [loadingOrder, setLoadingOrder] = useState(false);
-  const [orderModalError, setOrderModalError] = useState<string | null>(null);
-  const [searchCatalog, setSearchCatalog] = useState('');
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [mutatingOrderItemId, setMutatingOrderItemId] = useState<string | null>(null);
-  const [releasingEmptyOrder, setReleasingEmptyOrder] = useState(false);
-  const [isSavingOrder, setIsSavingOrder] = useState(false);
-  const addCatalogQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const latestOrderItemsRef = useRef<MesaOrderItem[]>([]);
-  const orderItemsCacheRef = useRef(new Map<string, MesaOrderItem[]>());
-  const catalogBusinessIdRef = useRef<string | null>(null);
-  const catalogUpdatedAtRef = useRef(0);
-  const catalogItemsRef = useRef<MesaOrderCatalogItem[]>([]);
-  const catalogLoadPromiseRef = useRef<Promise<MesaOrderCatalogItem[]> | null>(null);
-  const orderModalOpenIntentRef = useRef(false);
   const mesasRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mesaLocksRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const orderRealtimeSummaryTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -505,31 +487,8 @@ export function MesasPanel({ session, businessContext }: Props) {
   const realtimeClientInstanceIdRef = useRef(`mesa-client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   const selectedMesaIdRef = useRef<string>('');
   const mesaLockPlaceholderTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const pendingQuantityUpdatesRef = useRef(new Map<string, {
-    orderId: string;
-    itemId: string;
-    quantity: number;
-    price: number;
-    total: number;
-  }>());
-  const quantitySyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUiTraceRef = useRef<RealtimeUiTrace | null>(null);
   const mesaActionVersionRef = useRef<Record<string, number>>({});
-
-  const [showCloseOrderChoiceModal, setShowCloseOrderChoiceModal] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showSplitBillModal, setShowSplitBillModal] = useState(false);
-  const [isClosingOrder, setIsClosingOrder] = useState(false);
-  const [showPaymentMethodMenu, setShowPaymentMethodMenu] = useState(false);
-  const [showMesaCreatedToast, setShowMesaCreatedToast] = useState(false);
-  const [mesaCreatedLabel, setMesaCreatedLabel] = useState('Mesa');
-  const [showMesaDeletedToast, setShowMesaDeletedToast] = useState(false);
-  const [mesaDeletedLabel, setMesaDeletedLabel] = useState('Mesa');
-  const [showSaleToast, setShowSaleToast] = useState(false);
-  const [saleMesaLabel, setSaleMesaLabel] = useState('Mesa');
-  const [saleTotalLabel, setSaleTotalLabel] = useState('');
-  const [showMesaSavedToast, setShowMesaSavedToast] = useState(false);
-  const [mesaSavedLabel, setMesaSavedLabel] = useState('Mesa');
 
   // Estados para modal de impresión
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -538,12 +497,6 @@ export function MesasPanel({ session, businessContext }: Props) {
   const [printCustomerName, setPrintCustomerName] = useState('Venta general');
   const [isPrintInProgress, setIsPrintInProgress] = useState(false);
   const printInFlightRef = useRef(false);
-
-  const isOrderFlowActive = showOrderModal
-    || showCloseOrderChoiceModal
-    || showPaymentModal
-    || showSplitBillModal
-    || showPaymentMethodMenu;
 
   const beginPrintFlow = useCallback(() => {
     if (printInFlightRef.current) return false;
@@ -557,14 +510,46 @@ export function MesasPanel({ session, businessContext }: Props) {
     setIsPrintInProgress(false);
   }, []);
 
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
-  const [amountReceived, setAmountReceived] = useState('');
   const [orderUnitsByOrderId, setOrderUnitsByOrderId] = useState<Record<string, number>>({});
   const [mesaLocksByTableId, setMesaLocksByTableId] = useState<Record<string, MesaEditLock>>({});
   const [actorDisplayName, setActorDisplayName] = useState(() => resolveSessionDisplayName(session));
   const sessionDisplayName = useMemo(() => resolveSessionDisplayName(session), [session]);
   const heldMesaLockRef = useRef<HeldMesaLock | null>(null);
   const canDeleteMesas = context?.source !== 'employee';
+
+  const toasts = useMesaToasts();
+  const orderState = useMesaOrderState({ listCatalogItems });
+  const {
+    showOrderModal, setShowOrderModal,
+    selectedMesa, setSelectedMesa,
+    catalogItems, setCatalogItems,
+    isCatalogLoading, setIsCatalogLoading,
+    orderItems, setOrderItems,
+    loadingOrder, setLoadingOrder,
+    orderModalError, setOrderModalError,
+    searchCatalog, setSearchCatalog,
+    deferredSearch,
+    isSearchFocused, setIsSearchFocused,
+    mutatingOrderItemId, setMutatingOrderItemId,
+    releasingEmptyOrder, setReleasingEmptyOrder,
+    isSavingOrder, setIsSavingOrder,
+    showCloseOrderChoiceModal, setShowCloseOrderChoiceModal,
+    showPaymentModal, setShowPaymentModal,
+    showSplitBillModal, setShowSplitBillModal,
+    showPaymentMethodMenu, setShowPaymentMethodMenu,
+    isClosingOrder, setIsClosingOrder,
+    paymentMethod, setPaymentMethod,
+    amountReceived, setAmountReceived,
+    addCatalogQueueRef, latestOrderItemsRef,
+    orderItemsCacheRef, catalogBusinessIdRef,
+    catalogUpdatedAtRef, catalogItemsRef,
+    catalogLoadPromiseRef, orderModalOpenIntentRef,
+    pendingQuantityUpdatesRef, quantitySyncTimerRef,
+    filteredCatalog, hasCatalogQuery, catalogLookup,
+    insufficientItems, insufficientComboComponents,
+    getStockValidationMessage, orderTotal, orderModalTitle,
+    isOrderFlowActive, cashChangeData, ensureCatalogLoaded,
+  } = orderState;
 
   const patchMesaOrderUnits = useCallback((orderId: string, units: number) => {
     const key = String(orderId || '').trim();
@@ -685,72 +670,6 @@ export function MesasPanel({ session, businessContext }: Props) {
         });
     }
   }, [extractOrderUnitsSnapshot]);
-
-  const ensureCatalogLoaded = useCallback(async (
-    businessId: string,
-    options?: { forceRefresh?: boolean },
-  ) => {
-    const normalizedBusinessId = String(businessId || '').trim();
-    if (!normalizedBusinessId) return [] as MesaOrderCatalogItem[];
-    const forceRefresh = options?.forceRefresh === true;
-    const localCatalog = catalogItemsRef.current;
-
-    const catalogAgeMs = Date.now() - Number(catalogUpdatedAtRef.current || 0);
-    const hasLocalCatalogForBusiness = (
-      !forceRefresh
-      && catalogBusinessIdRef.current === normalizedBusinessId
-      && localCatalog.length > 0
-    );
-
-    if (hasLocalCatalogForBusiness && catalogAgeMs <= CATALOG_LOCAL_TTL_MS) {
-      return localCatalog;
-    }
-
-    if (hasLocalCatalogForBusiness && catalogAgeMs > CATALOG_LOCAL_TTL_MS) {
-      // Stale-while-revalidate: mantener catalogo visible mientras refrescamos.
-      if (!catalogLoadPromiseRef.current) {
-        setIsCatalogLoading(true);
-        const refreshPromise = listCatalogItems(normalizedBusinessId, { forceRefresh: true })
-          .then((items) => {
-            catalogBusinessIdRef.current = normalizedBusinessId;
-            catalogUpdatedAtRef.current = Date.now();
-            setCatalogItems(items);
-            void writeCatalogToStorage(normalizedBusinessId, items);
-            return items;
-          })
-          .finally(() => {
-            catalogLoadPromiseRef.current = null;
-            setIsCatalogLoading(false);
-          });
-        catalogLoadPromiseRef.current = refreshPromise;
-      }
-      return localCatalog;
-    }
-
-    if (catalogLoadPromiseRef.current) {
-      return catalogLoadPromiseRef.current;
-    }
-
-    setIsCatalogLoading(true);
-    const promise = listCatalogItems(
-      normalizedBusinessId,
-      forceRefresh ? { forceRefresh: true } : undefined,
-    )
-      .then((items) => {
-        catalogBusinessIdRef.current = normalizedBusinessId;
-        catalogUpdatedAtRef.current = Date.now();
-        setCatalogItems(items);
-        void writeCatalogToStorage(normalizedBusinessId, items);
-        return items;
-      })
-      .finally(() => {
-        catalogLoadPromiseRef.current = null;
-        setIsCatalogLoading(false);
-      });
-
-    catalogLoadPromiseRef.current = promise;
-    return promise;
-  }, []);
 
   const applyMesaLocks = useCallback((locks: MesaEditLock[]) => {
     const next: Record<string, MesaEditLock> = {};
@@ -2183,8 +2102,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     };
   }, [actorDisplayName, isOrderFlowActive, refreshMesaLocks, releaseHeldMesaLock, session.user.id]);
 
-  const orderTotal = useMemo(() => calculateOrderTotal(orderItems), [orderItems]);
-  const orderModalTitle = selectedMesa ? `${mesaDisplayName(selectedMesa)} - Orden` : 'Mesa - Orden';
   const catalogNameByIdentity = useMemo(() => {
     if (orderItems.length === 0) return new Map<string, string>();
     const map = new Map<string, string>();
@@ -2214,40 +2131,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     }
     return direct;
   }, [catalogNameByIdentity]);
-
-  const filteredCatalog = useMemo(() => {
-    const source = Array.isArray(catalogItems) ? catalogItems : [];
-    const search = String(searchCatalog || '').trim().toLowerCase();
-
-    if (!search) {
-      return [];
-    }
-
-    return source
-      .filter((item) => {
-        const byName = String(item.name || '').toLowerCase().includes(search);
-        return byName;
-      })
-      .slice(0, 80);
-  }, [catalogItems, searchCatalog]);
-  const hasCatalogQuery = String(searchCatalog || '').trim().length > 0;
-
-  const catalogLookup = useMemo(() => buildCatalogLookup(catalogItems), [catalogItems]);
-  const { insufficientItems, insufficientComboComponents } = useMemo(() => {
-    if (loadingOrder) {
-      return { insufficientItems: [], insufficientComboComponents: [] };
-    }
-    if (catalogItems.length === 0) {
-      return { insufficientItems: [], insufficientComboComponents: [] };
-    }
-    return evaluateOrderStockShortagesWithLookup({ orderItems, lookup: catalogLookup });
-  }, [catalogItems.length, catalogLookup, loadingOrder, orderItems]);
-
-  const cashChangeData = useMemo(() => {
-    if (paymentMethod !== 'cash') return null;
-    if (String(amountReceived || '').trim() === '') return { isValid: false, reason: 'empty' as const, change: 0, paid: 0 };
-    return calculateCashChange(orderTotal, amountReceived);
-  }, [amountReceived, orderTotal, paymentMethod]);
 
   const closeAuxiliaryOrderModals = useCallback(() => {
     setShowCloseOrderChoiceModal(false);
@@ -2627,8 +2510,7 @@ export function MesasPanel({ session, businessContext }: Props) {
       );
       const toastLabel = mesaDisplayName(selectedMesa);
       closeOrderModal();
-      setMesaSavedLabel(toastLabel);
-      setShowMesaSavedToast(true);
+      toasts.showSavedToast(toastLabel);
     } catch (err) {
       const fallbackMessage = 'No se pudo guardar la orden.';
       const message = err instanceof Error
@@ -2817,8 +2699,7 @@ export function MesasPanel({ session, businessContext }: Props) {
       setMesas((prev) => [...prev, createdMesa].sort(compareMesaTableIdentifiers));
       setShowCreateMesaModal(false);
       setNewTableNumber('');
-      setMesaCreatedLabel(mesaDisplayName(createdMesa));
-      setShowMesaCreatedToast(true);
+      toasts.showCreatedToast(mesaDisplayName(createdMesa));
     } catch (err: any) {
       if (String(err?.code || '') === '23505') {
         setError('Ese identificador de mesa ya existe.');
@@ -2865,8 +2746,7 @@ export function MesasPanel({ session, businessContext }: Props) {
 
       setShowDeleteMesaModal(false);
       setMesaToDelete(null);
-      setMesaDeletedLabel(deletedLabel);
-      setShowMesaDeletedToast(true);
+      toasts.showDeletedToast(deletedLabel);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo eliminar la mesa.');
     } finally {
@@ -3420,20 +3300,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     }
   }, [beginPrintFlow, context?.businessId, context?.source, endPrintFlow]);
 
-  const getStockValidationMessage = useCallback(() => {
-    if (insufficientItems.length > 0) {
-      const first = insufficientItems[0];
-      return `Stock insuficiente para "${first.product_name}" (disp: ${first.available_stock}, req: ${first.quantity}).`;
-    }
-
-    if (insufficientComboComponents.length > 0) {
-      const first = insufficientComboComponents[0];
-      return `Stock insuficiente para "${first.product_name}" (disp: ${first.available_stock}, req: ${first.required_quantity}).`;
-    }
-
-    return null;
-  }, [insufficientComboComponents, insufficientItems]);
-
   const markMesaAsAvailableAfterSale = useCallback((mesaId: string) => {
     let orderIdToClear = '';
     let mesaBusinessId = String(context?.businessId || '').trim();
@@ -3553,9 +3419,7 @@ export function MesasPanel({ session, businessContext }: Props) {
       markMesaAsAvailableAfterSale(selectedMesa.id);
       closeOrderModal();
       await loadData();
-      setSaleMesaLabel(saleMesaName);
-      setSaleTotalLabel(saleTotal);
-      setShowSaleToast(true);
+      toasts.showSaleConfirmationToast(saleMesaName, saleTotal);
     } catch (err) {
       setOrderModalError(err instanceof Error ? err.message : 'No se pudo cerrar la orden.');
     } finally {
@@ -3611,9 +3475,7 @@ export function MesasPanel({ session, businessContext }: Props) {
       markMesaAsAvailableAfterSale(selectedMesa.id);
       closeOrderModal();
       await loadData();
-      setSaleMesaLabel(saleMesaName);
-      setSaleTotalLabel(saleTotal);
-      setShowSaleToast(true);
+      toasts.showSaleConfirmationToast(saleMesaName, saleTotal);
     } catch (err) {
       setOrderModalError(err instanceof Error ? err.message : 'No se pudo cerrar la orden dividida.');
     } finally {
@@ -4338,44 +4200,44 @@ export function MesasPanel({ session, businessContext }: Props) {
         onConfirm={processSplitPaymentAndClose}
       />
       <StockyStatusToast
-        visible={showMesaCreatedToast}
+        visible={toasts.showMesaCreatedToast}
         title="Mesa Creada"
         primaryLabel="Mesa"
-        primaryValue={mesaCreatedLabel}
+        primaryValue={toasts.mesaCreatedLabel}
         secondaryLabel="Estado"
         secondaryValue="Disponible"
         durationMs={1000}
-        onClose={() => setShowMesaCreatedToast(false)}
+        onClose={() => toasts.setShowMesaCreatedToast(false)}
       />
       <StockyStatusToast
-        visible={showMesaDeletedToast}
+        visible={toasts.showMesaDeletedToast}
         title="Mesa Eliminada"
         primaryLabel="Mesa"
-        primaryValue={mesaDeletedLabel}
+        primaryValue={toasts.mesaDeletedLabel}
         secondaryLabel="Estado"
         secondaryValue="Eliminada"
         durationMs={1000}
-        onClose={() => setShowMesaDeletedToast(false)}
+        onClose={() => toasts.setShowMesaDeletedToast(false)}
       />
       <StockyStatusToast
-        visible={showSaleToast}
+        visible={toasts.showSaleToast}
         title="Venta Confirmada"
         primaryLabel="Mesa"
-        primaryValue={saleMesaLabel}
+        primaryValue={toasts.saleMesaLabel}
         secondaryLabel="Total"
-        secondaryValue={saleTotalLabel}
+        secondaryValue={toasts.saleTotalLabel}
         durationMs={1000}
-        onClose={() => setShowSaleToast(false)}
+        onClose={() => toasts.setShowSaleToast(false)}
       />
       <StockyStatusToast
-        visible={showMesaSavedToast}
+        visible={toasts.showMesaSavedToast}
         title="Mesa Actualizada"
         primaryLabel="Mesa"
-        primaryValue={mesaSavedLabel}
+        primaryValue={toasts.mesaSavedLabel}
         secondaryLabel="Estado"
         secondaryValue="Actualizada"
         durationMs={1000}
-        onClose={() => setShowMesaSavedToast(false)}
+        onClose={() => toasts.setShowMesaSavedToast(false)}
       />
       <PrintReceiptConfirmModal
         visible={showPrintModal}
