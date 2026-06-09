@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { EXPO_CONFIG } from '../config/env';
 import { getSupabaseClient } from '../lib/supabase';
+import type { SupabaseErrorLike } from '../types/errors';
 
 export type MesaStatus = 'available' | 'occupied' | string;
 
@@ -209,7 +210,7 @@ async function resolveRememberedBusinessCandidate(
   return null;
 }
 
-function isMissingNameColumnError(errorLike: any) {
+function isMissingNameColumnError(errorLike: SupabaseErrorLike) {
   const message = String(errorLike?.message || '').toLowerCase();
   const details = String(errorLike?.details || '').toLowerCase();
   return (
@@ -219,7 +220,7 @@ function isMissingNameColumnError(errorLike: any) {
   );
 }
 
-function isMissingListTablesWithOrderSummaryRpcError(errorLike: any) {
+function isMissingListTablesWithOrderSummaryRpcError(errorLike: SupabaseErrorLike) {
   const code = String(errorLike?.code || '').toLowerCase();
   const message = String(errorLike?.message || '').toLowerCase();
   return (
@@ -237,7 +238,7 @@ function isMissingListTablesWithOrderSummaryRpcError(errorLike: any) {
   );
 }
 
-function isMissingListTablesWithOrderSummaryFastRpcError(errorLike: any) {
+function isMissingListTablesWithOrderSummaryFastRpcError(errorLike: SupabaseErrorLike) {
   const code = String(errorLike?.code || '').toLowerCase();
   const message = String(errorLike?.message || '').toLowerCase();
   return (
@@ -255,7 +256,7 @@ function isMissingListTablesWithOrderSummaryFastRpcError(errorLike: any) {
   );
 }
 
-function isMissingResolveMobileBusinessContextRpcError(errorLike: any) {
+function isMissingResolveMobileBusinessContextRpcError(errorLike: SupabaseErrorLike) {
   const code = String(errorLike?.code || '').toLowerCase();
   const message = String(errorLike?.message || '').toLowerCase();
   return (
@@ -274,7 +275,7 @@ function isMissingResolveMobileBusinessContextRpcError(errorLike: any) {
 }
 
 function isMissingColumnInRelationError(
-  errorLike: any,
+  errorLike: SupabaseErrorLike,
   { tableName, columnName }: { tableName: string; columnName: string },
 ) {
   const message = String(errorLike?.message || '').toLowerCase();
@@ -287,12 +288,12 @@ function isMissingColumnInRelationError(
   );
 }
 
-function isDuplicateKeyError(errorLike: any) {
+function isDuplicateKeyError(errorLike: SupabaseErrorLike) {
   const code = String(errorLike?.code || '').trim();
   return code === '23505';
 }
 
-function isMissingTableEditLocksRelationError(errorLike: any) {
+function isMissingTableEditLocksRelationError(errorLike: SupabaseErrorLike) {
   const message = String(errorLike?.message || '').toLowerCase();
   return (
     message.includes('relation')
@@ -301,7 +302,7 @@ function isMissingTableEditLocksRelationError(errorLike: any) {
   );
 }
 
-function isMissingTableEditLocksColumnError(errorLike: any, columnName: string) {
+function isMissingTableEditLocksColumnError(errorLike: SupabaseErrorLike, columnName: string) {
   return isMissingColumnInRelationError(errorLike, {
     tableName: 'table_edit_locks',
     columnName,
@@ -327,6 +328,8 @@ function hasSyncVersionField(rows: any[]): boolean {
 }
 
 async function enrichMesasWithSyncVersion(mesas: MesaRecord[]): Promise<MesaRecord[]> {
+  if (mesas.some((m) => m.sync_version !== undefined)) return mesas;
+
   const mesaIds = (Array.isArray(mesas) ? mesas : [])
     .map((mesa) => String(mesa?.id || '').trim())
     .filter(Boolean);
@@ -497,7 +500,7 @@ async function closeOpenOrdersLegacy({
   excludeOrderId?: string | null;
 }) {
   const client = getSupabaseClient();
-  const basePayload: Record<string, any> = { status: nextStatus };
+  const basePayload: Record<string, unknown> = { status: nextStatus };
   const payloadWithClosedAt = { ...basePayload, closed_at: new Date().toISOString() };
 
   let query = client
@@ -860,7 +863,7 @@ export async function fetchMesasByBusinessId(businessId: string): Promise<MesaRe
       mesasSummaryFastRpcCompatibility = 'supported';
       return mesas;
     } catch (rpcError) {
-      if (isMissingListTablesWithOrderSummaryFastRpcError(rpcError)) {
+      if (isMissingListTablesWithOrderSummaryFastRpcError(rpcError as SupabaseErrorLike)) {
         mesasSummaryFastRpcCompatibility = 'unsupported';
       } else {
         throw rpcError;
@@ -874,7 +877,7 @@ export async function fetchMesasByBusinessId(businessId: string): Promise<MesaRe
       mesasSummaryRpcCompatibility = 'supported';
       return mesas;
     } catch (rpcError) {
-      if (isMissingListTablesWithOrderSummaryRpcError(rpcError)) {
+      if (isMissingListTablesWithOrderSummaryRpcError(rpcError as SupabaseErrorLike)) {
         mesasSummaryRpcCompatibility = 'unsupported';
       } else {
         throw rpcError;
@@ -1317,7 +1320,7 @@ export async function refreshMesaEditLockHeartbeat({
 
   const ttl = Number.isFinite(Number(ttlSeconds)) ? Math.max(15, Math.floor(Number(ttlSeconds))) : 45;
   const now = new Date();
-  const payload: Record<string, any> = {
+  const payload: Record<string, unknown> = {
     lock_owner_name: normalizedUserName,
     lock_expires_at: new Date(now.getTime() + ttl * 1000).toISOString(),
     updated_at: now.toISOString(),
@@ -1490,7 +1493,7 @@ export async function releaseMesaEditLock({
   throw withToken.error;
 }
 
-function isMissingUpdatedAtOnTablesError(errorLike: any) {
+function isMissingUpdatedAtOnTablesError(errorLike: SupabaseErrorLike) {
   const message = String(errorLike?.message || '').toLowerCase();
   return (
     message.includes('column')
@@ -1501,7 +1504,7 @@ function isMissingUpdatedAtOnTablesError(errorLike: any) {
   );
 }
 
-function isMissingOpenedAtOnTablesError(errorLike: any) {
+function isMissingOpenedAtOnTablesError(errorLike: SupabaseErrorLike) {
   const message = String(errorLike?.message || '').toLowerCase();
   return (
     message.includes('column')
@@ -1554,11 +1557,39 @@ function formatErrorMessage(errorLike: unknown, fallback = 'Operacion fallida'):
   }
 }
 
-function normalizeTableIdentifier(value: string | number): string {
+export function normalizeTableIdentifier(value: string | number | null | undefined): string {
   return String(value ?? '').trim();
 }
 
-function isInvalidIntegerTableNumberError(errorLike: any) {
+export function isMesaOccupied(status: string | null | undefined) {
+  return String(status || '').trim().toLowerCase() === 'occupied';
+}
+
+export function compareMesaTableIdentifiers(left: MesaRecord, right: MesaRecord) {
+  const leftId = normalizeTableIdentifier(left?.table_number ?? left?.name ?? left?.id);
+  const rightId = normalizeTableIdentifier(right?.table_number ?? right?.name ?? right?.id);
+
+  return leftId.localeCompare(rightId, 'es', {
+    numeric: true,
+    sensitivity: 'base',
+  });
+}
+
+export function resolveMesaSyncVersion(mesa: Partial<MesaRecord> | null | undefined): number {
+  const raw = Number(mesa?.sync_version);
+  if (!Number.isFinite(raw)) return 0;
+  return Math.max(0, Math.floor(raw));
+}
+
+export function mesaDisplayName(mesa: MesaRecord): string {
+  if (mesa.name && String(mesa.name).trim()) return String(mesa.name).trim();
+  if (mesa.table_number !== null && mesa.table_number !== undefined && String(mesa.table_number).trim()) {
+    return `Mesa ${String(mesa.table_number).trim()}`;
+  }
+  return `Mesa ${mesa.id.slice(0, 6)}`;
+}
+
+function isInvalidIntegerTableNumberError(errorLike: SupabaseErrorLike) {
   const code = String(errorLike?.code || '').trim();
   const message = String(errorLike?.message || '').toLowerCase();
   const details = String(errorLike?.details || '').toLowerCase();

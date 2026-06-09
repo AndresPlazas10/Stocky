@@ -10,7 +10,8 @@ export type SectionId =
   | 'proveedores'
   | 'empleados'
   | 'reportes'
-  | 'configuracion';
+  | 'configuracion'
+  | 'impresion';
 
 export type SectionGroup = 'principal' | 'gestion' | 'sistema';
 
@@ -33,6 +34,7 @@ export const SECTION_META: SectionMeta[] = [
   { id: 'empleados', label: 'Empleados', group: 'gestion', icon: 'people-outline' },
   { id: 'reportes', label: 'Reportes', group: 'sistema', icon: 'stats-chart-outline' },
   { id: 'configuracion', label: 'Configuración', group: 'sistema', icon: 'settings-outline' },
+  { id: 'impresion', label: 'Impresión', group: 'sistema', icon: 'print-outline' },
 ];
 
 export const SECTION_GROUP_LABELS: Record<SectionGroup, string> = {
@@ -51,7 +53,7 @@ export const SECTION_IDS = SECTION_META.map((section) => section.id);
 export const ADMIN_SECTION_IDS: SectionId[] = [...SECTION_IDS];
 
 // Paridad con web: dashboard de empleado solo expone estas 3 vistas.
-export const EMPLOYEE_SECTION_IDS: SectionId[] = ['home', 'ventas', 'inventario'];
+export const EMPLOYEE_SECTION_IDS: SectionId[] = ['home', 'ventas', 'inventario', 'impresion'];
 
 export function getSectionsBySource(source: 'owner' | 'employee' | null | undefined): SectionId[] {
   if (source === 'employee') return EMPLOYEE_SECTION_IDS;

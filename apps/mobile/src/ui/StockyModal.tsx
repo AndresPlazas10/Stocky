@@ -43,6 +43,8 @@ type Props = PropsWithChildren<{
   bodyFlex?: boolean;
   instantOpen?: boolean;
   perfTag?: string;
+  dismissable?: boolean;
+  hideCloseButton?: boolean;
 }>;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -91,6 +93,8 @@ export function StockyModal({
   bodyFlex,
   instantOpen = false,
   perfTag,
+  dismissable = false,
+  hideCloseButton = false,
 }: Props) {
   const isCentered = layout === 'centered';
   const centeredShift = Math.max(0, centeredOffsetY);
@@ -154,11 +158,8 @@ export function StockyModal({
   }, [sheetStyle]);
 
   useEffect(() => {
-    if (visible) setRenderVisible(true);
-  }, [visible]);
-
-  useEffect(() => {
     if (!visible) return;
+    setRenderVisible(true);
     modalOpenStartedAtRef.current = Date.now();
     openPaintLoggedRef.current = false;
     contentReadyLoggedRef.current = false;
@@ -170,7 +171,7 @@ export function StockyModal({
       deferContent,
       instantOpen,
     });
-  }, [deferContent, effectiveBackdrop, instantOpen, layout, modalAnimationType, perfTag, title, visible]);
+  }, [visible, perfTag, title, modalAnimationType, layout, effectiveBackdrop, deferContent, instantOpen]);
 
   useEffect(() => {
     if (!renderVisible) return;
@@ -250,11 +251,29 @@ export function StockyModal({
       return;
     }
 
-    if (!visible) {
+    if (!visible) return;
+
+    if (contentReady && !contentReadyLoggedRef.current) {
+      contentReadyLoggedRef.current = true;
+      perfMark('modal_content_ready', {
+        modal: perfTag || title || 'untagged',
+        readyMs: perfDurationMs(modalOpenStartedAtRef.current),
+        deferContent,
+      });
+      contentOpacity.setValue(0);
+      Animated.timing(contentOpacity, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
       return;
     }
 
+    if (contentReady) return;
+
     setContentReady(false);
+    contentOpacity.setValue(0);
     let cancelled = false;
     const handle = InteractionManager.runAfterInteractions(() => {
       if (!cancelled) setContentReady(true);
@@ -264,32 +283,7 @@ export function StockyModal({
       cancelled = true;
       (handle as { cancel?: () => void }).cancel?.();
     };
-  }, [deferContent, instantOpen, renderVisible, visible]);
-
-  useEffect(() => {
-    if (!deferContent) return;
-    if (!contentReady) {
-      contentOpacity.setValue(0);
-      return;
-    }
-
-    Animated.timing(contentOpacity, {
-      toValue: 1,
-      duration: 180,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [contentOpacity, contentReady, deferContent]);
-
-  useEffect(() => {
-    if (!visible || !renderVisible || !contentReady || contentReadyLoggedRef.current) return;
-    contentReadyLoggedRef.current = true;
-    perfMark('modal_content_ready', {
-      modal: perfTag || title || 'untagged',
-      readyMs: perfDurationMs(modalOpenStartedAtRef.current),
-      deferContent,
-    });
-  }, [contentReady, deferContent, perfTag, renderVisible, title, visible]);
+  }, [deferContent, instantOpen, renderVisible, visible, contentReady, contentOpacity, perfTag, title]);
 
   const scrimOpacity = appear;
   const sheetOpacity = appear.interpolate({
@@ -315,7 +309,7 @@ export function StockyModal({
       animationType="none"
       transparent
       visible={renderVisible}
-      onRequestClose={onClose}
+      onRequestClose={dismissable ? onClose : undefined}
       presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
       statusBarTranslucent
       navigationBarTranslucent={Platform.OS === 'android'}
@@ -337,7 +331,7 @@ export function StockyModal({
             effectiveBackdrop === 'blur' ? styles.scrimBlur : styles.scrimDim,
             { opacity: scrimOpacity },
           ]}
-          onPress={onClose}
+          onPress={dismissable ? onClose : undefined}
         />
         <Animated.View
           style={[
@@ -361,7 +355,14 @@ export function StockyModal({
             pointerEvents={wrapperPointerEvents}
           >
             {headerSlot ? (
-              <View style={styles.customHeader}>{headerSlot}</View>
+              <View style={styles.customHeader}>
+                {headerSlot}
+                {!hideCloseButton ? (
+                  <Pressable onPress={onClose} style={styles.headerCloseOverlay}>
+                    <Ionicons name="close" size={22} color={STOCKY_COLORS.textSecondary} />
+                  </Pressable>
+                ) : null}
+              </View>
             ) : (
               <View style={styles.header}>
                 <Text style={styles.title}>{title || 'Detalle'}</Text>
@@ -389,7 +390,7 @@ export function StockyModal({
             {footer ? <View style={[styles.footer, footerStyle]}>{footer}</View> : null}
           </Animated.View>
 
-          {entryEffect === 'blur' ? (
+          {entryEffect === 'blur' && Platform.OS === 'ios' ? (
             <Animated.View pointerEvents="none" style={[styles.sheetBlurOverlay, { opacity: blurOverlayOpacity }]}>
               <BlurView
                 style={StyleSheet.absoluteFillObject}
@@ -417,6 +418,18 @@ const styles = StyleSheet.create({
   customHeader: {
     borderBottomWidth: 1,
     borderBottomColor: STOCKY_COLORS.borderSoft,
+  },
+  headerCloseOverlay: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
   overlaySheet: {
     justifyContent: 'flex-end',

@@ -40,7 +40,7 @@ export function useMobileNotifications(session: Session | null) {
     void registerPushTokenForSession(session).then((result) => {
       if (cancelled) return;
       if (!result.ok) {
-        console.log('[notifications] push token registration skipped', result.reason, result.message);
+        if (__DEV__) console.log('[notifications] push token registration skipped', result.reason, result.message);
         return;
       }
 
@@ -50,7 +50,7 @@ export function useMobileNotifications(session: Session | null) {
           if (!businessContext || businessContext.source !== 'owner') return;
           await deactivateOtherPushTokensForUser(session.user.id, result.installationId);
         } catch (error) {
-          console.log('[notifications] cleanup old tokens error', error);
+          if (__DEV__) console.log('[notifications] cleanup old tokens error', error);
         }
       })();
     });
@@ -78,14 +78,14 @@ export function useMobileNotifications(session: Session | null) {
 
           if (cancelled) return;
           if (!result.ok) {
-            console.log('[notifications] employee-login notify failed', result.message);
+            if (__DEV__) console.log('[notifications] employee-login notify failed', result.message);
             return;
           }
 
           lastEmployeeLoginNotifyKeyRef.current = notifyKey;
         } catch (error) {
           if (cancelled) return;
-          console.log('[notifications] employee-login notify error', error);
+          if (__DEV__) console.log('[notifications] employee-login notify error', error);
         }
       })();
     }
@@ -103,15 +103,15 @@ export function useMobileNotifications(session: Session | null) {
     try {
       receivedSub = Notifications.addNotificationReceivedListener((notification) => {
         if (cancelled) return;
-        console.log('[notifications] received', notification.request?.identifier || 'unknown');
+        if (__DEV__) console.log('[notifications] received', notification.request?.identifier || 'unknown');
       });
 
       responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
         if (cancelled) return;
-        console.log('[notifications] tapped', response.notification.request?.identifier || 'unknown');
+        if (__DEV__) console.log('[notifications] tapped', response.notification.request?.identifier || 'unknown');
       });
     } catch (error) {
-      console.log('[notifications] listeners skipped', error);
+      if (__DEV__) console.log('[notifications] listeners skipped', error);
     }
 
     return () => {

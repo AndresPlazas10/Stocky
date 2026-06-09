@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { EXPO_CONFIG } from '../config/env';
 import { getSupabaseClient } from '../lib/supabase';
+import type { SupabaseErrorLike } from '../types/errors';
 
 const EMPLOYEE_LIST_COLUMNS = 'id,business_id,user_id,full_name,username,role,is_active,created_at';
 const DEFAULT_EMPLOYEE_MANAGEMENT_LIMIT = 40;
@@ -66,18 +67,18 @@ function normalizeEmpleado(row: any): EmpleadoRecord {
   };
 }
 
-function wrapDbError(errorLike: any, fallbackMessage: string): Error & { code?: string } {
+function wrapDbError(errorLike: SupabaseErrorLike, fallbackMessage: string): Error & { code?: string } {
   const wrapped: Error & { code?: string } = new Error(errorLike?.message || fallbackMessage);
   wrapped.code = normalizeReference(errorLike?.code) || undefined;
   return wrapped;
 }
 
-function isMissingDeleteEmployeeFunction(errorLike: any): boolean {
+function isMissingDeleteEmployeeFunction(errorLike: SupabaseErrorLike): boolean {
   const message = String(errorLike?.message || '').toLowerCase();
   return message.includes('delete_employee') && message.includes('does not exist');
 }
 
-function isMissingBusinessUsernameColumn(errorLike: any): boolean {
+function isMissingBusinessUsernameColumn(errorLike: SupabaseErrorLike): boolean {
   const message = String(errorLike?.message || '').toLowerCase();
   return (
     message.includes('column')
@@ -88,7 +89,7 @@ function isMissingBusinessUsernameColumn(errorLike: any): boolean {
   );
 }
 
-function mapAuthSignUpError(errorLike: any): Error {
+function mapAuthSignUpError(errorLike: SupabaseErrorLike): Error {
   const errorMsg = String(errorLike?.message || '');
   if (errorMsg.includes('already registered') || errorMsg === 'User already registered') {
     return new Error('Ya existe un empleado con este nombre de usuario.');
@@ -102,7 +103,7 @@ function mapAuthSignUpError(errorLike: any): Error {
   return new Error(`Error al crear la cuenta: ${errorMsg || 'desconocido'}.`);
 }
 
-function mapCreateEmployeeRpcError(errorLike: any): Error {
+function mapCreateEmployeeRpcError(errorLike: SupabaseErrorLike): Error {
   const errorMsg = String(errorLike?.message || '');
   const lower = errorMsg.toLowerCase();
 

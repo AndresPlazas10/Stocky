@@ -1,6 +1,7 @@
 import { getSupabaseClient } from '../lib/supabase';
 import { notifyAdminLowStock, notifyAdminSaleRegistered } from '../notifications/mobileNotificationsService';
 import type { MesaOrderItem } from './mesaOrderService';
+import type { SupabaseErrorLike } from '../types/errors';
 
 export type PaymentMethod =
   | 'cash'
@@ -83,7 +84,7 @@ function buildIdempotencyKey({
   return `stocky:mobile:${action}:${businessId}:${orderId || 'none'}:${tableId || 'none'}`;
 }
 
-function isFunctionUnavailableError(errorLike: any, functionName: string) {
+function isFunctionUnavailableError(errorLike: SupabaseErrorLike, functionName: string) {
   const message = normalizeForMatch(errorLike?.message || '');
   if (!message) return false;
 
@@ -97,7 +98,7 @@ function isFunctionUnavailableError(errorLike: any, functionName: string) {
     );
 }
 
-function isOrderContextError(errorLike: any) {
+function isOrderContextError(errorLike: SupabaseErrorLike) {
   const message = normalizeForMatch(errorLike?.message || '');
   return (
     (message.includes('la orden') && message.includes('no esta abierta'))
@@ -109,7 +110,7 @@ function isOrderContextError(errorLike: any) {
 }
 
 function isMissingColumnInRelationError(
-  errorLike: any,
+  errorLike: SupabaseErrorLike,
   { tableName, columnName }: { tableName: string; columnName: string },
 ) {
   const message = String(errorLike?.message || '').toLowerCase();
@@ -262,8 +263,8 @@ async function callCreateSaleCompleteWithFallback({
   idempotentParams,
 }: {
   preferBase?: boolean;
-  baseParams: Record<string, any>;
-  idempotentParams: Record<string, any>;
+  baseParams: Record<string, unknown>;
+  idempotentParams: Record<string, unknown>;
 }) {
   const client = getSupabaseClient();
 
@@ -287,8 +288,8 @@ async function callCreateSplitSalesCompleteWithFallback({
   baseParams,
   idempotentParams,
 }: {
-  baseParams: Record<string, any>;
-  idempotentParams: Record<string, any>;
+  baseParams: Record<string, unknown>;
+  idempotentParams: Record<string, unknown>;
 }) {
   const client = getSupabaseClient();
 

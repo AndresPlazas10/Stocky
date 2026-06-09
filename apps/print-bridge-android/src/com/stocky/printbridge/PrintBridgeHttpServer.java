@@ -162,16 +162,28 @@ public class PrintBridgeHttpServer {
 
     private void handleStatus(OutputStream output) throws Exception {
         JSONObject status = new JSONObject();
+        String deviceAddress = prefs.getString("deviceAddress", "");
+        boolean hasPrinter = !deviceAddress.isEmpty();
         status.put("ok", true);
-        status.put("enabled", true);
-        status.put("name", prefs.getString("deviceName", ""));
+        status.put("enabled", hasPrinter);
+        status.put("hasPrinter", hasPrinter);
+        status.put("name", hasPrinter ? prefs.getString("deviceName", "") : "");
         status.put("paperWidthMm", parseInt(prefs.getString("paper", "80"), 80));
         sendCorsResponse(output, 200, status.toString());
     }
 
     private void handlePrint(OutputStream output, Map<String, String> headers, String body) throws Exception {
-        if (!validateToken(headers)) {
+        String token = headers.get("x-stocky-bridge-token");
+        boolean hasToken = token != null && !token.trim().isEmpty();
+        boolean tokenValid = hasToken && token.trim().equals(prefs.getString("bridgeToken", ""));
+        if (hasToken && !tokenValid) {
             sendCorsResponse(output, 401, "{\"ok\":false,\"error\":\"Token invalido\"}");
+            return;
+        }
+
+        String deviceAddress = prefs.getString("deviceAddress", "");
+        if (deviceAddress.isEmpty()) {
+            sendCorsResponse(output, 503, "{\"ok\":false,\"error\":\"No hay impresora configurada. Abre Stocky Print y configura una impresora.\"}");
             return;
         }
 
@@ -200,18 +212,24 @@ public class PrintBridgeHttpServer {
             return;
         }
 
-        int paperWidthMm = payload.optInt("paperWidthMm", parseInt(prefs.getString("paper", "80"), 80));
+        final int paperWidthMm = parseInt(prefs.getString("paper", "80"), 80);
+        final boolean openCashDrawer = prefs.getBoolean("cashDrawer", false);
+        final byte[] escposData = ReceiptSerializer.serialize(receipt, paperWidthMm);
 
-        try {
-            byte[] escposData = ReceiptSerializer.serialize(receipt, paperWidthMm);
-            boolean openCashDrawer = prefs.getBoolean("cashDrawer", false);
-            BluetoothPrinter.printBytes(escposData, openCashDrawer, bluetoothAdapter, prefs);
-            sendCorsResponse(output, 200, "{\"ok\":true}");
-        } catch (Exception e) {
-            Log.e(TAG, "Print failed", e);
-            String errorMsg = e.getMessage() != null ? e.getMessage() : "Error desconocido";
-            sendCorsResponse(output, 500, "{\"ok\":false,\"error\":" + JSONObject.quote(errorMsg) + "}");
-        }
+        sendCorsResponse(output, 202, "{\"ok\":true,\"message\":\"Impresion iniciada\"}");
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Log.i(TAG, "Async print starting: " + escposData.length + " bytes");
+                    BluetoothPrinter.printBytes(escposData, openCashDrawer, bluetoothAdapter, prefs);
+                    Log.i(TAG, "Async print completed successfully");
+                } catch (Exception e) {
+                    Log.e(TAG, "Async print failed", e);
+                }
+            }
+        }, "AsyncPrintJob").start();
     }
 
     private void sendCorsResponse(OutputStream output, int status, String body) throws Exception {

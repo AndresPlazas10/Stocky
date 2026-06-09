@@ -1,6 +1,7 @@
 export const STOCKY_COLORS = {
   primary900: '#003B46',
   primary700: '#07575B',
+  primary50: '#EEF2FF',
   accent500: '#66A5AD',
   accent300: '#99D3DB',
   backgroundBase: '#C4DFE6',
@@ -14,6 +15,7 @@ export const STOCKY_COLORS = {
   successText: '#166534',
   errorBg: '#FEE2E2',
   errorText: '#991B1B',
+  errorLight: '#FEE2E2',
   white: '#FFFFFF',
 };
 

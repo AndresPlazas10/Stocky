@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '../lib/supabase';
+import type { SupabaseErrorLike } from '../types/errors';
 
 export type InventorySupplierRecord = {
   id: string;
@@ -23,6 +24,14 @@ export type InventoryProductRecord = {
   created_at: string | null;
   supplier: InventorySupplierRecord | null;
 };
+
+const productsCache = new Map<string, { items: InventoryProductRecord[]; cachedAt: number }>();
+const suppliersCache = new Map<string, { items: InventorySupplierRecord[]; cachedAt: number }>();
+const CACHE_TTL_MS = 45_000;
+const productsInFlightByBusinessId = new Map<string, Promise<InventoryProductRecord[]>>();
+const suppliersInFlightByBusinessId = new Map<string, Promise<InventorySupplierRecord[]>>();
+const rpcAvailabilityCache = new Map<string, boolean>();
+
 let inventoryProductsFastRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
 let inventoryProductsWithSupplierRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
 let inventoryProductsFastPagedRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
@@ -89,7 +98,7 @@ function normalizeProduct(
   };
 }
 
-function isMissingCreateProductRpcError(errorLike: any): boolean {
+function isMissingCreateProductRpcError(errorLike: SupabaseErrorLike): boolean {
   const code = normalizeText(errorLike?.code);
   const message = normalizeText(errorLike?.message).toLowerCase();
 
@@ -99,7 +108,7 @@ function isMissingCreateProductRpcError(errorLike: any): boolean {
     || message.includes('could not find the function');
 }
 
-function isMissingProductSupplierJoinRelationError(errorLike: any): boolean {
+function isMissingProductSupplierJoinRelationError(errorLike: SupabaseErrorLike): boolean {
   const code = normalizeText(errorLike?.code).toUpperCase();
   const message = normalizeText(errorLike?.message).toLowerCase();
   return code === 'PGRST200'
@@ -108,7 +117,7 @@ function isMissingProductSupplierJoinRelationError(errorLike: any): boolean {
     || message.includes('products_supplier_id_fkey');
 }
 
-function isMissingListInventoryProductsWithSupplierRpcError(errorLike: any): boolean {
+function isMissingListInventoryProductsWithSupplierRpcError(errorLike: SupabaseErrorLike): boolean {
   const code = normalizeText(errorLike?.code).toUpperCase();
   const message = normalizeText(errorLike?.message).toLowerCase();
   return code === 'PGRST202'
@@ -118,7 +127,7 @@ function isMissingListInventoryProductsWithSupplierRpcError(errorLike: any): boo
     || message.includes('schema cache');
 }
 
-function isMissingListInventoryProductsFastRpcError(errorLike: any): boolean {
+function isMissingListInventoryProductsFastRpcError(errorLike: SupabaseErrorLike): boolean {
   const code = normalizeText(errorLike?.code).toUpperCase();
   const message = normalizeText(errorLike?.message).toLowerCase();
   return code === 'PGRST202'
@@ -128,7 +137,7 @@ function isMissingListInventoryProductsFastRpcError(errorLike: any): boolean {
     || message.includes('schema cache');
 }
 
-function isMissingListInventoryProductsFastPagedRpcError(errorLike: any): boolean {
+function isMissingListInventoryProductsFastPagedRpcError(errorLike: SupabaseErrorLike): boolean {
   const code = normalizeText(errorLike?.code).toUpperCase();
   const message = normalizeText(errorLike?.message).toLowerCase();
   return code === 'PGRST202'
@@ -171,12 +180,39 @@ function validateProductInput({
   }
 }
 
+export function invalidateInventorySuppliersCache(businessId?: string) {
+  if (businessId) {
+    suppliersCache.delete(businessId);
+    suppliersInFlightByBusinessId.delete(businessId);
+    return;
+  }
+  suppliersCache.clear();
+  suppliersInFlightByBusinessId.clear();
+}
+
+export function invalidateInventoryProductsCache(businessId?: string) {
+  if (businessId) {
+    productsCache.delete(businessId);
+    productsInFlightByBusinessId.delete(businessId);
+    return;
+  }
+  productsCache.clear();
+  productsInFlightByBusinessId.clear();
+}
+
 export async function listInventorySuppliers(
   businessId: string,
   options: { limit?: number; offset?: number } = {},
 ): Promise<InventorySupplierRecord[]> {
-  const client = getSupabaseClient();
   const limit = Number.isFinite(options.limit) ? Number(options.limit) : null;
+  if (limit === null) {
+    const cached = suppliersCache.get(businessId);
+    if (cached && (Date.now() - cached.cachedAt) <= CACHE_TTL_MS) return cached.items;
+    const inFlight = suppliersInFlightByBusinessId.get(businessId);
+    if (inFlight) return inFlight;
+  }
+
+  const client = getSupabaseClient();
   const offset = Number.isFinite(options.offset) ? Number(options.offset) : 0;
   let query = client
     .from('suppliers')
@@ -186,6 +222,22 @@ export async function listInventorySuppliers(
 
   if (limit !== null) {
     query = query.range(offset, offset + limit - 1);
+  }
+
+  if (limit === null) {
+    const request = (async () => {
+      const { data, error } = await query;
+      if (error) throw error;
+      const items = (Array.isArray(data) ? data : []).map(normalizeSupplier);
+      suppliersCache.set(businessId, { items, cachedAt: Date.now() });
+      return items;
+    })();
+    suppliersInFlightByBusinessId.set(businessId, request);
+    try {
+      return await request;
+    } finally {
+      suppliersInFlightByBusinessId.delete(businessId);
+    }
   }
 
   const { data, error } = await query;
@@ -202,160 +254,190 @@ export async function listInventoryProducts(
     offset?: number;
   } = {},
 ): Promise<InventoryProductRecord[]> {
-  const client = getSupabaseClient();
   const includeSuppliers = options.includeSuppliers !== false;
   const limit = Number.isFinite(options.limit) ? Number(options.limit) : null;
-  const offset = Number.isFinite(options.offset) ? Number(options.offset) : 0;
   const usePaging = limit !== null;
+  const cacheable = includeSuppliers && !usePaging && options.activeOnly !== true;
+
+  if (cacheable) {
+    const cached = productsCache.get(businessId);
+    if (cached && (Date.now() - cached.cachedAt) <= CACHE_TTL_MS) return cached.items;
+    const inFlight = productsInFlightByBusinessId.get(businessId);
+    if (inFlight) return inFlight;
+  }
+
+  const client = getSupabaseClient();
+  const offset = Number.isFinite(options.offset) ? Number(options.offset) : 0;
   const baseSelect = 'id,business_id,code,name,category,purchase_price,sale_price,stock,min_stock,unit,supplier_id,is_active,manage_stock,created_at';
 
-  if (!includeSuppliers) {
-    if (!usePaging && inventoryProductsFastRpcCompatibility !== 'unsupported') {
-      const fastRpcResult = await client.rpc('list_inventory_products_fast', {
+  const fetchItems = async (): Promise<InventoryProductRecord[]> => {
+    if (!includeSuppliers) {
+      if (!usePaging && inventoryProductsFastRpcCompatibility !== 'unsupported' && rpcAvailabilityCache.get('list_inventory_products_fast') !== false) {
+        const fastRpcResult = await client.rpc('list_inventory_products_fast', {
+          p_business_id: businessId,
+          p_active_only: options.activeOnly === true,
+        });
+
+        if (!fastRpcResult.error) {
+          rpcAvailabilityCache.set('list_inventory_products_fast', true);
+          inventoryProductsFastRpcCompatibility = 'supported';
+          const rows = Array.isArray(fastRpcResult.data) ? fastRpcResult.data : [];
+          return rows.map((row: any) => normalizeProduct(row, new Map<string, InventorySupplierRecord>()));
+        }
+
+        if (isMissingListInventoryProductsFastRpcError(fastRpcResult.error)) {
+          rpcAvailabilityCache.set('list_inventory_products_fast', false);
+          inventoryProductsFastRpcCompatibility = 'unsupported';
+        } else {
+          throw fastRpcResult.error;
+        }
+      }
+
+      if (usePaging && inventoryProductsFastPagedRpcCompatibility !== 'unsupported' && rpcAvailabilityCache.get('list_inventory_products_fast_paged') !== false) {
+        const pagedRpcResult = await client.rpc('list_inventory_products_fast_paged', {
+          p_business_id: businessId,
+          p_active_only: options.activeOnly === true,
+          p_limit: limit,
+          p_offset: offset,
+        });
+
+        if (!pagedRpcResult.error) {
+          rpcAvailabilityCache.set('list_inventory_products_fast_paged', true);
+          inventoryProductsFastPagedRpcCompatibility = 'supported';
+          const rows = Array.isArray(pagedRpcResult.data) ? pagedRpcResult.data : [];
+          return rows.map((row: any) => normalizeProduct(row, new Map<string, InventorySupplierRecord>()));
+        }
+
+        if (isMissingListInventoryProductsFastPagedRpcError(pagedRpcResult.error)) {
+          rpcAvailabilityCache.set('list_inventory_products_fast_paged', false);
+          inventoryProductsFastPagedRpcCompatibility = 'unsupported';
+        } else {
+          throw pagedRpcResult.error;
+        }
+      }
+
+      let query = client
+        .from('products')
+        .select(baseSelect)
+        .eq('business_id', businessId)
+        .order('created_at', { ascending: false });
+
+      if (options.activeOnly) {
+        query = query.eq('is_active', true);
+      }
+      if (usePaging) {
+        query = query.range(offset, offset + limit - 1);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      const products = Array.isArray(data) ? data : [];
+      return products.map((row: any) => normalizeProduct(row, new Map<string, InventorySupplierRecord>()));
+    }
+
+    if (!usePaging && inventoryProductsWithSupplierRpcCompatibility !== 'unsupported' && rpcAvailabilityCache.get('list_inventory_products_with_supplier') !== false) {
+      const rpcResult = await client.rpc('list_inventory_products_with_supplier', {
         p_business_id: businessId,
         p_active_only: options.activeOnly === true,
       });
 
-      if (!fastRpcResult.error) {
-        inventoryProductsFastRpcCompatibility = 'supported';
-        const rows = Array.isArray(fastRpcResult.data) ? fastRpcResult.data : [];
-        return rows.map((row: any) => normalizeProduct(row, new Map<string, InventorySupplierRecord>()));
+      if (!rpcResult.error) {
+        rpcAvailabilityCache.set('list_inventory_products_with_supplier', true);
+        inventoryProductsWithSupplierRpcCompatibility = 'supported';
+        const rpcRows = Array.isArray(rpcResult.data) ? rpcResult.data : [];
+        return rpcRows.map((row: any) => normalizeProduct(row, new Map<string, InventorySupplierRecord>()));
       }
 
-      if (isMissingListInventoryProductsFastRpcError(fastRpcResult.error)) {
-        inventoryProductsFastRpcCompatibility = 'unsupported';
+      if (isMissingListInventoryProductsWithSupplierRpcError(rpcResult.error)) {
+        rpcAvailabilityCache.set('list_inventory_products_with_supplier', false);
+        inventoryProductsWithSupplierRpcCompatibility = 'unsupported';
       } else {
-        throw fastRpcResult.error;
+        throw rpcResult.error;
       }
     }
 
-    if (usePaging && inventoryProductsFastPagedRpcCompatibility !== 'unsupported') {
-      const pagedRpcResult = await client.rpc('list_inventory_products_fast_paged', {
-        p_business_id: businessId,
-        p_active_only: options.activeOnly === true,
-        p_limit: limit,
-        p_offset: offset,
+    let withEmbeddedSuppliersQuery = client
+      .from('products')
+      .select(`
+        ${baseSelect},
+        supplier:suppliers!products_supplier_id_fkey (
+          id,
+          business_name,
+          contact_name
+        )
+      `)
+      .eq('business_id', businessId)
+      .order('created_at', { ascending: false });
+    if (options.activeOnly) {
+      withEmbeddedSuppliersQuery = withEmbeddedSuppliersQuery.eq('is_active', true);
+    }
+    if (usePaging) {
+      withEmbeddedSuppliersQuery = withEmbeddedSuppliersQuery.range(offset, offset + limit - 1);
+    }
+    const withEmbeddedSuppliers = await withEmbeddedSuppliersQuery;
+
+    if (!withEmbeddedSuppliers.error) {
+      const enrichedRows = Array.isArray(withEmbeddedSuppliers.data) ? withEmbeddedSuppliers.data : [];
+      return enrichedRows.map((row: any) => {
+        const supplier = row?.supplier ? normalizeSupplier(row.supplier) : null;
+        const supplierMap = new Map<string, InventorySupplierRecord>();
+        if (supplier?.id) supplierMap.set(supplier.id, supplier);
+        return normalizeProduct(row, supplierMap);
       });
-
-      if (!pagedRpcResult.error) {
-        inventoryProductsFastPagedRpcCompatibility = 'supported';
-        const rows = Array.isArray(pagedRpcResult.data) ? pagedRpcResult.data : [];
-        return rows.map((row: any) => normalizeProduct(row, new Map<string, InventorySupplierRecord>()));
-      }
-
-      if (isMissingListInventoryProductsFastPagedRpcError(pagedRpcResult.error)) {
-        inventoryProductsFastPagedRpcCompatibility = 'unsupported';
-      } else {
-        throw pagedRpcResult.error;
-      }
     }
 
-    let query = client
+    if (!isMissingProductSupplierJoinRelationError(withEmbeddedSuppliers.error)) {
+      throw withEmbeddedSuppliers.error;
+    }
+
+    let fallbackProductsQuery = client
       .from('products')
       .select(baseSelect)
       .eq('business_id', businessId)
       .order('created_at', { ascending: false });
-
     if (options.activeOnly) {
-      query = query.eq('is_active', true);
+      fallbackProductsQuery = fallbackProductsQuery.eq('is_active', true);
     }
     if (usePaging) {
-      query = query.range(offset, offset + limit - 1);
+      fallbackProductsQuery = fallbackProductsQuery.range(offset, offset + limit - 1);
+    }
+    const fallbackProducts = await fallbackProductsQuery;
+    if (fallbackProducts.error) throw fallbackProducts.error;
+    const products = Array.isArray(fallbackProducts.data) ? fallbackProducts.data : [];
+
+    const supplierMap = new Map<string, InventorySupplierRecord>();
+    const supplierIds = Array.from(new Set(
+      products.map((row: any) => normalizeReference(row?.supplier_id)).filter(Boolean) as string[],
+    ));
+    if (supplierIds.length > 0) {
+      const suppliersResult = await client
+        .from('suppliers')
+        .select('id,business_name,contact_name')
+        .eq('business_id', businessId)
+        .in('id', supplierIds);
+
+      if (suppliersResult.error) throw suppliersResult.error;
+      (Array.isArray(suppliersResult.data) ? suppliersResult.data : []).forEach((row: any) => {
+        const supplier = normalizeSupplier(row);
+        supplierMap.set(supplier.id, supplier);
+      });
     }
 
-    const { data, error } = await query;
-    if (error) throw error;
-    const products = Array.isArray(data) ? data : [];
-    return products.map((row: any) => normalizeProduct(row, new Map<string, InventorySupplierRecord>()));
+    return products.map((row: any) => normalizeProduct(row, supplierMap));
+  };
+
+  if (!cacheable) return fetchItems();
+
+  const request = fetchItems();
+  productsInFlightByBusinessId.set(businessId, request);
+
+  try {
+    const items = await request;
+    productsCache.set(businessId, { items, cachedAt: Date.now() });
+    return items;
+  } finally {
+    productsInFlightByBusinessId.delete(businessId);
   }
-
-  if (!usePaging && inventoryProductsWithSupplierRpcCompatibility !== 'unsupported') {
-    const rpcResult = await client.rpc('list_inventory_products_with_supplier', {
-      p_business_id: businessId,
-      p_active_only: options.activeOnly === true,
-    });
-
-    if (!rpcResult.error) {
-      inventoryProductsWithSupplierRpcCompatibility = 'supported';
-      const rpcRows = Array.isArray(rpcResult.data) ? rpcResult.data : [];
-      return rpcRows.map((row: any) => normalizeProduct(row, new Map<string, InventorySupplierRecord>()));
-    }
-
-    if (isMissingListInventoryProductsWithSupplierRpcError(rpcResult.error)) {
-      inventoryProductsWithSupplierRpcCompatibility = 'unsupported';
-    } else {
-      throw rpcResult.error;
-    }
-  }
-
-  let withEmbeddedSuppliersQuery = client
-    .from('products')
-    .select(`
-      ${baseSelect},
-      supplier:suppliers!products_supplier_id_fkey (
-        id,
-        business_name,
-        contact_name
-      )
-    `)
-    .eq('business_id', businessId)
-    .order('created_at', { ascending: false });
-  if (options.activeOnly) {
-    withEmbeddedSuppliersQuery = withEmbeddedSuppliersQuery.eq('is_active', true);
-  }
-  if (usePaging) {
-    withEmbeddedSuppliersQuery = withEmbeddedSuppliersQuery.range(offset, offset + limit - 1);
-  }
-  const withEmbeddedSuppliers = await withEmbeddedSuppliersQuery;
-
-  if (!withEmbeddedSuppliers.error) {
-    const enrichedRows = Array.isArray(withEmbeddedSuppliers.data) ? withEmbeddedSuppliers.data : [];
-    return enrichedRows.map((row: any) => {
-      const supplier = row?.supplier ? normalizeSupplier(row.supplier) : null;
-      const supplierMap = new Map<string, InventorySupplierRecord>();
-      if (supplier?.id) supplierMap.set(supplier.id, supplier);
-      return normalizeProduct(row, supplierMap);
-    });
-  }
-
-  if (!isMissingProductSupplierJoinRelationError(withEmbeddedSuppliers.error)) {
-    throw withEmbeddedSuppliers.error;
-  }
-
-  let fallbackProductsQuery = client
-    .from('products')
-    .select(baseSelect)
-    .eq('business_id', businessId)
-    .order('created_at', { ascending: false });
-  if (options.activeOnly) {
-    fallbackProductsQuery = fallbackProductsQuery.eq('is_active', true);
-  }
-  if (usePaging) {
-    fallbackProductsQuery = fallbackProductsQuery.range(offset, offset + limit - 1);
-  }
-  const fallbackProducts = await fallbackProductsQuery;
-  if (fallbackProducts.error) throw fallbackProducts.error;
-  const products = Array.isArray(fallbackProducts.data) ? fallbackProducts.data : [];
-
-  const supplierMap = new Map<string, InventorySupplierRecord>();
-  const supplierIds = Array.from(new Set(
-    products.map((row: any) => normalizeReference(row?.supplier_id)).filter(Boolean) as string[],
-  ));
-  if (supplierIds.length > 0) {
-    const suppliersResult = await client
-      .from('suppliers')
-      .select('id,business_name,contact_name')
-      .eq('business_id', businessId)
-      .in('id', supplierIds);
-
-    if (suppliersResult.error) throw suppliersResult.error;
-    (Array.isArray(suppliersResult.data) ? suppliersResult.data : []).forEach((row: any) => {
-      const supplier = normalizeSupplier(row);
-      supplierMap.set(supplier.id, supplier);
-    });
-  }
-
-  return products.map((row: any) => normalizeProduct(row, supplierMap));
 }
 
 export async function createInventoryProductWithRpcFallback({
@@ -456,6 +538,8 @@ export async function createInventoryProductWithRpcFallback({
     createdProductId = normalizeReference(rpcRow?.product_id) || normalizeReference(rpcRow?.id);
   }
 
+  invalidateInventoryProductsCache(businessId);
+
   return {
     productId: createdProductId,
     usedLegacyFallback,
@@ -522,6 +606,8 @@ export async function updateInventoryProductById({
   if (error) {
     throw new Error(error.message || 'No se pudo actualizar el producto.');
   }
+
+  invalidateInventoryProductsCache(businessId);
 }
 
 export async function checkInventoryProductCanDelete(productId: string): Promise<{
@@ -557,6 +643,8 @@ export async function deleteInventoryProductById({
     wrapped.code = normalizeReference((error as any)?.code) || undefined;
     throw wrapped;
   }
+
+  invalidateInventoryProductsCache(businessId);
 }
 
 export async function setInventoryProductActiveStatus({
@@ -578,4 +666,6 @@ export async function setInventoryProductActiveStatus({
   if (error) {
     throw new Error(error.message || 'No se pudo actualizar el estado del producto.');
   }
+
+  invalidateInventoryProductsCache(businessId);
 }

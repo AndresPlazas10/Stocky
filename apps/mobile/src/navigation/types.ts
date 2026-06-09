@@ -8,4 +8,5 @@ export type RootDrawerParamList = {
   empleados: undefined;
   reportes: undefined;
   configuracion: undefined;
+  impresion: undefined;
 };
