@@ -65,6 +65,7 @@ import { BLUETOOTH_PRINT_REQUIRED_MESSAGE, ensureBluetoothEnabled } from '../../
 import { getPaymentMethodLabel, getPaymentMethodIcon } from '../../utils/paymentMethods';
 import { useMesaToasts } from './hooks/useMesaToasts';
 import { useMesaOrderState } from './hooks/useMesaOrderState';
+import { useMesaEditLock } from './hooks/useMesaEditLock';
 
 type Props = {
   session: Session;
@@ -511,10 +512,8 @@ export function MesasPanel({ session, businessContext }: Props) {
   }, []);
 
   const [orderUnitsByOrderId, setOrderUnitsByOrderId] = useState<Record<string, number>>({});
-  const [mesaLocksByTableId, setMesaLocksByTableId] = useState<Record<string, MesaEditLock>>({});
   const [actorDisplayName, setActorDisplayName] = useState(() => resolveSessionDisplayName(session));
   const sessionDisplayName = useMemo(() => resolveSessionDisplayName(session), [session]);
-  const heldMesaLockRef = useRef<HeldMesaLock | null>(null);
   const canDeleteMesas = context?.source !== 'employee';
 
   const toasts = useMesaToasts();
@@ -550,6 +549,38 @@ export function MesasPanel({ session, businessContext }: Props) {
     getStockValidationMessage, orderTotal, orderModalTitle,
     isOrderFlowActive, cashChangeData, ensureCatalogLoaded,
   } = orderState;
+
+  const editLock = useMesaEditLock({
+    session,
+    context,
+    actorDisplayName,
+    onError: (msg) => setError(msg),
+    isOrderFlowActive,
+    onLockLost: () => {
+      setShowOrderModal(false);
+      setSelectedMesa(null);
+      setOrderItems([]);
+      setOrderModalError(null);
+      setSearchCatalog('');
+      setIsSearchFocused(false);
+      setMutatingOrderItemId(null);
+    },
+    onCloseAuxiliaryOrderModals: () => {
+      setShowCloseOrderChoiceModal(false);
+      setShowPaymentModal(false);
+      setShowSplitBillModal(false);
+      setPaymentMethod('cash');
+      setAmountReceived('');
+    },
+  });
+
+  const {
+    mesaLocksByTableId, setMesaLocksByTableId,
+    heldMesaLockRef, closeOrderModal,
+    closeAuxiliaryOrderModals,
+    publishMesaLockBroadcast, acquireMesaLockForEdition,
+    releaseHeldMesaLock, refreshMesaLocks,
+  } = editLock;
 
   const patchMesaOrderUnits = useCallback((orderId: string, units: number) => {
     const key = String(orderId || '').trim();
@@ -671,250 +702,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     }
   }, [extractOrderUnitsSnapshot]);
 
-  const applyMesaLocks = useCallback((locks: MesaEditLock[]) => {
-    const next: Record<string, MesaEditLock> = {};
-    (Array.isArray(locks) ? locks : []).forEach((lock) => {
-      const tableId = String(lock?.table_id || '').trim();
-      if (!tableId) return;
-      next[tableId] = lock;
-    });
-    setMesaLocksByTableId((prev) => {
-      if (!prev || Object.keys(prev).length === 0) return next;
-      const nowMs = Date.now();
-      Object.entries(prev).forEach(([tableId, lock]) => {
-        if (next[tableId]) return;
-        const token = String(lock?.lock_token || '').trim();
-        const expiresAtMs = Date.parse(String(lock?.lock_expires_at || '').trim());
-        if (!Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs) return;
-        const isPending = token.startsWith('pending-') || token.startsWith('broadcast-');
-        const updatedAtMs = Date.parse(String(lock?.updated_at || '').trim());
-        const isFresh = Number.isFinite(updatedAtMs) && (nowMs - updatedAtMs) <= 4000;
-        if (isPending || isFresh) {
-          next[tableId] = lock;
-        }
-      });
-      return next;
-    });
-  }, []);
-
-
-  const clearMesaLockPlaceholderTimer = useCallback((mesaId: string) => {
-    const timers = mesaLockPlaceholderTimersRef.current;
-    const existing = timers[mesaId];
-    if (existing) {
-      clearTimeout(existing);
-      delete timers[mesaId];
-    }
-  }, []);
-
-  const applyMesaLockPlaceholder = useCallback((mesaId: string, businessId: string) => {
-    if (!mesaId || !businessId) return;
-    const token = `pending-${mesaId}-${Date.now()}`;
-    const expiresAt = new Date(Date.now() + 3500).toISOString();
-    const updatedAt = new Date().toISOString();
-
-    setMesaLocksByTableId((prev) => {
-      if (prev[mesaId]) return prev;
-      return {
-        ...prev,
-        [mesaId]: {
-          table_id: mesaId,
-          business_id: businessId,
-          lock_owner_user_id: '',
-          lock_owner_name: 'Alguien',
-          lock_token: token,
-          lock_expires_at: expiresAt,
-          updated_at: updatedAt,
-        },
-      };
-    });
-
-    clearMesaLockPlaceholderTimer(mesaId);
-    mesaLockPlaceholderTimersRef.current[mesaId] = setTimeout(() => {
-      setMesaLocksByTableId((prev) => {
-        const current = prev[mesaId];
-        if (!current) return prev;
-        if (String(current.lock_token || '') !== token) return prev;
-        const next = { ...prev };
-        delete next[mesaId];
-        return next;
-      });
-      clearMesaLockPlaceholderTimer(mesaId);
-    }, 3800);
-  }, [clearMesaLockPlaceholderTimer]);
-
-  const refreshMesaLocks = useCallback(async (businessId: string) => {
-    const normalizedBusinessId = String(businessId || '').trim();
-    if (!normalizedBusinessId) {
-      setMesaLocksByTableId({});
-      return;
-    }
-    try {
-      const locks = await listActiveMesaEditLocks(normalizedBusinessId);
-      applyMesaLocks(locks);
-    } catch {
-      // no-op: no bloquear flujo principal por locks
-    }
-  }, [applyMesaLocks]);
-
-  const applyRealtimeMesaLockHint = useCallback((payload: any) => {
-    const mesaId = String(payload?.mesa_id || '').trim();
-    if (!mesaId) return;
-
-    const status = String(payload?.status || '').trim().toLowerCase();
-    if (status === 'available') {
-      setMesaLocksByTableId((prev) => {
-        if (!prev[mesaId]) return prev;
-        const next = { ...prev };
-        delete next[mesaId];
-        return next;
-      });
-      return;
-    }
-
-    const ownerUserId = String(payload?.editing_user_id || payload?.sender_user_id || '').trim();
-    if (!ownerUserId) return;
-
-    const ownerName = String(
-      payload?.editing_user_name
-      || payload?.sender_user_name
-      || 'Usuario',
-    ).trim() || 'Usuario';
-    const businessId = String(payload?.business_id || '').trim();
-    const lockToken = String(payload?.editing_lock_token || '').trim() || null;
-    const expiresAtRaw = String(payload?.editing_lock_expires_at || '').trim();
-    const lockTtlMs = Math.max(15_000, Number(payload?.editing_lock_ttl_ms || 45_000));
-    const lockExpiresAt = expiresAtRaw || new Date(Date.now() + lockTtlMs).toISOString();
-    const updatedAt = new Date().toISOString();
-
-    setMesaLocksByTableId((prev) => ({
-      ...prev,
-      [mesaId]: {
-        table_id: mesaId,
-        business_id: businessId || String(prev[mesaId]?.business_id || '').trim(),
-        lock_owner_user_id: ownerUserId,
-        lock_owner_name: ownerName,
-        lock_token: lockToken,
-        lock_expires_at: lockExpiresAt,
-        updated_at: updatedAt,
-      },
-    }));
-  }, []);
-
-  const applyRealtimeMesaLockEvent = useCallback((payload: any) => {
-    const eventType = String(payload?.eventType || '').trim().toUpperCase();
-    const nextRow = payload?.new && typeof payload.new === 'object' ? payload.new : null;
-    const prevRow = payload?.old && typeof payload.old === 'object' ? payload.old : null;
-    const tableId = String(nextRow?.table_id || prevRow?.table_id || '').trim();
-    if (!tableId) return;
-
-    if (eventType === 'DELETE') {
-      setMesaLocksByTableId((prev) => {
-        if (!prev[tableId]) return prev;
-        const next = { ...prev };
-        delete next[tableId];
-        return next;
-      });
-      return;
-    }
-
-    const lockOwnerUserId = String(nextRow?.lock_owner_user_id || '').trim();
-    if (!lockOwnerUserId) {
-      setMesaLocksByTableId((prev) => {
-        if (!prev[tableId]) return prev;
-        const next = { ...prev };
-        delete next[tableId];
-        return next;
-      });
-      return;
-    }
-
-    const rawExpiresAt = String(nextRow?.lock_expires_at || '').trim();
-    if (rawExpiresAt) {
-      const expiresAtMs = Date.parse(rawExpiresAt);
-      if (Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now()) {
-        setMesaLocksByTableId((prev) => {
-          if (!prev[tableId]) return prev;
-          const next = { ...prev };
-          delete next[tableId];
-          return next;
-        });
-        return;
-      }
-    }
-
-    const lock: MesaEditLock = {
-      table_id: tableId,
-      business_id: String(nextRow?.business_id || prevRow?.business_id || '').trim(),
-      lock_owner_user_id: lockOwnerUserId,
-      lock_owner_name: String(nextRow?.lock_owner_name || 'Usuario').trim() || 'Usuario',
-      lock_token: String(nextRow?.lock_token || '').trim() || null,
-      lock_expires_at: rawExpiresAt || null,
-      updated_at: String(nextRow?.updated_at || '').trim() || new Date().toISOString(),
-    };
-
-    setMesaLocksByTableId((prev) => ({
-      ...prev,
-      [tableId]: lock,
-    }));
-  }, []);
-
-  const applyRealtimeMesaLockBroadcast = useCallback((payload: any) => {
-    const senderClientId = String(payload?.sender_client_id || '').trim();
-    if (senderClientId && senderClientId === String(realtimeClientInstanceIdRef.current || '').trim()) return;
-
-    const activeBusinessId = String(context?.businessId || '').trim();
-    const payloadBusinessId = String(payload?.business_id || '').trim();
-    if (activeBusinessId && (!payloadBusinessId || payloadBusinessId !== activeBusinessId)) {
-      return;
-    }
-
-    const mesaId = String(payload?.mesa_id || '').trim();
-    if (!mesaId) return;
-
-    const locked = (
-      payload?.locked === true
-      || String(payload?.locked || '').trim().toLowerCase() === 'true'
-    );
-
-    if (!locked) {
-      setMesaLocksByTableId((prev) => {
-        if (!prev[mesaId]) return prev;
-        const next = { ...prev };
-        delete next[mesaId];
-        return next;
-      });
-      return;
-    }
-
-    const ownerUserId = String(payload?.lock_owner_user_id || payload?.sender_user_id || '').trim();
-    if (!ownerUserId) return;
-
-    const resolvedBusinessId = activeBusinessId || String(payload?.business_id || '').trim();
-    const lockToken = String(payload?.lock_token || '').trim() || null;
-    const rawExpiresAt = String(payload?.lock_expires_at || '').trim();
-    const lockTtlMs = Math.min(120_000, Math.max(15_000, Number(payload?.lock_ttl_ms || 45_000)));
-    const nowMs = Date.now();
-    const parsedExpiresAt = rawExpiresAt ? Date.parse(rawExpiresAt) : Number.NaN;
-    const safeExpiresAtMs = Number.isFinite(parsedExpiresAt)
-      ? Math.min(parsedExpiresAt, nowMs + lockTtlMs)
-      : nowMs + lockTtlMs;
-    const lockExpiresAt = new Date(safeExpiresAtMs).toISOString();
-
-    setMesaLocksByTableId((prev) => ({
-      ...prev,
-      [mesaId]: {
-        table_id: mesaId,
-        business_id: resolvedBusinessId || String(prev[mesaId]?.business_id || '').trim(),
-        lock_owner_user_id: ownerUserId,
-        lock_owner_name: 'Alguien',
-        lock_token: lockToken,
-        lock_expires_at: lockExpiresAt,
-        updated_at: new Date().toISOString(),
-      },
-    }));
-  }, [context?.businessId]);
-
   const sendMesaSyncBroadcast = useCallback((event: string, payload: Record<string, any>) => {
     const channel = mesasSyncBroadcastChannelRef.current;
     if (!channel) return;
@@ -943,170 +730,6 @@ export function MesasPanel({ session, businessContext }: Props) {
       });
     }
   }, []);
-
-  const publishMesaLockBroadcast = useCallback((
-    input: {
-      businessId: string;
-      tableId: string;
-      locked: boolean;
-      mode?: 'optimistic' | 'confirmed' | 'rollback';
-      lockToken?: string | null;
-      lockExpiresAt?: string | null;
-    },
-  ) => {
-    const businessId = String(input.businessId || '').trim();
-    const tableId = String(input.tableId || '').trim();
-    if (!businessId || !tableId) return;
-
-    const locked = Boolean(input.locked);
-    const lockTtlMs = 45_000;
-    const lockExpiresAt = locked
-      ? (String(input.lockExpiresAt || '').trim() || new Date(Date.now() + lockTtlMs).toISOString())
-      : null;
-
-    sendMesaSyncBroadcast('mesa_lock_changed', {
-      sender_user_id: session.user.id,
-      sender_client_id: realtimeClientInstanceIdRef.current,
-      mesa_id: tableId,
-      business_id: businessId,
-      locked,
-      mode: input.mode || 'confirmed',
-      lock_owner_user_id: locked ? session.user.id : null,
-      lock_token: locked ? (String(input.lockToken || '').trim() || null) : null,
-      lock_expires_at: lockExpiresAt,
-      lock_ttl_ms: locked ? lockTtlMs : null,
-      emitted_at: Date.now(),
-    });
-  }, [sendMesaSyncBroadcast, session.user.id]);
-
-  const releaseHeldMesaLock = useCallback(async (lockSnapshot?: HeldMesaLock | null) => {
-    const snapshot = lockSnapshot || heldMesaLockRef.current;
-    if (!snapshot) return;
-    if (!lockSnapshot) {
-      heldMesaLockRef.current = null;
-    } else {
-      const current = heldMesaLockRef.current;
-      if (
-        current
-        && current.businessId === snapshot.businessId
-        && current.tableId === snapshot.tableId
-        && current.lockToken === snapshot.lockToken
-      ) {
-        heldMesaLockRef.current = null;
-      }
-    }
-
-    publishMesaLockBroadcast({
-      businessId: snapshot.businessId,
-      tableId: snapshot.tableId,
-      locked: false,
-      mode: 'optimistic',
-    });
-
-    let releaseFailed = false;
-    try {
-      await releaseMesaEditLock({
-        businessId: snapshot.businessId,
-        tableId: snapshot.tableId,
-        userId: session.user.id,
-        lockToken: snapshot.lockToken,
-      });
-    } catch {
-      releaseFailed = true;
-    } finally {
-      setMesaLocksByTableId((prev) => {
-        const current = prev[snapshot.tableId];
-        if (!current) return prev;
-        if (String(current.lock_owner_user_id || '') !== String(session.user.id || '')) return prev;
-        const next = { ...prev };
-        delete next[snapshot.tableId];
-        return next;
-      });
-      publishMesaLockBroadcast({
-        businessId: snapshot.businessId,
-        tableId: snapshot.tableId,
-        locked: releaseFailed,
-        mode: releaseFailed ? 'rollback' : 'confirmed',
-        lockToken: snapshot.lockToken,
-      });
-      void refreshMesaLocks(snapshot.businessId);
-    }
-  }, [publishMesaLockBroadcast, refreshMesaLocks, session.user.id]);
-
-  const acquireMesaLockForEdition = useCallback(async (mesa: MesaRecord): Promise<boolean> => {
-    if (!context?.businessId) return true;
-    const tableId = String(mesa?.id || '').trim();
-    if (!tableId) return false;
-
-    const held = heldMesaLockRef.current;
-    if (held && (held.tableId !== tableId || held.businessId !== context.businessId)) {
-      await releaseHeldMesaLock(held);
-    }
-
-    publishMesaLockBroadcast({
-      businessId: context.businessId,
-      tableId,
-      locked: true,
-      mode: 'optimistic',
-    });
-
-    const result = await acquireMesaEditLock({
-      businessId: context.businessId,
-      tableId,
-      userId: session.user.id,
-      userName: actorDisplayName,
-      ttlSeconds: 45,
-    });
-
-    if (result.unsupported) {
-      publishMesaLockBroadcast({
-        businessId: context.businessId,
-        tableId,
-        locked: false,
-        mode: 'rollback',
-      });
-      return true;
-    }
-
-    if (!result.ok) {
-      publishMesaLockBroadcast({
-        businessId: context.businessId,
-        tableId,
-        locked: false,
-        mode: 'rollback',
-      });
-      setError(MESA_IN_USE_MESSAGE);
-      if (result.lock) {
-        setMesaLocksByTableId((prev) => ({
-          ...prev,
-          [tableId]: result.lock as MesaEditLock,
-        }));
-      }
-      void refreshMesaLocks(context.businessId);
-      return false;
-    }
-
-    if (result.lock) {
-      setMesaLocksByTableId((prev) => ({
-        ...prev,
-        [tableId]: result.lock as MesaEditLock,
-      }));
-    }
-    heldMesaLockRef.current = {
-      businessId: context.businessId,
-      tableId,
-      lockToken: result.lockToken || null,
-    };
-    publishMesaLockBroadcast({
-      businessId: context.businessId,
-      tableId,
-      locked: true,
-      mode: 'confirmed',
-      lockToken: result.lockToken || null,
-      lockExpiresAt: result.lock?.lock_expires_at || null,
-    });
-    return true;
-  }, [actorDisplayName, context?.businessId, publishMesaLockBroadcast, refreshMesaLocks, releaseHeldMesaLock, session.user.id]);
 
   const loadData = useCallback(async () => {
     const shouldShowLoading = mesasLengthRef.current === 0 && !hasLoadedOnceRef.current;
@@ -1464,27 +1087,13 @@ export function MesasPanel({ session, businessContext }: Props) {
 
     if (eventType !== 'DELETE' && hasNextStatus) {
       const normalizedStatus = String(nextStatus || '').trim().toLowerCase();
-      const businessId = String(nextRow?.business_id || prevRow?.business_id || context?.businessId || '').trim();
       if (normalizedStatus === 'available') {
-        clearMesaLockPlaceholderTimer(mesaId);
         setMesaLocksByTableId((prev) => {
           if (!prev[mesaId]) return prev;
           const next = { ...prev };
           delete next[mesaId];
           return next;
         });
-      }
-      if (normalizedStatus === 'occupied' && businessId) {
-        const selectedMesaId = String(selectedMesaIdRef.current || '').trim();
-        const held = heldMesaLockRef.current;
-        const hasHeldLock = Boolean(
-          held
-          && held.tableId === mesaId
-          && held.businessId === businessId,
-        );
-        if (!hasHeldLock && (!selectedMesaId || selectedMesaId !== mesaId)) {
-          applyMesaLockPlaceholder(mesaId, businessId);
-        }
       }
     }
     if (eventType !== 'DELETE' && (hasNextStatus || hasNextCurrentOrderId)) {
@@ -1494,8 +1103,6 @@ export function MesasPanel({ session, businessContext }: Props) {
       }
     }
   }, [
-    applyMesaLockPlaceholder,
-    clearMesaLockPlaceholderTimer,
     context?.businessId,
     scheduleMesaLocksRefresh,
   ]);
@@ -1522,20 +1129,6 @@ export function MesasPanel({ session, businessContext }: Props) {
           && held.tableId === tableId
           && held.businessId === businessId,
         );
-        if (!hasHeldLock && (!selectedMesaId || selectedMesaId !== tableId)) {
-          applyMesaLockPlaceholder(tableId, businessId);
-        }
-      } else if (normalizedStatus) {
-        clearMesaLockPlaceholderTimer(tableId);
-        setMesaLocksByTableId((prev) => {
-          const current = prev[tableId];
-          if (!current) return prev;
-          const currentToken = String(current.lock_token || '').trim();
-          if (!currentToken.startsWith('pending-')) return prev;
-          const next = { ...prev };
-          delete next[tableId];
-          return next;
-        });
       }
     }
 
@@ -1552,8 +1145,6 @@ export function MesasPanel({ session, businessContext }: Props) {
       };
     }));
   }, [
-    applyMesaLockPlaceholder,
-    clearMesaLockPlaceholderTimer,
     context?.businessId,
   ]);
 
@@ -1710,8 +1301,6 @@ export function MesasPanel({ session, businessContext }: Props) {
       return;
     }
 
-    applyRealtimeMesaLockHint(payload);
-
     applyRealtimeTableEvent({
       eventType: 'UPDATE',
       old: {
@@ -1746,7 +1335,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         },
       });
     }
-  }, [applyRealtimeMesaLockHint, applyRealtimeOrderEvent, applyRealtimeTableEvent, context?.businessId]);
+  }, [applyRealtimeOrderEvent, applyRealtimeTableEvent, context?.businessId]);
 
   const publishMesaStateBroadcast = useCallback((
     mesa: MesaRecord,
@@ -1908,7 +1497,6 @@ export function MesasPanel({ session, businessContext }: Props) {
       }, (payload) => {
         if (cancelled) return;
         markRealtimeIngress('mesa_lock', payload);
-        applyRealtimeMesaLockEvent(payload);
         scheduleLocks();
       });
 
@@ -1921,7 +1509,6 @@ export function MesasPanel({ session, businessContext }: Props) {
           rowRef: String(payload?.mesa_id || '').trim() || 'unknown',
           syncMode: String(payload?.mode || '').trim() || null,
         });
-        applyRealtimeMesaLockBroadcast(payload);
       })
       .on('broadcast', { event: 'mesa_state_changed' }, ({ payload }) => {
         if (cancelled) return;
@@ -1980,9 +1567,7 @@ export function MesasPanel({ session, businessContext }: Props) {
       orderRealtimeSummaryTimersRef.current = {};
     };
   }, [
-    applyRealtimeMesaLockBroadcast,
     applyRealtimeMesaBroadcast,
-    applyRealtimeMesaLockEvent,
     applyRealtimeOrderItemDelta,
     applyRealtimeOrderEvent,
     applyRealtimeTableEvent,
@@ -2131,30 +1716,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     }
     return direct;
   }, [catalogNameByIdentity]);
-
-  const closeAuxiliaryOrderModals = useCallback(() => {
-    setShowCloseOrderChoiceModal(false);
-    setShowPaymentModal(false);
-    setShowSplitBillModal(false);
-    setPaymentMethod('cash');
-    setAmountReceived('');
-  }, []);
-
-  const closeOrderModal = useCallback(() => {
-    const held = heldMesaLockRef.current;
-    if (held) {
-      void releaseHeldMesaLock(held);
-    }
-    orderModalOpenIntentRef.current = false;
-    closeAuxiliaryOrderModals();
-    setShowOrderModal(false);
-    setSelectedMesa(null);
-    setOrderItems([]);
-    setOrderModalError(null);
-    setSearchCatalog('');
-    setIsSearchFocused(false);
-    setMutatingOrderItemId(null);
-  }, [closeAuxiliaryOrderModals, releaseHeldMesaLock]);
 
   const releaseEmptyOrderAndClose = useCallback(async () => {
     if (!selectedMesa?.id) {
