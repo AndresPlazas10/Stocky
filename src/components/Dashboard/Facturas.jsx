@@ -779,7 +779,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                             </div>
                           </td>
                           <td className="p-2 text-right">{formatPrice(item.unit_price)}</td>
-                          <td className="p-2 text-right font-semibold text-blue-600">{formatPrice(item.total)}</td>
+                          <td className="p-2 text-right font-semibold text-gray-600">{formatPrice(item.total)}</td>
                           <td className="p-2 text-center">
                             <button
                               type="button"
@@ -796,7 +796,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                     <tfoot className="bg-gray-50 font-semibold">
                       <tr className="border-t-2">
                         <td colSpan="3" className="p-3 text-right text-lg">Total a pagar:</td>
-                        <td className="p-3 text-right text-xl text-blue-600">{formatPrice(totalFactura)}</td>
+                        <td className="p-3 text-right text-xl text-gray-600">{formatPrice(totalFactura)}</td>
                         <td></td>
                       </tr>
                     </tfoot>
@@ -818,7 +818,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
 
             {/* Checkbox para enviar email automáticamente */}
             {selectedCliente && clientes.find(c => c.id === selectedCliente)?.email && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -898,7 +898,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                     </div>
                     <span className={`px-2 py-1 rounded text-xs ${
                       factura.status === 'validated' ? 'bg-green-100' :
-                      factura.status === 'sent' ? 'bg-blue-100' :
+                      factura.status === 'sent' ? 'bg-gray-100' :
                       factura.status === 'cancelled' ? 'bg-red-100' :
                       'bg-yellow-100'
                     }`}>
@@ -990,7 +990,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                   <td className="p-3">
                     <span className={`px-2 py-1 rounded text-sm ${
                       factura.status === 'validated' ? 'bg-green-100' :
-                      factura.status === 'sent' ? 'bg-blue-100' :
+                      factura.status === 'sent' ? 'bg-gray-100' :
                       factura.status === 'cancelled' ? 'bg-red-100' :
                       'bg-yellow-100'
                     }`}>
@@ -1123,8 +1123,8 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                   ¿Estás seguro de cancelar esta factura? El stock se restaurará automáticamente.
                 </p>
                 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-800">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-800">
                     ℹ️ Esta acción cancelará la factura y devolverá todos los productos al inventario.
                   </p>
                 </div>

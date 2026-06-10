@@ -506,20 +506,20 @@ function Configuracion({ user, business, onBusinessUpdate }) {
 
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200">
+              <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
                 <div className="flex items-center gap-3 mb-2">
-                  <Settings className="w-5 h-5 text-blue-600" />
-                  <span className="text-sm text-blue-700 font-medium">Versión</span>
+                  <Settings className="w-5 h-5 text-gray-600" />
+                  <span className="text-sm text-gray-700 font-medium">Versión</span>
                 </div>
-                <p className="text-lg font-bold text-blue-800 pl-8">Stocky v1.0.0</p>
+                <p className="text-lg font-bold text-gray-800 pl-8">Stocky v1.0.0</p>
               </div>
 
-              <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200">
+              <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
                 <div className="flex items-center gap-3 mb-2">
-                  <Database className="w-5 h-5 text-purple-600" />
-                  <span className="text-sm text-purple-700 font-medium">Base de Datos</span>
+                  <Database className="w-5 h-5 text-gray-600" />
+                  <span className="text-sm text-gray-700 font-medium">Base de Datos</span>
                 </div>
-                <p className="text-lg font-bold text-purple-800 pl-8">Supabase PostgreSQL</p>
+                <p className="text-lg font-bold text-gray-800 pl-8">Supabase PostgreSQL</p>
               </div>
 
               <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200">
@@ -606,10 +606,10 @@ function Configuracion({ user, business, onBusinessUpdate }) {
               </div>
 
               {/* Tarjeta de Notificaciones */}
-              <div className="p-4 bg-gradient-to-br from-sky-50 to-white rounded-xl border border-sky-100">
+              <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 bg-sky-100 rounded-lg">
-                    <Bell className="w-5 h-5 text-sky-600" />
+                  <div className="p-2 bg-gray-100 rounded-lg">
+                    <Bell className="w-5 h-5 text-gray-600" />
                   </div>
                   <span className="text-sm text-gray-600 font-medium">Notificaciones Push</span>
                 </div>
@@ -618,7 +618,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                 </p>
                 <button
                   onClick={() => window.open('/descargar', '_blank')}
-                  className="ml-11 flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium transition-all text-sm"
+                  className="ml-11 flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-all text-sm"
                 >
                   Configurar notificaciones
                   <ExternalLink className="w-4 h-4" />

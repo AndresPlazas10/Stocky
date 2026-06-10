@@ -25,16 +25,16 @@ import { WarmupStatusBadge } from '../WarmupStatusBadge.jsx';
 
 // Avatares predefinidos
 const predefinedAvatars = [
-  { id: 1, emoji: '👨‍💼', name: 'Empresario', gradient: 'from-blue-500 to-blue-600' },
-  { id: 2, emoji: '👩‍💼', name: 'Empresaria', gradient: 'from-purple-500 to-purple-600' },
-  { id: 3, emoji: '🧑‍💻', name: 'Desarrollador', gradient: 'from-green-500 to-green-600' },
-  { id: 4, emoji: '👨‍🍳', name: 'Chef', gradient: 'from-orange-500 to-orange-600' },
-  { id: 5, emoji: '👩‍⚕️', name: 'Doctora', gradient: 'from-red-500 to-red-600' },
-  { id: 6, emoji: '🧑‍🎨', name: 'Artista', gradient: 'from-pink-500 to-pink-600' },
-  { id: 7, emoji: '👨‍🔧', name: 'Mecánico', gradient: 'from-gray-500 to-gray-600' },
-  { id: 8, emoji: '👩‍🏫', name: 'Profesora', gradient: 'from-indigo-500 to-indigo-600' },
-  { id: 9, emoji: '🧑‍🚀', name: 'Astronauta', gradient: 'from-cyan-500 to-cyan-600' },
-  { id: 10, emoji: '👨‍🎤', name: 'Músico', gradient: 'from-yellow-500 to-yellow-600' },
+  { id: 1, initials: 'AD', name: 'Admin', gradient: 'from-primary-500 to-primary-700' },
+  { id: 2, initials: 'MG', name: 'Manager', gradient: 'from-primary-600 to-secondary' },
+  { id: 3, initials: 'DV', name: 'Dev', gradient: 'from-secondary to-primary-400' },
+  { id: 4, initials: 'CH', name: 'Chef', gradient: 'from-primary-700 to-primary-500' },
+  { id: 5, initials: 'OW', name: 'Owner', gradient: 'from-primary-400 to-secondary' },
+  { id: 6, initials: 'ST', name: 'Staff', gradient: 'from-secondary to-primary-600' },
+  { id: 7, initials: 'SR', name: 'Server', gradient: 'from-primary-500 to-primary-800' },
+  { id: 8, initials: 'BR', name: 'Bar', gradient: 'from-primary-800 to-primary-500' },
+  { id: 9, initials: 'HG', name: 'Host', gradient: 'from-primary-300 to-primary-600' },
+  { id: 10, initials: 'KS', name: 'Kitchen', gradient: 'from-primary-600 to-primary-400' },
 ];
 
 export const Navbar = React.memo(function Navbar({
@@ -90,8 +90,8 @@ export const Navbar = React.memo(function Navbar({
           {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="relative p-2 rounded-2xl hover:bg-accent/10 transition-colors group">
-                <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 group-hover:text-accent dark:text-gray-300" />
+              <button className="cursor-pointer relative p-2 rounded-2xl hover:bg-primary-50 transition-colors duration-200 group">
+                <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 group-hover:text-primary transition-colors duration-200" />
                 {unreadCount > 0 && (
                   <motion.span
                     initial={{ scale: 0 }}
@@ -124,7 +124,7 @@ export const Navbar = React.memo(function Navbar({
                       onClick={() => markAsRead(notification.id)}
                       className={cn(
                         "flex flex-col items-start gap-1 p-3 cursor-pointer hover:bg-gray-50",
-                        notification.unread && "bg-blue-50/50"
+                        notification.unread && "bg-gray-50/50"
                       )}
                     >
                       <div className="flex items-start justify-between w-full">
@@ -137,7 +137,7 @@ export const Navbar = React.memo(function Navbar({
                           </p>
                         </div>
                         {notification.unread && (
-                          <div className="w-2 h-2 rounded-full bg-blue-500 mt-1" />
+                          <div className="w-2 h-2 rounded-full bg-gray-500 mt-1" />
                         )}
                       </div>
                       <span className="text-xs text-gray-400">{notification.time}</span>
@@ -150,7 +150,7 @@ export const Navbar = React.memo(function Navbar({
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     onClick={markAllAsRead}
-                    className="justify-center text-accent font-medium cursor-pointer"
+                    className="cursor-pointer justify-center text-primary font-medium transition-colors duration-200"
                   >
                     Marcar todas como leídas
                   </DropdownMenuItem>
@@ -162,10 +162,10 @@ export const Navbar = React.memo(function Navbar({
           {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-3 p-2 rounded-2xl hover:bg-accent/10 transition-colors group">
-                <Avatar className={`w-9 h-9 border-2 border-accent/20 bg-gradient-to-br ${selectedAvatar.gradient}`}>
-                  <AvatarFallback className={`bg-gradient-to-br ${selectedAvatar.gradient} text-white text-2xl`}>
-                    {selectedAvatar.emoji}
+              <button className="cursor-pointer flex items-center gap-3 p-2 rounded-2xl hover:bg-primary-50 transition-colors duration-200 group">
+                <Avatar className={`w-9 h-9 border-2 border-primary-200 bg-gradient-to-br ${selectedAvatar.gradient}`}>
+                  <AvatarFallback className={`bg-gradient-to-br ${selectedAvatar.gradient} text-white text-sm font-bold`}>
+                    {selectedAvatar.initials}
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden md:block text-left">
@@ -185,7 +185,7 @@ export const Navbar = React.memo(function Navbar({
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="cursor-pointer" onClick={() => setShowAvatarModal(true)}>
-                <ImageIcon className="mr-2 h-4 w-4 text-accent" />
+                <ImageIcon className="mr-2 h-4 w-4 text-primary" />
                 <span>Cambiar Avatar</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -241,14 +241,14 @@ export const Navbar = React.memo(function Navbar({
                     whileTap={{ scale: 0.95 }}
                     onClick={() => handleAvatarSelect(avatar)}
                     className={cn(
-                      "relative flex flex-col items-center gap-2 p-4 rounded-2xl transition-all duration-200",
+                      "cursor-pointer relative flex flex-col items-center gap-2 p-4 rounded-2xl transition-all duration-200",
                       selectedAvatar.id === avatar.id
-                        ? "bg-accent/20 ring-2 ring-accent shadow-lg"
+                        ? "bg-primary-100 ring-2 ring-primary shadow-lg"
                         : "bg-gray-50 hover:bg-gray-100"
                     )}
                   >
-                    <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${avatar.gradient} flex items-center justify-center text-3xl`}>
-                      {avatar.emoji}
+                    <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${avatar.gradient} flex items-center justify-center text-lg font-bold text-white`}>
+                      {avatar.initials}
                     </div>
                     <span className="text-xs font-medium text-gray-700 text-center">
                       {avatar.name}
@@ -257,7 +257,7 @@ export const Navbar = React.memo(function Navbar({
                       <motion.div
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
-                        className="absolute top-2 right-2 w-6 h-6 bg-accent rounded-full flex items-center justify-center"
+                        className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center"
                       >
                         <Check className="w-4 h-4 text-white" />
                       </motion.div>
@@ -275,7 +275,7 @@ export const Navbar = React.memo(function Navbar({
                   </button>
                   <button
                     onClick={() => setShowAvatarModal(false)}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-accent text-black hover:shadow-lg transition-all font-medium"
+                    className="cursor-pointer px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-700 transition-all duration-200 font-medium"
                   >
                     Guardar
                   </button>

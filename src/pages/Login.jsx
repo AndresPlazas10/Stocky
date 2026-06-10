@@ -40,21 +40,16 @@ function Login() {
       const { username, password } = formData;
       
       if (!username || !password) {
-        throw new Error('⚠️ Por favor ingresa usuario y contraseña');
+        throw new Error('Por favor ingresa usuario y contrasena');
       }
 
-      // Generar el email basado en el username (igual que en el registro)
       const { user } = await signInWithUsernamePassword({
         username,
         password
       });
 
-      // Login exitoso
-
-      // Verificar si es propietario de un negocio
       const business = await getOwnedBusinessByUserId(user?.id, 'id');
 
-      // Redireccionar según el rol (SPA, sin recargar)
       if (business) {
         navigate('/dashboard', { replace: true });
       } else {
@@ -67,14 +62,12 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4 bg-[#fafaf9]">
+    <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4 bg-background">
 
-      {/* Fondo animado */}
       <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute -top-32 -right-32 h-[28rem] w-[28rem] rounded-full bg-amber-100/40 blur-3xl animate-[drift_14s_ease-in-out_infinite]" />
-        <div className="absolute top-1/3 -left-32 h-[22rem] w-[22rem] rounded-full bg-stone-200/30 blur-3xl animate-[drift_18s_ease-in-out_infinite_3s]" />
-        <div className="absolute -bottom-20 right-1/4 h-[20rem] w-[20rem] rounded-full bg-amber-50/50 blur-3xl animate-[drift_20s_ease-in-out_infinite_6s]" />
-        <div className="absolute top-1/2 left-1/3 h-[16rem] w-[16rem] rounded-full bg-neutral-200/20 blur-3xl animate-[drift_16s_ease-in-out_infinite_9s]" />
+        <div className="absolute -top-32 -right-32 h-[28rem] w-[28rem] rounded-full bg-primary-100/40 blur-3xl animate-[drift_14s_ease-in-out_infinite]" />
+        <div className="absolute top-1/3 -left-32 h-[22rem] w-[22rem] rounded-full bg-primary-50/50 blur-3xl animate-[drift_18s_ease-in-out_infinite_3s]" />
+        <div className="absolute -bottom-20 right-1/4 h-[20rem] w-[20rem] rounded-full bg-secondary-100/30 blur-3xl animate-[drift_20s_ease-in-out_infinite_6s]" />
       </div>
 
       <style>{`
@@ -92,7 +85,7 @@ function Login() {
       >
         <Button
           variant="ghost"
-          className="bg-white/85 backdrop-blur-sm border border-neutral-200 text-neutral-700 hover:bg-white shadow-sm"
+          className="cursor-pointer bg-white/85 backdrop-blur-sm border border-primary-200 text-primary-700 hover:bg-primary-50 shadow-sm transition-colors duration-200"
           onClick={() => navigate('/')}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -106,16 +99,16 @@ function Login() {
         transition={{ duration: 0.5 }}
         className="w-full max-w-md relative z-10 max-h-[calc(100vh-120px)] overflow-auto"
       >
-        <Card className="bg-white/95 border border-neutral-200/60 shadow-[0_20px_45px_-22px_rgba(0,0,0,0.15)] rounded-3xl">
+        <Card className="bg-white/95 border border-primary-100 shadow-[0_20px_45px_-22px_rgba(8,145,178,0.15)] rounded-3xl">
           <CardHeader className="space-y-3 pb-6">
-            <div className="mx-auto w-16 h-16 rounded-2xl border border-neutral-200 bg-neutral-50 flex items-center justify-center shadow-sm">
+            <div className="mx-auto w-16 h-16 rounded-2xl border border-primary-200 bg-primary-50 flex items-center justify-center shadow-sm">
               <img src={logoStocky} alt="Stocky" className="w-12 h-12 object-contain" />
             </div>
-            <CardTitle className="text-3xl font-bold text-center text-neutral-900">
-              Iniciar Sesión
+            <CardTitle className="text-3xl font-bold text-center text-primary-900">
+              Iniciar Sesion
             </CardTitle>
-            <CardDescription className="text-center text-base text-neutral-500">
-              Ingresa tu usuario y contraseña para continuar en Stocky
+            <CardDescription className="text-center text-base text-muted-foreground">
+              Ingresa tu usuario y contrasena para continuar en Stocky
             </CardDescription>
           </CardHeader>
 
@@ -130,11 +123,11 @@ function Login() {
 
             <form onSubmit={handleLogin} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-base font-semibold text-neutral-700">
+                <Label htmlFor="username" className="text-base font-semibold text-primary-800">
                   Usuario
                 </Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-neutral-400" />
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
                   <Input
                     id="username"
                     name="username"
@@ -142,7 +135,7 @@ function Login() {
                     placeholder="Tu nombre de usuario"
                     value={formData.username}
                     onChange={handleChange}
-                    className="pl-10 h-12 text-base border border-neutral-200 bg-neutral-50 focus:border-neutral-400 focus-visible:ring-neutral-400/30"
+                    className="pl-10 h-12 text-base border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
                     required
                     autoComplete="username"
                   />
@@ -150,26 +143,26 @@ function Login() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-base font-semibold text-neutral-700">
-                  Contraseña
+                <Label htmlFor="password" className="text-base font-semibold text-primary-800">
+                  Contrasena
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-neutral-400" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
                   <Input
                     id="password"
                     name="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Tu contraseña"
+                    placeholder="Tu contrasena"
                     value={formData.password}
                     onChange={handleChange}
-                    className="pl-10 pr-10 h-12 text-base border border-neutral-200 bg-neutral-50 focus:border-neutral-400 focus-visible:ring-neutral-400/30"
+                    className="pl-10 pr-10 h-12 text-base border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
                     required
                     autoComplete="current-password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 hover:text-neutral-700 transition-colors"
+                    className="cursor-pointer absolute right-3 top-1/2 transform -translate-y-1/2 text-primary-400 hover:text-primary-700 transition-colors duration-200"
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -178,19 +171,19 @@ function Login() {
 
               <Button
                 type="submit"
-                className="w-full h-12 text-base font-semibold bg-neutral-900 text-white hover:bg-neutral-800 transition-all duration-300 rounded-xl"
+                className="cursor-pointer w-full h-12 text-base font-semibold bg-accent text-white hover:bg-accent-600 transition-all duration-200 rounded-xl"
                 disabled={loading}
               >
-                {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+                {loading ? 'Iniciando sesion...' : 'Iniciar Sesion'}
               </Button>
             </form>
 
             <div className="mt-6 text-center">
-              <p className="text-sm text-neutral-500">
-                ¿No tienes cuenta?{' '}
+              <p className="text-sm text-muted-foreground">
+                No tienes cuenta?{' '}
                 <button
                   onClick={() => navigate('/register')}
-                  className="font-semibold text-neutral-900 hover:text-neutral-700 transition-colors"
+                  className="cursor-pointer font-semibold text-primary-700 hover:text-primary-800 transition-colors duration-200"
                 >
                   Registrar negocio
                 </button>

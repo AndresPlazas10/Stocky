@@ -53,53 +53,47 @@ function Register() {
     try {
       const { name, address, phone, username, password, confirmPassword } = formData;
       
-      // Validaciones
       if (!name || !username || !password) {
-        throw new Error('⚠️ Por favor completa todos los campos requeridos');
+        throw new Error('Por favor completa todos los campos requeridos');
       }
 
-      // Validar que el nombre del negocio no sea solo números
       if (/^\d+$/.test(name.trim())) {
-        throw new Error('❌ El nombre del negocio no puede ser solo números');
+        throw new Error('El nombre del negocio no puede ser solo numeros');
       }
 
-      // Validar que el nombre del negocio contenga al menos una letra
-      if (!/[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(name.trim())) {
-        throw new Error('❌ El nombre del negocio debe contener al menos una letra');
+      if (!/[a-zA-Z]/.test(name.trim())) {
+        throw new Error('El nombre del negocio debe contener al menos una letra');
       }
 
-      // Validar longitud mínima del nombre
       if (name.trim().length < 2) {
-        throw new Error('❌ El nombre del negocio debe tener al menos 2 caracteres');
+        throw new Error('El nombre del negocio debe tener al menos 2 caracteres');
       }
 
       if (password !== confirmPassword) {
-        throw new Error('❌ Las contraseñas no coinciden');
+        throw new Error('Las contrasenas no coinciden');
       }
 
       if (password.length < 6) {
-        throw new Error('❌ La contraseña debe tener al menos 6 caracteres');
+        throw new Error('La contrasena debe tener al menos 6 caracteres');
       }
 
       const cleanUsername = username.trim().toLowerCase();
 
-      // Validar que el usuario no sea solo números
       if (/^\d+$/.test(cleanUsername)) {
-        throw new Error('❌ El nombre de usuario no puede ser solo números');
+        throw new Error('El nombre de usuario no puede ser solo numeros');
       }
 
       if (!/^[a-z0-9_]{3,20}$/.test(cleanUsername)) {
-        throw new Error('❌ El usuario debe tener entre 3-20 caracteres (solo letras, números y guiones bajos)');
+        throw new Error('El usuario debe tener entre 3-20 caracteres (solo letras, numeros y guiones bajos)');
       }
 
       const usernameTaken = await isBusinessUsernameTaken(cleanUsername);
       if (usernameTaken) {
-        throw new Error('❌ Este nombre de usuario ya está en uso');
+        throw new Error('Este nombre de usuario ya esta en uso');
       }
 
       const { email: cleanEmail } = normalizeUsernameToEmail(cleanUsername);
 
-      // Crear usuario en Auth
       let authData = null;
       try {
         const signUpResult = await signUpBusinessOwner({
@@ -110,35 +104,33 @@ function Register() {
         });
         authData = signUpResult?.authData || null;
       } catch (authError) {
-        // Mensajes de error mejorados
         const errorMsg = authError?.message || '';
 
         if (errorMsg.includes('already registered') || errorMsg === 'User already registered') {
-          throw new Error('❌ Ya existe una cuenta con este nombre de usuario. Intenta con otro nombre.');
+          throw new Error('Ya existe una cuenta con este nombre de usuario. Intenta con otro nombre.');
         }
         if (errorMsg.includes('password')) {
-          throw new Error('❌ La contraseña debe tener al menos 6 caracteres');
+          throw new Error('La contrasena debe tener al menos 6 caracteres');
         }
         if (errorMsg.includes('email')) {
-          throw new Error('❌ El formato del correo es inválido');
+          throw new Error('El formato del correo es invalido');
         }
-        throw new Error(`❌ Error al crear la cuenta: ${errorMsg || 'Error desconocido'}`);
+        throw new Error(`Error al crear la cuenta: ${errorMsg || 'Error desconocido'}`);
       }
       
-      if (!authData.user) throw new Error('❌ Error al crear la cuenta');
+      if (!authData.user) throw new Error('Error al crear la cuenta');
 
       if (!authData.session) {
         await signOutSession();
-        throw new Error('⚠️ Supabase requiere confirmación de email. Ve a Dashboard → Authentication → Providers → Email y desactiva "Confirm email"');
+        throw new Error('Supabase requiere confirmacion de email. Ve a Dashboard > Authentication > Providers > Email y desactiva "Confirm email"');
       }
 
-      // Garantizar sesión REAL activa antes de insertar en businesses (evita RLS por rol anon).
       let activeUserId = authData?.session?.user?.id || null;
       if (!activeUserId) {
         try {
           await signInWithUsernamePassword({ username: cleanUsername, password });
         } catch {
-          // noop: se valida justo después
+          // noop
         }
       }
 
@@ -149,10 +141,9 @@ function Register() {
       activeUserId = activeUser?.id || activeSession?.user?.id || activeUserId;
 
       if (!activeUserId || !activeSession?.access_token) {
-        throw new Error('❌ No hay sesión activa para crear el negocio. Inicia sesión nuevamente e intenta otra vez.');
+        throw new Error('No hay sesion activa para crear el negocio. Inicia sesion nuevamente e intenta otra vez.');
       }
 
-      // Crear negocio
       let businessData = null;
       try {
         businessData = await createBusinessRecord({
@@ -166,10 +157,9 @@ function Register() {
         });
       } catch (businessError) {
         await signOutSession().catch(() => {});
-        throw new Error(`❌ Error al crear el negocio: ${businessError?.message || 'Verifica las políticas RLS en Supabase'}`);
+        throw new Error(`Error al crear el negocio: ${businessError?.message || 'Verifica las politicas RLS en Supabase'}`);
       }
 
-      // Crear registro de empleado
       await createEmployeeRecord({
         user_id: activeUserId,
         business_id: businessData.id,
@@ -182,14 +172,12 @@ function Register() {
       setError('');
       setSuccess(true);
       
-      // Redirigir al dashboard
       setTimeout(() => {
         navigate('/dashboard');
       }, 1500);
       
     } catch (err) {
-      
-      setError(err.message || '❌ Error al crear el negocio');
+      setError(err.message || 'Error al crear el negocio');
     } finally {
       setIsSubmitting(false);
     }
@@ -226,14 +214,12 @@ function Register() {
   };
 
   return (
-    <div className="min-h-screen relative overflow-x-hidden overflow-y-auto flex items-start md:items-center justify-center p-3 bg-[#fafaf9]">
+    <div className="min-h-screen relative overflow-x-hidden overflow-y-auto flex items-start md:items-center justify-center p-3 bg-background">
 
-      {/* Fondo animado */}
       <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute -top-32 -right-32 h-[28rem] w-[28rem] rounded-full bg-amber-100/40 blur-3xl animate-[drift_14s_ease-in-out_infinite]" />
-        <div className="absolute top-1/3 -left-32 h-[22rem] w-[22rem] rounded-full bg-stone-200/30 blur-3xl animate-[drift_18s_ease-in-out_infinite_3s]" />
-        <div className="absolute -bottom-20 right-1/4 h-[20rem] w-[20rem] rounded-full bg-amber-50/50 blur-3xl animate-[drift_20s_ease-in-out_infinite_6s]" />
-        <div className="absolute top-1/2 left-1/3 h-[16rem] w-[16rem] rounded-full bg-neutral-200/20 blur-3xl animate-[drift_16s_ease-in-out_infinite_9s]" />
+        <div className="absolute -top-32 -right-32 h-[28rem] w-[28rem] rounded-full bg-primary-100/40 blur-3xl animate-[drift_14s_ease-in-out_infinite]" />
+        <div className="absolute top-1/3 -left-32 h-[22rem] w-[22rem] rounded-full bg-primary-50/50 blur-3xl animate-[drift_18s_ease-in-out_infinite_3s]" />
+        <div className="absolute -bottom-20 right-1/4 h-[20rem] w-[20rem] rounded-full bg-secondary-100/30 blur-3xl animate-[drift_20s_ease-in-out_infinite_6s]" />
       </div>
 
       <style>{`
@@ -251,7 +237,7 @@ function Register() {
       >
         <Button
           variant="ghost"
-          className="h-9 bg-white/85 backdrop-blur-sm border border-neutral-200 text-neutral-700 hover:bg-white shadow-sm"
+          className="cursor-pointer h-9 bg-white/85 backdrop-blur-sm border border-primary-200 text-primary-700 hover:bg-primary-50 shadow-sm transition-colors duration-200"
           onClick={() => navigate('/')}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -265,20 +251,20 @@ function Register() {
         transition={{ duration: 0.5 }}
         className="w-full max-w-5xl relative z-10 mt-12 md:mt-0 pb-4 md:pb-0"
       >
-        <Card className="bg-white/95 border border-neutral-200/60 shadow-[0_20px_45px_-22px_rgba(0,0,0,0.15)] rounded-3xl overflow-hidden">
+        <Card className="bg-white/95 border border-primary-100 shadow-[0_20px_45px_-22px_rgba(8,145,178,0.15)] rounded-3xl overflow-hidden">
           
           <CardHeader className="space-y-2 text-center pb-4 pt-5 relative">
             <div className="flex justify-center">
-              <div className="bg-neutral-900 p-3 rounded-2xl shadow-sm">
+              <div className="bg-primary p-3 rounded-2xl shadow-sm">
                 <Building2 className="h-8 w-8 text-white drop-shadow-md" />
               </div>
             </div>
             <div>
-              <CardTitle className="text-2xl font-bold text-neutral-900 mb-1">
+              <CardTitle className="text-2xl font-bold text-primary-900 mb-1">
                 Registrar Negocio
               </CardTitle>
-              <CardDescription className="text-sm text-neutral-500">
-                Completa la información de tu negocio para comenzar
+              <CardDescription className="text-sm text-muted-foreground">
+                Completa la informacion de tu negocio para comenzar
               </CardDescription>
             </div>
           </CardHeader>
@@ -295,7 +281,7 @@ function Register() {
             <SaleSuccessAlert
               isVisible={success}
               onClose={() => setSuccess(false)}
-              title="✨ Negocio registrado"
+              title="Negocio registrado"
               details={[{ label: 'Estado', value: 'Redirigiendo al dashboard...' }]}
               duration={2000}
             />
@@ -303,30 +289,30 @@ function Register() {
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="space-y-1 lg:col-span-2">
-                  <Label htmlFor="name" className="text-sm font-semibold">
+                  <Label htmlFor="name" className="text-sm font-semibold text-primary-800">
                     Nombre del Negocio <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
-                    <Store className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-neutral-400" />
+                    <Store className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
                     <Input
                       id="name"
                       name="name"
                       type="text"
-                      placeholder="Ej: Mi Cafetería"
+                      placeholder="Ej: Mi Cafeteria"
                       value={formData.name}
                       onChange={handleChange}
-                      className="pl-10 h-10 border border-neutral-200 bg-neutral-50 focus:border-neutral-400 focus-visible:ring-neutral-400/30"
+                      className="pl-10 h-10 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
                       required
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1 lg:col-span-2">
-                  <Label htmlFor="username" className="text-sm font-semibold">
+                  <Label htmlFor="username" className="text-sm font-semibold text-primary-800">
                     Nombre de Usuario <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-neutral-400" />
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
                     <Input
                       id="username"
                       name="username"
@@ -334,20 +320,20 @@ function Register() {
                       placeholder="usuario_negocio"
                       value={formData.username}
                       onChange={handleChange}
-                      className="pl-10 h-10 border border-neutral-200 bg-neutral-50 focus:border-neutral-400 focus-visible:ring-neutral-400/30"
+                      className="pl-10 h-10 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
                       required
                       pattern="[a-z0-9_]{3,20}"
-                      title="Solo letras minúsculas, números y guiones bajos (3-20 caracteres)"
+                      title="Solo letras minusculas, numeros y guiones bajos (3-20 caracteres)"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="nit" className="text-sm font-semibold">
+                  <Label htmlFor="nit" className="text-sm font-semibold text-primary-800">
                     NIT <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
                   </Label>
                   <div className="relative">
-                    <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-neutral-400" />
+                    <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
                     <Input
                       id="nit"
                       name="nit"
@@ -355,17 +341,17 @@ function Register() {
                       placeholder="900.123.456-7"
                       value={formData.nit}
                       onChange={handleChange}
-                      className="pl-10 h-10 border border-neutral-200 bg-neutral-50 focus:border-neutral-400 focus-visible:ring-neutral-400/30"
+                      className="pl-10 h-10 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="phone" className="text-sm font-semibold">
-                    Teléfono
+                  <Label htmlFor="phone" className="text-sm font-semibold text-primary-800">
+                    Telefono
                   </Label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-neutral-400" />
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
                     <Input
                       id="phone"
                       name="phone"
@@ -373,17 +359,17 @@ function Register() {
                       placeholder="+57 300 123 4567"
                       value={formData.phone}
                       onChange={handleChange}
-                      className="pl-10 h-10 border border-neutral-200 bg-neutral-50 focus:border-neutral-400 focus-visible:ring-neutral-400/30"
+                      className="pl-10 h-10 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1 lg:col-span-2">
-                  <Label htmlFor="address" className="text-sm font-semibold">
-                    Dirección
+                  <Label htmlFor="address" className="text-sm font-semibold text-primary-800">
+                    Direccion
                   </Label>
                   <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-neutral-400" />
+                    <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
                     <Input
                       id="address"
                       name="address"
@@ -391,32 +377,32 @@ function Register() {
                       placeholder="Calle 123 #45-67"
                       value={formData.address}
                       onChange={handleChange}
-                      className="pl-10 h-10 border border-neutral-200 bg-neutral-50 focus:border-neutral-400 focus-visible:ring-neutral-400/30"
+                      className="pl-10 h-10 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1 lg:col-span-2">
-                  <Label htmlFor="password" className="text-sm font-semibold">
-                    Contraseña <span className="text-destructive">*</span>
+                  <Label htmlFor="password" className="text-sm font-semibold text-primary-800">
+                    Contrasena <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-neutral-400" />
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
                     <Input
                       id="password"
                       name="password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="Mínimo 6 caracteres"
+                      placeholder="Minimo 6 caracteres"
                       value={formData.password}
                       onChange={handleChange}
-                      className="pl-10 pr-10 h-10 border border-neutral-200 bg-neutral-50 focus:border-neutral-400 focus-visible:ring-neutral-400/30"
+                      className="pl-10 pr-10 h-10 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
                       required
                       minLength={6}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 hover:text-neutral-700 transition-colors"
+                      className="cursor-pointer absolute right-3 top-1/2 transform -translate-y-1/2 text-primary-400 hover:text-primary-700 transition-colors duration-200"
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -424,26 +410,26 @@ function Register() {
                 </div>
 
                 <div className="space-y-1 lg:col-span-2">
-                  <Label htmlFor="confirmPassword" className="text-sm font-semibold">
-                    Confirmar Contraseña <span className="text-destructive">*</span>
+                  <Label htmlFor="confirmPassword" className="text-sm font-semibold text-primary-800">
+                    Confirmar Contrasena <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-neutral-400" />
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
                     <Input
                       id="confirmPassword"
                       name="confirmPassword"
                       type={showConfirmPassword ? "text" : "password"}
-                      placeholder="Repite la contraseña"
+                      placeholder="Repite la contrasena"
                       value={formData.confirmPassword}
                       onChange={handleChange}
-                      className="pl-10 pr-10 h-10 border border-neutral-200 bg-neutral-50 focus:border-neutral-400 focus-visible:ring-neutral-400/30"
+                      className="pl-10 pr-10 h-10 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
                       required
                       minLength={6}
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 hover:text-neutral-700 transition-colors"
+                      className="cursor-pointer absolute right-3 top-1/2 transform -translate-y-1/2 text-primary-400 hover:text-primary-700 transition-colors duration-200"
                     >
                       {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -453,7 +439,7 @@ function Register() {
 
               <Button
                 type="submit"
-                className="w-full h-10 text-sm font-semibold bg-neutral-900 text-white hover:bg-neutral-800 transition-all duration-300 rounded-xl"
+                className="cursor-pointer w-full h-10 text-sm font-semibold bg-accent text-white hover:bg-accent-600 transition-all duration-200 rounded-xl"
                 disabled={isSubmitting || success}
                 size="lg"
               >
@@ -472,21 +458,21 @@ function Register() {
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border"></div>
+                <div className="w-full border-t border-primary-100"></div>
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="px-4 bg-card text-muted-foreground">
-                  ¿Ya tienes cuenta?
+                  Ya tienes cuenta?
                 </span>
               </div>
             </div>
 
             <Button
               variant="outline"
-              className="w-full h-10 text-sm border border-neutral-200 text-neutral-700 hover:bg-neutral-50 rounded-xl"
+              className="cursor-pointer w-full h-10 text-sm border border-primary-200 text-primary-700 hover:bg-primary-50 rounded-xl transition-colors duration-200"
               onClick={() => navigate('/login')}
             >
-              Iniciar sesión
+              Iniciar sesion
             </Button>
           </CardContent>
         </Card>

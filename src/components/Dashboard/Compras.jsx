@@ -828,7 +828,7 @@ function Compras({ businessId }) {
 
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-600">Método de pago</span>
-                      <Badge className="bg-blue-100 text-blue-800 capitalize">
+                      <Badge className="bg-gray-100 text-gray-800 capitalize">
                         {getPaymentMethodLabel(compra.payment_method)}
                       </Badge>
                     </div>
@@ -1217,9 +1217,9 @@ function Compras({ businessId }) {
                 </div>
 
                 {selectedPurchase.notes && (
-                  <div className="p-4 bg-blue-50 rounded-xl border-l-4 border-blue-500">
-                    <p className="text-sm font-medium text-blue-800 mb-1">Notas</p>
-                    <p className="text-blue-700">{selectedPurchase.notes}</p>
+                  <div className="p-4 bg-gray-50 rounded-xl border-l-4 border-gray-500">
+                    <p className="text-sm font-medium text-gray-800 mb-1">Notas</p>
+                    <p className="text-gray-700">{selectedPurchase.notes}</p>
                   </div>
                 )}
               </div>

@@ -283,7 +283,7 @@ export default function TermsAndConditions() {
             </Section>
 
             {/* Aceptación final */}
-            <div className="mt-12 p-6 bg-gradient-to-r from-primary-50 to-blue-50 border-2 border-primary-200 rounded-xl">
+            <div className="mt-12 p-6 bg-gradient-to-r from-primary-50 to-gray-50 border-2 border-primary-200 rounded-xl">
               <div className="flex items-start gap-4">
                 <CheckCircle2 className="w-6 h-6 text-primary-600 shrink-0 mt-1" />
                 <div>
@@ -312,10 +312,10 @@ export default function TermsAndConditions() {
 function Section({ number, title, icon: _Icon, color, children, highlighted = false }) {
   const colorClasses = {
     green: 'from-green-500 to-emerald-500',
-    blue: 'from-blue-500 to-cyan-500',
+    blue: 'from-gray-500 to-gray-500',
     red: 'from-red-500 to-rose-500',
     amber: 'from-amber-500 to-orange-500',
-    purple: 'from-purple-500 to-pink-500',
+    purple: 'from-gray-500 to-pink-500',
   };
 
   return (

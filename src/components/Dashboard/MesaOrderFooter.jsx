@@ -32,7 +32,7 @@ export function MesaOrderFooter({
           <Button
             onClick={onPrintKitchen}
             variant="outline"
-            className="border-2 border-blue-300 text-blue-700 hover:bg-blue-50 h-12 px-6 w-full sm:w-auto"
+            className="border-2 border-gray-300 text-gray-700 hover:bg-gray-50 h-12 px-6 w-full sm:w-auto"
             disabled={orderItemsCount === 0}
           >
             <Printer className="w-5 h-5 mr-2" />

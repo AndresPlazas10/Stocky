@@ -30,11 +30,11 @@ const PurchaseFilters = React.memo(function PurchaseFilters({ _businessId, onApp
   }, [onClear]);
 
   return (
-    <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl shadow-md border border-purple-100 p-4 sm:p-5 mb-6">
+    <div className="bg-gradient-to-r from-gray-50 to-pink-50 rounded-2xl shadow-md border border-gray-100 p-4 sm:p-5 mb-6">
       {/* Encabezado */}
       <div className="mb-3">
         <div className="flex items-center gap-2">
-          <ShoppingCart className="w-5 h-5 text-purple-600" />
+          <ShoppingCart className="w-5 h-5 text-gray-600" />
           <h3 className="text-lg font-semibold text-gray-800">Filtros de Compras</h3>
         </div>
         <p className="text-xs text-gray-500 mt-1">Filtra por un día específico.</p>
@@ -43,16 +43,16 @@ const PurchaseFilters = React.memo(function PurchaseFilters({ _businessId, onApp
       {/* Contenedor de filtros */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
         {/* Filtro Día */}
-        <div className="lg:col-span-6 bg-white rounded-xl p-3 border border-gray-200 hover:border-purple-300 transition-all duration-200">
+        <div className="lg:col-span-6 bg-white rounded-xl p-3 border border-gray-200 hover:border-gray-300 transition-all duration-200">
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-            <Calendar className="w-4 h-4 text-purple-600" />
+            <Calendar className="w-4 h-4 text-gray-600" />
             Día
           </label>
           <Input 
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="w-full border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 rounded-lg transition-all"
+            className="w-full border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-lg transition-all"
           />
         </div>
 
@@ -61,7 +61,7 @@ const PurchaseFilters = React.memo(function PurchaseFilters({ _businessId, onApp
           <Button
             onClick={handleApply}
             disabled={loading}
-            className="h-11 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2"
+            className="h-11 bg-gradient-to-r from-gray-600 to-pink-600 hover:from-gray-700 hover:to-pink-700 text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2"
           >
             <Filter className="w-4 h-4" />
             {loading ? 'Aplicando...' : 'Aplicar Filtros'}

@@ -106,15 +106,15 @@ export default function ComprobanteDisclaimer({ variant = 'full', className = ''
  */
 export function FacturacionReminder({ onDismiss, className = '' }) {
   return (
-    <div className={`bg-blue-50 border-l-4 border-blue-400 p-4 rounded-r-lg shadow-sm ${className}`}>
+    <div className={`bg-gray-50 border-l-4 border-gray-400 p-4 rounded-r-lg shadow-sm ${className}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 flex-1">
-          <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+          <Info className="w-5 h-5 text-gray-600 shrink-0 mt-0.5" />
           <div className="text-sm">
-            <p className="font-semibold text-blue-900 mb-1">
+            <p className="font-semibold text-gray-900 mb-1">
               Recordatorio: Facturación Electrónica
             </p>
-            <p className="text-blue-800">
+            <p className="text-gray-800">
               Los comprobantes generados aquí NO son facturas electrónicas. 
               Para facturar oficialmente, ingresa a tu cuenta de <strong>Siigo</strong> incluida en tu plan.
             </p>
@@ -122,7 +122,7 @@ export function FacturacionReminder({ onDismiss, className = '' }) {
               href="https://app.siigo.com" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="inline-block mt-2 text-blue-600 hover:text-blue-800 font-medium underline text-xs"
+              className="inline-block mt-2 text-gray-600 hover:text-gray-800 font-medium underline text-xs"
             >
               Ir a Siigo →
             </a>
@@ -131,7 +131,7 @@ export function FacturacionReminder({ onDismiss, className = '' }) {
         {onDismiss && (
           <button
             onClick={onDismiss}
-            className="text-blue-400 hover:text-blue-600 transition-colors"
+            className="text-gray-400 hover:text-gray-600 transition-colors"
             aria-label="Cerrar"
           >
             ✕

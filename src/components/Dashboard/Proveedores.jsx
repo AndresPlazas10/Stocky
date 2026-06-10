@@ -460,7 +460,7 @@ function Proveedores({ businessId }) {
                           <div className="flex gap-2 shrink-0">
                             <button
                               onClick={() => handleEdit(proveedor)}
-                              className="p-2 hover:bg-blue-50 text-blue-600 rounded-xl transition-all duration-300 hover:scale-110"
+                              className="p-2 hover:bg-gray-50 text-gray-600 rounded-xl transition-all duration-300 hover:scale-110"
                               title="Editar proveedor"
                             >
                               <Edit2 className="w-5 h-5" />
@@ -498,7 +498,7 @@ function Proveedores({ businessId }) {
                                 <p className="text-xs text-accent-500 uppercase tracking-wide">Email</p>
                                 <a 
                                   href={`mailto:${proveedor.email}`} 
-                                  className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors truncate block"
+                                  className="text-sm font-medium text-gray-600 hover:text-gray-700 transition-colors truncate block"
                                 >
                                   {proveedor.email}
                                 </a>

@@ -232,22 +232,22 @@ function EmployeeDashboard() {
               </h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200">
+                <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
                   <div className="flex items-center gap-3 mb-2">
-                    <Shield className="w-5 h-5 text-purple-600" />
-                    <span className="text-sm text-purple-700 font-medium">Tu Rol</span>
+                    <Shield className="w-5 h-5 text-gray-600" />
+                    <span className="text-sm text-gray-700 font-medium">Tu Rol</span>
                   </div>
-                  <p className="text-lg font-bold text-purple-800 pl-8">
+                  <p className="text-lg font-bold text-gray-800 pl-8">
                     {employee?.role === 'admin' ? 'Administrador' : 'Empleado'}
                   </p>
                 </div>
 
-                <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200">
+                <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
                   <div className="flex items-center gap-3 mb-2">
-                    <Building2 className="w-5 h-5 text-blue-600" />
-                    <span className="text-sm text-blue-700 font-medium">Negocio</span>
+                    <Building2 className="w-5 h-5 text-gray-600" />
+                    <span className="text-sm text-gray-700 font-medium">Negocio</span>
                   </div>
-                  <p className="text-lg font-bold text-blue-800 pl-8">{business?.name}</p>
+                  <p className="text-lg font-bold text-gray-800 pl-8">{business?.name}</p>
                 </div>
               </div>
             </motion.div>
@@ -274,9 +274,9 @@ function EmployeeDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-600 border-t-transparent"></div>
           <p className="text-gray-600">Cargando...</p>
         </div>
       </div>
@@ -290,7 +290,7 @@ function EmployeeDashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full border border-gray-100">
           <div className="text-center">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -300,7 +300,7 @@ function EmployeeDashboard() {
             <p className="text-gray-600 mb-6">{error}</p>
             <button 
               onClick={handleSignOut}
-              className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all"
+              className="px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all"
             >
               Volver al inicio
             </button>
@@ -313,7 +313,7 @@ function EmployeeDashboard() {
   return (
     <>
       {activeSection === 'home' ? <WhatsNewModal /> : null}
-      <div className="flex h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 overflow-hidden">
+      <div className="flex h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 overflow-hidden">
       {/* Sidebar */}
       <motion.aside
         initial={{ x: -300 }}

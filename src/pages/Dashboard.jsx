@@ -43,7 +43,7 @@ const Configuracion = lazy(() => import('../components/Dashboard/Configuracion.j
 const IncidentesSync = lazy(() => import('../components/Dashboard/IncidentesSync.jsx'));
 
 const SectionLoader = () => (
-  <div className="rounded-xl border border-indigo-100 bg-white/80 p-4 text-sm text-indigo-700">
+  <div className="rounded-xl border border-gray-100 bg-white/80 p-4 text-sm text-gray-700">
     Cargando modulo...
   </div>
 );
@@ -345,7 +345,7 @@ function Dashboard() {
 
   if (loading || error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 p-6">
         <AsyncStateWrapper
           loading={loading}
           error={error}

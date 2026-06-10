@@ -976,7 +976,7 @@ export default function IncidentesSync({ businessId }) {
                 pageSize: {auditPageSize}
               </span>
               {auditActionFilter !== 'all' && (
-                <span className="inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-[11px] text-blue-700">
+                <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-700">
                   acción: {auditActionFilter}
                 </span>
               )}
@@ -999,7 +999,7 @@ export default function IncidentesSync({ businessId }) {
                 Copiar estado filtros
               </Button>
               {copyAuditStatus && (
-                <span className="inline-flex rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] text-indigo-700">
+                <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-700">
                   {copyAuditStatus}
                 </span>
               )}

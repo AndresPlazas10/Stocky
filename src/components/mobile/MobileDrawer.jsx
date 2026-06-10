@@ -16,18 +16,18 @@ export function MobileDrawer({ isOpen, onClose, currentView, onNavigate, userNam
     {
       title: 'Principal',
       items: [
-        { id: 'home', icon: Home, label: 'Inicio', color: 'text-blue-600' },
+        { id: 'home', icon: Home, label: 'Inicio', color: 'text-gray-600' },
         { id: 'ventas', icon: ShoppingCart, label: 'Ventas', color: 'text-green-600' },
         { id: 'compras', icon: ShoppingBag, label: 'Compras', color: 'text-amber-600' },
-        { id: 'inventario', icon: Package, label: 'Inventario', color: 'text-purple-600' },
+        { id: 'inventario', icon: Package, label: 'Inventario', color: 'text-gray-600' },
         { id: 'combos', icon: Layers, label: 'Combos', color: 'text-pink-600' },
       ]
     },
     {
       title: 'Gestión',
       items: [
-        { id: 'proveedores', icon: Truck, label: 'Proveedores', color: 'text-indigo-600' },
-        { id: 'empleados', icon: Users, label: 'Empleados', color: 'text-cyan-600' },
+        { id: 'proveedores', icon: Truck, label: 'Proveedores', color: 'text-gray-600' },
+        { id: 'empleados', icon: Users, label: 'Empleados', color: 'text-gray-600' },
       ]
     },
     {
