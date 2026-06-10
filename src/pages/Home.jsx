@@ -300,7 +300,7 @@ function Home() {
                   transition={{ duration: 0.4, delay: 0.1 }}
                   className="text-4xl font-bold leading-[1.08] tracking-tight text-primary-900 sm:text-5xl lg:text-6xl"
                 >
-                  Vende, controla y crece sin complicaciones
+                  Con StockyPOS vende, controla y crece sin complicaciones
                 </motion.h1>
 
                 <motion.p
