@@ -439,7 +439,7 @@ function Register() {
 
               <Button
                 type="submit"
-                className="cursor-pointer w-full h-10 text-sm font-semibold bg-accent text-white hover:bg-accent-600 transition-all duration-200 rounded-xl"
+                className="cursor-pointer w-full h-10 text-sm font-semibold bg-white text-black border border-gray-300 hover:bg-gray-50 transition-all duration-200 rounded-xl"
                 disabled={isSubmitting || success}
                 size="lg"
               >
