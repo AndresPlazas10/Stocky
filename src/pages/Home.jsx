@@ -192,7 +192,7 @@ function Home() {
           <div className="hidden items-center gap-2 md:flex">
             <button
               onClick={() => navigate('/login')}
-              className="cursor-pointer rounded-xl px-4 py-2 text-sm font-semibold text-primary-700 transition-colors duration-200 hover:bg-primary-50"
+              className="cursor-pointer rounded-xl px-4 py-2 text-sm font-semibold text-black transition-colors duration-200 hover:bg-primary-50"
             >
               Iniciar sesión
             </button>
