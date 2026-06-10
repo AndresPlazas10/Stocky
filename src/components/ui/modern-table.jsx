@@ -96,7 +96,7 @@ export function ModernBadge({ children, variant = "default", className }) {
     success: "bg-green-100 text-green-700 border-green-200",
     warning: "bg-yellow-100 text-yellow-700 border-yellow-200",
     error: "bg-red-100 text-red-700 border-red-200",
-    info: "bg-blue-100 text-blue-700 border-blue-200",
+    info: "bg-gray-100 text-gray-700 border-gray-200",
     primary: "bg-primary-100 text-primary-800 border-primary-200",
   };
 
@@ -122,7 +122,7 @@ export function ModernTableActions({ children, className }) {
 export function ModernTableButton({ onClick, icon: Icon, variant = "default", children, className }) {
   const variants = {
     default: "bg-accent/10 hover:bg-accent/20 text-accent-700",
-    edit: "bg-blue-50 hover:bg-blue-100 text-blue-700",
+    edit: "bg-gray-50 hover:bg-gray-100 text-gray-700",
     delete: "bg-red-50 hover:bg-red-100 text-red-700",
     view: "bg-green-50 hover:bg-green-100 text-green-700",
   };

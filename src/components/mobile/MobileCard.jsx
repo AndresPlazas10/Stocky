@@ -122,7 +122,7 @@ export function MobileListCard({
                 ${badge.variant === 'success' && 'bg-green-100 text-green-700'}
                 ${badge.variant === 'warning' && 'bg-yellow-100 text-yellow-700'}
                 ${badge.variant === 'error' && 'bg-red-100 text-red-700'}
-                ${badge.variant === 'info' && 'bg-blue-100 text-blue-700'}
+                ${badge.variant === 'info' && 'bg-gray-100 text-gray-700'}
               `}>
                 {badge.text}
               </span>

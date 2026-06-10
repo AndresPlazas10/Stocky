@@ -49,7 +49,7 @@ export function MesaOrderItemsGrid({
                           </h4>
                           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
                             {item.combo_id && (
-                              <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 font-medium">
+                              <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 font-medium">
                                 Combo
                               </span>
                             )}

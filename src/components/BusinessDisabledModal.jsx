@@ -60,8 +60,8 @@ function BusinessDisabledModal({ businessName = 'su negocio', onSignOut }) {
           </div>
 
           {/* Nota importante */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-3">
-            <p className="text-blue-900 text-xs text-center leading-snug">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-2 mb-3">
+            <p className="text-gray-900 text-xs text-center leading-snug">
               💡 Si ya regularizaste tu cuenta, tu acceso se restablecerá en las próximas horas.
             </p>
           </div>

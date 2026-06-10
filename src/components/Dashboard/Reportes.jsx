@@ -290,13 +290,13 @@ function Reportes({ businessId }) {
       return 'from-green-500 to-green-600';
     }
     if (methodKey === 'card') {
-      return 'from-blue-500 to-blue-600';
+      return 'from-gray-500 to-gray-600';
     }
     if (methodKey === 'transfer') return 'from-violet-500 to-violet-600';
     if (methodKey === 'nequi') return 'from-fuchsia-500 to-fuchsia-600';
     if (methodKey === 'bancolombia') return 'from-yellow-500 to-amber-600';
     if (methodKey === 'banco_bogota') return 'from-red-500 to-red-600';
-    if (methodKey === 'nu') return 'from-purple-500 to-purple-700';
+    if (methodKey === 'nu') return 'from-gray-500 to-gray-700';
     if (methodKey === 'davivienda') return 'from-orange-500 to-orange-600';
     return 'from-gray-500 to-gray-600';
   };
@@ -411,7 +411,7 @@ function Reportes({ businessId }) {
               {/* Compras Totales */}
               <motion.div
                 whileHover={{ scale: 1.02 }}
-                className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 sm:p-6 text-white shadow-lg hover:shadow-xl transition-all"
+                className="bg-gradient-to-br from-gray-500 to-gray-600 rounded-2xl p-5 sm:p-6 text-white shadow-lg hover:shadow-xl transition-all"
               >
                 <div className="flex items-start justify-between mb-3 sm:mb-4">
                   <div className="p-2.5 sm:p-3 bg-white/20 rounded-xl backdrop-blur-sm">
@@ -434,7 +434,7 @@ function Reportes({ businessId }) {
                 whileHover={{ scale: 1.02 }}
                 className={`bg-gradient-to-br ${
                   metrics.gananciaBruta >= 0 
-                    ? 'from-purple-500 to-purple-600' 
+                    ? 'from-gray-500 to-gray-600' 
                     : 'from-red-500 to-red-600'
                 } rounded-2xl p-5 sm:p-6 text-white shadow-lg hover:shadow-xl transition-all`}
               >
@@ -539,8 +539,8 @@ function Reportes({ businessId }) {
               {/* Proveedores */}
               <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-xl">
-                    <Building2 className="w-8 h-8 text-indigo-600" />
+                  <div className="p-3 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl">
+                    <Building2 className="w-8 h-8 text-gray-600" />
                   </div>
                   <div className="text-right">
                     <p className="text-3xl font-bold text-gray-800">{metrics.totalProveedores}</p>
@@ -548,7 +548,7 @@ function Reportes({ businessId }) {
                 </div>
                 <p className="text-gray-600 font-medium">Proveedores Activos</p>
                 <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600" style={{ width: '100%' }}></div>
+                  <div className="h-full bg-gradient-to-r from-gray-500 to-gray-600" style={{ width: '100%' }}></div>
                 </div>
               </div>
             </motion.div>

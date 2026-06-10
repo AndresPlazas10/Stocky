@@ -55,7 +55,7 @@ export function MesaCatalogSearch({
                     {catalogItem.name}
                   </span>
                   {catalogItem.item_type === ORDER_ITEM_TYPE.COMBO && (
-                    <Badge className="bg-blue-100 text-blue-700">Combo</Badge>
+                    <Badge className="bg-gray-100 text-gray-700">Combo</Badge>
                   )}
                 </div>
                 <span className="text-lg font-bold text-green-600">

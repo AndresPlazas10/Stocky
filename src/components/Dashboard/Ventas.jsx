@@ -1392,7 +1392,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
             <div className="flex flex-wrap gap-2">
               <Badge className="bg-slate-100 text-slate-800 border border-slate-200">Cola: {salesOutboxState.total}</Badge>
               <Badge className="bg-amber-100 text-amber-800 border border-amber-200">Pendientes: {salesOutboxState.pending}</Badge>
-              <Badge className="bg-blue-100 text-blue-800 border border-blue-200">Procesando: {salesOutboxState.processing}</Badge>
+              <Badge className="bg-gray-100 text-gray-800 border border-gray-200">Procesando: {salesOutboxState.processing}</Badge>
               <Badge className="bg-red-100 text-red-800 border border-red-200">Errores: {salesOutboxState.error}</Badge>
               <Button
                 type="button"
@@ -1538,7 +1538,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                   Código: {catalogItem.code || 'N/A'}
                                 </p>
                                 {catalogItem.item_type === SALE_ITEM_TYPE.COMBO ? (
-                                  <Badge className="mt-2 bg-blue-100 text-blue-800 border border-blue-200">
+                                  <Badge className="mt-2 bg-gray-100 text-gray-800 border border-gray-200">
                                     Combo ({catalogItem.combo_items?.length || 0} productos)
                                   </Badge>
                                 ) : catalogItem.manage_stock === false ? (
@@ -1662,7 +1662,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                         <p className="font-bold text-accent-600 truncate">{item.name}</p>
                                         <p className="text-xs text-gray-500 truncate">{item.code}</p>
                                         {item.item_type === SALE_ITEM_TYPE.COMBO && (
-                                          <Badge className="mt-1 bg-blue-100 text-blue-700 border border-blue-200">Combo</Badge>
+                                          <Badge className="mt-1 bg-gray-100 text-gray-700 border border-gray-200">Combo</Badge>
                                         )}
                                       </div>
                                       <Button
@@ -1900,9 +1900,9 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                   venta.payment_method === 'cash' 
                                     ? 'bg-green-100 text-green-800 border-green-200' 
                                     : venta.payment_method === 'card'
-                                    ? 'bg-blue-100 text-blue-800 border-blue-200'
+                                    ? 'bg-gray-100 text-gray-800 border-gray-200'
                                     : venta.payment_method === 'transfer'
-                                    ? 'bg-purple-100 text-purple-800 border-purple-200'
+                                    ? 'bg-gray-100 text-gray-800 border-gray-200'
                                     : 'bg-orange-100 text-orange-800 border-orange-200'
                                 } border inline-flex items-center gap-1.5`}
                               >
@@ -1942,7 +1942,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                 <Badge className="bg-amber-100 text-amber-800 border border-amber-200">Pendiente sync</Badge>
                               )}
                               {saleSyncStatus === 'processing' && (
-                                <Badge className="bg-blue-100 text-blue-800 border border-blue-200">Sincronizando...</Badge>
+                                <Badge className="bg-gray-100 text-gray-800 border border-gray-200">Sincronizando...</Badge>
                               )}
                               {saleSyncStatus === 'error' && (
                                 <Badge className="bg-red-100 text-red-800 border border-red-200">Error sync</Badge>
@@ -2005,7 +2005,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                                   setInvoiceCustomerIdNumber('');
                                   setShowInvoiceModal(true);
                                 }}
-                                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
+                                className="bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
                               >
                                 <Mail className="w-4 h-4" />
                                 <span className="text-sm">Enviar por correo</span>
@@ -2070,14 +2070,14 @@ function Ventas({ businessId, userRole = 'admin' }) {
               className="w-full max-w-2xl max-h-[90vh] overflow-y-auto"
             >
               <Card className="bg-white shadow-2xl rounded-2xl border-none">
-                <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-t-2xl">
+                <div className="bg-gradient-to-r from-gray-600 to-gray-700 text-white p-6 rounded-t-2xl">
                   <div className="flex items-center gap-3">
                     <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
                       <FileText className="w-8 h-8" />
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold">Enviar Comprobante de Pago</h2>
-                      <p className="text-blue-100 mt-1">
+                      <p className="text-gray-100 mt-1">
                         Venta del {selectedSale?.created_at ? formatDateOnly(selectedSale.created_at) : 'fecha no disponible'} por {formatPrice(selectedSale.total)}
                       </p>
                     </div>
@@ -2096,7 +2096,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                       onChange={(e) => setInvoiceCustomerName(e.target.value)}
                       placeholder="Nombre completo del cliente"
                       required
-                      className="h-11 rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      className="h-11 rounded-xl border-gray-300 focus:border-gray-500 focus:ring-gray-500"
                     />
                   </div>
 
@@ -2111,7 +2111,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                       onChange={(e) => setInvoiceCustomerEmail(e.target.value)}
                       placeholder="correo@ejemplo.com"
                       required
-                      className="h-11 rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      className="h-11 rounded-xl border-gray-300 focus:border-gray-500 focus:ring-gray-500"
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       El comprobante de pago se enviará a este correo electrónico
@@ -2128,7 +2128,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                       value={invoiceCustomerIdNumber}
                       onChange={(e) => setInvoiceCustomerIdNumber(e.target.value)}
                       placeholder="123456789-0"
-                      className="h-11 rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      className="h-11 rounded-xl border-gray-300 focus:border-gray-500 focus:ring-gray-500"
                     />
                   </div>
 
@@ -2165,12 +2165,12 @@ function Ventas({ businessId, userRole = 'admin' }) {
                     </div>
                   )}
 
-                  <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 shadow-md rounded-xl mt-6">
+                  <Card className="bg-gradient-to-r from-gray-50 to-gray-100 border-gray-200 shadow-md rounded-xl mt-6">
                     <div className="p-4">
-                      <p className="text-sm font-medium text-blue-800 mb-2">Resumen:</p>
+                      <p className="text-sm font-medium text-gray-800 mb-2">Resumen:</p>
                       <div className="flex items-center justify-between">
-                        <span className="text-lg font-semibold text-blue-900">Total:</span>
-                        <span className="text-2xl font-bold text-blue-900">{formatPrice(selectedSale.total)}</span>
+                        <span className="text-lg font-semibold text-gray-900">Total:</span>
+                        <span className="text-2xl font-bold text-gray-900">{formatPrice(selectedSale.total)}</span>
                       </div>
                     </div>
                   </Card>
@@ -2267,9 +2267,9 @@ function Ventas({ businessId, userRole = 'admin' }) {
                       </div>
                     )}
                     {showCashPaymentDetails && (
-                      <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
-                        <p className="text-xs text-blue-700 uppercase">Cambio</p>
-                        <p className="font-semibold text-blue-900">
+                      <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                        <p className="text-xs text-gray-700 uppercase">Cambio</p>
+                        <p className="font-semibold text-gray-900">
                           {resolvedChangeAmount !== null ? formatPrice(resolvedChangeAmount) : 'No registrado'}
                         </p>
                       </div>

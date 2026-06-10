@@ -396,8 +396,8 @@ function Empleados({ businessId }) {
             className="bg-white rounded-xl shadow p-4 border border-gray-100"
           >
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Users className="w-5 h-5 text-blue-600" />
+              <div className="p-2 bg-gray-100 rounded-lg">
+                <Users className="w-5 h-5 text-gray-600" />
               </div>
               <div>
                 <p className="text-sm text-gray-600">Total</p>
@@ -715,36 +715,36 @@ function Empleados({ businessId }) {
                 </p>
 
                 <div className="space-y-4 mb-6">
-                  <div className="bg-blue-50 rounded-xl p-4">
+                  <div className="bg-gray-50 rounded-xl p-4">
                     <p className="text-sm text-gray-600 mb-1">Usuario</p>
                     <div className="flex items-center justify-center gap-2">
-                      <code className="text-lg font-mono font-semibold text-blue-600">
+                      <code className="text-lg font-mono font-semibold text-gray-600">
                         {generatedCode.username}
                       </code>
                       <button
                         onClick={() => copyToClipboard(generatedCode.username)}
-                        className="p-1 hover:bg-blue-200 rounded transition-colors"
+                        className="p-1 hover:bg-gray-200 rounded transition-colors"
                       >
-                        <Copy className="w-4 h-4 text-blue-500" />
+                        <Copy className="w-4 h-4 text-gray-500" />
                       </button>
                     </div>
                   </div>
 
-                  <div className="bg-purple-50 rounded-xl p-4">
+                  <div className="bg-gray-50 rounded-xl p-4">
                     <p className="text-sm text-gray-600 mb-1">Contraseña</p>
                     <div className="flex items-center justify-center gap-2">
-                      <code className="text-lg font-mono font-semibold text-purple-600">
+                      <code className="text-lg font-mono font-semibold text-gray-600">
                         {generatedCode.password}
                       </code>
                       <button
                         onClick={() => copyToClipboard(generatedCode.password)}
-                        className="p-1 hover:bg-purple-200 rounded transition-colors"
+                        className="p-1 hover:bg-gray-200 rounded transition-colors"
                         title="Copiar contraseña"
                       >
                         {copiedCode ? (
                           <CheckCircle className="w-4 h-4 text-green-600" />
                         ) : (
-                          <Copy className="w-4 h-4 text-purple-500" />
+                          <Copy className="w-4 h-4 text-gray-500" />
                         )}
                       </button>
                     </div>

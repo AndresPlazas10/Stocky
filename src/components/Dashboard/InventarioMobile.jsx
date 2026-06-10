@@ -294,7 +294,7 @@ function InventarioMobile({ businessId }) {
           icon={Package}
           label="Total productos"
           value={totalProductos.toString()}
-          color="text-blue-600"
+          color="text-gray-600"
         />
         <MobileStatCard
           icon={DollarSign}
@@ -350,7 +350,7 @@ function InventarioMobile({ businessId }) {
                 e.stopPropagation();
                 handleEdit(product);
               }}
-              className="p-2 text-blue-600 hover:bg-blue-50 rounded active:scale-95 transition-all"
+              className="p-2 text-gray-600 hover:bg-gray-50 rounded active:scale-95 transition-all"
             >
               <Edit size={18} />
             </button>

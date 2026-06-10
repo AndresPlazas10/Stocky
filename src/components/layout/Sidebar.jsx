@@ -16,6 +16,7 @@ import {
   Menu,
   X,
   Upload,
+  Camera,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import logoStocky from '../../assets/logoStocky.png';
@@ -117,8 +118,9 @@ export const Sidebar = React.memo(function Sidebar({ activeSection, onSectionCha
               </h1>
               <p className="text-xs text-muted-foreground">POS System</p>
               <div className="mt-3 flex flex-col gap-1.5">
-                <label className="text-xs text-blue-600 hover:text-blue-700 cursor-pointer font-medium transition-colors hover:underline">
-                  📷 Cambiar logo
+                <label className="cursor-pointer text-xs text-primary hover:text-primary-700 font-medium transition-colors duration-200 hover:underline inline-flex items-center gap-1">
+                  <Camera className="h-3 w-3" />
+                  Cambiar logo
                   <input
                     type="file"
                     accept="image/*"
@@ -129,9 +131,10 @@ export const Sidebar = React.memo(function Sidebar({ activeSection, onSectionCha
                 {businessLogo && (
                   <button
                     onClick={handleRemoveLogo}
-                    className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors hover:underline"
+                    className="cursor-pointer text-xs text-destructive hover:text-destructive/80 font-medium transition-colors duration-200 hover:underline inline-flex items-center gap-1"
                   >
-                    ✕ Quitar logo
+                    <X className="h-3 w-3" />
+                    Quitar logo
                   </button>
                 )}
               </div>

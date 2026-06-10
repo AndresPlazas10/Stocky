@@ -348,9 +348,9 @@ export default function Combos({ businessId }) {
                             <p className="text-accent-600 text-xs uppercase">Precio</p>
                             <p className="font-bold text-primary-900">{formatPrice(combo.precio_venta)}</p>
                           </div>
-                          <div className="rounded-lg bg-blue-50 p-2">
-                            <p className="text-blue-700 text-xs uppercase">Productos</p>
-                            <p className="font-bold text-blue-900">{combo.combo_items?.length || 0}</p>
+                          <div className="rounded-lg bg-gray-50 p-2">
+                            <p className="text-gray-700 text-xs uppercase">Productos</p>
+                            <p className="font-bold text-gray-900">{combo.combo_items?.length || 0}</p>
                           </div>
                         </div>
 
@@ -362,7 +362,7 @@ export default function Combos({ businessId }) {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                           <Button
                             onClick={() => openEditModal(combo)}
-                            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl"
+                            className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white rounded-xl"
                           >
                             <Edit className="w-4 h-4 mr-2" />
                             Editar
