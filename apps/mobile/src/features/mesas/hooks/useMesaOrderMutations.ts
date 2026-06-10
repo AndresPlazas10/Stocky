@@ -891,7 +891,7 @@ export function useMesaOrderMutations({
   );
 
   const handleSaveOrder = useCallback(async () => {
-    if (releasingEmptyOrder || isClosingOrder || isSavingOrder)
+    if (releasingEmptyOrder || isClosingOrder || isSavingOrder || loadingOrder)
       return;
 
     const snapshotBeforeSave = latestOrderItemsRef.current;
@@ -979,6 +979,7 @@ export function useMesaOrderMutations({
     isClosingOrder,
     isSavingOrder,
     latestOrderItemsRef,
+    loadingOrder,
     orderItemsCacheRef,
     patchMesaOrderTotal,
     patchMesaOrderUnits,
