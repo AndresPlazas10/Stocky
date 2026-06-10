@@ -1407,9 +1407,6 @@ export function MesasPanel({ session, businessContext }: Props) {
         closeOrderModal();
       }
     } catch (err) {
-      if (!isMesaActionVersionCurrent(mesa.id, actionVersion)) {
-        return;
-      }
       if (action === 'open') {
         closeOrderModal();
       }
@@ -1419,9 +1416,7 @@ export function MesasPanel({ session, businessContext }: Props) {
       });
       setError(err instanceof Error ? err.message : 'No se pudo actualizar la mesa.');
     } finally {
-      if (isMesaActionVersionCurrent(mesa.id, actionVersion)) {
-        setActingMesaId(null);
-      }
+      setActingMesaId((current) => (current === mesa.id ? null : current));
     }
   }, [
     bumpMesaActionVersion,

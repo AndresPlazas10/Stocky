@@ -73,6 +73,7 @@ export function OrderModal({
     <StockyModal
       visible={visible}
       onClose={onClose}
+      hideCloseButton
       backdropVariant="blur"
       layout="centered"
       modalAnimationType="fade"
