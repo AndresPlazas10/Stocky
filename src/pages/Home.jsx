@@ -6,6 +6,7 @@ import WhatsNewModal from '../components/Modals/WhatsNewModal.jsx';
 import { isIOs, isStandalone, supportsPWA } from '../utils/deviceDetection.js';
 import { SplineScene } from '../components/ui/splite.jsx';
 import GradientButton from '../components/ui/gradient-button.jsx';
+import { useViewport } from '../hooks/useViewport.js';
 import {
   Menu,
   X,
@@ -73,6 +74,7 @@ function Home() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showIosBanner, setShowIosBanner] = useState(false);
+  const { isMobile } = useViewport();
 
   useEffect(() => {
     const signOut = async () => {
@@ -286,10 +288,6 @@ function Home() {
               transition={{ duration: 0.3 }}
               className="text-center mb-8"
             >
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary-200/70 bg-primary-50 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-primary-700">
-                <Sparkles className="h-3 w-3" />
-                POS integral para restaurantes y bares
-              </div>
             </motion.div>
 
             <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
@@ -339,20 +337,22 @@ function Home() {
                 </motion.div>
               </div>
 
-              <div className="flex-1 w-full lg:w-auto">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.5, delay: 0.2 }}
-                  className="relative w-full h-[400px] lg:h-[500px] bg-white rounded-2xl overflow-hidden"
-                  style={{ position: 'relative' }}
-                >
-                  <SplineScene 
-                    scene="https://prod.spline.design/c81LtkO3jIPTCgFo/scene.splinecode"
-                    className="w-full h-full pointer-events-none"
-                  />
-                </motion.div>
-              </div>
+              {!isMobile && (
+                <div className="flex-1 w-full lg:w-auto">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5, delay: 0.2 }}
+                    className="relative w-full h-[400px] lg:h-[500px] bg-white rounded-2xl overflow-hidden"
+                    style={{ position: 'relative' }}
+                  >
+                    <SplineScene 
+                      scene="https://prod.spline.design/c81LtkO3jIPTCgFo/scene.splinecode"
+                      className="w-full h-full pointer-events-none"
+                    />
+                  </motion.div>
+                </div>
+              )}
             </div>
           </div>
         </section>
