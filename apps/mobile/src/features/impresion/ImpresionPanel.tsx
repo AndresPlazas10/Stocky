@@ -30,6 +30,7 @@ import {
 } from '../../services/bluetoothPrinterService';
 import { buildSaleEscPos } from '../../services/escposService';
 import { getThermalPaperWidthMm, setThermalPaperWidthMm } from '../../utils/printer';
+import { ensureBluetoothEnabled, BLUETOOTH_PRINT_REQUIRED_MESSAGE } from '../../utils/bluetooth';
 
 async function requestBluetoothPermissions(): Promise<boolean> {
   if (Platform.OS !== 'android') return true;
@@ -149,6 +150,11 @@ export function ImpresionPanel({ businessName }: Props) {
   const handlePrintTest = useCallback(async () => {
     if (!savedPrinter) {
       Alert.alert('Sin impresora', 'Conecta una impresora primero.');
+      return;
+    }
+    const btReady = await ensureBluetoothEnabled();
+    if (!btReady) {
+      Alert.alert('Bluetooth desactivado', BLUETOOTH_PRINT_REQUIRED_MESSAGE);
       return;
     }
     setIsPrintingTest(true);
