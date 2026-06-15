@@ -69,7 +69,11 @@ export function ImpresionPanel({ businessName }: Props) {
       const pw = await getThermalPaperWidthMm();
       setPaperWidthMm(pw);
       if (saved) {
-        const ok = await isPrinterConnected(saved.address);
+        let ok = await isPrinterConnected(saved.address);
+        if (!ok) {
+          console.log('[Impresion] Printer not connected, attempting reconnect...');
+          ok = await connectToPrinter(saved.address);
+        }
         setConnected(ok);
       }
     })();

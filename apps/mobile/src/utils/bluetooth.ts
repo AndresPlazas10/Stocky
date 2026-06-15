@@ -1,16 +1,14 @@
 import { Alert, Linking, Platform } from 'react-native';
-import { BleManager, State } from 'react-native-ble-plx';
-
-const bleManager = new BleManager();
+import BluetoothClassic from 'react-native-bluetooth-classic';
 
 export const BLUETOOTH_PRINT_REQUIRED_MESSAGE =
   'Para imprimir necesitas activar el Bluetooth y conectar una impresora termica.';
 
 export async function isBluetoothEnabled(): Promise<boolean> {
   try {
-    const state = await bleManager.state();
-    return state === State.PoweredOn;
-  } catch {
+    return await BluetoothClassic.isBluetoothEnabled();
+  } catch (error) {
+    console.error('[BT] isBluetoothEnabled failed:', error);
     return false;
   }
 }
@@ -30,9 +28,8 @@ export async function ensureBluetoothEnabled(): Promise<boolean> {
           onPress: async () => {
             if (Platform.OS === 'android') {
               try {
-                await bleManager.enable();
-                const state = await bleManager.state();
-                resolve(state === State.PoweredOn);
+                const result = await BluetoothClassic.requestBluetoothEnabled();
+                resolve(result);
               } catch {
                 resolve(false);
               }
