@@ -87,21 +87,22 @@ export async function connectToPrinter(address: string): Promise<boolean> {
   } catch (error) {
     console.error('[BT Printer] cancelDiscovery before connect failed:', error);
   }
+  await delay(300);
   try {
     await BluetoothClassic.connectToDevice(address, {
       connectorType: 'rfcomm',
-      secureSocket: false,
-      connectionType: 'binary',
+      secure: false,
     });
+    console.log('[BT Printer] Connected (insecure) to', address);
     return true;
   } catch (error) {
     console.error('[BT Printer] connectToDevice (insecure) failed:', error);
     try {
       await BluetoothClassic.connectToDevice(address, {
         connectorType: 'rfcomm',
-        secureSocket: true,
-        connectionType: 'binary',
+        secure: true,
       });
+      console.log('[BT Printer] Connected (secure) to', address);
       return true;
     } catch (error2) {
       console.error('[BT Printer] connectToDevice (secure fallback) failed:', error2);
@@ -137,6 +138,7 @@ export async function printBytes(address: string, data: Uint8Array): Promise<boo
       }
 
       const buffer = Buffer.from(data);
+      console.log(`[BT Printer] Writing ${buffer.length} bytes to ${address}`);
 
       if (buffer.length <= CHUNK_SIZE) {
         await BluetoothClassic.writeToDevice(address, buffer);
