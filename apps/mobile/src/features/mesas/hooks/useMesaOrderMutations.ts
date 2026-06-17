@@ -175,7 +175,6 @@ type UseMesaOrderMutationsParams = {
     subAccounts: SplitSubAccount[];
   }) => Promise<{ saleIds?: string[] | null }>;
 
-  patchMesaOrderUnits: (orderId: string, units: number) => void;
   patchMesaOrderTotal: (mesaId: string, orderId: string, total: number) => void;
   publishRealtimeOrderSummary: (
     mesa: MesaRecord | null | undefined,
@@ -187,7 +186,6 @@ type UseMesaOrderMutationsParams = {
 
   setError: (v: string | null) => void;
   setMesas: (v: MesaRecord[] | ((prev: MesaRecord[]) => MesaRecord[])) => void;
-  clearMesaOrderUnits: (orderId: string | null | undefined) => void;
   markMesaAsAvailableAfterSale: (mesaId: string) => void;
   loadData: () => Promise<void>;
 
@@ -221,12 +219,10 @@ export function useMesaOrderMutations({
   persistOrderSnapshot,
   closeOrderSingle,
   closeOrderAsSplit,
-  patchMesaOrderUnits,
   patchMesaOrderTotal,
   publishRealtimeOrderSummary,
   setError,
   setMesas,
-  clearMesaOrderUnits,
   markMesaAsAvailableAfterSale,
   loadData,
   beginPrintFlow,
@@ -365,7 +361,6 @@ export function useMesaOrderMutations({
         )
         .sort(compareMesaTableIdentifiers),
     );
-    clearMesaOrderUnits(orderId);
     if (orderId) {
       orderItemsCacheRef.current.delete(orderId);
     }
@@ -424,7 +419,6 @@ export function useMesaOrderMutations({
     }
   }, [
     bumpMesaActionVersion,
-    clearMesaOrderUnits,
     closeOrderModal,
     isMesaActionVersionCurrent,
     publishMesaStateBroadcast,
@@ -468,14 +462,12 @@ export function useMesaOrderMutations({
         try {
           const freshItems = await listOrderItems(latestUpdate.orderId);
           setOrderItems(freshItems);
-          patchMesaOrderUnits(latestUpdate.orderId, sumOrderItemsQuantity(freshItems));
         } catch {
           // no-op
         }
       });
   }, [
     addCatalogQueueRef,
-    patchMesaOrderUnits,
     pendingQuantityUpdatesRef,
     quantitySyncTimerRef,
     setOrderItems,
@@ -573,7 +565,6 @@ export function useMesaOrderMutations({
 
       const optimisticUnits = sumOrderItemsQuantity(optimisticItems);
       const optimisticTotal = calculateOrderTotal(optimisticItems);
-      patchMesaOrderUnits(orderId, optimisticUnits);
       patchMesaOrderTotal(selectedMesa.id, orderId, optimisticTotal);
       publishRealtimeOrderSummary(
         selectedMesa,
@@ -613,7 +604,6 @@ export function useMesaOrderMutations({
             const next = reconcileOrderItemsFromServer(prev, [confirmedItem]);
             const confirmedUnits = sumOrderItemsQuantity(next);
             const confirmedTotal = calculateOrderTotal(next);
-            patchMesaOrderUnits(orderId, confirmedUnits);
             patchMesaOrderTotal(selectedMesa.id, orderId, confirmedTotal);
             publishRealtimeOrderSummary(
               selectedMesa,
@@ -637,7 +627,6 @@ export function useMesaOrderMutations({
           setOrderItems(previousItemsSnapshot);
           const rollbackUnits = sumOrderItemsQuantity(previousItemsSnapshot);
           const rollbackTotal = calculateOrderTotal(previousItemsSnapshot);
-          patchMesaOrderUnits(orderId, rollbackUnits);
           patchMesaOrderTotal(selectedMesa.id, orderId, rollbackTotal);
           publishRealtimeOrderSummary(
             selectedMesa,
@@ -655,7 +644,6 @@ export function useMesaOrderMutations({
       isClosingOrder,
       loadingOrder,
       patchMesaOrderTotal,
-      patchMesaOrderUnits,
       publishRealtimeOrderSummary,
       releasingEmptyOrder,
       selectedMesa,
@@ -710,7 +698,6 @@ export function useMesaOrderMutations({
 
       const optimisticTotal = calculateOrderTotal(optimisticItems);
       const optimisticUnits = sumOrderItemsQuantity(optimisticItems);
-      patchMesaOrderUnits(orderId, optimisticUnits);
       patchMesaOrderTotal(selectedMesa.id, orderId, optimisticTotal);
       publishRealtimeOrderSummary(
         selectedMesa,
@@ -731,7 +718,6 @@ export function useMesaOrderMutations({
     },
     [
       patchMesaOrderTotal,
-      patchMesaOrderUnits,
       publishRealtimeOrderSummary,
       scheduleQuantitySync,
       selectedMesa,
@@ -758,7 +744,6 @@ export function useMesaOrderMutations({
 
         setOrderItems(result.items);
         const nextUnits = sumOrderItemsQuantity(result.items);
-        patchMesaOrderUnits(selectedMesa.current_order_id, nextUnits);
         patchMesaOrderTotal(selectedMesa.id, selectedMesa.current_order_id, result.total);
         publishRealtimeOrderSummary(
           selectedMesa,
@@ -775,7 +760,6 @@ export function useMesaOrderMutations({
     },
     [
       patchMesaOrderTotal,
-      patchMesaOrderUnits,
       publishRealtimeOrderSummary,
       removeOrderItemFromOrder,
       selectedMesa,
@@ -834,7 +818,6 @@ export function useMesaOrderMutations({
       setOrderItemsCacheSnapshot(selectedMesa.current_order_id, persisted.items);
       const persistedUnits = sumOrderItemsQuantity(persisted.items);
       patchMesaOrderTotal(selectedMesa.id, selectedMesa.current_order_id, persisted.total);
-      patchMesaOrderUnits(selectedMesa.current_order_id, persistedUnits);
       publishRealtimeOrderSummary(
         selectedMesa,
         selectedMesa.current_order_id,
@@ -866,7 +849,6 @@ export function useMesaOrderMutations({
     loadingOrder,
     orderItemsCacheRef,
     patchMesaOrderTotal,
-    patchMesaOrderUnits,
     pendingQuantityUpdatesRef,
     persistOrderSnapshot,
     publishRealtimeOrderSummary,
@@ -920,7 +902,6 @@ export function useMesaOrderMutations({
         if (orderId) {
           orderItemsCacheRef.current.set(orderId, cachedItems);
         }
-        patchMesaOrderUnits(orderId, sumOrderItemsQuantity(cachedItems));
         patchMesaOrderTotal(mesa.id, orderId, calculateOrderTotal(cachedItems));
       }
 
@@ -931,7 +912,6 @@ export function useMesaOrderMutations({
       if (skipOrderItemsFetch) {
         if (!cachedItems) {
           setOrderItems([]);
-          patchMesaOrderUnits(orderId, 0);
           orderItemsCacheRef.current.set(orderId, []);
         }
         if (!skipLockAcquire) {
@@ -975,7 +955,6 @@ export function useMesaOrderMutations({
               setOrderItems(mergedItems);
               orderItemsCacheRef.current.set(orderId, mergedItems);
               setOrderItemsCacheSnapshot(orderId, mergedItems);
-              patchMesaOrderUnits(orderId, sumOrderItemsQuantity(mergedItems));
               patchMesaOrderTotal(mesa.id, orderId, calculateOrderTotal(mergedItems));
             }
 
@@ -1002,7 +981,6 @@ export function useMesaOrderMutations({
         setOrderItems(mergedItems);
         orderItemsCacheRef.current.set(orderId, mergedItems);
         setOrderItemsCacheSnapshot(orderId, mergedItems);
-        patchMesaOrderUnits(orderId, sumOrderItemsQuantity(mergedItems));
         patchMesaOrderTotal(mesa.id, orderId, calculateOrderTotal(mergedItems));
       } catch (err) {
         if (!cachedItems) {
@@ -1021,7 +999,6 @@ export function useMesaOrderMutations({
       orderItemsCacheRef,
       orderModalOpenIntentRef,
       patchMesaOrderTotal,
-      patchMesaOrderUnits,
       setError,
       setIsSearchFocused,
       setLoadingOrder,

@@ -12,7 +12,6 @@ interface MesaCardProps {
   lockedByOther: boolean;
   isBusy?: boolean;
   total?: number;
-  productsCount?: number;
   onPress: (mesa: MesaRecord) => void;
   onDeletePress?: (mesa: MesaRecord) => void;
 }
@@ -23,7 +22,6 @@ export function MesaCard({
   lockedByOther,
   isBusy = false,
   total = 0,
-  productsCount = 0,
   onPress,
   onDeletePress,
 }: MesaCardProps) {
@@ -59,9 +57,6 @@ export function MesaCard({
         <View style={styles.occupiedSummary}>
           <View style={styles.divider} />
           <StockyMoneyText value={total} style={styles.metaTotal} />
-          <Text style={styles.metaProducts}>
-            {productsCount} {productsCount === 1 ? 'producto' : 'productos'}
-          </Text>
         </View>
       ) : null}
 
@@ -155,11 +150,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     lineHeight: 30,
     fontWeight: '700',
-  },
-  metaProducts: {
-    color: '#374151',
-    fontSize: 14,
-    fontWeight: '500',
   },
   lockOverlay: {
     ...StyleSheet.absoluteFillObject,
