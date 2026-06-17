@@ -1,9 +1,16 @@
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import {
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { StockyButton } from './StockyButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 
 type BusinessDisabledScreenProps = {
   businessName: string | null;

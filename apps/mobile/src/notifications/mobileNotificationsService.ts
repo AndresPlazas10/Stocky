@@ -5,39 +5,56 @@ import type { Session } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import { EXPO_CONFIG } from '../config/env';
 import { getSupabaseClient } from '../lib/supabase';
+import { getErrorMessage } from '../utils/error';
 
 const INSTALLATION_ID_KEY = 'stocky.mobile.installation_id';
 const DEFAULT_NOTIFICATION_CHANNEL_ID = 'stocky-default';
 
 let notificationsConfigured = false;
 let notificationsModuleCache: typeof import('expo-notifications') | null = null;
+let notificationsModulePromise: Promise<typeof import('expo-notifications') | null> | null = null;
 
-function getNotificationsModule() {
+async function loadNotificationsModule(): Promise<typeof import('expo-notifications') | null> {
   if (!shouldEnableMobileNotificationsRuntime()) return null;
   if (notificationsModuleCache) return notificationsModuleCache;
+  if (notificationsModulePromise) return notificationsModulePromise;
 
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    notificationsModuleCache = require('expo-notifications') as typeof import('expo-notifications');
-    return notificationsModuleCache;
-  } catch (error) {
-    if (__DEV__) console.log('[notifications] expo-notifications unavailable in current runtime', error);
-    return null;
-  }
+  notificationsModulePromise = import('expo-notifications')
+    .then((mod) => {
+      notificationsModuleCache = mod;
+      return mod;
+    })
+    .catch((error) => {
+      if (__DEV__)
+        console.warn('[notifications] expo-notifications unavailable in current runtime', error);
+      return null;
+    });
+
+  return notificationsModulePromise;
 }
 
 type PushRegistrationResult =
   | { ok: true; token: string; installationId: string }
-  | { ok: false; reason: 'unsupported' | 'simulator' | 'expo_go_unsupported' | 'permission_denied' | 'missing_project_id' | 'error'; message: string };
+  | {
+      ok: false;
+      reason:
+        | 'unsupported'
+        | 'simulator'
+        | 'expo_go_unsupported'
+        | 'permission_denied'
+        | 'missing_project_id'
+        | 'error';
+      message: string;
+    };
 
 type NotifyAdminEmployeeLoginResult =
-  | { ok: true; status: number; data: any }
+  | { ok: true; status: number; data: unknown }
   | { ok: false; status: number | null; message: string };
 type NotifyAdminSaleRegisteredResult =
-  | { ok: true; status: number; data: any }
+  | { ok: true; status: number; data: unknown }
   | { ok: false; status: number | null; message: string };
 type NotifyAdminLowStockResult =
-  | { ok: true; status: number; data: any }
+  | { ok: true; status: number; data: unknown }
   | { ok: false; status: number | null; message: string };
 
 function createInstallationId() {
@@ -52,21 +69,29 @@ async function getInstallationId() {
   return next;
 }
 
+type ExpoConstantsLike = {
+  executionEnvironment?: string;
+  easConfig?: { projectId?: string };
+  expoConfig?: { extra?: { eas?: { projectId?: string } } };
+};
+
 function resolveProjectId() {
   const fromEnv = String(EXPO_CONFIG.easProjectId || '').trim();
   if (fromEnv) return fromEnv;
 
-  const fromEasConfig = String((Constants as any)?.easConfig?.projectId || '').trim();
+  const constants = Constants as ExpoConstantsLike;
+  const fromEasConfig = String(constants?.easConfig?.projectId || '').trim();
   if (fromEasConfig) return fromEasConfig;
 
-  const fromExpoConfigExtra = String((Constants as any)?.expoConfig?.extra?.eas?.projectId || '').trim();
+  const fromExpoConfigExtra = String(constants?.expoConfig?.extra?.eas?.projectId || '').trim();
   if (fromExpoConfigExtra) return fromExpoConfigExtra;
 
   return '';
 }
 
 function isExpoGoRuntime() {
-  const executionEnvironment = String((Constants as any)?.executionEnvironment || '').toLowerCase();
+  const constants = Constants as ExpoConstantsLike;
+  const executionEnvironment = String(constants?.executionEnvironment || '').toLowerCase();
   return executionEnvironment === 'storeclient';
 }
 
@@ -76,15 +101,15 @@ export function shouldEnableMobileNotificationsRuntime() {
   return true;
 }
 
-export function getMobileNotificationsModule() {
-  return getNotificationsModule();
+export async function getMobileNotificationsModule() {
+  return loadNotificationsModule();
 }
 
-export function configureMobileNotifications() {
+export async function configureMobileNotifications() {
   if (!shouldEnableMobileNotificationsRuntime()) return;
   if (notificationsConfigured) return;
 
-  const Notifications = getNotificationsModule();
+  const Notifications = await loadNotificationsModule();
   if (!Notifications) return;
 
   notificationsConfigured = true;
@@ -99,7 +124,7 @@ export function configureMobileNotifications() {
       }),
     });
   } catch (error) {
-    if (__DEV__) console.log('[notifications] setNotificationHandler skipped', error);
+    if (__DEV__) console.warn('[notifications] setNotificationHandler skipped', error);
     return;
   }
 
@@ -112,12 +137,14 @@ export function configureMobileNotifications() {
         lightColor: '#1D4ED8',
       });
     } catch (error) {
-      if (__DEV__) console.log('[notifications] setNotificationChannelAsync skipped', error);
+      if (__DEV__) console.warn('[notifications] setNotificationChannelAsync skipped', error);
     }
   }
 }
 
-export async function registerPushTokenForSession(session: Session): Promise<PushRegistrationResult> {
+export async function registerPushTokenForSession(
+  session: Session,
+): Promise<PushRegistrationResult> {
   try {
     if (Platform.OS === 'web') {
       return {
@@ -135,7 +162,7 @@ export async function registerPushTokenForSession(session: Session): Promise<Pus
       };
     }
 
-    const Notifications = getNotificationsModule();
+    const Notifications = await loadNotificationsModule();
     if (!Notifications) {
       return {
         ok: false,
@@ -190,9 +217,8 @@ export async function registerPushTokenForSession(session: Session): Promise<Pus
     const client = getSupabaseClient();
     const nowIso = new Date().toISOString();
 
-    const { error } = await client
-      .from('mobile_push_tokens')
-      .upsert({
+    const { error } = await client.from('mobile_push_tokens').upsert(
+      {
         user_id: session.user.id,
         installation_id: installationId,
         push_token: token,
@@ -201,18 +227,18 @@ export async function registerPushTokenForSession(session: Session): Promise<Pus
         is_active: true,
         last_seen_at: nowIso,
         updated_at: nowIso,
-      }, {
+      },
+      {
         onConflict: 'user_id,installation_id',
         ignoreDuplicates: false,
-      });
+      },
+    );
 
     if (error) throw error;
 
     return { ok: true, token, installationId };
   } catch (err) {
-    const message = err instanceof Error
-      ? err.message
-      : String((err as any)?.message || err || 'Failed to register push token.');
+    const message = err instanceof Error ? err.message : getErrorMessage(err);
     if (String(message).toLowerCase().includes('expo-notifications')) {
       return {
         ok: false,
@@ -298,7 +324,7 @@ async function notifyAdminEmployeeLoginViaRoute({
     });
 
     const raw = await response.text();
-    let payload: any = null;
+    let payload: Record<string, unknown> | null = null;
     try {
       payload = raw ? JSON.parse(raw) : null;
     } catch {
@@ -309,15 +335,15 @@ async function notifyAdminEmployeeLoginViaRoute({
       return {
         ok: false,
         status: response.status,
-        message: String(payload?.error || payload?.message || `Request failed (${response.status})`),
+        message: String(
+          payload?.error || payload?.message || `Request failed (${response.status})`,
+        ),
       };
     }
 
     return { ok: true, status: response.status, data: payload };
   } catch (error) {
-    const errorMessage = error instanceof Error
-      ? error.message
-      : String((error as any)?.message || error || 'Network error');
+    const errorMessage = error instanceof Error ? error.message : getErrorMessage(error);
     const targetUrl = `${EXPO_CONFIG.apiBaseUrl}${route}`;
     return {
       ok: false,
@@ -391,7 +417,7 @@ async function notifyAdminSaleRegisteredViaRoute({
     });
 
     const raw = await response.text();
-    let payload: any = null;
+    let payload: Record<string, unknown> | null = null;
     try {
       payload = raw ? JSON.parse(raw) : null;
     } catch {
@@ -402,15 +428,15 @@ async function notifyAdminSaleRegisteredViaRoute({
       return {
         ok: false,
         status: response.status,
-        message: String(payload?.error || payload?.message || `Request failed (${response.status})`),
+        message: String(
+          payload?.error || payload?.message || `Request failed (${response.status})`,
+        ),
       };
     }
 
     return { ok: true, status: response.status, data: payload };
   } catch (error) {
-    const errorMessage = error instanceof Error
-      ? error.message
-      : String((error as any)?.message || error || 'Network error');
+    const errorMessage = error instanceof Error ? error.message : getErrorMessage(error);
     const targetUrl = `${EXPO_CONFIG.apiBaseUrl}${route}`;
     return {
       ok: false,
@@ -485,7 +511,7 @@ async function notifyAdminLowStockViaRoute({
     });
 
     const raw = await response.text();
-    let payload: any = null;
+    let payload: Record<string, unknown> | null = null;
     try {
       payload = raw ? JSON.parse(raw) : null;
     } catch {
@@ -496,15 +522,15 @@ async function notifyAdminLowStockViaRoute({
       return {
         ok: false,
         status: response.status,
-        message: String(payload?.error || payload?.message || `Request failed (${response.status})`),
+        message: String(
+          payload?.error || payload?.message || `Request failed (${response.status})`,
+        ),
       };
     }
 
     return { ok: true, status: response.status, data: payload };
   } catch (error) {
-    const errorMessage = error instanceof Error
-      ? error.message
-      : String((error as any)?.message || error || 'Network error');
+    const errorMessage = error instanceof Error ? error.message : getErrorMessage(error);
     const targetUrl = `${EXPO_CONFIG.apiBaseUrl}${route}`;
     return {
       ok: false,

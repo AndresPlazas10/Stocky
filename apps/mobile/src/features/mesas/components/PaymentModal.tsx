@@ -47,7 +47,7 @@ export function PaymentModal({
       centeredOffsetY={8}
       modalAnimationType="fade"
       sheetStyle={styles.sheet}
-      headerSlot={(
+      headerSlot={
         <View style={styles.header}>
           <View style={styles.headerRow}>
             <View style={styles.headerBadge}>
@@ -55,28 +55,23 @@ export function PaymentModal({
             </View>
             <View style={styles.headerTextWrap}>
               <Text style={styles.headerTitle}>Confirmar pago</Text>
-              <Text style={styles.headerSubtitle}>Revisa el cierre antes de confirmar la venta.</Text>
+              <Text style={styles.headerSubtitle}>
+                Revisa el cierre antes de confirmar la venta.
+              </Text>
             </View>
           </View>
         </View>
-      )}
+      }
       contentContainerStyle={styles.content}
       onClose={onClose}
       footerStyle={styles.footer}
-      footer={(
+      footer={
         <View style={styles.footerRow}>
-          <Pressable
-            style={styles.cancelButton}
-            onPress={onClose}
-            disabled={isClosing}
-          >
+          <Pressable style={styles.cancelButton} onPress={onClose} disabled={isClosing}>
             <Text style={styles.cancelText}>Cancelar</Text>
           </Pressable>
           <Pressable
-            style={[
-              styles.confirmButtonWrap,
-              (isClosing || !isValid) && styles.disabled,
-            ]}
+            style={[styles.confirmButtonWrap, (isClosing || !isValid) && styles.disabled]}
             onPress={onConfirm}
             disabled={isClosing || !isValid}
           >
@@ -87,11 +82,13 @@ export function PaymentModal({
               style={styles.confirmButton}
             >
               <Ionicons name="checkmark-circle-outline" size={22} color="#C4B5FD" />
-              <Text style={styles.confirmText}>{isClosing ? 'Procesando...' : 'Confirmar Venta'}</Text>
+              <Text style={styles.confirmText}>
+                {isClosing ? 'Procesando...' : 'Confirmar Venta'}
+              </Text>
             </LinearGradient>
           </Pressable>
         </View>
-      )}
+      }
     >
       <LinearGradient
         colors={['#F5F3FF', '#FFFFFF']}
@@ -109,7 +106,11 @@ export function PaymentModal({
           <View style={[styles.summaryMetaBlock, styles.summaryMetaBlockRight]}>
             <Text style={styles.summaryMetaLabel}>Cambio</Text>
             <StockyMoneyText
-              value={paymentMethod === 'cash' && cashChangeData?.isValid ? Number(cashChangeData.change || 0) : 0}
+              value={
+                paymentMethod === 'cash' && cashChangeData?.isValid
+                  ? Number(cashChangeData.change || 0)
+                  : 0
+              }
               style={styles.summaryMetaValue}
             />
           </View>
@@ -118,14 +119,14 @@ export function PaymentModal({
 
       <View style={styles.formCard}>
         <Text style={styles.fieldLabel}>Método de pago *</Text>
-        <Pressable
-          style={styles.field}
-          onPress={onToggleMenu}
-          disabled={isClosing}
-        >
+        <Pressable style={styles.field} onPress={onToggleMenu} disabled={isClosing}>
           <View style={styles.fieldLeft}>
             {isBankPaymentMethod(paymentMethod) ? (
-              <Image source={getBankLogoSource(paymentMethod)!} style={styles.methodLogo} resizeMode="contain" />
+              <Image
+                source={getBankLogoSource(paymentMethod)!}
+                style={styles.methodLogo}
+                resizeMode="contain"
+              />
             ) : (
               <Ionicons name={getPaymentMethodIcon(paymentMethod)} size={20} color="#111827" />
             )}
@@ -150,11 +151,21 @@ export function PaymentModal({
                 >
                   <View style={styles.fieldLeft}>
                     {isBankPaymentMethod(option.value) ? (
-                      <Image source={getBankLogoSource(option.value)!} style={styles.methodLogoSmall} resizeMode="contain" />
+                      <Image
+                        source={getBankLogoSource(option.value)!}
+                        style={styles.methodLogoSmall}
+                        resizeMode="contain"
+                      />
                     ) : (
-                      <Ionicons name={getPaymentMethodIcon(option.value)} size={18} color={selected ? '#4F46E5' : '#111827'} />
+                      <Ionicons
+                        name={getPaymentMethodIcon(option.value)}
+                        size={18}
+                        color={selected ? '#4F46E5' : '#111827'}
+                      />
                     )}
-                    <Text style={[styles.menuText, selected && styles.menuTextSelected]}>{option.label}</Text>
+                    <Text style={[styles.menuText, selected && styles.menuTextSelected]}>
+                      {option.label}
+                    </Text>
                   </View>
                   {selected ? <Ionicons name="checkmark" size={18} color="#4F46E5" /> : null}
                 </Pressable>

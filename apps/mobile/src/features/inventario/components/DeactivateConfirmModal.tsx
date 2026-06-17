@@ -31,30 +31,27 @@ export function DeactivateConfirmModal({
       visible={visible}
       title="Desactivar producto"
       onClose={onClose}
-      footer={(
+      footer={
         <View style={styles.modalFooterRow}>
-          <StockyButton
-            variant="ghost"
-            onPress={onClose}
-            disabled={deleting}
-          >
+          <StockyButton variant="ghost" onPress={onClose} disabled={deleting}>
             Cancelar
           </StockyButton>
           <StockyButton onPress={onConfirm} loading={deleting} disabled={deleting}>
             Desactivar
           </StockyButton>
         </View>
-      )}
+      }
     >
       <Text style={styles.modalText}>
         {deleteCheckResult?.has_sales && deleteCheckResult?.has_purchases
           ? `${productTarget?.name || 'Este producto'} tiene ${deleteCheckResult.sales_count} ventas y ${deleteCheckResult.purchases_count} compras registradas. No se puede eliminar.`
           : deleteCheckResult?.has_sales
             ? `${productTarget?.name || 'Este producto'} tiene ${deleteCheckResult.sales_count} ventas registradas. No se puede eliminar.`
-            : `${productTarget?.name || 'Este producto'} tiene ${deleteCheckResult?.purchases_count || 0} compras registradas. No se puede eliminar.`
-        }
+            : `${productTarget?.name || 'Este producto'} tiene ${deleteCheckResult?.purchases_count || 0} compras registradas. No se puede eliminar.`}
       </Text>
-      <Text style={styles.modalSubText}>Puedes desactivarlo para ocultarlo del catálogo activo.</Text>
+      <Text style={styles.modalSubText}>
+        Puedes desactivarlo para ocultarlo del catálogo activo.
+      </Text>
     </StockyModal>
   );
 }

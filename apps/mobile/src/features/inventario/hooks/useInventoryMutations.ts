@@ -8,6 +8,7 @@ import {
   type InventoryProductRecord,
 } from '../../../services/inventoryService';
 import { invalidateCatalogItemsCache } from '../../../services/mesaOrderService';
+import { getErrorMessage } from '../../../utils/error';
 import { parseIntegerText, parseMoneyText, type ProductFormState } from '../inventoryUtils';
 
 interface UseInventoryMutationsParams {
@@ -70,7 +71,10 @@ export function useInventoryMutations({
       setError('El precio de venta no es válido.');
       return;
     }
-    if (form.manageStock && (!Number.isFinite(stock) || stock < 0 || !Number.isFinite(minStock) || minStock < 0)) {
+    if (
+      form.manageStock &&
+      (!Number.isFinite(stock) || stock < 0 || !Number.isFinite(minStock) || minStock < 0)
+    ) {
       setError('Stock y stock mínimo deben ser valores válidos.');
       return;
     }
@@ -116,7 +120,15 @@ export function useInventoryMutations({
     } finally {
       setSaving(false);
     }
-  }, [businessId, canManageProducts, closeFormModal, editingProduct, form, refreshProducts, setError]);
+  }, [
+    businessId,
+    canManageProducts,
+    closeFormModal,
+    editingProduct,
+    form,
+    refreshProducts,
+    setError,
+  ]);
 
   const askDeleteProduct = useCallback(async (product: InventoryProductRecord) => {
     setProductTarget(product);
@@ -150,8 +162,8 @@ export function useInventoryMutations({
       setProductTarget(null);
       invalidateCatalogItemsCache(businessId);
       await refreshProducts();
-    } catch (err: any) {
-      setError(err instanceof Error ? err.message : 'No se pudo eliminar el producto.');
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setDeleting(false);
       setDeleteCheckResult(null);
@@ -180,23 +192,26 @@ export function useInventoryMutations({
     }
   }, [businessId, productTarget, refreshProducts, setError]);
 
-  const activateProduct = useCallback(async (product: InventoryProductRecord) => {
-    setDeleting(true);
-    setError(null);
-    try {
-      await setInventoryProductActiveStatus({
-        businessId,
-        productId: product.id,
-        isActive: true,
-      });
-      invalidateCatalogItemsCache(businessId);
-      await refreshProducts();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo activar el producto.');
-    } finally {
-      setDeleting(false);
-    }
-  }, [businessId, refreshProducts, setError]);
+  const activateProduct = useCallback(
+    async (product: InventoryProductRecord) => {
+      setDeleting(true);
+      setError(null);
+      try {
+        await setInventoryProductActiveStatus({
+          businessId,
+          productId: product.id,
+          isActive: true,
+        });
+        invalidateCatalogItemsCache(businessId);
+        await refreshProducts();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No se pudo activar el producto.');
+      } finally {
+        setDeleting(false);
+      }
+    },
+    [businessId, refreshProducts, setError],
+  );
 
   const closeDeleteModals = useCallback(() => {
     setShowDeleteModal(false);

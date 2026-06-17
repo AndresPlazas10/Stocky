@@ -5,7 +5,11 @@ import { STOCKY_COLORS } from '../../../theme/tokens';
 import { StockyModal } from '../../../ui/StockyModal';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { PaymentMethodSelector } from '../../../ui/PaymentMethodSelector';
-import type { CompraCartItem, CompraProductRecord, CompraSupplierRecord } from '../../../services/comprasService';
+import type {
+  CompraCartItem,
+  CompraProductRecord,
+  CompraSupplierRecord,
+} from '../../../services/comprasService';
 import { getPaymentMethodLabel } from '../../../utils/paymentMethods';
 import { comprasStyles as s } from '../comprasStyles';
 
@@ -67,7 +71,7 @@ export function CreatePurchaseModal({
         onClose();
       }}
       hideCloseButton
-      headerSlot={(
+      headerSlot={
         <View style={s.purchaseOrderModalHeader}>
           <LinearGradient
             colors={['#4F46E5', '#7C3AED']}
@@ -89,10 +93,10 @@ export function CreatePurchaseModal({
             <Ionicons name="close" size={34} color="#111827" />
           </Pressable>
         </View>
-      )}
+      }
       contentContainerStyle={s.purchaseOrderModalContent}
       footerStyle={s.purchaseOrderModalFooter}
-      footer={(
+      footer={
         <View style={s.purchaseOrderFooterContainer}>
           <View style={s.purchaseOrderFooterTotalBlock}>
             <Text style={s.purchaseOrderFooterTotalLabel}>Total compra:</Text>
@@ -108,7 +112,10 @@ export function CreatePurchaseModal({
               <Text style={s.purchaseOrderSecondaryButtonText}>Limpiar</Text>
             </Pressable>
             <Pressable
-              style={[s.purchaseOrderPrimaryButton, (creatingPurchase || cart.length === 0) && s.buttonDisabled]}
+              style={[
+                s.purchaseOrderPrimaryButton,
+                (creatingPurchase || cart.length === 0) && s.buttonDisabled,
+              ]}
               onPress={onSubmit}
               disabled={creatingPurchase || cart.length === 0}
             >
@@ -118,7 +125,7 @@ export function CreatePurchaseModal({
             </Pressable>
           </View>
         </View>
-      )}
+      }
     >
       <View style={s.purchaseOrderBlock}>
         <View style={s.purchaseOrderBlockHeader}>
@@ -129,14 +136,17 @@ export function CreatePurchaseModal({
         <View style={s.filterRow}>
           {suppliers.map((supplier) => {
             const selected = supplierId === supplier.id;
-            const label = supplier.business_name || supplier.contact_name || supplier.id.slice(0, 6);
+            const label =
+              supplier.business_name || supplier.contact_name || supplier.id.slice(0, 6);
             return (
               <Pressable
                 key={supplier.id}
                 style={[s.filterChip, selected && s.filterChipSelected]}
                 onPress={() => onSupplierSelect(supplier.id)}
               >
-                <Text style={[s.filterChipText, selected && s.filterChipTextSelected]}>{label}</Text>
+                <Text style={[s.filterChipText, selected && s.filterChipTextSelected]}>
+                  {label}
+                </Text>
               </Pressable>
             );
           })}
@@ -169,16 +179,25 @@ export function CreatePurchaseModal({
         <Text style={s.emptyText}>No hay productos para este proveedor.</Text>
       ) : (
         <View style={s.catalogResultsCard}>
-          <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="never" style={{ maxHeight: 240 }}>
+          <ScrollView
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="never"
+            style={{ maxHeight: 240 }}
+          >
             {productsFiltered.map((product, index) => (
               <Pressable
                 key={product.id}
-                style={[s.catalogResultRow, index < productsFiltered.length - 1 && s.catalogResultRowDivider]}
+                style={[
+                  s.catalogResultRow,
+                  index < productsFiltered.length - 1 && s.catalogResultRowDivider,
+                ]}
                 onPress={() => onAddProduct(product)}
                 disabled={creatingPurchase}
               >
                 <View style={s.catalogResultLeft}>
-                  <Text style={s.catalogResultName} numberOfLines={1}>{product.name}</Text>
+                  <Text style={s.catalogResultName} numberOfLines={1}>
+                    {product.name}
+                  </Text>
                   <Text style={s.catalogResultMeta}>Stock: {product.stock}</Text>
                 </View>
                 <View style={s.catalogResultRight}>
@@ -211,14 +230,18 @@ export function CreatePurchaseModal({
               <View style={s.orderItemStepper}>
                 <Pressable
                   style={s.orderItemStepperButton}
-                  onPress={() => onUpdateCartQuantity(item.product_id, Number(item.quantity || 0) - 1)}
+                  onPress={() =>
+                    onUpdateCartQuantity(item.product_id, Number(item.quantity || 0) - 1)
+                  }
                 >
                   <Text style={s.orderItemMinusText}>-</Text>
                 </Pressable>
                 <Text style={s.orderItemQtyText}>{item.quantity}</Text>
                 <Pressable
                   style={s.orderItemStepperButton}
-                  onPress={() => onUpdateCartQuantity(item.product_id, Number(item.quantity || 0) + 1)}
+                  onPress={() =>
+                    onUpdateCartQuantity(item.product_id, Number(item.quantity || 0) + 1)
+                  }
                 >
                   <Text style={s.orderItemPlusText}>+</Text>
                 </Pressable>

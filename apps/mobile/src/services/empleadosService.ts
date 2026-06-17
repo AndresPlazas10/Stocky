@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { EXPO_CONFIG } from '../config/env';
 import { getSupabaseClient } from '../lib/supabase';
+import { normalizeReference, normalizeText } from '../utils/normalization';
+import { wrapDbError } from '../utils/supabaseErrors';
 import type { SupabaseErrorLike } from '../types/errors';
 
 const EMPLOYEE_LIST_COLUMNS = 'id,business_id,user_id,full_name,username,role,is_active,created_at';
@@ -12,17 +14,18 @@ const isolatedAuthStorage = {
   removeItem: async () => {},
 };
 
-const isolatedAuthClient = (EXPO_CONFIG.supabaseUrl && EXPO_CONFIG.supabaseAnonKey)
-  ? createClient(EXPO_CONFIG.supabaseUrl, EXPO_CONFIG.supabaseAnonKey, {
-      auth: {
-        storage: isolatedAuthStorage,
-        storageKey: 'supabase.auth.employee',
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-    })
-  : null;
+const isolatedAuthClient =
+  EXPO_CONFIG.supabaseUrl && EXPO_CONFIG.supabaseAnonKey
+    ? createClient(EXPO_CONFIG.supabaseUrl, EXPO_CONFIG.supabaseAnonKey, {
+        auth: {
+          storage: isolatedAuthStorage,
+          storageKey: 'supabase.auth.employee',
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+      })
+    : null;
 
 export type EmpleadoRecord = {
   id: string;
@@ -36,23 +39,11 @@ export type EmpleadoRecord = {
   created_at: string | null;
 };
 
-function normalizeText(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
-function normalizeReference(value: unknown): string | null {
-  const normalized = normalizeText(value);
-  if (!normalized) return null;
-  const lower = normalized.toLowerCase();
-  if (lower === 'null' || lower === 'undefined') return null;
-  return normalized;
-}
-
 function normalizeRole(role: unknown): string {
   return normalizeText(role).toLowerCase() || 'employee';
 }
 
-function normalizeEmpleado(row: any): EmpleadoRecord {
+function normalizeEmpleado(row: Record<string, unknown>): EmpleadoRecord {
   const isActive = row?.is_active !== false;
   return {
     id: normalizeText(row?.id),
@@ -67,12 +58,6 @@ function normalizeEmpleado(row: any): EmpleadoRecord {
   };
 }
 
-function wrapDbError(errorLike: SupabaseErrorLike, fallbackMessage: string): Error & { code?: string } {
-  const wrapped: Error & { code?: string } = new Error(errorLike?.message || fallbackMessage);
-  wrapped.code = normalizeReference(errorLike?.code) || undefined;
-  return wrapped;
-}
-
 function isMissingDeleteEmployeeFunction(errorLike: SupabaseErrorLike): boolean {
   const message = String(errorLike?.message || '').toLowerCase();
   return message.includes('delete_employee') && message.includes('does not exist');
@@ -81,11 +66,11 @@ function isMissingDeleteEmployeeFunction(errorLike: SupabaseErrorLike): boolean 
 function isMissingBusinessUsernameColumn(errorLike: SupabaseErrorLike): boolean {
   const message = String(errorLike?.message || '').toLowerCase();
   return (
-    message.includes('column')
-    && message.includes('username')
-    && message.includes('relation')
-    && message.includes('businesses')
-    && message.includes('does not exist')
+    message.includes('column') &&
+    message.includes('username') &&
+    message.includes('relation') &&
+    message.includes('businesses') &&
+    message.includes('does not exist')
   );
 }
 
@@ -117,7 +102,11 @@ function mapCreateEmployeeRpcError(errorLike: SupabaseErrorLike): Error {
     return new Error('Este empleado ya existe en tu negocio.');
   }
 
-  if (lower.includes('permission denied') || lower.includes('42501') || lower.includes('no autorizado')) {
+  if (
+    lower.includes('permission denied') ||
+    lower.includes('42501') ||
+    lower.includes('no autorizado')
+  ) {
     return new Error('No tienes permisos para crear empleados.');
   }
 
@@ -282,7 +271,7 @@ export async function deleteEmployeeWithRpcFallback({
   businessId: string;
 }): Promise<boolean> {
   const client = getSupabaseClient();
-  let finalError: any = null;
+  let finalError: SupabaseErrorLike | null = null;
 
   const { error: rpcError } = await client.rpc('delete_employee', {
     p_employee_id: employeeId,

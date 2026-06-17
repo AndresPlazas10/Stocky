@@ -5,6 +5,7 @@ import {
   type InventoryProductRecord,
   type InventorySupplierRecord,
 } from '../../../services/inventoryService';
+import { getErrorMessage } from '../../../utils/error';
 import { hydrateProductsWithSuppliers, INVENTORY_PAGE_SIZE } from '../inventoryUtils';
 
 export function useInventoryProducts(businessId: string) {
@@ -81,7 +82,12 @@ export function useInventoryProducts(businessId: string) {
       setProducts(hydrateProductsWithSuppliers(nextProducts, suppliersRef.current));
       setHasMoreProducts(nextProducts.length === INVENTORY_PAGE_SIZE);
       setPage(1);
-    } catch {}
+    } catch (err) {
+      console.error(
+        '[Inventario] error al refrescar productos silenciosamente:',
+        getErrorMessage(err),
+      );
+    }
   }, [businessId]);
 
   const refreshSuppliersSilently = useCallback(async () => {
@@ -89,7 +95,12 @@ export function useInventoryProducts(businessId: string) {
       const nextSuppliers = await listInventorySuppliers(businessId);
       setSuppliers(nextSuppliers);
       setProducts((prev) => hydrateProductsWithSuppliers(prev, nextSuppliers));
-    } catch {}
+    } catch (err) {
+      console.error(
+        '[Inventario] error al refrescar proveedores silenciosamente:',
+        getErrorMessage(err),
+      );
+    }
   }, [businessId]);
 
   const loadMoreProducts = useCallback(async () => {
@@ -102,11 +113,14 @@ export function useInventoryProducts(businessId: string) {
         limit: INVENTORY_PAGE_SIZE,
         offset: (nextPage - 1) * INVENTORY_PAGE_SIZE,
       });
-      setProducts((prev) => hydrateProductsWithSuppliers([...prev, ...nextProducts], suppliersRef.current));
+      setProducts((prev) =>
+        hydrateProductsWithSuppliers([...prev, ...nextProducts], suppliersRef.current),
+      );
       setHasMoreProducts(nextProducts.length === INVENTORY_PAGE_SIZE);
       setPage(nextPage);
-    } catch {}
-    finally {
+    } catch (err) {
+      console.error('[Inventario] error al cargar más productos:', getErrorMessage(err));
+    } finally {
       setLoadingMore(false);
     }
   }, [businessId, hasMoreProducts, loadingMore, page]);

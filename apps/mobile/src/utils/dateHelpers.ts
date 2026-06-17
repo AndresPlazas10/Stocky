@@ -27,7 +27,8 @@ export function parseDayKey(key: string): Date | null {
   if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
   const parsed = new Date(year, month - 1, day);
   if (Number.isNaN(parsed.getTime())) return null;
-  if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) return null;
+  if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day)
+    return null;
   return parsed;
 }
 

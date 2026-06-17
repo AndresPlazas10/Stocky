@@ -1,11 +1,21 @@
-import { ActivityIndicator, InteractionManager, Pressable, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  InteractionManager,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 import { StockyModal } from '../../../ui/StockyModal';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
-import type { InventoryProductRecord, InventorySupplierRecord } from '../../../services/inventoryService';
+import type {
+  InventoryProductRecord,
+  InventorySupplierRecord,
+} from '../../../services/inventoryService';
 import { getSupplierDisplayName, UNIT_OPTIONS, type ProductFormState } from '../inventoryUtils';
 import { inventarioStyles as styles } from '../inventarioStyles';
 
@@ -44,7 +54,7 @@ export function ProductFormModal({
 
   useEffect(() => {
     if (!visible) {
-      setFormDetailsReady(false);
+      setFormDetailsReady(false); // eslint-disable-line react-hooks/set-state-in-effect -- reset al cerrar modal
       return;
     }
 
@@ -61,7 +71,8 @@ export function ProductFormModal({
     };
   }, [visible]);
 
-  const selectedUnitLabel = UNIT_OPTIONS.find((item) => item.value === form.unit)?.label || 'Unidad';
+  const selectedUnitLabel =
+    UNIT_OPTIONS.find((item) => item.value === form.unit)?.label || 'Unidad';
   const selectedSupplierLabel = form.supplierId
     ? getSupplierDisplayName(suppliers.find((s) => s.id === form.supplierId))
     : 'Sin proveedor';
@@ -80,7 +91,7 @@ export function ProductFormModal({
       perfTag="inventario.form_producto"
       onClose={onClose}
       hideCloseButton
-      headerSlot={(
+      headerSlot={
         <View style={styles.productFormHeader}>
           <LinearGradient
             colors={['#4F46E5', '#7C3AED']}
@@ -93,25 +104,43 @@ export function ProductFormModal({
           <Text style={styles.productFormHeaderTitle}>
             {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
           </Text>
-          <Pressable style={[styles.productFormHeaderClose, saving && styles.buttonDisabled]} onPress={onClose} disabled={saving}>
+          <Pressable
+            style={[styles.productFormHeaderClose, saving && styles.buttonDisabled]}
+            onPress={onClose}
+            disabled={saving}
+          >
             <Ionicons name="close" size={34} color="#111827" />
           </Pressable>
         </View>
-      )}
+      }
       footerStyle={styles.productFormFooter}
-      footer={(
+      footer={
         <View style={styles.productFormFooterRow}>
-          <Pressable style={[styles.productFormCancelButton, saving && styles.buttonDisabled]} onPress={onClose} disabled={saving}>
+          <Pressable
+            style={[styles.productFormCancelButton, saving && styles.buttonDisabled]}
+            onPress={onClose}
+            disabled={saving}
+          >
             <Text style={styles.productFormCancelText}>Cancelar</Text>
           </Pressable>
-          <Pressable style={[styles.productFormSaveButton, saving && styles.buttonDisabled]} onPress={onSave} disabled={saving}>
+          <Pressable
+            style={[styles.productFormSaveButton, saving && styles.buttonDisabled]}
+            onPress={onSave}
+            disabled={saving}
+          >
             {saving ? <ActivityIndicator size="small" color="#F5F3FF" /> : null}
             <Text style={styles.productFormSaveText}>
-              {saving ? (editingProduct ? 'Actualizando...' : 'Creando...') : (editingProduct ? 'Actualizar' : 'Guardar')}
+              {saving
+                ? editingProduct
+                  ? 'Actualizando...'
+                  : 'Creando...'
+                : editingProduct
+                  ? 'Actualizar'
+                  : 'Guardar'}
             </Text>
           </Pressable>
         </View>
-      )}
+      }
     >
       <View style={styles.formFields}>
         {error ? (
@@ -153,8 +182,8 @@ export function ProductFormModal({
             <View style={styles.warningCard}>
               <Ionicons name="alert-circle-outline" size={16} color="#B45309" />
               <Text style={styles.warningText}>
-                Nota importante: para que los productos aparezcan en los recibos de cocina, deben estar en la
-                categoría "Platos". Los productos de otras categorías no se incluirán.
+                Nota importante: para que los productos aparezcan en los recibos de cocina, deben
+                estar en la categoría "Platos". Los productos de otras categorías no se incluirán.
               </Text>
             </View>
 
@@ -187,11 +216,13 @@ export function ProductFormModal({
               <Text style={styles.inputLabel}>Control de stock</Text>
               <Pressable
                 style={styles.stockControlRow}
-                onPress={() => onFormChange(
-                  form.manageStock
-                    ? { manageStock: false, stock: '0', minStock: '0' }
-                    : { manageStock: true }
-                )}
+                onPress={() =>
+                  onFormChange(
+                    form.manageStock
+                      ? { manageStock: false, stock: '0', minStock: '0' }
+                      : { manageStock: true },
+                  )
+                }
               >
                 <Text style={styles.stockControlText}>¿Este producto lleva control de stock?</Text>
                 <Ionicons
@@ -204,7 +235,10 @@ export function ProductFormModal({
 
             <View style={styles.formRow}>
               <View style={[styles.fieldGroup, styles.formColThird]}>
-                <Text style={styles.inputLabel}>Stock {editingProduct ? 'actual' : 'inicial'} {form.manageStock ? '*' : '(deshabilitado)'}</Text>
+                <Text style={styles.inputLabel}>
+                  Stock {editingProduct ? 'actual' : 'inicial'}{' '}
+                  {form.manageStock ? '*' : '(deshabilitado)'}
+                </Text>
                 <TextInput
                   value={form.stock}
                   onChangeText={(value) => onFormChange({ stock: value })}
@@ -212,7 +246,10 @@ export function ProductFormModal({
                   keyboardType="numeric"
                   editable={!editingProduct && form.manageStock}
                   placeholderTextColor={STOCKY_COLORS.textMuted}
-                  style={[styles.textInput, (!form.manageStock || !!editingProduct) && styles.textInputDisabled]}
+                  style={[
+                    styles.textInput,
+                    (!form.manageStock || !!editingProduct) && styles.textInputDisabled,
+                  ]}
                 />
               </View>
               <View style={[styles.fieldGroup, styles.formColThird]}>
@@ -238,11 +275,20 @@ export function ProductFormModal({
 
             <View style={styles.fieldGroup}>
               <Text style={styles.inputLabel}>Proveedor (opcional)</Text>
-              <Pressable style={styles.selectInput} onPress={() => {
-                onRefreshSuppliers();
-                onOpenSupplierPicker();
-              }}>
-                <Text style={[styles.selectInputText, !form.supplierId && styles.selectInputPlaceholder]} numberOfLines={1}>
+              <Pressable
+                style={styles.selectInput}
+                onPress={() => {
+                  onRefreshSuppliers();
+                  onOpenSupplierPicker();
+                }}
+              >
+                <Text
+                  style={[
+                    styles.selectInputText,
+                    !form.supplierId && styles.selectInputPlaceholder,
+                  ]}
+                  numberOfLines={1}
+                >
                   {selectedSupplierLabel}
                 </Text>
                 <Ionicons name="chevron-down" size={18} color="#64748B" />

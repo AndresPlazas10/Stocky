@@ -1,6 +1,6 @@
 import type { StyleProp, TextStyle } from 'react-native';
 import { Text } from 'react-native';
-import { formatCopAmount } from '../services/mesasService';
+import { formatCopAmount } from '../utils/money';
 
 type Props = {
   value: number | null | undefined;

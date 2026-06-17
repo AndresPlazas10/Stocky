@@ -16,22 +16,25 @@ export function useCompraDetails() {
     showPurchaseDetailsRef.current = Boolean(showPurchaseDetails);
   }, [selectedPurchase?.id, showPurchaseDetails]);
 
-  const openPurchaseDetails = useCallback((purchase: CompraRecord, setError: (msg: string | null) => void) => {
-    setSelectedPurchase(purchase);
-    setSelectedPurchaseDetails([]);
-    setShowPurchaseDetails(true);
-    setLoadingPurchaseDetails(true);
+  const openPurchaseDetails = useCallback(
+    (purchase: CompraRecord, setError: (msg: string | null) => void) => {
+      setSelectedPurchase(purchase);
+      setSelectedPurchaseDetails([]);
+      setShowPurchaseDetails(true);
+      setLoadingPurchaseDetails(true);
 
-    listCompraDetails(purchase.id)
-      .then((details) => {
-        setSelectedPurchaseDetails(details);
-        setLoadingPurchaseDetails(false);
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : 'No se pudo cargar detalle de la compra.');
-        setLoadingPurchaseDetails(false);
-      });
-  }, []);
+      listCompraDetails(purchase.id)
+        .then((details) => {
+          setSelectedPurchaseDetails(details);
+          setLoadingPurchaseDetails(false);
+        })
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : 'No se pudo cargar detalle de la compra.');
+          setLoadingPurchaseDetails(false);
+        });
+    },
+    [],
+  );
 
   const closePurchaseDetails = useCallback(() => {
     setShowPurchaseDetails(false);
@@ -39,17 +42,20 @@ export function useCompraDetails() {
     setSelectedPurchaseDetails([]);
   }, []);
 
-  const refreshDetailsForCurrentPurchase = useCallback(async (setError?: (msg: string | null) => void) => {
-    const currentId = selectedPurchaseIdRef.current;
-    if (showPurchaseDetailsRef.current && currentId) {
-      try {
-        const details = await listCompraDetails(currentId);
-        setSelectedPurchaseDetails(details);
-      } catch {
-        setError?.('No se pudieron actualizar los detalles de la compra.');
+  const refreshDetailsForCurrentPurchase = useCallback(
+    async (setError?: (msg: string | null) => void) => {
+      const currentId = selectedPurchaseIdRef.current;
+      if (showPurchaseDetailsRef.current && currentId) {
+        try {
+          const details = await listCompraDetails(currentId);
+          setSelectedPurchaseDetails(details);
+        } catch {
+          setError?.('No se pudieron actualizar los detalles de la compra.');
+        }
       }
-    }
-  }, []);
+    },
+    [],
+  );
 
   return {
     selectedPurchase,

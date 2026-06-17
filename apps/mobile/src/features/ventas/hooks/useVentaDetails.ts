@@ -31,7 +31,10 @@ export function useVentaDetails() {
       return await Promise.race([
         listVentaDetails(saleId),
         new Promise<VentaDetailRecord[]>((_, reject) => {
-          setTimeout(() => reject(new Error('Tiempo de espera al cargar el detalle de venta.')), timeoutMs);
+          setTimeout(
+            () => reject(new Error('Tiempo de espera al cargar el detalle de venta.')),
+            timeoutMs,
+          );
         }),
       ]);
     };
@@ -44,7 +47,9 @@ export function useVentaDetails() {
       })
       .catch((err) => {
         if (ventaDetailsLoadTokenRef.current !== token) return;
-        setVentaDetailsError(err instanceof Error ? err.message : 'No se pudo cargar el detalle de venta.');
+        setVentaDetailsError(
+          err instanceof Error ? err.message : 'No se pudo cargar el detalle de venta.',
+        );
       })
       .finally(() => {
         if (ventaDetailsLoadTokenRef.current === token) {

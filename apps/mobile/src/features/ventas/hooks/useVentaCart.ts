@@ -27,7 +27,11 @@ export function useVentaCart() {
   const [cart, setCart] = useState<VentaCartItem[]>([]);
 
   const cartTotal = useMemo(
-    () => cart.reduce((sum, item) => sum + Number(item.subtotal || item.quantity * item.unit_price || 0), 0),
+    () =>
+      cart.reduce(
+        (sum, item) => sum + Number(item.subtotal || item.quantity * item.unit_price || 0),
+        0,
+      ),
     [cart],
   );
 

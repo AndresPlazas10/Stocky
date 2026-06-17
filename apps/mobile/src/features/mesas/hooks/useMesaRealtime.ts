@@ -1,9 +1,6 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSupabaseClient } from '../../../lib/supabase';
-import type {
-  MesaRecord,
-  MesaEditLock,
-} from '../../../services/mesasService';
+import type { MesaRecord, MesaEditLock } from '../../../services/mesasService';
 import {
   fetchMesasByBusinessId,
   compareMesaTableIdentifiers,
@@ -98,12 +95,15 @@ function resolveRealtimeRowRef(payload: any): string {
 
 function traceMesaSync(label: string, data: Record<string, unknown>) {
   if (!MESA_SYNC_TRACE_ENABLED) return;
-  const safeData = Object.entries(data || {}).reduce<Record<string, unknown>>((acc, [key, value]) => {
-    if (value === undefined) return acc;
-    acc[key] = value;
-    return acc;
-  }, {});
-  console.info(`[mesa-sync] ${label}`, safeData);
+  const safeData = Object.entries(data || {}).reduce<Record<string, unknown>>(
+    (acc, [key, value]) => {
+      if (value === undefined) return acc;
+      acc[key] = value;
+      return acc;
+    },
+    {},
+  );
+  console.warn(`[mesa-sync] ${label}`, safeData);
 }
 
 export function useMesaRealtime({
@@ -122,9 +122,10 @@ export function useMesaRealtime({
   const orderRealtimeSummaryTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const mesasSyncBroadcastChannelRef = useRef<any>(null);
   const mesasSyncBroadcastReadyRef = useRef(false);
-  const realtimeClientInstanceIdRef = useRef(
-    `mesa-client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  const [realtimeClientInstanceId] = useState(
+    () => `mesa-client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   );
+  const realtimeClientInstanceIdRef = useRef(realtimeClientInstanceId);
   const pendingUiTraceRef = useRef<RealtimeUiTrace | null>(null);
   const mesaLockPlaceholderTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -134,11 +135,11 @@ export function useMesaRealtime({
   // markRealtimeIngress
   // -------------------------------------------------------------------
 
-  const markRealtimeIngress = useCallback((
-    source: RealtimeUiTrace['source'],
-    payload: any,
-  ) => {
-    const eventType = String(payload?.eventType || '').trim().toUpperCase() || 'UNKNOWN';
+  const markRealtimeIngress = useCallback((source: RealtimeUiTrace['source'], payload: any) => {
+    const eventType =
+      String(payload?.eventType || '')
+        .trim()
+        .toUpperCase() || 'UNKNOWN';
     const rowRef = resolveRealtimeRowRef(payload);
     const commitLagMs = parseCommitLagMs(payload);
     const receivedAt = Date.now();
@@ -157,16 +158,15 @@ export function useMesaRealtime({
     });
   }, []);
 
-  const traceAsyncDuration = useCallback((
-    label: string,
-    startMs: number,
-    extra?: Record<string, unknown>,
-  ) => {
-    traceMesaSync(label, {
-      durationMs: Math.max(0, Date.now() - startMs),
-      ...(extra || {}),
-    });
-  }, []);
+  const traceAsyncDuration = useCallback(
+    (label: string, startMs: number, extra?: Record<string, unknown>) => {
+      traceMesaSync(label, {
+        durationMs: Math.max(0, Date.now() - startMs),
+        ...(extra || {}),
+      });
+    },
+    [],
+  );
 
   // -------------------------------------------------------------------
   // extractOrderUnitsSnapshot / applyOrderUnitsSnapshot
@@ -188,63 +188,69 @@ export function useMesaRealtime({
     return { unitsByOrderId, missingOrderIds: Array.from(missingOrderIdsSet) };
   }, []);
 
-  const applyOrderUnitsSnapshot = useCallback((mesasRows: MesaRecord[]) => {
-    const { unitsByOrderId, missingOrderIds } = extractOrderUnitsSnapshot(mesasRows);
-    const activeOrderIds = new Set(
-      (Array.isArray(mesasRows) ? mesasRows : [])
-        .map((mesa) => String(mesa?.current_order_id || '').trim())
-        .filter(Boolean),
-    );
+  const applyOrderUnitsSnapshot = useCallback(
+    (mesasRows: MesaRecord[]) => {
+      const { unitsByOrderId, missingOrderIds } = extractOrderUnitsSnapshot(mesasRows);
+      const activeOrderIds = new Set(
+        (Array.isArray(mesasRows) ? mesasRows : [])
+          .map((mesa) => String(mesa?.current_order_id || '').trim())
+          .filter(Boolean),
+      );
 
-    setOrderUnitsByOrderId((prev) => {
-      const next: Record<string, number> = {};
-      let changed = false;
+      setOrderUnitsByOrderId((prev) => {
+        const next: Record<string, number> = {};
+        let changed = false;
 
-      for (const [orderId, units] of Object.entries(unitsByOrderId)) {
-        next[orderId] = units;
-        if (prev[orderId] !== units) changed = true;
-      }
-
-      for (const orderId of missingOrderIds) {
-        if (activeOrderIds.has(orderId)) {
-          next[orderId] = prev[orderId] ?? 0;
-          if (prev[orderId] !== (next[orderId] ?? 0)) changed = true;
+        for (const [orderId, units] of Object.entries(unitsByOrderId)) {
+          next[orderId] = units;
+          if (prev[orderId] !== units) changed = true;
         }
-      }
 
-      return changed ? next : prev;
-    });
-  }, [extractOrderUnitsSnapshot, setOrderUnitsByOrderId]);
+        for (const orderId of missingOrderIds) {
+          if (activeOrderIds.has(orderId)) {
+            next[orderId] = prev[orderId] ?? 0;
+            if (prev[orderId] !== (next[orderId] ?? 0)) changed = true;
+          }
+        }
+
+        return changed ? next : prev;
+      });
+    },
+    [extractOrderUnitsSnapshot, setOrderUnitsByOrderId],
+  );
 
   // -------------------------------------------------------------------
   // applyMesaLocks
   // -------------------------------------------------------------------
 
-  const applyMesaLocks = useCallback((locks: MesaEditLock[]) => {
-    const next: Record<string, MesaEditLock> = {};
-    (Array.isArray(locks) ? locks : []).forEach((lock) => {
-      const tableId = String(lock?.table_id || '').trim();
-      if (!tableId) return;
-      next[tableId] = lock;
-    });
-    setMesaLocksByTableId((prev) => {
-      if (!prev || Object.keys(prev).length === 0) return next;
-      const nowMs = Date.now();
-      Object.entries(prev).forEach(([tableId, lock]) => {
-        if (next[tableId]) return;
-        const token = String(lock?.lock_token || '').trim();
-        const expiresAtMs = Date.parse(String(lock?.lock_expires_at || '').trim());
-        if (!Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs) return;
-        const isPending = token.startsWith('pending-') || token.startsWith('broadcast-');
-        const updatedAtMs = Date.parse(String(lock?.updated_at || '').trim());
-        const isFresh = Number.isFinite(updatedAtMs) && (nowMs - updatedAtMs) <= 4000;
-        if (isPending || isFresh) {
-          next[tableId] = lock;
-        }
+  const applyMesaLocks = useCallback(
+    (locks: MesaEditLock[]) => {
+      const next: Record<string, MesaEditLock> = {};
+      (Array.isArray(locks) ? locks : []).forEach((lock) => {
+        const tableId = String(lock?.table_id || '').trim();
+        if (!tableId) return;
+        next[tableId] = lock;
       });
-      return next;
-    });
-  }, [setMesaLocksByTableId]);
+      setMesaLocksByTableId((prev) => {
+        if (!prev || Object.keys(prev).length === 0) return next;
+        const nowMs = Date.now();
+        Object.entries(prev).forEach(([tableId, lock]) => {
+          if (next[tableId]) return;
+          const token = String(lock?.lock_token || '').trim();
+          const expiresAtMs = Date.parse(String(lock?.lock_expires_at || '').trim());
+          if (!Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs) return;
+          const isPending = token.startsWith('pending-') || token.startsWith('broadcast-');
+          const updatedAtMs = Date.parse(String(lock?.updated_at || '').trim());
+          const isFresh = Number.isFinite(updatedAtMs) && nowMs - updatedAtMs <= 4000;
+          if (isPending || isFresh) {
+            next[tableId] = lock;
+          }
+        });
+        return next;
+      });
+    },
+    [setMesaLocksByTableId],
+  );
 
   // -------------------------------------------------------------------
   // clearMesaLockPlaceholderTimer / applyMesaLockPlaceholder
@@ -259,144 +265,132 @@ export function useMesaRealtime({
     }
   }, []);
 
-  const applyMesaLockPlaceholder = useCallback((mesaId: string, lockBusinessId: string) => {
-    if (!mesaId || !lockBusinessId) return;
-    const token = `pending-${mesaId}-${Date.now()}`;
-    const expiresAt = new Date(Date.now() + 3500).toISOString();
-    const updatedAt = new Date().toISOString();
+  const applyMesaLockPlaceholder = useCallback(
+    (mesaId: string, lockBusinessId: string) => {
+      if (!mesaId || !lockBusinessId) return;
+      const token = `pending-${mesaId}-${Date.now()}`;
+      const expiresAt = new Date(Date.now() + 3500).toISOString();
+      const updatedAt = new Date().toISOString();
 
-    setMesaLocksByTableId((prev) => {
-      if (prev[mesaId]) return prev;
-      return {
-        ...prev,
-        [mesaId]: {
-          table_id: mesaId,
-          business_id: lockBusinessId,
-          lock_owner_user_id: '',
-          lock_owner_name: 'Alguien',
-          lock_token: token,
-          lock_expires_at: expiresAt,
-          updated_at: updatedAt,
-        },
-      };
-    });
-
-    clearMesaLockPlaceholderTimer(mesaId);
-    mesaLockPlaceholderTimersRef.current[mesaId] = setTimeout(() => {
       setMesaLocksByTableId((prev) => {
-        const current = prev[mesaId];
-        if (!current) return prev;
-        if (String(current.lock_token || '') !== token) return prev;
-        const next = { ...prev };
-        delete next[mesaId];
-        return next;
+        if (prev[mesaId]) return prev;
+        return {
+          ...prev,
+          [mesaId]: {
+            table_id: mesaId,
+            business_id: lockBusinessId,
+            lock_owner_user_id: '',
+            lock_owner_name: 'Alguien',
+            lock_token: token,
+            lock_expires_at: expiresAt,
+            updated_at: updatedAt,
+          },
+        };
       });
+
       clearMesaLockPlaceholderTimer(mesaId);
-    }, 3800);
-  }, [clearMesaLockPlaceholderTimer, setMesaLocksByTableId]);
+      mesaLockPlaceholderTimersRef.current[mesaId] = setTimeout(() => {
+        setMesaLocksByTableId((prev) => {
+          const current = prev[mesaId];
+          if (!current) return prev;
+          if (String(current.lock_token || '') !== token) return prev;
+          const next = { ...prev };
+          delete next[mesaId];
+          return next;
+        });
+        clearMesaLockPlaceholderTimer(mesaId);
+      }, 3800);
+    },
+    [clearMesaLockPlaceholderTimer, setMesaLocksByTableId],
+  );
 
   // -------------------------------------------------------------------
   // refreshMesaLocks
   // -------------------------------------------------------------------
 
-  const refreshMesaLocks = useCallback(async (lockBusinessId: string) => {
-    const normalizedBusinessId = String(lockBusinessId || '').trim();
-    if (!normalizedBusinessId) {
-      setMesaLocksByTableId({});
-      return;
-    }
-    try {
-      const locks = await listActiveMesaEditLocks(normalizedBusinessId);
-      applyMesaLocks(locks);
-    } catch {
-      // no-op: no bloquear flujo principal por locks
-    }
-  }, [applyMesaLocks, setMesaLocksByTableId]);
+  const refreshMesaLocks = useCallback(
+    async (lockBusinessId: string) => {
+      const normalizedBusinessId = String(lockBusinessId || '').trim();
+      if (!normalizedBusinessId) {
+        setMesaLocksByTableId({});
+        return;
+      }
+      try {
+        const locks = await listActiveMesaEditLocks(normalizedBusinessId);
+        applyMesaLocks(locks);
+      } catch {
+        // no-op: no bloquear flujo principal por locks
+      }
+    },
+    [applyMesaLocks, setMesaLocksByTableId],
+  );
 
   // -------------------------------------------------------------------
   // applyRealtimeMesaLockHint
   // -------------------------------------------------------------------
 
-  const applyRealtimeMesaLockHint = useCallback((payload: any) => {
-    const mesaId = String(payload?.mesa_id || '').trim();
-    if (!mesaId) return;
+  const applyRealtimeMesaLockHint = useCallback(
+    (payload: any) => {
+      const mesaId = String(payload?.mesa_id || '').trim();
+      if (!mesaId) return;
 
-    const status = String(payload?.status || '').trim().toLowerCase();
-    if (status === 'available') {
-      setMesaLocksByTableId((prev) => {
-        if (!prev[mesaId]) return prev;
-        const next = { ...prev };
-        delete next[mesaId];
-        return next;
-      });
-      return;
-    }
+      const status = String(payload?.status || '')
+        .trim()
+        .toLowerCase();
+      if (status === 'available') {
+        setMesaLocksByTableId((prev) => {
+          if (!prev[mesaId]) return prev;
+          const next = { ...prev };
+          delete next[mesaId];
+          return next;
+        });
+        return;
+      }
 
-    const ownerUserId = String(payload?.editing_user_id || payload?.sender_user_id || '').trim();
-    if (!ownerUserId) return;
+      const ownerUserId = String(payload?.editing_user_id || payload?.sender_user_id || '').trim();
+      if (!ownerUserId) return;
 
-    const ownerName = String(
-      payload?.editing_user_name
-      || payload?.sender_user_name
-      || 'Usuario',
-    ).trim() || 'Usuario';
-    const hintBusinessId = String(payload?.business_id || '').trim();
-    const lockToken = String(payload?.editing_lock_token || '').trim() || null;
-    const expiresAtRaw = String(payload?.editing_lock_expires_at || '').trim();
-    const lockTtlMs = Math.max(15_000, Number(payload?.editing_lock_ttl_ms || 45_000));
-    const lockExpiresAt = expiresAtRaw || new Date(Date.now() + lockTtlMs).toISOString();
-    const updatedAt = new Date().toISOString();
+      const ownerName =
+        String(payload?.editing_user_name || payload?.sender_user_name || 'Usuario').trim() ||
+        'Usuario';
+      const hintBusinessId = String(payload?.business_id || '').trim();
+      const lockToken = String(payload?.editing_lock_token || '').trim() || null;
+      const expiresAtRaw = String(payload?.editing_lock_expires_at || '').trim();
+      const lockTtlMs = Math.max(15_000, Number(payload?.editing_lock_ttl_ms || 45_000));
+      const lockExpiresAt = expiresAtRaw || new Date(Date.now() + lockTtlMs).toISOString();
+      const updatedAt = new Date().toISOString();
 
-    setMesaLocksByTableId((prev) => ({
-      ...prev,
-      [mesaId]: {
-        table_id: mesaId,
-        business_id: hintBusinessId || String(prev[mesaId]?.business_id || '').trim(),
-        lock_owner_user_id: ownerUserId,
-        lock_owner_name: ownerName,
-        lock_token: lockToken,
-        lock_expires_at: lockExpiresAt,
-        updated_at: updatedAt,
-      },
-    }));
-  }, [setMesaLocksByTableId]);
+      setMesaLocksByTableId((prev) => ({
+        ...prev,
+        [mesaId]: {
+          table_id: mesaId,
+          business_id: hintBusinessId || String(prev[mesaId]?.business_id || '').trim(),
+          lock_owner_user_id: ownerUserId,
+          lock_owner_name: ownerName,
+          lock_token: lockToken,
+          lock_expires_at: lockExpiresAt,
+          updated_at: updatedAt,
+        },
+      }));
+    },
+    [setMesaLocksByTableId],
+  );
 
   // -------------------------------------------------------------------
   // applyRealtimeMesaLockEvent
   // -------------------------------------------------------------------
 
-  const applyRealtimeMesaLockEvent = useCallback((payload: any) => {
-    const eventType = String(payload?.eventType || '').trim().toUpperCase();
-    const nextRow = payload?.new && typeof payload.new === 'object' ? payload.new : null;
-    const prevRow = payload?.old && typeof payload.old === 'object' ? payload.old : null;
-    const tableId = String(nextRow?.table_id || prevRow?.table_id || '').trim();
-    if (!tableId) return;
+  const applyRealtimeMesaLockEvent = useCallback(
+    (payload: any) => {
+      const eventType = String(payload?.eventType || '')
+        .trim()
+        .toUpperCase();
+      const nextRow = payload?.new && typeof payload.new === 'object' ? payload.new : null;
+      const prevRow = payload?.old && typeof payload.old === 'object' ? payload.old : null;
+      const tableId = String(nextRow?.table_id || prevRow?.table_id || '').trim();
+      if (!tableId) return;
 
-    if (eventType === 'DELETE') {
-      setMesaLocksByTableId((prev) => {
-        if (!prev[tableId]) return prev;
-        const next = { ...prev };
-        delete next[tableId];
-        return next;
-      });
-      return;
-    }
-
-    const lockOwnerUserId = String(nextRow?.lock_owner_user_id || '').trim();
-    if (!lockOwnerUserId) {
-      setMesaLocksByTableId((prev) => {
-        if (!prev[tableId]) return prev;
-        const next = { ...prev };
-        delete next[tableId];
-        return next;
-      });
-      return;
-    }
-
-    const rawExpiresAt = String(nextRow?.lock_expires_at || '').trim();
-    if (rawExpiresAt) {
-      const expiresAtMs = Date.parse(rawExpiresAt);
-      if (Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now()) {
+      if (eventType === 'DELETE') {
         setMesaLocksByTableId((prev) => {
           if (!prev[tableId]) return prev;
           const next = { ...prev };
@@ -405,83 +399,119 @@ export function useMesaRealtime({
         });
         return;
       }
-    }
 
-    const lock: MesaEditLock = {
-      table_id: tableId,
-      business_id: String(nextRow?.business_id || prevRow?.business_id || '').trim(),
-      lock_owner_user_id: lockOwnerUserId,
-      lock_owner_name: String(nextRow?.lock_owner_name || 'Usuario').trim() || 'Usuario',
-      lock_token: String(nextRow?.lock_token || '').trim() || null,
-      lock_expires_at: rawExpiresAt || null,
-      updated_at: String(nextRow?.updated_at || '').trim() || new Date().toISOString(),
-    };
+      const lockOwnerUserId = String(nextRow?.lock_owner_user_id || '').trim();
+      if (!lockOwnerUserId) {
+        setMesaLocksByTableId((prev) => {
+          if (!prev[tableId]) return prev;
+          const next = { ...prev };
+          delete next[tableId];
+          return next;
+        });
+        return;
+      }
 
-    setMesaLocksByTableId((prev) => ({
-      ...prev,
-      [tableId]: lock,
-    }));
-  }, [setMesaLocksByTableId]);
+      const rawExpiresAt = String(nextRow?.lock_expires_at || '').trim();
+      if (rawExpiresAt) {
+        const expiresAtMs = Date.parse(rawExpiresAt);
+        if (Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now()) {
+          setMesaLocksByTableId((prev) => {
+            if (!prev[tableId]) return prev;
+            const next = { ...prev };
+            delete next[tableId];
+            return next;
+          });
+          return;
+        }
+      }
+
+      const lock: MesaEditLock = {
+        table_id: tableId,
+        business_id: String(nextRow?.business_id || prevRow?.business_id || '').trim(),
+        lock_owner_user_id: lockOwnerUserId,
+        lock_owner_name: String(nextRow?.lock_owner_name || 'Usuario').trim() || 'Usuario',
+        lock_token: String(nextRow?.lock_token || '').trim() || null,
+        lock_expires_at: rawExpiresAt || null,
+        updated_at: String(nextRow?.updated_at || '').trim() || new Date().toISOString(),
+      };
+
+      setMesaLocksByTableId((prev) => ({
+        ...prev,
+        [tableId]: lock,
+      }));
+    },
+    [setMesaLocksByTableId],
+  );
 
   // -------------------------------------------------------------------
   // applyRealtimeMesaLockBroadcast
   // -------------------------------------------------------------------
 
-  const applyRealtimeMesaLockBroadcast = useCallback((payload: any) => {
-    const senderClientId = String(payload?.sender_client_id || '').trim();
-    if (senderClientId && senderClientId === String(realtimeClientInstanceIdRef.current || '').trim()) return;
+  const applyRealtimeMesaLockBroadcast = useCallback(
+    (payload: any) => {
+      const senderClientId = String(payload?.sender_client_id || '').trim();
+      if (
+        senderClientId &&
+        senderClientId === String(realtimeClientInstanceIdRef.current || '').trim()
+      )
+        return;
 
-    const activeBusinessId = businessId;
-    const payloadBusinessId = String(payload?.business_id || '').trim();
-    if (activeBusinessId && (!payloadBusinessId || payloadBusinessId !== activeBusinessId)) {
-      return;
-    }
+      const activeBusinessId = businessId;
+      const payloadBusinessId = String(payload?.business_id || '').trim();
+      if (activeBusinessId && (!payloadBusinessId || payloadBusinessId !== activeBusinessId)) {
+        return;
+      }
 
-    const mesaId = String(payload?.mesa_id || '').trim();
-    if (!mesaId) return;
+      const mesaId = String(payload?.mesa_id || '').trim();
+      if (!mesaId) return;
 
-    const locked = (
-      payload?.locked === true
-      || String(payload?.locked || '').trim().toLowerCase() === 'true'
-    );
+      const locked =
+        payload?.locked === true ||
+        String(payload?.locked || '')
+          .trim()
+          .toLowerCase() === 'true';
 
-    if (!locked) {
-      setMesaLocksByTableId((prev) => {
-        if (!prev[mesaId]) return prev;
-        const next = { ...prev };
-        delete next[mesaId];
-        return next;
-      });
-      return;
-    }
+      if (!locked) {
+        setMesaLocksByTableId((prev) => {
+          if (!prev[mesaId]) return prev;
+          const next = { ...prev };
+          delete next[mesaId];
+          return next;
+        });
+        return;
+      }
 
-    const ownerUserId = String(payload?.lock_owner_user_id || payload?.sender_user_id || '').trim();
-    if (!ownerUserId) return;
+      const ownerUserId = String(
+        payload?.lock_owner_user_id || payload?.sender_user_id || '',
+      ).trim();
+      if (!ownerUserId) return;
 
-    const resolvedBusinessId = activeBusinessId || String(payload?.business_id || '').trim();
-    const lockToken = String(payload?.lock_token || '').trim() || null;
-    const rawExpiresAt = String(payload?.lock_expires_at || '').trim();
-    const lockTtlMs = Math.min(120_000, Math.max(15_000, Number(payload?.lock_ttl_ms || 45_000)));
-    const nowMs = Date.now();
-    const parsedExpiresAt = rawExpiresAt ? Date.parse(rawExpiresAt) : Number.NaN;
-    const safeExpiresAtMs = Number.isFinite(parsedExpiresAt)
-      ? Math.min(parsedExpiresAt, nowMs + lockTtlMs)
-      : nowMs + lockTtlMs;
-    const lockExpiresAt = new Date(safeExpiresAtMs).toISOString();
+      const resolvedBusinessId = activeBusinessId || String(payload?.business_id || '').trim();
+      const lockToken = String(payload?.lock_token || '').trim() || null;
+      const rawExpiresAt = String(payload?.lock_expires_at || '').trim();
+      const lockTtlMs = Math.min(120_000, Math.max(15_000, Number(payload?.lock_ttl_ms || 45_000)));
+      const nowMs = Date.now();
+      const parsedExpiresAt = rawExpiresAt ? Date.parse(rawExpiresAt) : Number.NaN;
+      const safeExpiresAtMs = Number.isFinite(parsedExpiresAt)
+        ? Math.min(parsedExpiresAt, nowMs + lockTtlMs)
+        : nowMs + lockTtlMs;
+      const lockExpiresAt = new Date(safeExpiresAtMs).toISOString();
 
-    setMesaLocksByTableId((prev) => ({
-      ...prev,
-      [mesaId]: {
-        table_id: mesaId,
-        business_id: resolvedBusinessId || String(prev[mesaId]?.business_id || '').trim(),
-        lock_owner_user_id: ownerUserId,
-        lock_owner_name: 'Alguien',
-        lock_token: lockToken,
-        lock_expires_at: lockExpiresAt,
-        updated_at: new Date().toISOString(),
-      },
-    }));
-  }, [businessId, setMesaLocksByTableId]);
+      setMesaLocksByTableId((prev) => ({
+        ...prev,
+        [mesaId]: {
+          table_id: mesaId,
+          business_id: resolvedBusinessId || String(prev[mesaId]?.business_id || '').trim(),
+          lock_owner_user_id: ownerUserId,
+          lock_owner_name: 'Alguien',
+          lock_token: lockToken,
+          lock_expires_at: lockExpiresAt,
+          updated_at: new Date().toISOString(),
+        },
+      }));
+    },
+    [businessId, setMesaLocksByTableId],
+  );
 
   // -------------------------------------------------------------------
   // refreshMesasRealtime
@@ -497,7 +527,9 @@ export function useMesaRealtime({
         businessId,
         rows: incoming.length,
       });
-      const selectedMesaId = isOrderFlowActive ? String(selectedMesaIdRef.current || '').trim() : '';
+      const selectedMesaId = isOrderFlowActive
+        ? String(selectedMesaIdRef.current || '').trim()
+        : '';
 
       setMesas((prev) => {
         const previousById = new Map(prev.map((mesa) => [String(mesa.id || ''), mesa]));
@@ -552,55 +584,491 @@ export function useMesaRealtime({
   // scheduleMesaLocksRefresh
   // -------------------------------------------------------------------
 
-  const scheduleMesaLocksRefresh = useCallback((lockBusinessId: string) => {
-    const normalizedBusinessId = String(lockBusinessId || '').trim();
-    if (!normalizedBusinessId) return;
-    if (mesaLocksRealtimeRefreshTimerRef.current) return;
-    mesaLocksRealtimeRefreshTimerRef.current = setTimeout(() => {
-      mesaLocksRealtimeRefreshTimerRef.current = null;
-      void refreshMesaLocks(normalizedBusinessId);
-    }, 140);
-  }, [refreshMesaLocks]);
+  const scheduleMesaLocksRefresh = useCallback(
+    (lockBusinessId: string) => {
+      const normalizedBusinessId = String(lockBusinessId || '').trim();
+      if (!normalizedBusinessId) return;
+      if (mesaLocksRealtimeRefreshTimerRef.current) return;
+      mesaLocksRealtimeRefreshTimerRef.current = setTimeout(() => {
+        mesaLocksRealtimeRefreshTimerRef.current = null;
+        void refreshMesaLocks(normalizedBusinessId);
+      }, 140);
+    },
+    [refreshMesaLocks],
+  );
 
   // -------------------------------------------------------------------
   // hydrateOrderRealtimeSummary / scheduleOrderRealtimeSummaryHydration
   // -------------------------------------------------------------------
 
-  const hydrateOrderRealtimeSummary = useCallback(async (orderId: string) => {
-    const normalizedOrderId = normalizeOrderReference(orderId);
-    if (!normalizedOrderId) return;
+  const hydrateOrderRealtimeSummary = useCallback(
+    async (orderId: string) => {
+      const normalizedOrderId = normalizeOrderReference(orderId);
+      if (!normalizedOrderId) return;
 
-    try {
-      const hydrateStart = Date.now();
-      const snapshot = await loadOpenOrderSnapshot(normalizedOrderId, { forceRefresh: true });
-      traceAsyncDuration('hydrate_order_summary', hydrateStart, {
-        orderId: normalizedOrderId,
+      try {
+        const hydrateStart = Date.now();
+        const snapshot = await loadOpenOrderSnapshot(normalizedOrderId, { forceRefresh: true });
+        traceAsyncDuration('hydrate_order_summary', hydrateStart, {
+          orderId: normalizedOrderId,
+        });
+        const total = Math.max(0, Number(snapshot?.total || 0));
+        const units = Math.max(0, Math.floor(Number(snapshot?.units || 0)));
+
+        setOrderUnitsByOrderId((prev) => {
+          if (Math.max(0, Math.floor(Number(prev?.[normalizedOrderId] || 0))) === units)
+            return prev;
+          return {
+            ...prev,
+            [normalizedOrderId]: units,
+          };
+        });
+
+        setMesas((prev) => {
+          let changed = false;
+          const next = prev.map((mesa) => {
+            if (normalizeOrderReference(mesa?.current_order_id) !== normalizedOrderId) return mesa;
+            changed = true;
+            return {
+              ...mesa,
+              status: 'occupied',
+              order_units: units,
+              orders: {
+                ...(mesa.orders || {}),
+                id: normalizedOrderId,
+                status: String(mesa?.orders?.status || 'open'),
+                total,
+              },
+            };
+          });
+          return changed ? next : prev;
+        });
+
+        setSelectedMesa((prev) => {
+          if (!prev || normalizeOrderReference(prev?.current_order_id) !== normalizedOrderId)
+            return prev;
+          return {
+            ...prev,
+            status: 'occupied',
+            order_units: units,
+            orders: {
+              ...(prev.orders || {}),
+              id: normalizedOrderId,
+              status: String(prev?.orders?.status || 'open'),
+              total,
+            },
+          };
+        });
+      } catch {
+        // no-op
+      }
+    },
+    [setMesas, setOrderUnitsByOrderId, setSelectedMesa, traceAsyncDuration],
+  );
+
+  const scheduleOrderRealtimeSummaryHydration = useCallback(
+    (orderId: string) => {
+      const normalizedOrderId = normalizeOrderReference(orderId);
+      if (!normalizedOrderId) return;
+
+      const timers = orderRealtimeSummaryTimersRef.current;
+      const previousTimer = timers[normalizedOrderId];
+      if (previousTimer) {
+        clearTimeout(previousTimer);
+      }
+
+      timers[normalizedOrderId] = setTimeout(() => {
+        delete timers[normalizedOrderId];
+        void hydrateOrderRealtimeSummary(normalizedOrderId);
+      }, 40);
+    },
+    [hydrateOrderRealtimeSummary],
+  );
+
+  // -------------------------------------------------------------------
+  // applyRealtimeTableEvent
+  // -------------------------------------------------------------------
+
+  const applyRealtimeTableEvent = useCallback(
+    (payload: any) => {
+      const eventType = String(payload?.eventType || '')
+        .trim()
+        .toUpperCase();
+      const nextRow = payload?.new && typeof payload.new === 'object' ? payload.new : null;
+      const prevRow = payload?.old && typeof payload.old === 'object' ? payload.old : null;
+      const mesaId = String(nextRow?.id || prevRow?.id || '').trim();
+      if (!mesaId) return;
+
+      const hasNextCurrentOrderId = Boolean(
+        nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'current_order_id'),
+      );
+      const nextCurrentOrderId = hasNextCurrentOrderId
+        ? String(nextRow?.current_order_id || '').trim() || null
+        : undefined;
+      const hasNextStatus = Boolean(
+        nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'status'),
+      );
+      const nextStatus = hasNextStatus
+        ? String(nextRow?.status || '')
+            .trim()
+            .toLowerCase() || undefined
+        : undefined;
+
+      const hasNextTableNumber = Boolean(
+        nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'table_number'),
+      );
+      const hasNextName = Boolean(nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'name'));
+      const hasNextSyncVersion = Boolean(
+        nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'sync_version'),
+      );
+      const nextSyncVersion = hasNextSyncVersion
+        ? resolveMesaSyncVersion({ sync_version: nextRow?.sync_version } as Partial<MesaRecord>)
+        : undefined;
+
+      setMesas((prev) => {
+        const index = prev.findIndex((mesa) => String(mesa?.id || '').trim() === mesaId);
+
+        if (eventType === 'DELETE') {
+          if (index === -1) return prev;
+          const next = prev.filter((mesa) => String(mesa?.id || '').trim() !== mesaId);
+          return next;
+        }
+
+        if (index === -1) {
+          if (!nextRow) return prev;
+          const insertedMesa: MesaRecord = {
+            id: mesaId,
+            business_id: String(nextRow?.business_id || '').trim(),
+            table_number: hasNextTableNumber ? (nextRow?.table_number ?? null) : null,
+            name: hasNextName ? (nextRow?.name ?? null) : null,
+            status: String(nextStatus || 'available'),
+            current_order_id: hasNextCurrentOrderId ? nextCurrentOrderId : null,
+            sync_version: hasNextSyncVersion ? nextSyncVersion : undefined,
+            orders: null,
+          };
+          return [...prev, insertedMesa].sort(compareMesaTableIdentifiers);
+        }
+
+        const current = prev[index];
+        if (hasNextSyncVersion) {
+          const currentSyncVersion = resolveMesaSyncVersion(current);
+          const incomingSyncVersion = nextSyncVersion || 0;
+          if (incomingSyncVersion < currentSyncVersion) {
+            traceMesaSync('drop_stale_table_event', {
+              mesaId,
+              currentSyncVersion,
+              incomingSyncVersion,
+              eventType,
+            });
+            return prev;
+          }
+        }
+        const resolvedCurrentOrderId = hasNextCurrentOrderId
+          ? nextCurrentOrderId
+          : (current.current_order_id ?? null);
+        const resolvedStatus = String(nextStatus || current.status || 'available');
+        const nextMesa: MesaRecord = {
+          ...current,
+          status: resolvedStatus,
+          current_order_id: resolvedCurrentOrderId,
+          table_number: hasNextTableNumber ? (nextRow?.table_number ?? null) : current.table_number,
+          name: hasNextName ? (nextRow?.name ?? null) : current.name,
+          sync_version: hasNextSyncVersion ? nextSyncVersion : current.sync_version,
+          orders: (() => {
+            if (!resolvedCurrentOrderId || resolvedStatus === 'available') return null;
+            if (
+              String(current?.orders?.id || '').trim() ===
+              String(resolvedCurrentOrderId || '').trim()
+            ) {
+              return current.orders || null;
+            }
+            return {
+              ...(current.orders || {}),
+              id: resolvedCurrentOrderId,
+              status: String(current?.orders?.status || 'open'),
+              total: Number(current?.orders?.total || 0),
+            };
+          })(),
+        };
+
+        const next = [...prev];
+        next[index] = nextMesa;
+        return next.sort(compareMesaTableIdentifiers);
       });
-      const total = Math.max(0, Number(snapshot?.total || 0));
-      const units = Math.max(0, Math.floor(Number(snapshot?.units || 0)));
 
-      setOrderUnitsByOrderId((prev) => {
-        if (Math.max(0, Math.floor(Number(prev?.[normalizedOrderId] || 0))) === units) return prev;
+      setSelectedMesa((prev) => {
+        if (!prev || String(prev?.id || '').trim() !== mesaId || eventType === 'DELETE')
+          return prev;
+        if (hasNextSyncVersion) {
+          const currentSyncVersion = resolveMesaSyncVersion(prev);
+          const incomingSyncVersion = nextSyncVersion || 0;
+          if (incomingSyncVersion < currentSyncVersion) return prev;
+        }
+        const resolvedCurrentOrderId = hasNextCurrentOrderId
+          ? nextCurrentOrderId
+          : (prev.current_order_id ?? null);
+        const resolvedStatus = String(nextStatus || prev.status || 'available');
         return {
           ...prev,
-          [normalizedOrderId]: units,
+          status: resolvedStatus,
+          current_order_id: resolvedCurrentOrderId,
+          table_number: hasNextTableNumber ? (nextRow?.table_number ?? null) : prev.table_number,
+          name: hasNextName ? (nextRow?.name ?? null) : prev.name,
+          sync_version: hasNextSyncVersion ? nextSyncVersion : prev.sync_version,
+          orders: !resolvedCurrentOrderId || resolvedStatus === 'available' ? null : prev.orders,
         };
       });
+
+      const previousOrderId = String(prevRow?.current_order_id || '').trim();
+      const updatedOrderId = hasNextCurrentOrderId ? String(nextCurrentOrderId || '').trim() : '';
+      if (previousOrderId || updatedOrderId || eventType === 'DELETE') {
+        setOrderUnitsByOrderId((prev) => {
+          const next = { ...prev };
+          if (previousOrderId && previousOrderId !== updatedOrderId) {
+            delete next[previousOrderId];
+          }
+          if (eventType === 'DELETE' || (!updatedOrderId && hasNextCurrentOrderId)) {
+            delete next[updatedOrderId];
+          }
+          return next;
+        });
+      }
+
+      if (eventType !== 'DELETE' && hasNextStatus) {
+        const normalizedStatus = String(nextStatus || '')
+          .trim()
+          .toLowerCase();
+        const tableBusinessId = String(
+          nextRow?.business_id || prevRow?.business_id || businessId || '',
+        ).trim();
+        if (normalizedStatus === 'available') {
+          clearMesaLockPlaceholderTimer(mesaId);
+          setMesaLocksByTableId((prev) => {
+            if (!prev[mesaId]) return prev;
+            const next = { ...prev };
+            delete next[mesaId];
+            return next;
+          });
+        }
+        if (normalizedStatus === 'occupied' && tableBusinessId) {
+          const selectedMesaId = String(selectedMesaIdRef.current || '').trim();
+          const held = heldMesaLockRef.current;
+          const hasHeldLock = Boolean(
+            held && held.tableId === mesaId && held.businessId === tableBusinessId,
+          );
+          if (!hasHeldLock && (!selectedMesaId || selectedMesaId !== mesaId)) {
+            applyMesaLockPlaceholder(mesaId, tableBusinessId);
+          }
+        }
+      }
+      if (eventType !== 'DELETE' && (hasNextStatus || hasNextCurrentOrderId)) {
+        const tableBusinessId = String(
+          nextRow?.business_id || prevRow?.business_id || businessId || '',
+        ).trim();
+        if (tableBusinessId) {
+          scheduleMesaLocksRefresh(tableBusinessId);
+        }
+      }
+    },
+    [
+      applyMesaLockPlaceholder,
+      businessId,
+      clearMesaLockPlaceholderTimer,
+      heldMesaLockRef,
+      scheduleMesaLocksRefresh,
+      selectedMesaIdRef,
+      setMesas,
+      setMesaLocksByTableId,
+      setOrderUnitsByOrderId,
+      setSelectedMesa,
+    ],
+  );
+
+  // -------------------------------------------------------------------
+  // applyRealtimeOrderEvent
+  // -------------------------------------------------------------------
+
+  const applyRealtimeOrderEvent = useCallback(
+    (payload: any) => {
+      const nextRow = payload?.new && typeof payload.new === 'object' ? payload.new : null;
+      const prevRow = payload?.old && typeof payload.old === 'object' ? payload.old : null;
+      const orderId = String(nextRow?.id || prevRow?.id || '').trim();
+      if (!orderId) return;
+
+      const nextStatus =
+        String(nextRow?.status || prevRow?.status || '')
+          .trim()
+          .toLowerCase() || undefined;
+      const hasNextTotal = Boolean(
+        nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'total'),
+      );
+      const nextTotal = hasNextTotal ? Number(nextRow?.total || 0) : null;
+      const tableId = String(nextRow?.table_id || prevRow?.table_id || '').trim();
+      const tableBusinessId = String(
+        nextRow?.business_id || prevRow?.business_id || businessId || '',
+      ).trim();
+
+      if (tableId && tableBusinessId) {
+        const normalizedStatus = String(nextStatus || '')
+          .trim()
+          .toLowerCase();
+        if (normalizedStatus === 'open') {
+          const selectedMesaId = String(selectedMesaIdRef.current || '').trim();
+          const held = heldMesaLockRef.current;
+          const hasHeldLock = Boolean(
+            held && held.tableId === tableId && held.businessId === tableBusinessId,
+          );
+          if (!hasHeldLock && (!selectedMesaId || selectedMesaId !== tableId)) {
+            applyMesaLockPlaceholder(tableId, tableBusinessId);
+          }
+        } else if (normalizedStatus) {
+          clearMesaLockPlaceholderTimer(tableId);
+          setMesaLocksByTableId((prev) => {
+            const current = prev[tableId];
+            if (!current) return prev;
+            const currentToken = String(current.lock_token || '').trim();
+            if (!currentToken.startsWith('pending-')) return prev;
+            const next = { ...prev };
+            delete next[tableId];
+            return next;
+          });
+        }
+      }
+
+      setMesas((prev) =>
+        prev.map((mesa) => {
+          if (String(mesa?.current_order_id || '').trim() !== orderId) return mesa;
+          return {
+            ...mesa,
+            orders: {
+              ...(mesa.orders || {}),
+              id: orderId,
+              status: nextStatus || String(mesa?.orders?.status || 'open'),
+              total: nextTotal === null ? Number(mesa?.orders?.total || 0) : Number(nextTotal || 0),
+            },
+          };
+        }),
+      );
+    },
+    [
+      applyMesaLockPlaceholder,
+      businessId,
+      clearMesaLockPlaceholderTimer,
+      heldMesaLockRef,
+      selectedMesaIdRef,
+      setMesas,
+      setMesaLocksByTableId,
+    ],
+  );
+
+  // -------------------------------------------------------------------
+  // applyRealtimeOrderItemDelta
+  // -------------------------------------------------------------------
+
+  const applyRealtimeOrderItemDelta = useCallback(
+    (payload: any) => {
+      const eventType = String(payload?.eventType || '')
+        .trim()
+        .toUpperCase();
+      const nextRow = payload?.new && typeof payload.new === 'object' ? payload.new : null;
+      const prevRow = payload?.old && typeof payload.old === 'object' ? payload.old : null;
+
+      const deltasByOrderId = new Map<string, { deltaUnits: number; deltaTotal: number }>();
+      const pushDelta = (orderId: unknown, deltaUnits: number, deltaTotal: number) => {
+        const normalizedOrderId = normalizeOrderReference(orderId);
+        if (!normalizedOrderId) return;
+        const previous = deltasByOrderId.get(normalizedOrderId) || { deltaUnits: 0, deltaTotal: 0 };
+        deltasByOrderId.set(normalizedOrderId, {
+          deltaUnits: previous.deltaUnits + deltaUnits,
+          deltaTotal: previous.deltaTotal + deltaTotal,
+        });
+      };
+
+      const nextOrderId = normalizeOrderReference(nextRow?.order_id);
+      const previousOrderId = normalizeOrderReference(prevRow?.order_id);
+
+      if (eventType === 'INSERT') {
+        pushDelta(
+          nextOrderId,
+          normalizeOrderItemQuantity(nextRow?.quantity),
+          normalizeOrderItemSubtotal(nextRow),
+        );
+      } else if (eventType === 'DELETE') {
+        pushDelta(
+          previousOrderId,
+          -normalizeOrderItemQuantity(prevRow?.quantity),
+          -normalizeOrderItemSubtotal(prevRow),
+        );
+      } else {
+        const nextQuantity = normalizeOrderItemQuantity(nextRow?.quantity);
+        const previousQuantity = normalizeOrderItemQuantity(prevRow?.quantity);
+        const nextSubtotal = normalizeOrderItemSubtotal(nextRow);
+        const previousSubtotal = normalizeOrderItemSubtotal(prevRow);
+
+        if (nextOrderId && previousOrderId && nextOrderId !== previousOrderId) {
+          pushDelta(previousOrderId, -previousQuantity, -previousSubtotal);
+          pushDelta(nextOrderId, nextQuantity, nextSubtotal);
+        } else {
+          pushDelta(
+            nextOrderId || previousOrderId,
+            nextQuantity - previousQuantity,
+            nextSubtotal - previousSubtotal,
+          );
+        }
+      }
+
+      if (deltasByOrderId.size === 0) return;
+
+      setOrderUnitsByOrderId((prev) => {
+        let changed = false;
+        const next = { ...prev };
+
+        deltasByOrderId.forEach((delta, orderId) => {
+          const currentUnits = Math.max(0, Math.floor(Number(next[orderId] || 0)));
+          const resolvedUnits = Math.max(0, currentUnits + Math.trunc(delta.deltaUnits));
+          if (resolvedUnits === currentUnits) return;
+          changed = true;
+          if (resolvedUnits === 0) {
+            delete next[orderId];
+          } else {
+            next[orderId] = resolvedUnits;
+          }
+        });
+
+        return changed ? next : prev;
+      });
+
+      const normalizeTotal = (value: number) => Math.max(0, Math.round(value * 100) / 100);
 
       setMesas((prev) => {
         let changed = false;
         const next = prev.map((mesa) => {
-          if (normalizeOrderReference(mesa?.current_order_id) !== normalizedOrderId) return mesa;
+          const orderId = normalizeOrderReference(mesa?.current_order_id);
+          if (!orderId) return mesa;
+          const delta = deltasByOrderId.get(orderId);
+          if (!delta) return mesa;
+
+          const currentTotal = Number(mesa?.orders?.total || 0);
+          const safeCurrentTotal = Number.isFinite(currentTotal) ? currentTotal : 0;
+          const nextTotal = normalizeTotal(safeCurrentTotal + delta.deltaTotal);
+
+          const currentUnitsRaw = Number(mesa?.order_units);
+          const safeCurrentUnits = Number.isFinite(currentUnitsRaw)
+            ? Math.max(0, Math.floor(currentUnitsRaw))
+            : 0;
+          const nextUnits = Math.max(0, safeCurrentUnits + Math.trunc(delta.deltaUnits));
+
+          if (nextTotal === safeCurrentTotal && nextUnits === safeCurrentUnits) return mesa;
           changed = true;
           return {
             ...mesa,
             status: 'occupied',
-            order_units: units,
+            order_units: nextUnits,
             orders: {
               ...(mesa.orders || {}),
-              id: normalizedOrderId,
+              id: orderId,
               status: String(mesa?.orders?.status || 'open'),
-              total,
+              total: nextTotal,
             },
           };
         });
@@ -608,477 +1076,107 @@ export function useMesaRealtime({
       });
 
       setSelectedMesa((prev) => {
-        if (!prev || normalizeOrderReference(prev?.current_order_id) !== normalizedOrderId) return prev;
-        return {
-          ...prev,
-          status: 'occupied',
-          order_units: units,
-          orders: {
-            ...(prev.orders || {}),
-            id: normalizedOrderId,
-            status: String(prev?.orders?.status || 'open'),
-            total,
-          },
-        };
-      });
-    } catch {
-      // no-op
-    }
-  }, [setMesas, setOrderUnitsByOrderId, setSelectedMesa, traceAsyncDuration]);
+        if (!prev) return prev;
+        const selectedOrderId = normalizeOrderReference(prev?.current_order_id);
+        if (!selectedOrderId) return prev;
+        const delta = deltasByOrderId.get(selectedOrderId);
+        if (!delta) return prev;
 
-  const scheduleOrderRealtimeSummaryHydration = useCallback((orderId: string) => {
-    const normalizedOrderId = normalizeOrderReference(orderId);
-    if (!normalizedOrderId) return;
-
-    const timers = orderRealtimeSummaryTimersRef.current;
-    const previousTimer = timers[normalizedOrderId];
-    if (previousTimer) {
-      clearTimeout(previousTimer);
-    }
-
-    timers[normalizedOrderId] = setTimeout(() => {
-      delete timers[normalizedOrderId];
-      void hydrateOrderRealtimeSummary(normalizedOrderId);
-    }, 40);
-  }, [hydrateOrderRealtimeSummary]);
-
-  // -------------------------------------------------------------------
-  // applyRealtimeTableEvent
-  // -------------------------------------------------------------------
-
-  const applyRealtimeTableEvent = useCallback((payload: any) => {
-    const eventType = String(payload?.eventType || '').trim().toUpperCase();
-    const nextRow = payload?.new && typeof payload.new === 'object' ? payload.new : null;
-    const prevRow = payload?.old && typeof payload.old === 'object' ? payload.old : null;
-    const mesaId = String(nextRow?.id || prevRow?.id || '').trim();
-    if (!mesaId) return;
-
-    const hasNextCurrentOrderId = Boolean(nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'current_order_id'));
-    const nextCurrentOrderId = hasNextCurrentOrderId
-      ? (String(nextRow?.current_order_id || '').trim() || null)
-      : undefined;
-    const hasNextStatus = Boolean(nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'status'));
-    const nextStatus = hasNextStatus
-      ? (String(nextRow?.status || '').trim().toLowerCase() || undefined)
-      : undefined;
-
-    const hasNextTableNumber = Boolean(nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'table_number'));
-    const hasNextName = Boolean(nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'name'));
-    const hasNextSyncVersion = Boolean(nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'sync_version'));
-    const nextSyncVersion = hasNextSyncVersion
-      ? resolveMesaSyncVersion({ sync_version: nextRow?.sync_version } as Partial<MesaRecord>)
-      : undefined;
-
-    setMesas((prev) => {
-      const index = prev.findIndex((mesa) => String(mesa?.id || '').trim() === mesaId);
-
-      if (eventType === 'DELETE') {
-        if (index === -1) return prev;
-        const next = prev.filter((mesa) => String(mesa?.id || '').trim() !== mesaId);
-        return next;
-      }
-
-      if (index === -1) {
-        if (!nextRow) return prev;
-        const insertedMesa: MesaRecord = {
-          id: mesaId,
-          business_id: String(nextRow?.business_id || '').trim(),
-          table_number: hasNextTableNumber ? (nextRow?.table_number ?? null) : null,
-          name: hasNextName ? (nextRow?.name ?? null) : null,
-          status: String(nextStatus || 'available'),
-          current_order_id: hasNextCurrentOrderId ? nextCurrentOrderId : null,
-          sync_version: hasNextSyncVersion ? nextSyncVersion : undefined,
-          orders: null,
-        };
-        return [...prev, insertedMesa].sort(compareMesaTableIdentifiers);
-      }
-
-      const current = prev[index];
-      if (hasNextSyncVersion) {
-        const currentSyncVersion = resolveMesaSyncVersion(current);
-        const incomingSyncVersion = nextSyncVersion || 0;
-        if (incomingSyncVersion < currentSyncVersion) {
-          traceMesaSync('drop_stale_table_event', {
-            mesaId,
-            currentSyncVersion,
-            incomingSyncVersion,
-            eventType,
-          });
-          return prev;
-        }
-      }
-      const resolvedCurrentOrderId = hasNextCurrentOrderId ? nextCurrentOrderId : (current.current_order_id ?? null);
-      const resolvedStatus = String(nextStatus || current.status || 'available');
-      const nextMesa: MesaRecord = {
-        ...current,
-        status: resolvedStatus,
-        current_order_id: resolvedCurrentOrderId,
-        table_number: hasNextTableNumber ? (nextRow?.table_number ?? null) : current.table_number,
-        name: hasNextName ? (nextRow?.name ?? null) : current.name,
-        sync_version: hasNextSyncVersion ? nextSyncVersion : current.sync_version,
-        orders: (() => {
-          if (!resolvedCurrentOrderId || resolvedStatus === 'available') return null;
-          if (String(current?.orders?.id || '').trim() === String(resolvedCurrentOrderId || '').trim()) {
-            return current.orders || null;
-          }
-          return {
-            ...(current.orders || {}),
-            id: resolvedCurrentOrderId,
-            status: String(current?.orders?.status || 'open'),
-            total: Number(current?.orders?.total || 0),
-          };
-        })(),
-      };
-
-      const next = [...prev];
-      next[index] = nextMesa;
-      return next.sort(compareMesaTableIdentifiers);
-    });
-
-    setSelectedMesa((prev) => {
-      if (!prev || String(prev?.id || '').trim() !== mesaId || eventType === 'DELETE') return prev;
-      if (hasNextSyncVersion) {
-        const currentSyncVersion = resolveMesaSyncVersion(prev);
-        const incomingSyncVersion = nextSyncVersion || 0;
-        if (incomingSyncVersion < currentSyncVersion) return prev;
-      }
-      const resolvedCurrentOrderId = hasNextCurrentOrderId ? nextCurrentOrderId : (prev.current_order_id ?? null);
-      const resolvedStatus = String(nextStatus || prev.status || 'available');
-      return {
-        ...prev,
-        status: resolvedStatus,
-        current_order_id: resolvedCurrentOrderId,
-        table_number: hasNextTableNumber ? (nextRow?.table_number ?? null) : prev.table_number,
-        name: hasNextName ? (nextRow?.name ?? null) : prev.name,
-        sync_version: hasNextSyncVersion ? nextSyncVersion : prev.sync_version,
-        orders: (!resolvedCurrentOrderId || resolvedStatus === 'available')
-          ? null
-          : prev.orders,
-      };
-    });
-
-    const previousOrderId = String(prevRow?.current_order_id || '').trim();
-    const updatedOrderId = hasNextCurrentOrderId ? String(nextCurrentOrderId || '').trim() : '';
-    if (previousOrderId || updatedOrderId || eventType === 'DELETE') {
-      setOrderUnitsByOrderId((prev) => {
-        const next = { ...prev };
-        if (previousOrderId && previousOrderId !== updatedOrderId) {
-          delete next[previousOrderId];
-        }
-        if (eventType === 'DELETE' || (!updatedOrderId && hasNextCurrentOrderId)) {
-          delete next[updatedOrderId];
-        }
-        return next;
-      });
-    }
-
-    if (eventType !== 'DELETE' && hasNextStatus) {
-      const normalizedStatus = String(nextStatus || '').trim().toLowerCase();
-      const tableBusinessId = String(nextRow?.business_id || prevRow?.business_id || businessId || '').trim();
-      if (normalizedStatus === 'available') {
-        clearMesaLockPlaceholderTimer(mesaId);
-        setMesaLocksByTableId((prev) => {
-          if (!prev[mesaId]) return prev;
-          const next = { ...prev };
-          delete next[mesaId];
-          return next;
-        });
-      }
-      if (normalizedStatus === 'occupied' && tableBusinessId) {
-        const selectedMesaId = String(selectedMesaIdRef.current || '').trim();
-        const held = heldMesaLockRef.current;
-        const hasHeldLock = Boolean(
-          held
-          && held.tableId === mesaId
-          && held.businessId === tableBusinessId,
-        );
-        if (!hasHeldLock && (!selectedMesaId || selectedMesaId !== mesaId)) {
-          applyMesaLockPlaceholder(mesaId, tableBusinessId);
-        }
-      }
-    }
-    if (eventType !== 'DELETE' && (hasNextStatus || hasNextCurrentOrderId)) {
-      const tableBusinessId = String(nextRow?.business_id || prevRow?.business_id || businessId || '').trim();
-      if (tableBusinessId) {
-        scheduleMesaLocksRefresh(tableBusinessId);
-      }
-    }
-  }, [
-    applyMesaLockPlaceholder,
-    businessId,
-    clearMesaLockPlaceholderTimer,
-    heldMesaLockRef,
-    scheduleMesaLocksRefresh,
-    selectedMesaIdRef,
-    setMesas,
-    setMesaLocksByTableId,
-    setOrderUnitsByOrderId,
-    setSelectedMesa,
-  ]);
-
-  // -------------------------------------------------------------------
-  // applyRealtimeOrderEvent
-  // -------------------------------------------------------------------
-
-  const applyRealtimeOrderEvent = useCallback((payload: any) => {
-    const nextRow = payload?.new && typeof payload.new === 'object' ? payload.new : null;
-    const prevRow = payload?.old && typeof payload.old === 'object' ? payload.old : null;
-    const orderId = String(nextRow?.id || prevRow?.id || '').trim();
-    if (!orderId) return;
-
-    const nextStatus = String(nextRow?.status || prevRow?.status || '').trim().toLowerCase() || undefined;
-    const hasNextTotal = Boolean(nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'total'));
-    const nextTotal = hasNextTotal ? Number(nextRow?.total || 0) : null;
-    const tableId = String(nextRow?.table_id || prevRow?.table_id || '').trim();
-    const tableBusinessId = String(nextRow?.business_id || prevRow?.business_id || businessId || '').trim();
-
-    if (tableId && tableBusinessId) {
-      const normalizedStatus = String(nextStatus || '').trim().toLowerCase();
-      if (normalizedStatus === 'open') {
-        const selectedMesaId = String(selectedMesaIdRef.current || '').trim();
-        const held = heldMesaLockRef.current;
-        const hasHeldLock = Boolean(
-          held
-          && held.tableId === tableId
-          && held.businessId === tableBusinessId,
-        );
-        if (!hasHeldLock && (!selectedMesaId || selectedMesaId !== tableId)) {
-          applyMesaLockPlaceholder(tableId, tableBusinessId);
-        }
-      } else if (normalizedStatus) {
-        clearMesaLockPlaceholderTimer(tableId);
-        setMesaLocksByTableId((prev) => {
-          const current = prev[tableId];
-          if (!current) return prev;
-          const currentToken = String(current.lock_token || '').trim();
-          if (!currentToken.startsWith('pending-')) return prev;
-          const next = { ...prev };
-          delete next[tableId];
-          return next;
-        });
-      }
-    }
-
-    setMesas((prev) => prev.map((mesa) => {
-      if (String(mesa?.current_order_id || '').trim() !== orderId) return mesa;
-      return {
-        ...mesa,
-        orders: {
-          ...(mesa.orders || {}),
-          id: orderId,
-          status: nextStatus || String(mesa?.orders?.status || 'open'),
-          total: nextTotal === null ? Number(mesa?.orders?.total || 0) : Number(nextTotal || 0),
-        },
-      };
-    }));
-  }, [
-    applyMesaLockPlaceholder,
-    businessId,
-    clearMesaLockPlaceholderTimer,
-    heldMesaLockRef,
-    selectedMesaIdRef,
-    setMesas,
-    setMesaLocksByTableId,
-  ]);
-
-  // -------------------------------------------------------------------
-  // applyRealtimeOrderItemDelta
-  // -------------------------------------------------------------------
-
-  const applyRealtimeOrderItemDelta = useCallback((payload: any) => {
-    const eventType = String(payload?.eventType || '').trim().toUpperCase();
-    const nextRow = payload?.new && typeof payload.new === 'object' ? payload.new : null;
-    const prevRow = payload?.old && typeof payload.old === 'object' ? payload.old : null;
-
-    const deltasByOrderId = new Map<string, { deltaUnits: number; deltaTotal: number }>();
-    const pushDelta = (orderId: unknown, deltaUnits: number, deltaTotal: number) => {
-      const normalizedOrderId = normalizeOrderReference(orderId);
-      if (!normalizedOrderId) return;
-      const previous = deltasByOrderId.get(normalizedOrderId) || { deltaUnits: 0, deltaTotal: 0 };
-      deltasByOrderId.set(normalizedOrderId, {
-        deltaUnits: previous.deltaUnits + deltaUnits,
-        deltaTotal: previous.deltaTotal + deltaTotal,
-      });
-    };
-
-    const nextOrderId = normalizeOrderReference(nextRow?.order_id);
-    const previousOrderId = normalizeOrderReference(prevRow?.order_id);
-
-    if (eventType === 'INSERT') {
-      pushDelta(
-        nextOrderId,
-        normalizeOrderItemQuantity(nextRow?.quantity),
-        normalizeOrderItemSubtotal(nextRow),
-      );
-    } else if (eventType === 'DELETE') {
-      pushDelta(
-        previousOrderId,
-        -normalizeOrderItemQuantity(prevRow?.quantity),
-        -normalizeOrderItemSubtotal(prevRow),
-      );
-    } else {
-      const nextQuantity = normalizeOrderItemQuantity(nextRow?.quantity);
-      const previousQuantity = normalizeOrderItemQuantity(prevRow?.quantity);
-      const nextSubtotal = normalizeOrderItemSubtotal(nextRow);
-      const previousSubtotal = normalizeOrderItemSubtotal(prevRow);
-
-      if (nextOrderId && previousOrderId && nextOrderId !== previousOrderId) {
-        pushDelta(previousOrderId, -previousQuantity, -previousSubtotal);
-        pushDelta(nextOrderId, nextQuantity, nextSubtotal);
-      } else {
-        pushDelta(
-          nextOrderId || previousOrderId,
-          nextQuantity - previousQuantity,
-          nextSubtotal - previousSubtotal,
-        );
-      }
-    }
-
-    if (deltasByOrderId.size === 0) return;
-
-    setOrderUnitsByOrderId((prev) => {
-      let changed = false;
-      const next = { ...prev };
-
-      deltasByOrderId.forEach((delta, orderId) => {
-        const currentUnits = Math.max(0, Math.floor(Number(next[orderId] || 0)));
-        const resolvedUnits = Math.max(0, currentUnits + Math.trunc(delta.deltaUnits));
-        if (resolvedUnits === currentUnits) return;
-        changed = true;
-        if (resolvedUnits === 0) {
-          delete next[orderId];
-        } else {
-          next[orderId] = resolvedUnits;
-        }
-      });
-
-      return changed ? next : prev;
-    });
-
-    const normalizeTotal = (value: number) => Math.max(0, Math.round(value * 100) / 100);
-
-    setMesas((prev) => {
-      let changed = false;
-      const next = prev.map((mesa) => {
-        const orderId = normalizeOrderReference(mesa?.current_order_id);
-        if (!orderId) return mesa;
-        const delta = deltasByOrderId.get(orderId);
-        if (!delta) return mesa;
-
-        const currentTotal = Number(mesa?.orders?.total || 0);
+        const currentTotal = Number(prev?.orders?.total || 0);
         const safeCurrentTotal = Number.isFinite(currentTotal) ? currentTotal : 0;
         const nextTotal = normalizeTotal(safeCurrentTotal + delta.deltaTotal);
 
-        const currentUnitsRaw = Number(mesa?.order_units);
+        const currentUnitsRaw = Number(prev?.order_units);
         const safeCurrentUnits = Number.isFinite(currentUnitsRaw)
           ? Math.max(0, Math.floor(currentUnitsRaw))
           : 0;
         const nextUnits = Math.max(0, safeCurrentUnits + Math.trunc(delta.deltaUnits));
 
-        if (nextTotal === safeCurrentTotal && nextUnits === safeCurrentUnits) return mesa;
-        changed = true;
+        if (nextTotal === safeCurrentTotal && nextUnits === safeCurrentUnits) return prev;
+
         return {
-          ...mesa,
+          ...prev,
           status: 'occupied',
           order_units: nextUnits,
           orders: {
-            ...(mesa.orders || {}),
-            id: orderId,
-            status: String(mesa?.orders?.status || 'open'),
+            ...(prev.orders || {}),
+            id: selectedOrderId,
+            status: String(prev?.orders?.status || 'open'),
             total: nextTotal,
           },
         };
       });
-      return changed ? next : prev;
-    });
-
-    setSelectedMesa((prev) => {
-      if (!prev) return prev;
-      const selectedOrderId = normalizeOrderReference(prev?.current_order_id);
-      if (!selectedOrderId) return prev;
-      const delta = deltasByOrderId.get(selectedOrderId);
-      if (!delta) return prev;
-
-      const currentTotal = Number(prev?.orders?.total || 0);
-      const safeCurrentTotal = Number.isFinite(currentTotal) ? currentTotal : 0;
-      const nextTotal = normalizeTotal(safeCurrentTotal + delta.deltaTotal);
-
-      const currentUnitsRaw = Number(prev?.order_units);
-      const safeCurrentUnits = Number.isFinite(currentUnitsRaw)
-        ? Math.max(0, Math.floor(currentUnitsRaw))
-        : 0;
-      const nextUnits = Math.max(0, safeCurrentUnits + Math.trunc(delta.deltaUnits));
-
-      if (nextTotal === safeCurrentTotal && nextUnits === safeCurrentUnits) return prev;
-
-      return {
-        ...prev,
-        status: 'occupied',
-        order_units: nextUnits,
-        orders: {
-          ...(prev.orders || {}),
-          id: selectedOrderId,
-          status: String(prev?.orders?.status || 'open'),
-          total: nextTotal,
-        },
-      };
-    });
-  }, [setMesas, setOrderUnitsByOrderId, setSelectedMesa]);
+    },
+    [setMesas, setOrderUnitsByOrderId, setSelectedMesa],
+  );
 
   // -------------------------------------------------------------------
   // applyRealtimeMesaBroadcast
   // -------------------------------------------------------------------
 
-  const applyRealtimeMesaBroadcast = useCallback((payload: any) => {
-    const senderClientId = String(payload?.sender_client_id || '').trim();
-    if (senderClientId && senderClientId === String(realtimeClientInstanceIdRef.current || '').trim()) return;
+  const applyRealtimeMesaBroadcast = useCallback(
+    (payload: any) => {
+      const senderClientId = String(payload?.sender_client_id || '').trim();
+      if (
+        senderClientId &&
+        senderClientId === String(realtimeClientInstanceIdRef.current || '').trim()
+      )
+        return;
 
-    const mesaId = String(payload?.mesa_id || '').trim();
-    if (!mesaId) return;
+      const mesaId = String(payload?.mesa_id || '').trim();
+      if (!mesaId) return;
 
-    const activeBusinessId = businessId;
-    const payloadBusinessId = String(payload?.business_id || '').trim();
-    if (activeBusinessId && (!payloadBusinessId || payloadBusinessId !== activeBusinessId)) {
-      return;
-    }
-
-    applyRealtimeMesaLockHint(payload);
-
-    applyRealtimeTableEvent({
-      eventType: 'UPDATE',
-      old: {
-        current_order_id: payload?.previous_order_id ?? null,
-      },
-      new: {
-        id: mesaId,
-        business_id: payload?.business_id ?? null,
-        status: payload?.status ?? null,
-        current_order_id: payload?.current_order_id ?? null,
-        table_number: payload?.table_number ?? null,
-        name: payload?.name ?? null,
-        sync_version: payload?.sync_version ?? null,
-      },
-    });
-
-    if (payload?.current_order_id) {
-      const orderId = String(payload.current_order_id || '').trim();
-      const orderUnits = Number(payload?.order_units);
-      if (orderId && Number.isFinite(orderUnits)) {
-        setOrderUnitsByOrderId((prev) => ({
-          ...prev,
-          [orderId]: Math.max(0, Math.floor(orderUnits)),
-        }));
+      const activeBusinessId = businessId;
+      const payloadBusinessId = String(payload?.business_id || '').trim();
+      if (activeBusinessId && (!payloadBusinessId || payloadBusinessId !== activeBusinessId)) {
+        return;
       }
-      applyRealtimeOrderEvent({
+
+      applyRealtimeMesaLockHint(payload);
+
+      applyRealtimeTableEvent({
         eventType: 'UPDATE',
+        old: {
+          current_order_id: payload?.previous_order_id ?? null,
+        },
         new: {
-          id: payload.current_order_id,
-          status: payload?.order_status ?? 'open',
-          total: payload?.order_total ?? 0,
+          id: mesaId,
+          business_id: payload?.business_id ?? null,
+          status: payload?.status ?? null,
+          current_order_id: payload?.current_order_id ?? null,
+          table_number: payload?.table_number ?? null,
+          name: payload?.name ?? null,
+          sync_version: payload?.sync_version ?? null,
         },
       });
-    }
-  }, [applyRealtimeMesaLockHint, applyRealtimeOrderEvent, applyRealtimeTableEvent, businessId, setOrderUnitsByOrderId]);
+
+      if (payload?.current_order_id) {
+        const orderId = String(payload.current_order_id || '').trim();
+        const orderUnits = Number(payload?.order_units);
+        if (orderId && Number.isFinite(orderUnits)) {
+          setOrderUnitsByOrderId((prev) => ({
+            ...prev,
+            [orderId]: Math.max(0, Math.floor(orderUnits)),
+          }));
+        }
+        applyRealtimeOrderEvent({
+          eventType: 'UPDATE',
+          new: {
+            id: payload.current_order_id,
+            status: payload?.order_status ?? 'open',
+            total: payload?.order_total ?? 0,
+          },
+        });
+      }
+    },
+    [
+      applyRealtimeMesaLockHint,
+      applyRealtimeOrderEvent,
+      applyRealtimeTableEvent,
+      businessId,
+      setOrderUnitsByOrderId,
+    ],
+  );
 
   // -------------------------------------------------------------------
   // Main realtime useEffect (channel creation, subscription, fallback polling)
@@ -1112,64 +1210,80 @@ export function useMesaRealtime({
 
     const channel = client
       .channel(`mobile-mesas:${businessId}:${userId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'tables',
-        filter: `business_id=eq.${businessId}`,
-      }, (payload: any) => {
-        if (cancelled) return;
-        markRealtimeIngress('tables', payload);
-        applyRealtimeTableEvent(payload);
-        scheduleRefresh();
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'orders',
-        filter: `business_id=eq.${businessId}`,
-      }, (payload: any) => {
-        if (cancelled) return;
-        markRealtimeIngress('orders', payload);
-        applyRealtimeOrderEvent(payload);
-        scheduleRefresh();
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'order_items',
-      }, (payload: any) => {
-        if (cancelled) return;
-        markRealtimeIngress('order_items', payload);
-        const newRow = payload?.new as Record<string, unknown> | undefined;
-        const oldRow = payload?.old as Record<string, unknown> | undefined;
-        const nextOrderId = normalizeOrderReference(newRow?.order_id);
-        const previousOrderId = normalizeOrderReference(oldRow?.order_id);
-
-        applyRealtimeOrderItemDelta(payload);
-
-        if (nextOrderId) {
-          scheduleOrderRealtimeSummaryHydration(nextOrderId);
-        }
-        if (previousOrderId && previousOrderId !== nextOrderId) {
-          scheduleOrderRealtimeSummaryHydration(previousOrderId);
-        }
-
-        if (!nextOrderId && !previousOrderId) {
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tables',
+          filter: `business_id=eq.${businessId}`,
+        },
+        (payload: any) => {
+          if (cancelled) return;
+          markRealtimeIngress('tables', payload);
+          applyRealtimeTableEvent(payload);
           scheduleRefresh();
-        }
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'table_edit_locks',
-        filter: `business_id=eq.${businessId}`,
-      }, (payload: any) => {
-        if (cancelled) return;
-        markRealtimeIngress('mesa_lock', payload);
-        applyRealtimeMesaLockEvent(payload);
-        scheduleLocks();
-      });
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `business_id=eq.${businessId}`,
+        },
+        (payload: any) => {
+          if (cancelled) return;
+          markRealtimeIngress('orders', payload);
+          applyRealtimeOrderEvent(payload);
+          scheduleRefresh();
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'order_items',
+        },
+        (payload: any) => {
+          if (cancelled) return;
+          markRealtimeIngress('order_items', payload);
+          const newRow = payload?.new as Record<string, unknown> | undefined;
+          const oldRow = payload?.old as Record<string, unknown> | undefined;
+          const nextOrderId = normalizeOrderReference(newRow?.order_id);
+          const previousOrderId = normalizeOrderReference(oldRow?.order_id);
+
+          applyRealtimeOrderItemDelta(payload);
+
+          if (nextOrderId) {
+            scheduleOrderRealtimeSummaryHydration(nextOrderId);
+          }
+          if (previousOrderId && previousOrderId !== nextOrderId) {
+            scheduleOrderRealtimeSummaryHydration(previousOrderId);
+          }
+
+          if (!nextOrderId && !previousOrderId) {
+            scheduleRefresh();
+          }
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'table_edit_locks',
+          filter: `business_id=eq.${businessId}`,
+        },
+        (payload: any) => {
+          if (cancelled) return;
+          markRealtimeIngress('mesa_lock', payload);
+          applyRealtimeMesaLockEvent(payload);
+          scheduleLocks();
+        },
+      );
 
     const syncChannel = client
       .channel(`private:mobile-mesas-sync:${businessId}`)
@@ -1193,7 +1307,9 @@ export function useMesaRealtime({
             : null,
         });
         applyRealtimeMesaBroadcast(payload);
-        const mode = String(payload?.sync_mode || 'confirmed').trim().toLowerCase();
+        const mode = String(payload?.sync_mode || 'confirmed')
+          .trim()
+          .toLowerCase();
         if (mode !== 'optimistic') {
           scheduleRefresh();
         }
@@ -1250,6 +1366,7 @@ export function useMesaRealtime({
     scheduleOrderRealtimeSummaryHydration,
     scheduleMesaLocksRefresh,
     scheduleMesasRealtimeRefresh,
+    setMesaLocksByTableId,
     userId,
   ]);
 

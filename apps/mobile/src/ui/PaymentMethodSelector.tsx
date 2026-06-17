@@ -12,7 +12,7 @@ type Props = {
   onBlockedInteraction?: () => void;
 };
 
-const OPTIONS: Array<{ value: PaymentMethodValue; label: string }> = [
+const OPTIONS: { value: PaymentMethodValue; label: string }[] = [
   { value: 'cash', label: 'Efectivo' },
   { value: 'card', label: 'Tarjeta' },
   { value: 'transfer', label: 'Transferencia' },
@@ -24,7 +24,12 @@ const OPTIONS: Array<{ value: PaymentMethodValue; label: string }> = [
   { value: 'davivienda', label: 'Davivienda' },
 ];
 
-export function PaymentMethodSelector({ value, onChange, blockInteractions, onBlockedInteraction }: Props) {
+export function PaymentMethodSelector({
+  value,
+  onChange,
+  blockInteractions,
+  onBlockedInteraction,
+}: Props) {
   return (
     <View style={styles.grid}>
       {OPTIONS.map((option) => {
@@ -43,7 +48,11 @@ export function PaymentMethodSelector({ value, onChange, blockInteractions, onBl
           >
             <View style={styles.content}>
               {isBankPaymentMethod(option.value) ? (
-                <Image source={getBankLogoSource(option.value)!} style={styles.logo} resizeMode="contain" />
+                <Image
+                  source={getBankLogoSource(option.value)!}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
               ) : (
                 <Ionicons
                   name={getPaymentMethodTheme(option.value).icon}
@@ -51,9 +60,7 @@ export function PaymentMethodSelector({ value, onChange, blockInteractions, onBl
                   color={selected ? '#1D4ED8' : '#475569'}
                 />
               )}
-              <Text style={[styles.label, selected && styles.labelSelected]}>
-                {option.label}
-              </Text>
+              <Text style={[styles.label, selected && styles.labelSelected]}>{option.label}</Text>
             </View>
           </Pressable>
         );

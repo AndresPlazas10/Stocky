@@ -3,9 +3,13 @@ import type { PaymentMethod } from '../../../services/mesaCheckoutService';
 import type { MesaOrderCatalogItem, MesaOrderItem } from '../../../services/mesaOrderService';
 import type { MesaRecord } from '../../../services/mesasService';
 
-export const COLOMBIAN_DENOMINATIONS = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50];
+export const MESA_IN_USE_MESSAGE = 'Alguien esta usando esta mesa.';
 
-export const PAYMENT_METHOD_OPTIONS: Array<{ value: PaymentMethod; label: string }> = [
+export const COLOMBIAN_DENOMINATIONS = [
+  100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50,
+];
+
+export const PAYMENT_METHOD_OPTIONS: { value: PaymentMethod; label: string }[] = [
   { value: 'cash', label: 'Efectivo' },
   { value: 'card', label: 'Tarjeta' },
   { value: 'transfer', label: 'Transferencia' },
@@ -18,7 +22,11 @@ export const PAYMENT_METHOD_OPTIONS: Array<{ value: PaymentMethod; label: string
 ];
 
 export function isMesaOccupied(status: string | null | undefined) {
-  return String(status || '').trim().toLowerCase() === 'occupied';
+  return (
+    String(status || '')
+      .trim()
+      .toLowerCase() === 'occupied'
+  );
 }
 
 export function normalizeTableIdentifier(value: string | number | null | undefined) {
@@ -36,23 +44,28 @@ export function compareMesaTableIdentifiers(left: MesaRecord, right: MesaRecord)
 }
 
 export function resolveMesaSyncVersion(mesa: Partial<MesaRecord> | null | undefined): number {
-  const raw = Number((mesa as any)?.sync_version);
+  const raw = Number(mesa?.sync_version);
   if (!Number.isFinite(raw)) return 0;
   return Math.max(0, Math.floor(raw));
 }
 
 export function mesaDisplayName(mesa: MesaRecord): string {
   if (mesa.name && String(mesa.name).trim()) return String(mesa.name).trim();
-  if (mesa.table_number !== null && mesa.table_number !== undefined && String(mesa.table_number).trim()) {
+  if (
+    mesa.table_number !== null &&
+    mesa.table_number !== undefined &&
+    String(mesa.table_number).trim()
+  ) {
     return `Mesa ${String(mesa.table_number).trim()}`;
   }
   return `Mesa ${mesa.id.slice(0, 6)}`;
 }
 
 export function resolveSessionDisplayName(session: Session): string {
-  const metadata = session?.user?.user_metadata && typeof session.user.user_metadata === 'object'
-    ? session.user.user_metadata as Record<string, unknown>
-    : {};
+  const metadata =
+    session?.user?.user_metadata && typeof session.user.user_metadata === 'object'
+      ? (session.user.user_metadata as Record<string, unknown>)
+      : {};
 
   const candidates = [
     metadata?.full_name,
@@ -72,7 +85,7 @@ export function resolveSessionDisplayName(session: Session): string {
 
 export function buildCashBreakdown(change: number) {
   let remaining = Math.round(Number(change || 0));
-  const breakdown: Array<{ denomination: number; count: number }> = [];
+  const breakdown: { denomination: number; count: number }[] = [];
 
   for (const denomination of COLOMBIAN_DENOMINATIONS) {
     const count = Math.floor(remaining / denomination);
@@ -102,7 +115,7 @@ export function normalizeOrderItemQuantity(value: unknown): number {
   return Math.max(0, Math.floor(parsed));
 }
 
-export function normalizeOrderItemSubtotal(row: any): number {
+export function normalizeOrderItemSubtotal(row: Record<string, unknown>): number {
   const subtotal = Number(row?.subtotal);
   if (Number.isFinite(subtotal)) {
     return Math.max(0, subtotal);
@@ -134,14 +147,21 @@ export function isSameOrderItemIdentity(left: MesaOrderItem, right: MesaOrderIte
   return false;
 }
 
-export function reconcileOrderItemsFromServer(current: MesaOrderItem[], fromServer: MesaOrderItem[]) {
+export function reconcileOrderItemsFromServer(
+  current: MesaOrderItem[],
+  fromServer: MesaOrderItem[],
+) {
   const local = Array.isArray(current) ? current : [];
   const server = Array.isArray(fromServer) ? fromServer : [];
 
   const serverById = new Map(server.map((item) => [String(item.id || ''), item]));
   const serverByIdentity = new Map<string, MesaOrderItem>();
   server.forEach((item) => {
-    const key = item.product_id ? `p:${item.product_id}` : item.combo_id ? `c:${item.combo_id}` : '';
+    const key = item.product_id
+      ? `p:${item.product_id}`
+      : item.combo_id
+        ? `c:${item.combo_id}`
+        : '';
     if (!key) return;
     if (!serverByIdentity.has(key)) {
       serverByIdentity.set(key, item);

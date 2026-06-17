@@ -6,24 +6,24 @@ import { STOCKY_COLORS } from '../../../theme/tokens';
 
 interface CreateMesaModalProps {
   visible: boolean;
-  isCreating: boolean;
+  isCreatingMesa: boolean;
   newTableNumber: string;
   mesaPreviewName: string;
   isKeyboardVisible: boolean;
-  onClose: () => void;
-  onTableNumberChange: (value: string) => void;
-  onCreate: () => void;
+  onChangeNumber: (value: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
 }
 
 export function CreateMesaModal({
   visible,
-  isCreating,
+  isCreatingMesa,
   newTableNumber,
   mesaPreviewName,
   isKeyboardVisible,
-  onClose,
-  onTableNumberChange,
-  onCreate,
+  onChangeNumber,
+  onSubmit,
+  onCancel,
 }: CreateMesaModalProps) {
   return (
     <StockyModal
@@ -34,15 +34,11 @@ export function CreateMesaModal({
       centeredOffsetY={106}
       modalAnimationType="fade"
       onClose={() => {
-        if (!isCreating) onClose();
+        if (!isCreatingMesa) onCancel();
       }}
-      footer={(
+      footer={
         <View style={styles.footerRow}>
-          <Pressable
-            style={styles.cancelButton}
-            onPress={onClose}
-            disabled={isCreating}
-          >
+          <Pressable style={styles.cancelButton} onPress={onCancel} disabled={isCreatingMesa}>
             <Text style={styles.cancelText}>Cancelar</Text>
           </Pressable>
 
@@ -52,23 +48,23 @@ export function CreateMesaModal({
                 Keyboard.dismiss();
                 return;
               }
-              onCreate();
+              onSubmit();
             }}
-            disabled={isCreating}
+            disabled={isCreatingMesa}
             style={styles.primaryWrap}
           >
             <LinearGradient
-              colors={isCreating ? ['#7D8AA7', '#9CA3AF'] : ['#4F46E5', '#7C3AED']}
+              colors={isCreatingMesa ? ['#7D8AA7', '#9CA3AF'] : ['#4F46E5', '#7C3AED']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={[styles.primaryButton, isCreating && styles.disabled]}
+              style={[styles.primaryButton, isCreatingMesa && styles.disabled]}
             >
               <Ionicons name="add" size={16} color={STOCKY_COLORS.white} />
-              <Text style={styles.primaryText}>{isCreating ? 'Creando...' : 'Agregar'}</Text>
+              <Text style={styles.primaryText}>{isCreatingMesa ? 'Creando...' : 'Agregar'}</Text>
             </LinearGradient>
           </Pressable>
         </View>
-      )}
+      }
     >
       <View style={styles.body}>
         <View style={styles.heroCard}>
@@ -102,7 +98,7 @@ export function CreateMesaModal({
         <Ionicons name="pricetag-outline" size={18} color="#64748B" />
         <TextInput
           value={newTableNumber}
-          onChangeText={onTableNumberChange}
+          onChangeText={onChangeNumber}
           placeholder="Identificador de mesa"
           placeholderTextColor={STOCKY_COLORS.textMuted}
           style={styles.inputField}

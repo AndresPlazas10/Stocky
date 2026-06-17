@@ -10,13 +10,15 @@ interface SplitBillStepOneProps {
   onRemoveAccount: (accountId: number) => void;
 }
 
-export function SplitBillStepOne({ accounts, onAddAccount, onRemoveAccount }: SplitBillStepOneProps) {
+export function SplitBillStepOne({
+  accounts,
+  onAddAccount,
+  onRemoveAccount,
+}: SplitBillStepOneProps) {
   return (
     <>
       <Text style={styles.sectionTitle}>1. Configura cuentas</Text>
-      <Text style={styles.helper}>
-        Define cuántas cuentas pagarán esta orden.
-      </Text>
+      <Text style={styles.helper}>Define cuántas cuentas pagarán esta orden.</Text>
       <View style={styles.counterCard}>
         <Text style={styles.counterLabel}>Número de cuentas</Text>
         <View style={styles.counterRow}>
@@ -29,7 +31,10 @@ export function SplitBillStepOne({ accounts, onAddAccount, onRemoveAccount }: Sp
           </Pressable>
           <Text style={styles.counterValue}>{accounts.length}</Text>
           <Pressable
-            style={[styles.counterButton, accounts.length >= MAX_SUB_ACCOUNTS && styles.actionButtonDisabled]}
+            style={[
+              styles.counterButton,
+              accounts.length >= MAX_SUB_ACCOUNTS && styles.actionButtonDisabled,
+            ]}
             onPress={onAddAccount}
             disabled={accounts.length >= MAX_SUB_ACCOUNTS}
           >

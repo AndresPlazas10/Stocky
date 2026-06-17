@@ -56,10 +56,12 @@ export function ProductPickerModal({
       ) : null}
 
       {productCatalogFiltered.map((product) => {
-        const selected = productPickerRowIndex !== null && formItems[productPickerRowIndex]?.productoId === product.id;
-        const takenByOther = formItems.some((item, index) => (
-          index !== productPickerRowIndex && item.productoId === product.id
-        ));
+        const selected =
+          productPickerRowIndex !== null &&
+          formItems[productPickerRowIndex]?.productoId === product.id;
+        const takenByOther = formItems.some(
+          (item, index) => index !== productPickerRowIndex && item.productoId === product.id,
+        );
         return (
           <Pressable
             key={product.id}
@@ -71,10 +73,14 @@ export function ProductPickerModal({
             onPress={() => onSelectProduct(product.id)}
             disabled={takenByOther}
           >
-            <Text style={[styles.comboPickerItemTitle, selected && styles.comboPickerItemTitleSelected]}>
+            <Text
+              style={[styles.comboPickerItemTitle, selected && styles.comboPickerItemTitleSelected]}
+            >
               {product.name}
             </Text>
-            <Text style={[styles.comboPickerItemMeta, selected && styles.comboPickerItemMetaSelected]}>
+            <Text
+              style={[styles.comboPickerItemMeta, selected && styles.comboPickerItemMetaSelected]}
+            >
               {product.code || 'Sin código'} · Stock {product.stock}
               {takenByOther ? ' · Ya agregado' : ''}
             </Text>

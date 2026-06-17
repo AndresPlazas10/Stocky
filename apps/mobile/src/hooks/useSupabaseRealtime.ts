@@ -40,11 +40,14 @@ export function useSupabaseRealtime({
   schema = 'public',
 }: Options) {
   const onSubscribedRef = useRef(onSubscribed);
-  onSubscribedRef.current = onSubscribed;
   const onPollTickRef = useRef(onPollTick);
-  onPollTickRef.current = onPollTick;
   const onCleanupRef = useRef(onCleanup);
-  onCleanupRef.current = onCleanup;
+
+  useEffect(() => {
+    onSubscribedRef.current = onSubscribed;
+    onPollTickRef.current = onPollTick;
+    onCleanupRef.current = onCleanup;
+  }, [onSubscribed, onPollTick, onCleanup]);
 
   useEffect(() => {
     const normalizedBusinessId = String(businessId || '').trim();
@@ -72,7 +75,12 @@ export function useSupabaseRealtime({
     dbChannel = client.channel(channelId);
 
     for (const sub of tables) {
-      const filterConfig = { event, schema, table: sub.table, ...(sub.filter ? { filter: sub.filter } : {}) };
+      const filterConfig = {
+        event,
+        schema,
+        table: sub.table,
+        ...(sub.filter ? { filter: sub.filter } : {}),
+      };
       dbChannel = (dbChannel as any).on('postgres_changes', filterConfig, (payload: any) => {
         if (cancelled) return;
         sub.onEvent(payload);
@@ -89,10 +97,14 @@ export function useSupabaseRealtime({
       const broadcastChannelId = `private:mobile-${channelKey}-sync:${normalizedBusinessId}`;
       broadcastChannel = client.channel(broadcastChannelId);
       for (const be of broadcastEvents) {
-        broadcastChannel = broadcastChannel.on('broadcast', { event: be.event }, ({ payload }: any) => {
-          if (cancelled) return;
-          be.onPayload(payload);
-        });
+        broadcastChannel = broadcastChannel.on(
+          'broadcast',
+          { event: be.event },
+          ({ payload }: any) => {
+            if (cancelled) return;
+            be.onPayload(payload);
+          },
+        );
       }
       broadcastChannel.subscribe();
     }
@@ -110,5 +122,5 @@ export function useSupabaseRealtime({
       if (broadcastChannel) void client.removeChannel(broadcastChannel);
       onCleanupRef.current?.();
     };
-  }, [businessId, userId, channelKey, event, schema, pollIntervalMs]);
+  }, [broadcastEvents, businessId, channelKey, event, pollIntervalMs, schema, tables, userId]);
 }

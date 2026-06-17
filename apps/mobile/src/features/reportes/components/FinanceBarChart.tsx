@@ -5,14 +5,14 @@ import { reportesStyles as s } from '../reportesStyles';
 interface FinanceBarChartProps {
   data: {
     labels: string[];
-    datasets: Array<{
+    datasets: {
       data: number[];
-      colors?: Array<(opacity?: number) => string>;
-    }>;
+      colors?: ((opacity?: number) => string)[];
+    }[];
   };
   width: number;
   height: number;
-  chartConfig: Record<string, any>;
+  chartConfig: Record<string, unknown>;
 }
 
 export function FinanceBarChart({ data, width, height, chartConfig }: FinanceBarChartProps) {

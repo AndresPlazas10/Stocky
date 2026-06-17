@@ -33,7 +33,7 @@ async function post(route: string) {
 }
 
 export async function runApiSmokeChecks(): Promise<ApiCheckResult[]> {
-  const checks: Array<{ name: string; route: string; expectedVersion: 'v1' | 'v2' }> = [
+  const checks: { name: string; route: string; expectedVersion: 'v1' | 'v2' }[] = [
     {
       name: 'v2 open-close-table (mobile)',
       route: '/api/v2/open-close-table',

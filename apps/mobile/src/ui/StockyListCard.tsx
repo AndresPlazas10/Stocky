@@ -23,7 +23,9 @@ export function StockyListCard({ title, subtitle, meta, rightSlot, onPress }: Pr
       </View>
       <View style={styles.right}>
         {rightSlot}
-        {onPress ? <Ionicons name="chevron-forward" size={18} color={STOCKY_COLORS.textMuted} /> : null}
+        {onPress ? (
+          <Ionicons name="chevron-forward" size={18} color={STOCKY_COLORS.textMuted} />
+        ) : null}
       </View>
     </Component>
   );

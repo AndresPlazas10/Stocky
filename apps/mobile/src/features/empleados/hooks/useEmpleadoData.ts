@@ -117,8 +117,10 @@ export function useEmpleadoData({ businessId, source, userId }: UseEmpleadoDataP
   }, [businessId, source, userId]);
 
   useEffect(() => {
-    loadData();
-    checkManagePermission();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial de datos
+    void loadData();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial de datos
+    void checkManagePermission();
   }, [checkManagePermission, loadData]);
 
   const scheduleEmployeesRefresh = useCallback(() => {
@@ -133,7 +135,11 @@ export function useEmpleadoData({ businessId, source, userId }: UseEmpleadoDataP
     channelKey: 'empleados',
     businessId,
     tables: [
-      { table: 'employees', filter: `business_id=eq.${businessId}`, onEvent: scheduleEmployeesRefresh },
+      {
+        table: 'employees',
+        filter: `business_id=eq.${businessId}`,
+        onEvent: scheduleEmployeesRefresh,
+      },
     ],
     onSubscribed: scheduleEmployeesRefresh,
     onPollTick: scheduleEmployeesRefresh,

@@ -8,6 +8,6 @@ export const EXPO_CONFIG = {
   supabaseUrl: String(process.env.EXPO_PUBLIC_SUPABASE_URL || '').trim() || null,
   supabaseAnonKey: String(process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '').trim() || null,
   easProjectId: String(process.env.EXPO_PUBLIC_EAS_PROJECT_ID || '').trim() || null,
-  androidDownloadUrl: String(process.env.EXPO_PUBLIC_ANDROID_DOWNLOAD_URL || '').trim()
-    || defaultAndroidDownloadUrl,
+  androidDownloadUrl:
+    String(process.env.EXPO_PUBLIC_ANDROID_DOWNLOAD_URL || '').trim() || defaultAndroidDownloadUrl,
 };

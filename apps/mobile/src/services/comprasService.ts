@@ -1,4 +1,6 @@
+import type { PostgrestError } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../lib/supabase';
+import { normalizeNumber, normalizeReference, normalizeText } from '../utils/normalization';
 import type { SupabaseErrorLike } from '../types/errors';
 
 export type CompraSupplierRecord = {
@@ -69,25 +71,37 @@ export type FirstCompraDayOptions = {
 const DEFAULT_PURCHASE_CATALOG_CACHE_TTL_MS = 45_000;
 const DEFAULT_PURCHASE_HISTORY_CACHE_TTL_MS = 15_000;
 const DEFAULT_FIRST_COMPRA_DAY_CACHE_TTL_MS = 5 * 60_000;
-const purchaseProductsCacheByBusinessId = new Map<string, {
-  items: CompraProductRecord[];
-  cachedAt: number;
-}>();
-const purchaseSuppliersCacheByBusinessId = new Map<string, {
-  items: CompraSupplierRecord[];
-  cachedAt: number;
-}>();
+const purchaseProductsCacheByBusinessId = new Map<
+  string,
+  {
+    items: CompraProductRecord[];
+    cachedAt: number;
+  }
+>();
+const purchaseSuppliersCacheByBusinessId = new Map<
+  string,
+  {
+    items: CompraSupplierRecord[];
+    cachedAt: number;
+  }
+>();
 const purchaseProductsInFlightByBusinessId = new Map<string, Promise<CompraProductRecord[]>>();
 const purchaseSuppliersInFlightByBusinessId = new Map<string, Promise<CompraSupplierRecord[]>>();
-const purchaseHistoryCacheByKey = new Map<string, {
-  items: CompraRecord[];
-  cachedAt: number;
-}>();
+const purchaseHistoryCacheByKey = new Map<
+  string,
+  {
+    items: CompraRecord[];
+    cachedAt: number;
+  }
+>();
 const purchaseHistoryInFlightByKey = new Map<string, Promise<CompraRecord[]>>();
-const firstCompraDayCacheByBusinessId = new Map<string, {
-  dayKey: string | null;
-  cachedAt: number;
-}>();
+const firstCompraDayCacheByBusinessId = new Map<
+  string,
+  {
+    dayKey: string | null;
+    cachedAt: number;
+  }
+>();
 const firstCompraDayInFlightByBusinessId = new Map<string, Promise<string | null>>();
 let recentPurchasesFastRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
 let recentPurchasesRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
@@ -96,25 +110,8 @@ function buildPurchaseHistoryCacheKey(businessId: string, limit: number) {
   return `${normalizeBusinessId(businessId)}::${Math.max(1, Math.floor(Number(limit) || 0))}`;
 }
 
-function normalizeText(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
 function normalizeBusinessId(value: unknown): string {
   return String(value ?? '').trim();
-}
-
-function normalizeReference(value: unknown): string | null {
-  const normalized = normalizeText(value);
-  if (!normalized) return null;
-  const lower = normalized.toLowerCase();
-  if (lower === 'null' || lower === 'undefined') return null;
-  return normalized;
-}
-
-function normalizeNumber(value: unknown, fallback = 0): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function normalizePurchasePaymentMethod(value: unknown): string {
@@ -129,41 +126,45 @@ function normalizePurchasePaymentMethod(value: unknown): string {
 function isMissingCreatePurchaseRpcError(errorLike: SupabaseErrorLike) {
   const code = normalizeText(errorLike?.code);
   const message = normalizeText(errorLike?.message).toLowerCase();
-  return code === 'PGRST202'
-    || code === '42883'
-    || message.includes('create_purchase_complete');
+  return code === 'PGRST202' || code === '42883' || message.includes('create_purchase_complete');
 }
 
 function isMissingSupplierJoinRelationError(errorLike: SupabaseErrorLike) {
   const code = normalizeText(errorLike?.code).toUpperCase();
   const message = normalizeText(errorLike?.message).toLowerCase();
-  return code === 'PGRST200'
-    || message.includes('could not find a relationship')
-    || message.includes('relationship')
-    || message.includes('purchases_supplier_id_fkey');
+  return (
+    code === 'PGRST200' ||
+    message.includes('could not find a relationship') ||
+    message.includes('relationship') ||
+    message.includes('purchases_supplier_id_fkey')
+  );
 }
 
 function isMissingListRecentPurchasesRpcError(errorLike: SupabaseErrorLike) {
   const code = normalizeText(errorLike?.code).toUpperCase();
   const message = normalizeText(errorLike?.message).toLowerCase();
-  return code === 'PGRST202'
-    || code === '42883'
-    || message.includes('list_recent_purchases_with_supplier')
-    || message.includes('could not find the function')
-    || message.includes('schema cache');
+  return (
+    code === 'PGRST202' ||
+    code === '42883' ||
+    message.includes('list_recent_purchases_with_supplier') ||
+    message.includes('could not find the function') ||
+    message.includes('schema cache')
+  );
 }
 
 function isMissingListRecentPurchasesFastRpcError(errorLike: SupabaseErrorLike) {
   const code = normalizeText(errorLike?.code).toUpperCase();
   const message = normalizeText(errorLike?.message).toLowerCase();
-  return code === 'PGRST202'
-    || code === '42883'
-    || message.includes('list_recent_purchases_fast')
-    || message.includes('could not find the function')
-    || message.includes('schema cache');
+  return (
+    code === 'PGRST202' ||
+    code === '42883' ||
+    message.includes('list_recent_purchases_fast') ||
+    message.includes('could not find the function') ||
+    message.includes('schema cache')
+  );
 }
 
-function normalizeSupplier(row: any): CompraSupplierRecord {
+function normalizeSupplier(row: Record<string, unknown>): CompraSupplierRecord {
   return {
     id: normalizeText(row?.id),
     business_name: normalizeReference(row?.business_name),
@@ -171,7 +172,7 @@ function normalizeSupplier(row: any): CompraSupplierRecord {
   };
 }
 
-function normalizeProduct(row: any): CompraProductRecord {
+function normalizeProduct(row: Record<string, unknown>): CompraProductRecord {
   return {
     id: normalizeText(row?.id),
     name: normalizeText(row?.name) || 'Producto',
@@ -183,9 +184,15 @@ function normalizeProduct(row: any): CompraProductRecord {
   };
 }
 
-function normalizeCompra(row: any, supplierMap: Map<string, CompraSupplierRecord>): CompraRecord {
+function normalizeCompra(
+  row: Record<string, unknown>,
+  supplierMap: Map<string, CompraSupplierRecord>,
+): CompraRecord {
   const supplierId = normalizeReference(row?.supplier_id);
-  const embeddedSupplier = row?.supplier ? normalizeSupplier(row.supplier) : null;
+  const embeddedSupplier =
+    row.supplier && typeof row.supplier === 'object' && row.supplier !== null
+      ? normalizeSupplier(row.supplier as Record<string, unknown>)
+      : null;
   const supplier = embeddedSupplier || (supplierId ? supplierMap.get(supplierId) || null : null);
 
   return {
@@ -201,19 +208,27 @@ function normalizeCompra(row: any, supplierMap: Map<string, CompraSupplierRecord
   };
 }
 
-function normalizeCompraDetail(row: any): CompraDetailRecord {
+function normalizeCompraDetail(row: Record<string, unknown>): CompraDetailRecord {
+  const productRecord =
+    row.product && typeof row.product === 'object' && row.product !== null
+      ? (row.product as Record<string, unknown>)
+      : null;
+
   return {
     id: normalizeText(row?.id),
     purchase_id: normalizeText(row?.purchase_id),
     product_id: normalizeReference(row?.product_id),
     quantity: normalizeNumber(row?.quantity, 0),
     unit_cost: normalizeNumber(row?.unit_cost, 0),
-    subtotal: normalizeNumber(row?.subtotal, normalizeNumber(row?.quantity, 0) * normalizeNumber(row?.unit_cost, 0)),
-    product: row?.product
+    subtotal: normalizeNumber(
+      row?.subtotal,
+      normalizeNumber(row?.quantity, 0) * normalizeNumber(row?.unit_cost, 0),
+    ),
+    product: productRecord
       ? {
-          name: row.product.name ? String(row.product.name) : undefined,
-          code: row.product.code ? String(row.product.code) : undefined,
-          purchase_price: normalizeNumber(row.product.purchase_price, 0),
+          name: productRecord.name ? String(productRecord.name) : undefined,
+          code: productRecord.code ? String(productRecord.code) : undefined,
+          purchase_price: normalizeNumber(productRecord.purchase_price, 0),
         }
       : null,
   };
@@ -226,7 +241,9 @@ async function assertPurchasableProductsManageStock({
   businessId: string;
   cart: CompraCartItem[];
 }) {
-  const localBlocked = (Array.isArray(cart) ? cart : []).filter((item) => item?.manage_stock === false);
+  const localBlocked = (Array.isArray(cart) ? cart : []).filter(
+    (item) => item?.manage_stock === false,
+  );
   if (localBlocked.length > 0) {
     const sampleNames = localBlocked
       .map((item) => normalizeText(item?.product_name || item?.product_id))
@@ -237,12 +254,14 @@ async function assertPurchasableProductsManageStock({
     );
   }
 
-  const unknownIds = Array.from(new Set(
-    (Array.isArray(cart) ? cart : [])
-      .filter((item) => item?.manage_stock === undefined || item?.manage_stock === null)
-      .map((item) => normalizeText(item?.product_id))
-      .filter(Boolean),
-  ));
+  const unknownIds = Array.from(
+    new Set(
+      (Array.isArray(cart) ? cart : [])
+        .filter((item) => item?.manage_stock === undefined || item?.manage_stock === null)
+        .map((item) => normalizeText(item?.product_id))
+        .filter(Boolean),
+    ),
+  );
   if (unknownIds.length === 0) return;
 
   const client = getSupabaseClient();
@@ -253,7 +272,9 @@ async function assertPurchasableProductsManageStock({
     .in('id', unknownIds);
 
   if (error) throw error;
-  const byId = new Map((Array.isArray(data) ? data : []).map((row: any) => [String(row.id), row.manage_stock !== false]));
+  const byId = new Map(
+    (Array.isArray(data) ? data : []).map((row) => [String(row.id), row.manage_stock !== false]),
+  );
   const blocked = unknownIds.filter((id) => byId.get(id) === false);
   if (blocked.length > 0) {
     throw new Error('No puedes registrar compras de productos sin control de stock.');
@@ -306,16 +327,16 @@ async function createPurchaseLegacy({
     subtotal: Number(item.quantity || 0) * Number(item.unit_price || 0),
   }));
 
-  const detailsInsert = await client
-    .from('purchase_details')
-    .insert(detailRows);
+  const detailsInsert = await client.from('purchase_details').insert(detailRows);
 
   if (detailsInsert.error) {
     await client.from('purchases').delete().eq('id', purchaseId);
     throw detailsInsert.error;
   }
 
-  const productIds = Array.from(new Set(detailRows.map((row) => normalizeText(row.product_id)).filter(Boolean)));
+  const productIds = Array.from(
+    new Set(detailRows.map((row) => normalizeText(row.product_id)).filter(Boolean)),
+  );
   if (productIds.length > 0) {
     const productsResult = await client
       .from('products')
@@ -324,8 +345,15 @@ async function createPurchaseLegacy({
       .in('id', productIds);
 
     if (productsResult.error) throw productsResult.error;
-    const productById = new Map((Array.isArray(productsResult.data) ? productsResult.data : []).map((row: any) => [String(row.id), row]));
-    const cartByProductId = new Map((Array.isArray(cart) ? cart : []).map((item) => [item.product_id, item]));
+    const productById = new Map(
+      (Array.isArray(productsResult.data) ? productsResult.data : []).map((row) => [
+        String(row.id),
+        row,
+      ]),
+    );
+    const cartByProductId = new Map(
+      (Array.isArray(cart) ? cart : []).map((item) => [item.product_id, item]),
+    );
 
     const stockUpdates = productIds
       .map((productId) => {
@@ -335,7 +363,9 @@ async function createPurchaseLegacy({
 
         const currentStock = normalizeNumber(product.stock, 0);
         const shouldManageStock = product.manage_stock !== false;
-        const nextStock = shouldManageStock ? currentStock + Number(item.quantity || 0) : currentStock;
+        const nextStock = shouldManageStock
+          ? currentStock + Number(item.quantity || 0)
+          : currentStock;
 
         return client
           .from('products')
@@ -411,7 +441,7 @@ export async function listPurchaseProducts(
 
   if (!forceRefresh) {
     const cached = purchaseProductsCacheByBusinessId.get(normalizedBusinessId);
-    if (cached && (Date.now() - cached.cachedAt) <= ttlMs) return cached.items;
+    if (cached && Date.now() - cached.cachedAt <= ttlMs) return cached.items;
   }
 
   const inFlight = purchaseProductsInFlightByBusinessId.get(normalizedBusinessId);
@@ -458,7 +488,7 @@ export async function listPurchaseSuppliers(
 
   if (!forceRefresh) {
     const cached = purchaseSuppliersCacheByBusinessId.get(normalizedBusinessId);
-    if (cached && (Date.now() - cached.cachedAt) <= ttlMs) return cached.items;
+    if (cached && Date.now() - cached.cachedAt <= ttlMs) return cached.items;
   }
 
   const inFlight = purchaseSuppliersInFlightByBusinessId.get(normalizedBusinessId);
@@ -506,7 +536,7 @@ export async function listRecentCompras(
 
   if (!forceRefresh) {
     const cached = purchaseHistoryCacheByKey.get(cacheKey);
-    if (cached && (Date.now() - cached.cachedAt) <= ttlMs) return cached.items;
+    if (cached && Date.now() - cached.cachedAt <= ttlMs) return cached.items;
   }
 
   const inFlight = purchaseHistoryInFlightByKey.get(cacheKey);
@@ -516,9 +546,11 @@ export async function listRecentCompras(
     const client = getSupabaseClient();
     const cachedSuppliers = purchaseSuppliersCacheByBusinessId.get(normalizedBusinessId)?.items;
     let supplierMap = new Map<string, CompraSupplierRecord>(
-      (Array.isArray(cachedSuppliers) ? cachedSuppliers : []).map((supplier) => [supplier.id, supplier] as const),
+      (Array.isArray(cachedSuppliers) ? cachedSuppliers : []).map(
+        (supplier) => [supplier.id, supplier] as const,
+      ),
     );
-    let purchases: any[] = [];
+    let purchases: Record<string, unknown>[] = [];
     let loadedByRpc = false;
 
     if (recentPurchasesFastRpcCompatibility !== 'unsupported') {
@@ -558,7 +590,8 @@ export async function listRecentCompras(
     if (!loadedByRpc) {
       const enrichedPurchases = await client
         .from('purchases')
-        .select(`
+        .select(
+          `
           id,
           business_id,
           user_id,
@@ -572,7 +605,8 @@ export async function listRecentCompras(
             business_name,
             contact_name
           )
-        `)
+        `,
+        )
         .eq('business_id', normalizedBusinessId)
         .order('created_at', { ascending: false })
         .limit(normalizedLimit);
@@ -590,9 +624,13 @@ export async function listRecentCompras(
         if (fallbackPurchases.error) throw fallbackPurchases.error;
         purchases = Array.isArray(fallbackPurchases.data) ? fallbackPurchases.data : [];
 
-        const supplierIds = Array.from(new Set(
-          purchases.map((row: any) => normalizeReference(row?.supplier_id)).filter(Boolean) as string[],
-        ));
+        const supplierIds = Array.from(
+          new Set(
+            purchases
+              .map((row) => normalizeReference(row?.supplier_id))
+              .filter(Boolean) as string[],
+          ),
+        );
 
         if (supplierIds.length > 0) {
           const suppliersResult = await client
@@ -603,7 +641,7 @@ export async function listRecentCompras(
 
           if (suppliersResult.error) throw suppliersResult.error;
           supplierMap = new Map(
-            (Array.isArray(suppliersResult.data) ? suppliersResult.data : []).map((row: any) => {
+            (Array.isArray(suppliersResult.data) ? suppliersResult.data : []).map((row) => {
               const normalized = normalizeSupplier(row);
               return [normalized.id, normalized] as const;
             }),
@@ -614,7 +652,7 @@ export async function listRecentCompras(
       }
     }
 
-    const normalized = purchases.map((row: any) => normalizeCompra(row, supplierMap));
+    const normalized = purchases.map((row) => normalizeCompra(row, supplierMap));
     purchaseHistoryCacheByKey.set(cacheKey, {
       items: normalized,
       cachedAt: Date.now(),
@@ -644,51 +682,51 @@ export async function getFirstCompraDayKey(
 
   if (!forceRefresh) {
     const cached = firstCompraDayCacheByBusinessId.get(normalizedBusinessId);
-    if (cached && (Date.now() - cached.cachedAt) <= ttlMs) return cached.dayKey;
+    if (cached && Date.now() - cached.cachedAt <= ttlMs) return cached.dayKey;
   }
 
   const inFlight = firstCompraDayInFlightByBusinessId.get(normalizedBusinessId);
   if (inFlight) return inFlight;
 
   const request = (async () => {
-  const client = getSupabaseClient();
-  const { data, error } = await client
-    .from('purchases')
-    .select('created_at')
-    .eq('business_id', normalizedBusinessId)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('purchases')
+      .select('created_at')
+      .eq('business_id', normalizedBusinessId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
 
-  if (error) throw error;
+    if (error) throw error;
 
-  const rawDate = normalizeReference(data?.created_at);
-  if (!rawDate) {
+    const rawDate = normalizeReference(data?.created_at);
+    if (!rawDate) {
+      firstCompraDayCacheByBusinessId.set(normalizedBusinessId, {
+        dayKey: null,
+        cachedAt: Date.now(),
+      });
+      return null;
+    }
+
+    const parsed = new Date(rawDate);
+    if (Number.isNaN(parsed.getTime())) {
+      firstCompraDayCacheByBusinessId.set(normalizedBusinessId, {
+        dayKey: null,
+        cachedAt: Date.now(),
+      });
+      return null;
+    }
+
+    const year = parsed.getFullYear();
+    const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
+    const day = `${parsed.getDate()}`.padStart(2, '0');
+    const dayKey = `${year}-${month}-${day}`;
     firstCompraDayCacheByBusinessId.set(normalizedBusinessId, {
-      dayKey: null,
+      dayKey,
       cachedAt: Date.now(),
     });
-    return null;
-  }
-
-  const parsed = new Date(rawDate);
-  if (Number.isNaN(parsed.getTime())) {
-    firstCompraDayCacheByBusinessId.set(normalizedBusinessId, {
-      dayKey: null,
-      cachedAt: Date.now(),
-    });
-    return null;
-  }
-
-  const year = parsed.getFullYear();
-  const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
-  const day = `${parsed.getDate()}`.padStart(2, '0');
-  const dayKey = `${year}-${month}-${day}`;
-  firstCompraDayCacheByBusinessId.set(normalizedBusinessId, {
-    dayKey,
-    cachedAt: Date.now(),
-  });
-  return dayKey;
+    return dayKey;
   })();
 
   firstCompraDayInFlightByBusinessId.set(normalizedBusinessId, request);
@@ -704,7 +742,9 @@ export async function listCompraDetails(purchaseId: string): Promise<CompraDetai
   const client = getSupabaseClient();
   const { data, error } = await client
     .from('purchase_details')
-    .select('id,purchase_id,product_id,quantity,unit_cost,subtotal,product:products(name,code,purchase_price)')
+    .select(
+      'id,purchase_id,product_id,quantity,unit_cost,subtotal,product:products(name,code,purchase_price)',
+    )
     .eq('purchase_id', purchaseId)
     .order('id', { ascending: true });
 
@@ -744,13 +784,13 @@ export async function createCompraWithRpcFallback({
     unit_cost: Number(item.unit_price || 0),
   }));
   const total = cart.reduce(
-    (sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)),
+    (sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price || 0),
     0,
   );
 
   const client = getSupabaseClient();
-  let rpcData: any = null;
-  let rpcError: any = null;
+  let rpcData: unknown = null;
+  let rpcError: PostgrestError | null = null;
   ({ data: rpcData, error: rpcError } = await client.rpc('create_purchase_complete', {
     p_business_id: businessId,
     p_user_id: userId,
@@ -777,7 +817,9 @@ export async function createCompraWithRpcFallback({
     });
     purchaseId = normalizeReference(legacy.purchaseId);
   } else {
-    const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+    const row = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as
+      | Record<string, unknown>
+      | undefined;
     purchaseId = normalizeReference(row?.purchase_id);
   }
 
@@ -804,13 +846,16 @@ export async function deleteCompraWithStockFallback({
   if (detailsResult.error) throw detailsResult.error;
 
   const groupedMap = new Map<string, number>();
-  (Array.isArray(detailsResult.data) ? detailsResult.data : []).forEach((row: any) => {
+  (Array.isArray(detailsResult.data) ? detailsResult.data : []).forEach((row) => {
     const productId = normalizeReference(row?.product_id);
     const quantity = Number(row?.quantity || 0);
     if (!productId || quantity <= 0) return;
     groupedMap.set(productId, (groupedMap.get(productId) || 0) + quantity);
   });
-  const grouped = Array.from(groupedMap.entries()).map(([product_id, quantity]) => ({ product_id, quantity }));
+  const grouped = Array.from(groupedMap.entries()).map(([product_id, quantity]) => ({
+    product_id,
+    quantity,
+  }));
   const productIds = grouped.map((row) => row.product_id);
 
   let beforeMap = new Map<string, { stock: number; manage_stock: boolean }>();
@@ -823,7 +868,7 @@ export async function deleteCompraWithStockFallback({
 
     if (beforeResult.error) throw beforeResult.error;
     beforeMap = new Map(
-      (Array.isArray(beforeResult.data) ? beforeResult.data : []).map((row: any) => [
+      (Array.isArray(beforeResult.data) ? beforeResult.data : []).map((row) => [
         String(row.id),
         { stock: Number(row.stock || 0), manage_stock: row.manage_stock !== false },
       ]),
@@ -853,13 +898,15 @@ export async function deleteCompraWithStockFallback({
 
     if (afterResult.error) throw afterResult.error;
     const afterMap = new Map(
-      (Array.isArray(afterResult.data) ? afterResult.data : []).map((row: any) => [
+      (Array.isArray(afterResult.data) ? afterResult.data : []).map((row) => [
         String(row.id),
         { stock: Number(row.stock || 0), manage_stock: row.manage_stock !== false },
       ]),
     );
 
-    const managedGrouped = grouped.filter((row) => beforeMap.get(row.product_id)?.manage_stock !== false);
+    const managedGrouped = grouped.filter(
+      (row) => beforeMap.get(row.product_id)?.manage_stock !== false,
+    );
     const unchanged = managedGrouped.every((row) => {
       const before = beforeMap.get(row.product_id)?.stock;
       const after = afterMap.get(row.product_id)?.stock;

@@ -1,4 +1,7 @@
 import { getSupabaseClient } from '../../lib/supabase';
+import { normalizeText } from '../../utils/normalization';
+import { isMissingColumnError } from '../../utils/supabaseErrors';
+import type { SupabaseErrorLike } from '../../utils/supabaseErrors';
 
 type BusinessUpdatePayload = {
   name: string;
@@ -8,25 +11,12 @@ type BusinessUpdatePayload = {
   address?: string | null;
 };
 
-function normalizeText(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
 function normalizeNullable(value: unknown): string | null {
   const normalized = normalizeText(value);
   return normalized || null;
 }
 
-function isMissingColumnError(errorLike: any): boolean {
-  const message = String(errorLike?.message || '').toLowerCase();
-  const details = String(errorLike?.details || '').toLowerCase();
-  return (
-    message.includes('column')
-    && (message.includes('does not exist') || details.includes('does not exist') || message.includes('schema cache'))
-  );
-}
-
-function extractMissingColumnName(errorLike: any): string | null {
+function extractMissingColumnName(errorLike: SupabaseErrorLike): string | null {
   const haystack = `${String(errorLike?.message || '')} ${String(errorLike?.details || '')}`;
   const match = haystack.match(/column\s+"?([a-zA-Z_][a-zA-Z0-9_]*)"?/i);
   if (!match?.[1]) return null;
@@ -60,14 +50,11 @@ export async function updateConfiguracionBusinessProfile({
 
   const client = getSupabaseClient();
   let attempts = 0;
-  let lastError: any = null;
+  let lastError: SupabaseErrorLike | null = null;
 
   while (attempts < 5) {
     attempts += 1;
-    const { error } = await client
-      .from('businesses')
-      .update(data)
-      .eq('id', normalizedBusinessId);
+    const { error } = await client.from('businesses').update(data).eq('id', normalizedBusinessId);
 
     if (!error) return;
     lastError = error;
@@ -91,9 +78,9 @@ export async function updateConfiguracionBusinessProfile({
 
   if (fallback.error) {
     throw new Error(
-      fallback.error.message
-      || lastError?.message
-      || 'No se pudo actualizar la informacion del negocio.',
+      fallback.error.message ||
+        lastError?.message ||
+        'No se pudo actualizar la informacion del negocio.',
     );
   }
 }

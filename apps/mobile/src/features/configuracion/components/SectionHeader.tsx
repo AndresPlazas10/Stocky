@@ -11,7 +11,13 @@ interface SectionHeaderProps {
   onAction?: () => void;
 }
 
-export function SectionHeader({ icon, title, subtitle, actionLabel, onAction }: SectionHeaderProps) {
+export function SectionHeader({
+  icon,
+  title,
+  subtitle,
+  actionLabel,
+  onAction,
+}: SectionHeaderProps) {
   return (
     <LinearGradient
       colors={['#4F46E5', '#7C3AED']}

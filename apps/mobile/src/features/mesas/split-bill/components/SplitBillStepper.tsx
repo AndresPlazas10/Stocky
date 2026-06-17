@@ -16,10 +16,22 @@ export function SplitBillStepper({ currentStep }: SplitBillStepperProps) {
         const complete = currentStep > step.id;
         return (
           <View key={step.id} style={styles.stepperItem}>
-            <View style={[styles.stepperDot, active && styles.stepperDotActive, complete && styles.stepperDotComplete]}>
-              <Text style={[styles.stepperDotText, (active || complete) && styles.stepperDotTextActive]}>{step.id}</Text>
+            <View
+              style={[
+                styles.stepperDot,
+                active && styles.stepperDotActive,
+                complete && styles.stepperDotComplete,
+              ]}
+            >
+              <Text
+                style={[styles.stepperDotText, (active || complete) && styles.stepperDotTextActive]}
+              >
+                {step.id}
+              </Text>
             </View>
-            <Text style={[styles.stepperLabel, active && styles.stepperLabelActive]}>{step.label}</Text>
+            <Text style={[styles.stepperLabel, active && styles.stepperLabelActive]}>
+              {step.label}
+            </Text>
           </View>
         );
       })}

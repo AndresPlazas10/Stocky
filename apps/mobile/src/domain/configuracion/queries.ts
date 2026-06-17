@@ -1,5 +1,7 @@
 import { EXPO_CONFIG } from '../../config/env';
 import { getSupabaseClient } from '../../lib/supabase';
+import { normalizeText } from '../../utils/normalization';
+import { isMissingColumnError } from '../../utils/supabaseErrors';
 import type { ConfiguracionSnapshot } from './contracts';
 
 type Input = {
@@ -18,21 +20,10 @@ type BusinessDetails = {
   address: string | null;
 };
 
-function normalizeText(value: unknown) {
-  const raw = String(value ?? '').trim();
-  return raw || null;
-}
-
-function isMissingColumnError(errorLike: any) {
-  const message = String(errorLike?.message || '').toLowerCase();
-  const details = String(errorLike?.details || '').toLowerCase();
-  return (
-    message.includes('column')
-    && (message.includes('does not exist') || details.includes('does not exist'))
-  );
-}
-
-async function fetchBusinessDetails(businessId: string, fallbackBusinessName: string | null): Promise<BusinessDetails> {
+async function fetchBusinessDetails(
+  businessId: string,
+  fallbackBusinessName: string | null,
+): Promise<BusinessDetails> {
   const client = getSupabaseClient();
 
   const detailed = await client
@@ -44,10 +35,10 @@ async function fetchBusinessDetails(businessId: string, fallbackBusinessName: st
   if (!detailed.error) {
     return {
       name: normalizeText(detailed.data?.name) || fallbackBusinessName,
-      nit: normalizeText(detailed.data?.nit),
-      email: normalizeText(detailed.data?.email),
-      phone: normalizeText(detailed.data?.phone),
-      address: normalizeText(detailed.data?.address),
+      nit: normalizeText(detailed.data?.nit) || null,
+      email: normalizeText(detailed.data?.email) || null,
+      phone: normalizeText(detailed.data?.phone) || null,
+      address: normalizeText(detailed.data?.address) || null,
     };
   }
 

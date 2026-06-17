@@ -62,19 +62,19 @@ export function SupplierFormModal({
       modalAnimationType="fade"
       animationDurationMs={180}
       deferContent
-      deferFallback={(
+      deferFallback={
         <View style={styles.formDeferredFallback}>
           <ActivityIndicator color={STOCKY_COLORS.primary900} />
           <Text style={styles.formDeferredFallbackText}>Cargando formulario...</Text>
         </View>
-      )}
+      }
       bodyFlex
       sheetStyle={styles.supplierFormSheet}
       contentContainerStyle={styles.supplierFormContent}
       perfTag="proveedores.form_proveedor"
       onClose={onClose}
       hideCloseButton
-      headerSlot={(
+      headerSlot={
         <View style={styles.supplierFormHeader}>
           <LinearGradient
             colors={['#4F46E5', '#7C3AED']}
@@ -87,13 +87,17 @@ export function SupplierFormModal({
           <Text style={styles.supplierFormHeaderTitle}>
             {editingSupplier ? 'Editar Proveedor' : 'Nuevo Proveedor'}
           </Text>
-          <Pressable style={[styles.supplierFormHeaderClose, saving && styles.buttonDisabled]} onPress={onClose} disabled={saving}>
+          <Pressable
+            style={[styles.supplierFormHeaderClose, saving && styles.buttonDisabled]}
+            onPress={onClose}
+            disabled={saving}
+          >
             <Ionicons name="close" size={34} color="#111827" />
           </Pressable>
         </View>
-      )}
+      }
       footerStyle={styles.supplierFormFooter}
-      footer={(
+      footer={
         <View style={styles.supplierFormFooterRow}>
           <Pressable
             style={[styles.supplierFormCancelButton, saving && styles.buttonDisabled]}
@@ -109,11 +113,11 @@ export function SupplierFormModal({
           >
             {saving ? <ActivityIndicator size="small" color="#F5F3FF" /> : null}
             <Text style={styles.supplierFormSaveText}>
-              {saving ? 'Guardando...' : (editingSupplier ? 'Actualizar' : 'Guardar')}
+              {saving ? 'Guardando...' : editingSupplier ? 'Actualizar' : 'Guardar'}
             </Text>
           </Pressable>
         </View>
-      )}
+      }
     >
       <View style={styles.supplierFormFields}>
         {error ? (

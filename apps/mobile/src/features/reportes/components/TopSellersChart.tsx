@@ -5,11 +5,11 @@ import { reportesStyles as s } from '../reportesStyles';
 interface TopSellersChartProps {
   data: {
     labels: string[];
-    datasets: Array<{ data: number[] }>;
+    datasets: { data: number[] }[];
   };
   width: number;
   height: number;
-  chartConfig: Record<string, any>;
+  chartConfig: Record<string, unknown>;
 }
 
 export function TopSellersChart({ data, width, height, chartConfig }: TopSellersChartProps) {

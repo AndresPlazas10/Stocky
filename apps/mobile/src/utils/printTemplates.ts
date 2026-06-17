@@ -50,10 +50,10 @@ function formatPrice(value: number | null | undefined, includeCurrency = true) {
     const millions = integerPart.slice(0, -6);
     const remainder = integerPart.slice(-6);
     const formattedMillions = millions.replace(/\B(?=(\d{3})+(?!\d))/g, "'");
-    const formattedRemainder = remainder.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    const formattedRemainder = remainder.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     formattedInteger = `${formattedMillions}'${formattedRemainder}`;
   } else {
-    formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   }
 
   let formattedNumber = formattedInteger;
@@ -243,13 +243,17 @@ export function buildSaleReceiptHtml({
           <span class="item-price">Total</span>
         </div>
 
-        ${printableItems.map((item) => `
+        ${printableItems
+          .map(
+            (item) => `
           <div class="item">
             <div class="item-name">${getSaleDetailDisplayName(item)}</div>
             <div class="item-qty">x${Number(item?.quantity || 0)}</div>
             <div class="item-price">${formatPrice(item?.subtotal ?? (Number(item?.quantity || 0) * Number(item?.unit_price || 0) || 0))}</div>
           </div>
-        `).join('')}
+        `,
+          )
+          .join('')}
 
         <div class="total">
           <span>TOTAL:</span>
@@ -430,12 +434,16 @@ export function buildKitchenOrderHtml({
       <div class="separator"></div>
       
       <div class="items">
-        ${(Array.isArray(items) ? items : []).map((item) => `
+        ${(Array.isArray(items) ? items : [])
+          .map(
+            (item) => `
           <div class="item">
             <div class="item-name">${item?.products?.name || item?.combos?.nombre || 'Item'}</div>
             <div class="item-qty">x${Number(item?.quantity || 0)}</div>
           </div>
-        `).join('')}
+        `,
+          )
+          .join('')}
       </div>
       
       <div class="total">

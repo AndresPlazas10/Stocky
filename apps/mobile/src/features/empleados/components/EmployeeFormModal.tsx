@@ -39,7 +39,7 @@ export function EmployeeFormModal({
         onClose();
       }}
       hideCloseButton
-      headerSlot={(
+      headerSlot={
         <LinearGradient
           colors={['#EEF2FF', '#F5F3FF']}
           start={{ x: 0, y: 0 }}
@@ -66,9 +66,9 @@ export function EmployeeFormModal({
             <Ionicons name="close-circle-outline" size={22} color="#6B7280" />
           </Pressable>
         </LinearGradient>
-      )}
+      }
       footerStyle={s.employeeFormFooter}
-      footer={(
+      footer={
         <View style={s.employeeFormFooterRow}>
           <Pressable
             style={[s.employeeFormCancelButton, creating && s.buttonDisabled]}
@@ -88,12 +88,18 @@ export function EmployeeFormModal({
               end={{ x: 1, y: 0 }}
               style={s.employeeFormSaveButton}
             >
-              {creating ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="person-add-outline" size={17} color="#FFFFFF" />}
-              <Text style={s.employeeFormSaveText}>{creating ? 'Creando empleado...' : 'Crear Empleado'}</Text>
+              {creating ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="person-add-outline" size={17} color="#FFFFFF" />
+              )}
+              <Text style={s.employeeFormSaveText}>
+                {creating ? 'Creando empleado...' : 'Crear Empleado'}
+              </Text>
             </LinearGradient>
           </Pressable>
         </View>
-      )}
+      }
     >
       <View style={s.employeeFormFields}>
         <View style={s.fieldGroup}>
@@ -111,7 +117,9 @@ export function EmployeeFormModal({
           <Text style={s.inputLabel}>Usuario *</Text>
           <TextInput
             value={form.username}
-            onChangeText={(next) => onFormChange({ username: next.toLowerCase().replace(/\s+/g, '') })}
+            onChangeText={(next) =>
+              onFormChange({ username: next.toLowerCase().replace(/\s+/g, '') })
+            }
             placeholder="juan_perez"
             placeholderTextColor={STOCKY_COLORS.textMuted}
             style={s.input}
@@ -140,7 +148,9 @@ export function EmployeeFormModal({
         </View>
 
         {error ? (
-          <Text style={{ color: STOCKY_COLORS.errorText, fontSize: 12, fontWeight: '600' }}>{error}</Text>
+          <Text style={{ color: STOCKY_COLORS.errorText, fontSize: 12, fontWeight: '600' }}>
+            {error}
+          </Text>
         ) : null}
       </View>
     </StockyModal>

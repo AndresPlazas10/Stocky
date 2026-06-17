@@ -6,6 +6,7 @@ import {
   type ProveedorRecord,
   type SupplierTaxColumn,
 } from '../../../services/proveedoresService';
+import { getErrorMessage } from '../../../utils/error';
 import { normalizeRole, SUPPLIERS_PAGE_SIZE } from '../proveedoresUtils';
 
 interface UseProveedorDataParams {
@@ -70,7 +71,9 @@ export function useProveedorData({ businessId, source, userId }: UseProveedorDat
       setHasMoreSuppliers(result.suppliers.length === SUPPLIERS_PAGE_SIZE);
       setPage(1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo actualizar la lista de proveedores.');
+      setError(
+        err instanceof Error ? err.message : 'No se pudo actualizar la lista de proveedores.',
+      );
     } finally {
       setRefreshing(false);
     }
@@ -90,7 +93,12 @@ export function useProveedorData({ businessId, source, userId }: UseProveedorDat
       }
       setHasMoreSuppliers(result.suppliers.length === SUPPLIERS_PAGE_SIZE);
       setPage(1);
-    } catch {}
+    } catch (err) {
+      console.error(
+        '[Proveedores] error al refrescar proveedores silenciosamente:',
+        getErrorMessage(err),
+      );
+    }
   }, [businessId, taxColumn]);
 
   const loadMoreSuppliers = useCallback(async () => {
@@ -110,8 +118,9 @@ export function useProveedorData({ businessId, source, userId }: UseProveedorDat
       }
       setHasMoreSuppliers(result.suppliers.length === SUPPLIERS_PAGE_SIZE);
       setPage(nextPage);
-    } catch {}
-    finally {
+    } catch (err) {
+      console.error('[Proveedores] error al cargar más proveedores:', getErrorMessage(err));
+    } finally {
       setLoadingMore(false);
     }
   }, [businessId, hasMoreSuppliers, loadingMore, page, taxColumn]);
@@ -144,8 +153,10 @@ export function useProveedorData({ businessId, source, userId }: UseProveedorDat
   }, [businessId, source, userId]);
 
   useEffect(() => {
-    loadData();
-    checkManagePermission();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial de datos
+    void loadData();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial de datos
+    void checkManagePermission();
   }, [checkManagePermission, loadData]);
 
   const scheduleSuppliersRefresh = useCallback(() => {
@@ -160,7 +171,11 @@ export function useProveedorData({ businessId, source, userId }: UseProveedorDat
     channelKey: 'proveedores',
     businessId,
     tables: [
-      { table: 'suppliers', filter: `business_id=eq.${businessId}`, onEvent: scheduleSuppliersRefresh },
+      {
+        table: 'suppliers',
+        filter: `business_id=eq.${businessId}`,
+        onEvent: scheduleSuppliersRefresh,
+      },
     ],
     onSubscribed: scheduleSuppliersRefresh,
     onPollTick: scheduleSuppliersRefresh,

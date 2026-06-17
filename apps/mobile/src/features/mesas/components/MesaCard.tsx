@@ -3,47 +3,42 @@ import { BlurView } from 'expo-blur';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { StatusPill } from './StatusPill';
+import { MESA_IN_USE_MESSAGE, mesaDisplayName } from '../utils/mesaHelpers';
+import type { MesaRecord } from '../../../services/mesasService';
 
 interface MesaCardProps {
-  mesaId: string;
-  displayName: string;
+  mesa: MesaRecord;
   occupied: boolean;
-  isBusy: boolean;
   lockedByOther: boolean;
-  total: number;
-  productsCount: number;
-  canDelete: boolean;
-  lockMessage: string;
-  onPress: () => void;
-  onDelete: () => void;
+  isBusy?: boolean;
+  total?: number;
+  productsCount?: number;
+  onPress: (mesa: MesaRecord) => void;
+  onDeletePress?: (mesa: MesaRecord) => void;
 }
 
 export function MesaCard({
-  mesaId,
-  displayName,
+  mesa,
   occupied,
-  isBusy,
   lockedByOther,
-  total,
-  productsCount,
-  canDelete,
-  lockMessage,
+  isBusy = false,
+  total = 0,
+  productsCount = 0,
   onPress,
-  onDelete,
+  onDeletePress,
 }: MesaCardProps) {
   return (
     <Pressable
-      key={mesaId}
       style={[styles.card, occupied && styles.cardOccupied, lockedByOther && styles.cardLocked]}
       disabled={isBusy}
-      onPress={onPress}
+      onPress={() => onPress(mesa)}
     >
-      {canDelete ? (
+      {onDeletePress ? (
         <Pressable
           style={styles.deleteButton}
           onPress={(event) => {
             event.stopPropagation?.();
-            onDelete();
+            onDeletePress(mesa);
           }}
           hitSlop={8}
           disabled={isBusy}
@@ -56,13 +51,17 @@ export function MesaCard({
         <Ionicons name="layers-outline" size={54} color={occupied ? '#CA8A04' : '#00A63E'} />
       </View>
 
-      <Text style={styles.title}>{displayName}</Text>
+      <Text style={styles.title}>{mesaDisplayName(mesa)}</Text>
+
       {!lockedByOther ? <StatusPill occupied={occupied} lockedByOther={lockedByOther} /> : null}
+
       {occupied && !lockedByOther ? (
         <View style={styles.occupiedSummary}>
           <View style={styles.divider} />
           <StockyMoneyText value={total} style={styles.metaTotal} />
-          <Text style={styles.metaProducts}>{productsCount} {productsCount === 1 ? 'producto' : 'productos'}</Text>
+          <Text style={styles.metaProducts}>
+            {productsCount} {productsCount === 1 ? 'producto' : 'productos'}
+          </Text>
         </View>
       ) : null}
 
@@ -79,7 +78,7 @@ export function MesaCard({
             />
           )}
           <View style={styles.lockScrim} />
-          <Text style={styles.lockText}>{lockMessage}</Text>
+          <Text style={styles.lockText}>{MESA_IN_USE_MESSAGE}</Text>
         </View>
       ) : null}
     </Pressable>
@@ -88,90 +87,103 @@ export function MesaCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    alignItems: 'center',
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    width: '48%',
-    position: 'relative',
-    overflow: 'hidden',
+    borderColor: '#DCE2E8',
+    backgroundColor: '#F5FAF7',
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    gap: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#111827',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 4,
   },
   cardOccupied: {
-    borderColor: '#FCD34D',
+    backgroundColor: '#F7F9F3',
   },
   cardLocked: {
-    borderColor: '#FDBA74',
+    borderColor: '#F59E0B',
+    backgroundColor: 'rgba(255, 248, 235, 0.66)',
   },
   deleteButton: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 10,
+    right: 10,
     zIndex: 2,
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     borderRadius: 10,
-    backgroundColor: 'rgba(243,244,246,0.9)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconShell: {
-    marginBottom: 10,
-    paddingTop: 8,
+    width: 98,
+    height: 98,
+    borderRadius: 24,
+    backgroundColor: '#DDF5E7',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   iconShellOccupied: {
-    opacity: 0.9,
+    backgroundColor: '#F5EDBF',
   },
   title: {
-    fontSize: 18,
+    color: '#0F172A',
+    fontSize: 20,
+    lineHeight: 26,
     fontWeight: '800',
-    color: '#111827',
-    marginBottom: 6,
     textAlign: 'center',
   },
   occupiedSummary: {
     width: '100%',
-    marginTop: 8,
+    marginTop: 2,
     alignItems: 'center',
+    gap: 4,
   },
   divider: {
-    height: 1,
     width: '100%',
+    height: 1,
     backgroundColor: '#E5E7EB',
     marginBottom: 8,
   },
   metaTotal: {
-    fontSize: 16,
-    fontWeight: '800',
+    color: '#111827',
+    fontSize: 22,
+    lineHeight: 30,
+    fontWeight: '700',
   },
   metaProducts: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginTop: 2,
+    color: '#374151',
+    fontSize: 14,
+    fontWeight: '500',
   },
   lockOverlay: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: 'hidden',
-    justifyContent: 'center',
     alignItems: 'center',
-  },
-  lockScrimStrong: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(226,232,240,0.92)',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
   },
   lockScrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.24)',
+  },
+  lockScrimStrong: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
   },
   lockText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#7C2D12',
+    color: '#9A3412',
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '700',
     textAlign: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     zIndex: 1,
   },
 });

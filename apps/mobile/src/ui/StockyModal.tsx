@@ -58,9 +58,7 @@ function scaleModalHeightValue<T>(value: T): T {
   if (typeof value === 'string' && value.trim().endsWith('%')) {
     const parsedValue = Number.parseFloat(value);
     if (Number.isFinite(parsedValue)) {
-      const scaled = (parsedValue * MODAL_HEIGHT_REDUCTION_FACTOR)
-        .toFixed(2)
-        .replace(/\.?0+$/, '');
+      const scaled = (parsedValue * MODAL_HEIGHT_REDUCTION_FACTOR).toFixed(2).replace(/\.?0+$/, '');
       return `${scaled}%` as T;
     }
   }
@@ -113,22 +111,25 @@ export function StockyModal({
     () => (animationStyle === 'web' ? Easing.inOut(Easing.cubic) : Easing.in(Easing.cubic)),
     [animationStyle],
   );
-  const resolvedScaleFrom = typeof animationScaleFrom === 'number'
-    ? Math.min(1, Math.max(0.94, animationScaleFrom))
-    : (modalAnimationType === 'fade' ? 0.985 : 1);
+  const resolvedScaleFrom =
+    typeof animationScaleFrom === 'number'
+      ? Math.min(1, Math.max(0.94, animationScaleFrom))
+      : modalAnimationType === 'fade'
+        ? 0.985
+        : 1;
   const initialTranslateY = useMemo(() => {
     if (modalAnimationType === 'slide') return isCentered ? 24 : 32;
     if (modalAnimationType === 'fade') return isCentered ? 10 : 14;
     return 0;
   }, [isCentered, modalAnimationType]);
-  const appear = useRef(new Animated.Value(0)).current;
+  const [appear] = useState(() => new Animated.Value(0));
   const [renderVisible, setRenderVisible] = useState(visible);
   const visibilityAnimationIdRef = useRef(0);
   const modalOpenStartedAtRef = useRef(0);
   const openPaintLoggedRef = useRef(false);
   const contentReadyLoggedRef = useRef(false);
   const [contentReady, setContentReady] = useState(!deferContent);
-  const contentOpacity = useRef(new Animated.Value(deferContent ? 0 : 1)).current;
+  const [contentOpacity] = useState(() => new Animated.Value(deferContent ? 0 : 1));
   const shouldHideContent = deferContent && deferBehavior === 'hide';
   const shouldUnmountContent = deferContent && deferBehavior === 'unmount';
   const wrapperOpacity = shouldHideContent ? contentOpacity : 1;
@@ -136,7 +137,9 @@ export function StockyModal({
   const shouldFlexBody = typeof bodyFlex === 'boolean' ? bodyFlex : !isCentered;
   const wrapperLayoutStyle = shouldFlexBody ? styles.sheetBody : undefined;
   const sheetFlexStyle = shouldFlexBody
-    ? (isCentered ? styles.centeredSheetFlex : styles.sheetFlex)
+    ? isCentered
+      ? styles.centeredSheetFlex
+      : styles.sheetFlex
     : undefined;
   const adjustedSheetStyle = useMemo(() => {
     const flattened = StyleSheet.flatten(sheetStyle);
@@ -159,7 +162,7 @@ export function StockyModal({
 
   useEffect(() => {
     if (!visible) return;
-    setRenderVisible(true);
+    setRenderVisible(true); // eslint-disable-line react-hooks/set-state-in-effect -- control interno de visibilidad del modal
     modalOpenStartedAtRef.current = Date.now();
     openPaintLoggedRef.current = false;
     contentReadyLoggedRef.current = false;
@@ -171,7 +174,16 @@ export function StockyModal({
       deferContent,
       instantOpen,
     });
-  }, [visible, perfTag, title, modalAnimationType, layout, effectiveBackdrop, deferContent, instantOpen]);
+  }, [
+    visible,
+    perfTag,
+    title,
+    modalAnimationType,
+    layout,
+    effectiveBackdrop,
+    deferContent,
+    instantOpen,
+  ]);
 
   useEffect(() => {
     if (!renderVisible) return;
@@ -240,7 +252,7 @@ export function StockyModal({
 
   useEffect(() => {
     if (!deferContent || instantOpen) {
-      setContentReady(true);
+      setContentReady(true); // eslint-disable-line react-hooks/set-state-in-effect -- control interno de contenido diferido
       contentOpacity.setValue(1);
       return;
     }
@@ -283,7 +295,16 @@ export function StockyModal({
       cancelled = true;
       (handle as { cancel?: () => void }).cancel?.();
     };
-  }, [deferContent, instantOpen, renderVisible, visible, contentReady, contentOpacity, perfTag, title]);
+  }, [
+    deferContent,
+    instantOpen,
+    renderVisible,
+    visible,
+    contentReady,
+    contentOpacity,
+    perfTag,
+    title,
+  ]);
 
   const scrimOpacity = appear;
   const sheetOpacity = appear.interpolate({
@@ -391,7 +412,10 @@ export function StockyModal({
           </Animated.View>
 
           {entryEffect === 'blur' && Platform.OS === 'ios' ? (
-            <Animated.View pointerEvents="none" style={[styles.sheetBlurOverlay, { opacity: blurOverlayOpacity }]}>
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.sheetBlurOverlay, { opacity: blurOverlayOpacity }]}
+            >
               <BlurView
                 style={StyleSheet.absoluteFillObject}
                 tint="light"

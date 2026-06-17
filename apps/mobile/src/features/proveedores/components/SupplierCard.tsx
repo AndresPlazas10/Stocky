@@ -90,11 +90,17 @@ export const SupplierCard = memo(function SupplierCard({
         <>
           <View style={styles.divider} />
           <View style={styles.supplierActionsRow}>
-            <Pressable style={[styles.supplierEditButton, styles.supplierActionHalf]} onPress={() => onEdit(supplier)}>
+            <Pressable
+              style={[styles.supplierEditButton, styles.supplierActionHalf]}
+              onPress={() => onEdit(supplier)}
+            >
               <Ionicons name="create-outline" size={18} color="#DDE6FF" />
               <Text style={styles.supplierEditButtonText}>Editar</Text>
             </Pressable>
-            <Pressable style={[styles.supplierDeleteButton, styles.supplierActionHalf]} onPress={() => onDelete(supplier)}>
+            <Pressable
+              style={[styles.supplierDeleteButton, styles.supplierActionHalf]}
+              onPress={() => onDelete(supplier)}
+            >
               <Ionicons name="trash-outline" size={18} color="#FFE4E6" />
               <Text style={styles.supplierDeleteButtonText}>Eliminar</Text>
             </Pressable>

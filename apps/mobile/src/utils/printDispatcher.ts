@@ -1,8 +1,9 @@
 import * as Print from 'expo-print';
 import { buildSaleReceiptHtml } from '../utils/printTemplates';
+import { getErrorMessage } from '../utils/error';
 import { buildSaleEscPos, type SaleReceipt } from '../services/escposService';
 import { getSavedPrinter, printBytes } from '../services/bluetoothPrinterService';
-import { getThermalPaperWidthMm } from '../utils/printer';
+import { getThermalPaperWidthMm, isAutoCutEnabled } from '../utils/printer';
 import type { VentaDetailRecord, VentaRecord } from '../services/ventasService';
 
 function buildReceiptForEscPos(opts: {
@@ -28,9 +29,15 @@ function buildReceiptForEscPos(opts: {
   };
   const methodLabel = (m?: string | null) => {
     const map: Record<string, string> = {
-      cash: 'Efectivo', card: 'Tarjeta', transfer: 'Transferencia',
-      mixed: 'Mixto', nequi: 'Nequi', bancolombia: 'Bancolombia',
-      banco_bogota: 'Banco de Bogota', nu: 'Nu', davivienda: 'Davivienda',
+      cash: 'Efectivo',
+      card: 'Tarjeta',
+      transfer: 'Transferencia',
+      mixed: 'Mixto',
+      nequi: 'Nequi',
+      bancolombia: 'Bancolombia',
+      banco_bogota: 'Banco de Bogota',
+      nu: 'Nu',
+      davivienda: 'Davivienda',
     };
     return map[String(m || '')] || m || 'No especificado';
   };
@@ -94,10 +101,14 @@ export async function printSaleReceipt(
       businessName: opts?.businessName,
     });
     const paperWidthMm = await getThermalPaperWidthMm();
-    const escposData = buildSaleEscPos(receipt, paperWidthMm);
-    const ok = await printBytes(savedPrinter.address, escposData);
-    if (ok) return { ok: true };
-    return { ok: false, error: 'No se pudo enviar a la impresora. Verifica la conexion Bluetooth.' };
+    const autoCut = await isAutoCutEnabled();
+    const escposData = buildSaleEscPos(receipt, paperWidthMm, autoCut);
+    const result = await printBytes(savedPrinter.address, escposData);
+    if (result.ok) return { ok: true };
+    return {
+      ok: false,
+      error: result.error || 'No se pudo enviar a la impresora. Verifica la conexion Bluetooth.',
+    };
   }
 
   try {
@@ -112,7 +123,7 @@ export async function printSaleReceipt(
     });
     await Print.printAsync({ html });
     return { ok: true };
-  } catch (err: any) {
-    return { ok: false, error: err?.message || 'Error al imprimir.' };
+  } catch (err) {
+    return { ok: false, error: getErrorMessage(err) };
   }
 }

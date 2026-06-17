@@ -8,7 +8,11 @@ export function cleanText(value: string | null | undefined): string {
     .replace(/[^\x20-\x7E]/g, '');
 }
 
-export function buildSaleEscPos(receipt: SaleReceipt, paperWidthMm: number): Uint8Array {
+export function buildSaleEscPos(
+  receipt: SaleReceipt,
+  paperWidthMm: number,
+  autoCut = false,
+): Uint8Array {
   const columns = paperWidthMm <= 58 ? 32 : paperWidthMm <= 80 ? 48 : 64;
   const out = new ByteStream();
 
@@ -72,7 +76,12 @@ export function buildSaleEscPos(receipt: SaleReceipt, paperWidthMm: number): Uin
   const totals = receipt.totals;
   if (totals) {
     if (totals.voluntaryTip && totals.voluntaryTip > 0) {
-      twoColumns(out, 'Propina:', cleanText(totals.voluntaryTipText || String(totals.voluntaryTip)), columns);
+      twoColumns(
+        out,
+        'Propina:',
+        cleanText(totals.voluntaryTipText || String(totals.voluntaryTip)),
+        columns,
+      );
       feed(out, 1);
     }
 
@@ -101,16 +110,24 @@ export function buildSaleEscPos(receipt: SaleReceipt, paperWidthMm: number): Uin
   bold(out, false);
 
   align(out, 0);
-  feed(out, 3);
-  cmd(out, 0x1d, 0x56, 0x42, 0x00);
+  feed(out, 4);
+  // La PT-210 y muchas termicas portatiles de 58 mm no tienen cutter automatico.
+  // El comando GS V puede hacer que ignoren el trabajo o se queden esperando.
+  if (autoCut) {
+    cmd(out, 0x1d, 0x56, 0x42, 0x00);
+  }
 
   return out.toBytes();
 }
 
 class ByteStream {
   private chunks: number[] = [];
-  write(...bytes: number[]) { for (const b of bytes) this.chunks.push(b); }
-  toBytes(): Uint8Array { return new Uint8Array(this.chunks); }
+  write(...bytes: number[]) {
+    for (const b of bytes) this.chunks.push(b);
+  }
+  toBytes(): Uint8Array {
+    return new Uint8Array(this.chunks);
+  }
 }
 
 function cmd(out: ByteStream, ...bytes: number[]) {
@@ -151,7 +168,10 @@ function wrapText(text: string, width: number): string[] {
   const lines: string[] = [];
   let current = '';
   for (const word of words) {
-    if (!current) { current = word; continue; }
+    if (!current) {
+      current = word;
+      continue;
+    }
     if (current.length + word.length + 1 <= width) {
       current += ' ' + word;
     } else {
@@ -213,14 +233,14 @@ export interface SaleReceipt {
     dateText?: string;
     alignment?: 'left' | 'center' | 'right';
   };
-  metadata?: Array<{ label: string; value: string } | null>;
-  items?: Array<{
+  metadata?: ({ label: string; value: string } | null)[];
+  items?: ({
     name?: string;
     quantity?: number;
     unitPrice?: number;
     subtotal?: number;
     subtotalText?: string;
-  } | null>;
+  } | null)[];
   totals?: {
     subtotal?: number;
     subtotalText?: string;
@@ -241,10 +261,11 @@ export interface SaleReceipt {
 
 export function buildKitchenEscPos(opts: {
   mesaNumber: string | number;
-  items: Array<{ name: string; quantity: number }>;
+  items: { name: string; quantity: number }[];
   createdAt?: string;
   businessName?: string;
   paperWidthMm: number;
+  autoCut?: boolean;
 }): Uint8Array {
   const columns = opts.paperWidthMm <= 58 ? 32 : opts.paperWidthMm <= 80 ? 48 : 64;
   const out = new ByteStream();
@@ -305,7 +326,9 @@ export function buildKitchenEscPos(opts: {
   bold(out, false);
 
   align(out, 0);
-  feed(out, 3);
-  cmd(out, 0x1d, 0x56, 0x42, 0x00);
+  feed(out, 4);
+  if (opts.autoCut) {
+    cmd(out, 0x1d, 0x56, 0x42, 0x00);
+  }
   return out.toBytes();
 }

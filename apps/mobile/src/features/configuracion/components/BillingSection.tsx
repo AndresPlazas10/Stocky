@@ -27,14 +27,16 @@ export function BillingSection({ businessNameLabel, onOpenSiigo }: BillingSectio
             <Text style={styles.billingInfoTitle}>Estado actual del producto</Text>
           </View>
           <Text style={styles.billingInfoText}>
-            Stocky no emite facturas electrónicas DIAN desde el runtime de la app. {businessNameLabel}
-            {' '}debe gestionar su facturación oficial directamente en su proveedor autorizado.
+            Stocky no emite facturas electrónicas DIAN desde el runtime de la app.{' '}
+            {businessNameLabel} debe gestionar su facturación oficial directamente en su proveedor
+            autorizado.
           </Text>
         </View>
 
         <View style={styles.billingWarnBox}>
           <Text style={styles.billingWarnText}>
-            Los comprobantes generados en Stocky son informativos y no reemplazan la factura electrónica oficial.
+            Los comprobantes generados en Stocky son informativos y no reemplazan la factura
+            electrónica oficial.
           </Text>
         </View>
 

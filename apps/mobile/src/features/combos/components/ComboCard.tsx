@@ -13,7 +13,12 @@ type Props = {
   onDelete: (combo: ComboRecord) => void;
 };
 
-export const ComboCard = memo(function ComboCard({ combo, canManageCombos, onEdit, onDelete }: Props) {
+export const ComboCard = memo(function ComboCard({
+  combo,
+  canManageCombos,
+  onEdit,
+  onDelete,
+}: Props) {
   const status = normalizeStatus(combo.estado);
   const isActive = status === 'active';
 
@@ -22,14 +27,21 @@ export const ComboCard = memo(function ComboCard({ combo, canManageCombos, onEdi
       <View style={styles.comboHeader}>
         <View style={styles.comboNameRow}>
           <Ionicons name="layers-outline" size={24} color="#111827" />
-          <Text style={styles.comboTitle} numberOfLines={1}>{combo.nombre}</Text>
+          <Text style={styles.comboTitle} numberOfLines={1}>
+            {combo.nombre}
+          </Text>
         </View>
       </View>
 
       <View style={styles.comboTagRow}>
         <View style={[styles.statusBadge, isActive ? styles.statusActive : styles.statusInactive]}>
           {isActive ? <Ionicons name="checkmark" size={14} color="#067647" /> : null}
-          <Text style={[styles.statusBadgeText, isActive ? styles.statusActiveText : styles.statusInactiveText]}>
+          <Text
+            style={[
+              styles.statusBadgeText,
+              isActive ? styles.statusActiveText : styles.statusInactiveText,
+            ]}
+          >
             {formatComboStatusLabel(status)}
           </Text>
         </View>
@@ -75,12 +87,18 @@ export const ComboCard = memo(function ComboCard({ combo, canManageCombos, onEdi
         <>
           <View style={styles.divider} />
           <View style={styles.comboActionsRow}>
-            <Pressable style={[styles.comboEditButton, styles.comboActionHalf]} onPress={() => onEdit(combo)}>
+            <Pressable
+              style={[styles.comboEditButton, styles.comboActionHalf]}
+              onPress={() => onEdit(combo)}
+            >
               <Ionicons name="create-outline" size={18} color="#DDE6FF" />
               <Text style={styles.comboEditButtonText}>Editar</Text>
             </Pressable>
 
-            <Pressable style={[styles.comboDeleteButton, styles.comboActionHalf]} onPress={() => onDelete(combo)}>
+            <Pressable
+              style={[styles.comboDeleteButton, styles.comboActionHalf]}
+              onPress={() => onDelete(combo)}
+            >
               <Ionicons name="trash-outline" size={18} color="#FFE4E6" />
               <Text style={styles.comboDeleteButtonText}>Eliminar</Text>
             </Pressable>

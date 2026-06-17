@@ -38,7 +38,9 @@ export function EmpleadosPanel({ businessId, userId, source }: Props) {
           onInvite={form.openCreateModal}
         />
 
-        {(data.loading || data.refreshing) ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
+        {data.loading || data.refreshing ? (
+          <ActivityIndicator color={STOCKY_COLORS.primary900} />
+        ) : null}
 
         {data.loading ? (
           <View style={s.loadingBlock}>
@@ -64,14 +66,20 @@ export function EmpleadosPanel({ businessId, userId, source }: Props) {
             onEndReached={data.loadMoreEmployees}
             onEndReachedThreshold={0.3}
             ListEmptyComponent={<Text style={s.emptyText}>No hay empleados registrados.</Text>}
-            ListFooterComponent={data.hasMoreEmployees ? (
-              <View style={s.loadMoreWrap}>
-                <Text style={s.loadMoreHint}>Mostrando {data.employees.length} empleados</Text>
-                <StockyButton onPress={data.loadMoreEmployees} loading={data.loadingMore} variant="ghost">
-                  Cargar más empleados
-                </StockyButton>
-              </View>
-            ) : null}
+            ListFooterComponent={
+              data.hasMoreEmployees ? (
+                <View style={s.loadMoreWrap}>
+                  <Text style={s.loadMoreHint}>Mostrando {data.employees.length} empleados</Text>
+                  <StockyButton
+                    onPress={data.loadMoreEmployees}
+                    loading={data.loadingMore}
+                    variant="ghost"
+                  >
+                    Cargar más empleados
+                  </StockyButton>
+                </View>
+              ) : null
+            }
             windowSize={7}
             maxToRenderPerBatch={8}
             removeClippedSubviews={Platform.OS === 'android'}

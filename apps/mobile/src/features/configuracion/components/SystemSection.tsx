@@ -11,7 +11,11 @@ interface SystemSectionProps {
 export function SystemSection({ systemVersionLabel, systemStatusLabel }: SystemSectionProps) {
   return (
     <View style={styles.sectionCard}>
-      <SectionHeader icon="information-circle-outline" title="Información del Sistema" subtitle="Detalles técnicos" />
+      <SectionHeader
+        icon="information-circle-outline"
+        title="Información del Sistema"
+        subtitle="Detalles técnicos"
+      />
       <View style={styles.sectionBody}>
         <View style={[styles.systemItem, styles.systemInfoBlue]}>
           <View style={styles.systemTopRow}>

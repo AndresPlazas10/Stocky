@@ -25,7 +25,11 @@ export function UserSection({
 }: UserSectionProps) {
   return (
     <View style={styles.sectionCard}>
-      <SectionHeader icon="person-outline" title="Información del Usuario" subtitle="Datos de tu cuenta" />
+      <SectionHeader
+        icon="person-outline"
+        title="Información del Usuario"
+        subtitle="Datos de tu cuenta"
+      />
       <View style={styles.sectionBody}>
         <InfoItem icon="mail-outline" label="Email" value={userEmailLabel} />
         <InfoItem icon="shield-outline" label="ID de Usuario" value={userIdLabel} />

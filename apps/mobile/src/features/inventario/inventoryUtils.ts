@@ -1,4 +1,7 @@
-import type { InventoryProductRecord, InventorySupplierRecord } from '../../services/inventoryService';
+import type {
+  InventoryProductRecord,
+  InventorySupplierRecord,
+} from '../../services/inventoryService';
 
 export const INVENTORY_CATEGORY_OPTIONS = [
   'Platos',
@@ -12,7 +15,7 @@ export const INVENTORY_CATEGORY_OPTIONS = [
   'Otros',
 ];
 
-export const UNIT_OPTIONS: Array<{ value: string; label: string }> = [
+export const UNIT_OPTIONS: { value: string; label: string }[] = [
   { value: 'unit', label: 'Unidad' },
   { value: 'kg', label: 'Kilogramo' },
   { value: 'l', label: 'Litro' },
@@ -48,11 +51,15 @@ export const INITIAL_FORM: ProductFormState = {
 };
 
 export function normalizeRole(value: unknown): string {
-  return String(value || '').trim().toLowerCase();
+  return String(value || '')
+    .trim()
+    .toLowerCase();
 }
 
 export function parseMoneyText(value: string, fallback = 0): number {
-  const raw = String(value || '').trim().replace(/\s+/g, '');
+  const raw = String(value || '')
+    .trim()
+    .replace(/\s+/g, '');
   const normalized = (() => {
     if (!raw) return '';
     if (raw.includes(',')) {
@@ -82,7 +89,9 @@ export function formatInventoryDateTime(value: string | null): string {
   }).format(parsed);
 }
 
-export function getSupplierDisplayName(supplier: InventorySupplierRecord | null | undefined): string {
+export function getSupplierDisplayName(
+  supplier: InventorySupplierRecord | null | undefined,
+): string {
   if (!supplier) return 'Sin proveedor';
   return supplier.business_name || supplier.contact_name || 'Proveedor';
 }

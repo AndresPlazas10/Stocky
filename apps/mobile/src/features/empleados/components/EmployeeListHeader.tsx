@@ -9,7 +9,11 @@ interface EmployeeListHeaderProps {
   onInvite: () => void;
 }
 
-export function EmployeeListHeader({ canManageEmployees, checkingPermissions, onInvite }: EmployeeListHeaderProps) {
+export function EmployeeListHeader({
+  canManageEmployees,
+  checkingPermissions,
+  onInvite,
+}: EmployeeListHeaderProps) {
   return (
     <View style={s.heroCard}>
       <View style={s.heroTop}>
@@ -21,7 +25,10 @@ export function EmployeeListHeader({ canManageEmployees, checkingPermissions, on
       </View>
 
       <Pressable
-        style={[s.heroInviteButtonWrap, (!canManageEmployees || checkingPermissions) && s.buttonDisabled]}
+        style={[
+          s.heroInviteButtonWrap,
+          (!canManageEmployees || checkingPermissions) && s.buttonDisabled,
+        ]}
         onPress={onInvite}
         disabled={!canManageEmployees || checkingPermissions}
       >

@@ -9,7 +9,7 @@ type Props = {
 };
 
 export const ComboStatusSelector = memo(function ComboStatusSelector({ value, onChange }: Props) {
-  const options: Array<{ value: ComboStatusFilter; label: string }> = [
+  const options: { value: ComboStatusFilter; label: string }[] = [
     { value: 'all', label: 'Todos' },
     { value: 'active', label: 'Activos' },
     { value: 'inactive', label: 'Inactivos' },

@@ -1,4 +1,6 @@
 import { getSupabaseClient } from '../lib/supabase';
+import { normalizeNumber, normalizeReference, normalizeText } from '../utils/normalization';
+import { getErrorCode } from '../utils/error';
 import type { SupabaseErrorLike } from '../types/errors';
 
 export type InventorySupplierRecord = {
@@ -33,25 +35,9 @@ const suppliersInFlightByBusinessId = new Map<string, Promise<InventorySupplierR
 const rpcAvailabilityCache = new Map<string, boolean>();
 
 let inventoryProductsFastRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
-let inventoryProductsWithSupplierRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
+let inventoryProductsWithSupplierRpcCompatibility: 'unknown' | 'supported' | 'unsupported' =
+  'unknown';
 let inventoryProductsFastPagedRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
-
-function normalizeText(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
-function normalizeReference(value: unknown): string | null {
-  const normalized = normalizeText(value);
-  if (!normalized) return null;
-  const lowered = normalized.toLowerCase();
-  if (lowered === 'null' || lowered === 'undefined') return null;
-  return normalized;
-}
-
-function normalizeNumber(value: unknown, fallback = 0): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
 
 function parsePriceInput(value: unknown, fallback = 0): number {
   if (value === null || value === undefined) return fallback;
@@ -64,7 +50,7 @@ function parsePriceInput(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function normalizeSupplier(row: any): InventorySupplierRecord {
+function normalizeSupplier(row: Record<string, unknown>): InventorySupplierRecord {
   return {
     id: normalizeText(row?.id),
     business_name: normalizeReference(row?.business_name),
@@ -73,11 +59,14 @@ function normalizeSupplier(row: any): InventorySupplierRecord {
 }
 
 function normalizeProduct(
-  row: any,
+  row: Record<string, unknown>,
   supplierMap: Map<string, InventorySupplierRecord>,
 ): InventoryProductRecord {
   const supplierId = normalizeReference(row?.supplier_id);
-  const embeddedSupplier = row?.supplier ? normalizeSupplier(row.supplier) : null;
+  const embeddedSupplier =
+    row.supplier && typeof row.supplier === 'object' && row.supplier !== null
+      ? normalizeSupplier(row.supplier as Record<string, unknown>)
+      : null;
 
   return {
     id: normalizeText(row?.id),
@@ -102,49 +91,59 @@ function isMissingCreateProductRpcError(errorLike: SupabaseErrorLike): boolean {
   const code = normalizeText(errorLike?.code);
   const message = normalizeText(errorLike?.message).toLowerCase();
 
-  return code === 'PGRST202'
-    || code === '42883'
-    || message.includes('create_product_with_generated_code')
-    || message.includes('could not find the function');
+  return (
+    code === 'PGRST202' ||
+    code === '42883' ||
+    message.includes('create_product_with_generated_code') ||
+    message.includes('could not find the function')
+  );
 }
 
 function isMissingProductSupplierJoinRelationError(errorLike: SupabaseErrorLike): boolean {
   const code = normalizeText(errorLike?.code).toUpperCase();
   const message = normalizeText(errorLike?.message).toLowerCase();
-  return code === 'PGRST200'
-    || message.includes('could not find a relationship')
-    || message.includes('relationship')
-    || message.includes('products_supplier_id_fkey');
+  return (
+    code === 'PGRST200' ||
+    message.includes('could not find a relationship') ||
+    message.includes('relationship') ||
+    message.includes('products_supplier_id_fkey')
+  );
 }
 
 function isMissingListInventoryProductsWithSupplierRpcError(errorLike: SupabaseErrorLike): boolean {
   const code = normalizeText(errorLike?.code).toUpperCase();
   const message = normalizeText(errorLike?.message).toLowerCase();
-  return code === 'PGRST202'
-    || code === '42883'
-    || message.includes('list_inventory_products_with_supplier')
-    || message.includes('could not find the function')
-    || message.includes('schema cache');
+  return (
+    code === 'PGRST202' ||
+    code === '42883' ||
+    message.includes('list_inventory_products_with_supplier') ||
+    message.includes('could not find the function') ||
+    message.includes('schema cache')
+  );
 }
 
 function isMissingListInventoryProductsFastRpcError(errorLike: SupabaseErrorLike): boolean {
   const code = normalizeText(errorLike?.code).toUpperCase();
   const message = normalizeText(errorLike?.message).toLowerCase();
-  return code === 'PGRST202'
-    || code === '42883'
-    || message.includes('list_inventory_products_fast')
-    || message.includes('could not find the function')
-    || message.includes('schema cache');
+  return (
+    code === 'PGRST202' ||
+    code === '42883' ||
+    message.includes('list_inventory_products_fast') ||
+    message.includes('could not find the function') ||
+    message.includes('schema cache')
+  );
 }
 
 function isMissingListInventoryProductsFastPagedRpcError(errorLike: SupabaseErrorLike): boolean {
   const code = normalizeText(errorLike?.code).toUpperCase();
   const message = normalizeText(errorLike?.message).toLowerCase();
-  return code === 'PGRST202'
-    || code === '42883'
-    || message.includes('list_inventory_products_fast_paged')
-    || message.includes('could not find the function')
-    || message.includes('schema cache');
+  return (
+    code === 'PGRST202' ||
+    code === '42883' ||
+    message.includes('list_inventory_products_fast_paged') ||
+    message.includes('could not find the function') ||
+    message.includes('schema cache')
+  );
 }
 
 function buildFallbackProductCode(): string {
@@ -207,7 +206,7 @@ export async function listInventorySuppliers(
   const limit = Number.isFinite(options.limit) ? Number(options.limit) : null;
   if (limit === null) {
     const cached = suppliersCache.get(businessId);
-    if (cached && (Date.now() - cached.cachedAt) <= CACHE_TTL_MS) return cached.items;
+    if (cached && Date.now() - cached.cachedAt <= CACHE_TTL_MS) return cached.items;
     const inFlight = suppliersInFlightByBusinessId.get(businessId);
     if (inFlight) return inFlight;
   }
@@ -261,18 +260,23 @@ export async function listInventoryProducts(
 
   if (cacheable) {
     const cached = productsCache.get(businessId);
-    if (cached && (Date.now() - cached.cachedAt) <= CACHE_TTL_MS) return cached.items;
+    if (cached && Date.now() - cached.cachedAt <= CACHE_TTL_MS) return cached.items;
     const inFlight = productsInFlightByBusinessId.get(businessId);
     if (inFlight) return inFlight;
   }
 
   const client = getSupabaseClient();
   const offset = Number.isFinite(options.offset) ? Number(options.offset) : 0;
-  const baseSelect = 'id,business_id,code,name,category,purchase_price,sale_price,stock,min_stock,unit,supplier_id,is_active,manage_stock,created_at';
+  const baseSelect =
+    'id,business_id,code,name,category,purchase_price,sale_price,stock,min_stock,unit,supplier_id,is_active,manage_stock,created_at';
 
   const fetchItems = async (): Promise<InventoryProductRecord[]> => {
     if (!includeSuppliers) {
-      if (!usePaging && inventoryProductsFastRpcCompatibility !== 'unsupported' && rpcAvailabilityCache.get('list_inventory_products_fast') !== false) {
+      if (
+        !usePaging &&
+        inventoryProductsFastRpcCompatibility !== 'unsupported' &&
+        rpcAvailabilityCache.get('list_inventory_products_fast') !== false
+      ) {
         const fastRpcResult = await client.rpc('list_inventory_products_fast', {
           p_business_id: businessId,
           p_active_only: options.activeOnly === true,
@@ -282,7 +286,9 @@ export async function listInventoryProducts(
           rpcAvailabilityCache.set('list_inventory_products_fast', true);
           inventoryProductsFastRpcCompatibility = 'supported';
           const rows = Array.isArray(fastRpcResult.data) ? fastRpcResult.data : [];
-          return rows.map((row: any) => normalizeProduct(row, new Map<string, InventorySupplierRecord>()));
+          return rows.map((row) =>
+            normalizeProduct(row, new Map<string, InventorySupplierRecord>()),
+          );
         }
 
         if (isMissingListInventoryProductsFastRpcError(fastRpcResult.error)) {
@@ -293,7 +299,11 @@ export async function listInventoryProducts(
         }
       }
 
-      if (usePaging && inventoryProductsFastPagedRpcCompatibility !== 'unsupported' && rpcAvailabilityCache.get('list_inventory_products_fast_paged') !== false) {
+      if (
+        usePaging &&
+        inventoryProductsFastPagedRpcCompatibility !== 'unsupported' &&
+        rpcAvailabilityCache.get('list_inventory_products_fast_paged') !== false
+      ) {
         const pagedRpcResult = await client.rpc('list_inventory_products_fast_paged', {
           p_business_id: businessId,
           p_active_only: options.activeOnly === true,
@@ -305,7 +315,9 @@ export async function listInventoryProducts(
           rpcAvailabilityCache.set('list_inventory_products_fast_paged', true);
           inventoryProductsFastPagedRpcCompatibility = 'supported';
           const rows = Array.isArray(pagedRpcResult.data) ? pagedRpcResult.data : [];
-          return rows.map((row: any) => normalizeProduct(row, new Map<string, InventorySupplierRecord>()));
+          return rows.map((row) =>
+            normalizeProduct(row, new Map<string, InventorySupplierRecord>()),
+          );
         }
 
         if (isMissingListInventoryProductsFastPagedRpcError(pagedRpcResult.error)) {
@@ -332,10 +344,16 @@ export async function listInventoryProducts(
       const { data, error } = await query;
       if (error) throw error;
       const products = Array.isArray(data) ? data : [];
-      return products.map((row: any) => normalizeProduct(row, new Map<string, InventorySupplierRecord>()));
+      return products.map((row) =>
+        normalizeProduct(row, new Map<string, InventorySupplierRecord>()),
+      );
     }
 
-    if (!usePaging && inventoryProductsWithSupplierRpcCompatibility !== 'unsupported' && rpcAvailabilityCache.get('list_inventory_products_with_supplier') !== false) {
+    if (
+      !usePaging &&
+      inventoryProductsWithSupplierRpcCompatibility !== 'unsupported' &&
+      rpcAvailabilityCache.get('list_inventory_products_with_supplier') !== false
+    ) {
       const rpcResult = await client.rpc('list_inventory_products_with_supplier', {
         p_business_id: businessId,
         p_active_only: options.activeOnly === true,
@@ -345,7 +363,9 @@ export async function listInventoryProducts(
         rpcAvailabilityCache.set('list_inventory_products_with_supplier', true);
         inventoryProductsWithSupplierRpcCompatibility = 'supported';
         const rpcRows = Array.isArray(rpcResult.data) ? rpcResult.data : [];
-        return rpcRows.map((row: any) => normalizeProduct(row, new Map<string, InventorySupplierRecord>()));
+        return rpcRows.map((row) =>
+          normalizeProduct(row, new Map<string, InventorySupplierRecord>()),
+        );
       }
 
       if (isMissingListInventoryProductsWithSupplierRpcError(rpcResult.error)) {
@@ -358,14 +378,16 @@ export async function listInventoryProducts(
 
     let withEmbeddedSuppliersQuery = client
       .from('products')
-      .select(`
+      .select(
+        `
         ${baseSelect},
         supplier:suppliers!products_supplier_id_fkey (
           id,
           business_name,
           contact_name
         )
-      `)
+      `,
+      )
       .eq('business_id', businessId)
       .order('created_at', { ascending: false });
     if (options.activeOnly) {
@@ -377,9 +399,14 @@ export async function listInventoryProducts(
     const withEmbeddedSuppliers = await withEmbeddedSuppliersQuery;
 
     if (!withEmbeddedSuppliers.error) {
-      const enrichedRows = Array.isArray(withEmbeddedSuppliers.data) ? withEmbeddedSuppliers.data : [];
-      return enrichedRows.map((row: any) => {
-        const supplier = row?.supplier ? normalizeSupplier(row.supplier) : null;
+      const enrichedRows = Array.isArray(withEmbeddedSuppliers.data)
+        ? withEmbeddedSuppliers.data
+        : [];
+      return enrichedRows.map((row) => {
+        const supplier =
+          row.supplier && typeof row.supplier === 'object' && row.supplier !== null
+            ? normalizeSupplier(row.supplier as unknown as Record<string, unknown>)
+            : null;
         const supplierMap = new Map<string, InventorySupplierRecord>();
         if (supplier?.id) supplierMap.set(supplier.id, supplier);
         return normalizeProduct(row, supplierMap);
@@ -406,9 +433,11 @@ export async function listInventoryProducts(
     const products = Array.isArray(fallbackProducts.data) ? fallbackProducts.data : [];
 
     const supplierMap = new Map<string, InventorySupplierRecord>();
-    const supplierIds = Array.from(new Set(
-      products.map((row: any) => normalizeReference(row?.supplier_id)).filter(Boolean) as string[],
-    ));
+    const supplierIds = Array.from(
+      new Set(
+        products.map((row) => normalizeReference(row?.supplier_id)).filter(Boolean) as string[],
+      ),
+    );
     if (supplierIds.length > 0) {
       const suppliersResult = await client
         .from('suppliers')
@@ -417,13 +446,13 @@ export async function listInventoryProducts(
         .in('id', supplierIds);
 
       if (suppliersResult.error) throw suppliersResult.error;
-      (Array.isArray(suppliersResult.data) ? suppliersResult.data : []).forEach((row: any) => {
+      (Array.isArray(suppliersResult.data) ? suppliersResult.data : []).forEach((row) => {
         const supplier = normalizeSupplier(row);
         supplierMap.set(supplier.id, supplier);
       });
     }
 
-    return products.map((row: any) => normalizeProduct(row, supplierMap));
+    return products.map((row) => normalizeProduct(row, supplierMap));
   };
 
   if (!cacheable) return fetchItems();
@@ -621,7 +650,15 @@ export async function checkInventoryProductCanDelete(productId: string): Promise
     p_product_id: productId,
   });
   if (error) throw new Error(error.message || 'No se pudo verificar el producto.');
-  return (data as any) || { has_sales: false, has_purchases: false, sales_count: 0, purchases_count: 0 };
+  const fallback = { has_sales: false, has_purchases: false, sales_count: 0, purchases_count: 0 };
+  if (!data || typeof data !== 'object') return fallback;
+  const record = data as Record<string, unknown>;
+  return {
+    has_sales: record.has_sales !== false,
+    has_purchases: record.has_purchases !== false,
+    sales_count: normalizeNumber(record.sales_count, 0),
+    purchases_count: normalizeNumber(record.purchases_count, 0),
+  };
 }
 
 export async function deleteInventoryProductById({
@@ -639,8 +676,10 @@ export async function deleteInventoryProductById({
     .eq('business_id', businessId);
 
   if (error) {
-    const wrapped: Error & { code?: string } = new Error(error.message || 'No se pudo eliminar el producto.');
-    wrapped.code = normalizeReference((error as any)?.code) || undefined;
+    const wrapped: Error & { code?: string } = new Error(
+      error.message || 'No se pudo eliminar el producto.',
+    );
+    wrapped.code = getErrorCode(error);
     throw wrapped;
   }
 

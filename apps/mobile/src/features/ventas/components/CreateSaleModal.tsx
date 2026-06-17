@@ -1,12 +1,20 @@
 import { memo, useCallback } from 'react';
-import { ActivityIndicator, Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Keyboard,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 import { StockyModal } from '../../../ui/StockyModal';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { PaymentMethodSelector } from '../../../ui/PaymentMethodSelector';
-import { formatCop } from '../../../services/mesasService';
+import { formatCop } from '../../../utils/money';
 import type { MesaOrderCatalogItem } from '../../../services/mesaOrderService';
 import type { VentaCartItem } from '../../../services/ventasService';
 import { getPaymentMethodLabel } from '../../../utils/paymentMethods';
@@ -26,14 +34,16 @@ const CartItemRow = memo(function CartItemRow({
   return (
     <View style={s.orderItemCard}>
       <View style={s.orderItemTopRow}>
-        <Text numberOfLines={1} style={s.orderItemName}>{item.name}</Text>
+        <Text numberOfLines={1} style={s.orderItemName}>
+          {item.name}
+        </Text>
         <StockyMoneyText value={Number(item.subtotal || 0)} style={s.orderItemTotal} />
       </View>
       <View style={s.orderItemMetaRow}>
         <View style={s.orderItemUnitChip}>
           <Text style={s.orderItemUnitChipText}>
-            <StockyMoneyText value={Number(item.unit_price || 0)} style={s.orderItemUnitChipText} />
-            {' '}por unidad
+            <StockyMoneyText value={Number(item.unit_price || 0)} style={s.orderItemUnitChipText} />{' '}
+            por unidad
           </Text>
         </View>
         <Text style={s.orderItemSubtotalLabel}>Subtotal</Text>
@@ -41,21 +51,36 @@ const CartItemRow = memo(function CartItemRow({
       <View style={s.orderItemDivider} />
       <View style={s.orderItemControlsRow}>
         <View style={s.orderItemStepper}>
-          <Pressable style={s.orderItemStepperButton} onPressIn={() => {
-            if (isKeyboardVisible) { Keyboard.dismiss(); return; }
-            onUpdateQuantity(item, Number(item.quantity || 0) - 1);
-          }}>
+          <Pressable
+            style={s.orderItemStepperButton}
+            onPressIn={() => {
+              if (isKeyboardVisible) {
+                Keyboard.dismiss();
+                return;
+              }
+              onUpdateQuantity(item, Number(item.quantity || 0) - 1);
+            }}
+          >
             <Text style={s.orderItemMinusText}>-</Text>
           </Pressable>
           <Text style={s.orderItemQtyText}>{item.quantity}</Text>
-          <Pressable style={s.orderItemStepperButton} onPressIn={() => {
-            if (isKeyboardVisible) { Keyboard.dismiss(); return; }
-            onUpdateQuantity(item, Number(item.quantity || 0) + 1);
-          }}>
+          <Pressable
+            style={s.orderItemStepperButton}
+            onPressIn={() => {
+              if (isKeyboardVisible) {
+                Keyboard.dismiss();
+                return;
+              }
+              onUpdateQuantity(item, Number(item.quantity || 0) + 1);
+            }}
+          >
             <Text style={s.orderItemPlusText}>+</Text>
           </Pressable>
         </View>
-        <Pressable style={[s.saleDeleteButton, s.saleActionHalf]} onPress={() => onUpdateQuantity(item, 0)}>
+        <Pressable
+          style={[s.saleDeleteButton, s.saleActionHalf]}
+          onPress={() => onUpdateQuantity(item, 0)}
+        >
           <Ionicons name="trash-outline" size={20} color="#2563EB" />
           <Text style={s.saleDeleteText}>Eliminar</Text>
         </Pressable>
@@ -114,7 +139,8 @@ export function CreateSaleModal({
   onClearCart,
   onSubmit,
 }: CreateSaleModalProps) {
-  const canSubmit = !submitting && cart.length > 0 && (paymentMethod !== 'cash' || cashChangeData?.isValid);
+  const canSubmit =
+    !submitting && cart.length > 0 && (paymentMethod !== 'cash' || cashChangeData?.isValid);
 
   const handleClose = useCallback(() => {
     if (submitting) return;
@@ -142,7 +168,7 @@ export function CreateSaleModal({
       perfTag="ventas.form_nueva_venta"
       onClose={handleClose}
       hideCloseButton
-      headerSlot={(
+      headerSlot={
         <View style={s.saleOrderModalHeader}>
           <LinearGradient
             colors={['#4F46E5', '#7C3AED']}
@@ -161,10 +187,10 @@ export function CreateSaleModal({
             <Ionicons name="close" size={34} color="#111827" />
           </Pressable>
         </View>
-      )}
+      }
       contentContainerStyle={s.saleOrderModalContent}
       footerStyle={s.saleOrderModalFooter}
-      footer={(
+      footer={
         <View style={s.saleOrderFooterContainer}>
           <View style={s.saleOrderFooterTotalBlock}>
             <Text style={s.saleOrderFooterTotalLabel}>Total a cobrar:</Text>
@@ -196,11 +222,13 @@ export function CreateSaleModal({
               }}
               disabled={!canSubmit}
             >
-              <Text style={s.saleOrderPrimaryButtonText}>{submitting ? 'Procesando...' : 'Confirmar venta'}</Text>
+              <Text style={s.saleOrderPrimaryButtonText}>
+                {submitting ? 'Procesando...' : 'Confirmar venta'}
+              </Text>
             </Pressable>
           </View>
         </View>
-      )}
+      }
     >
       <View style={s.catalogSearchHeader}>
         <Ionicons name="search-outline" size={24} color="#111827" />
@@ -219,7 +247,9 @@ export function CreateSaleModal({
         onBlur={() => onSearchFocusChange(false)}
       />
 
-      {loadingCatalog && hasCatalogQuery ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
+      {loadingCatalog && hasCatalogQuery ? (
+        <ActivityIndicator color={STOCKY_COLORS.primary900} />
+      ) : null}
 
       {!hasCatalogQuery ? (
         <Text style={s.emptyText}>Escribe para buscar productos o combos.</Text>
@@ -239,7 +269,10 @@ export function CreateSaleModal({
             {catalogFiltered.map((item, index) => (
               <Pressable
                 key={`${item.item_type}:${item.id}`}
-                style={[s.catalogResultRow, index < catalogFiltered.length - 1 && s.catalogResultRowDivider]}
+                style={[
+                  s.catalogResultRow,
+                  index < catalogFiltered.length - 1 && s.catalogResultRowDivider,
+                ]}
                 disabled={false}
                 onPress={() => {
                   if (isKeyboardVisible) {
@@ -251,7 +284,9 @@ export function CreateSaleModal({
                 }}
               >
                 <View style={s.catalogResultLeft}>
-                  <Text style={s.catalogResultName} numberOfLines={1}>{item.name}</Text>
+                  <Text style={s.catalogResultName} numberOfLines={1}>
+                    {item.name}
+                  </Text>
                   {item.item_type === 'combo' ? (
                     <View style={s.comboPill}>
                       <Text style={s.comboPillText}>Combo</Text>
@@ -259,7 +294,10 @@ export function CreateSaleModal({
                   ) : null}
                 </View>
                 <View style={s.catalogResultRight}>
-                  <StockyMoneyText value={Number(item.sale_price || 0)} style={s.catalogResultPrice} />
+                  <StockyMoneyText
+                    value={Number(item.sale_price || 0)}
+                    style={s.catalogResultPrice}
+                  />
                 </View>
               </Pressable>
             ))}
@@ -274,16 +312,16 @@ export function CreateSaleModal({
           <Text style={s.orderItemsEmptyText}>No hay items en esta venta</Text>
         </View>
       ) : null}
-      {cart.length > 0 ? (
-        cart.map((item) => (
-          <CartItemRow
-            key={cartReferenceKey(item)}
-            item={item}
-            isKeyboardVisible={isKeyboardVisible}
-            onUpdateQuantity={onUpdateCartQuantity}
-          />
-        ))
-      ) : null}
+      {cart.length > 0
+        ? cart.map((item) => (
+            <CartItemRow
+              key={cartReferenceKey(item)}
+              item={item}
+              isKeyboardVisible={isKeyboardVisible}
+              onUpdateQuantity={onUpdateCartQuantity}
+            />
+          ))
+        : null}
 
       <View style={s.salePaymentBlock}>
         <View style={s.salePaymentHeader}>

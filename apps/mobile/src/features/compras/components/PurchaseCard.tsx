@@ -34,7 +34,9 @@ export const PurchaseCard = memo(function PurchaseCard({
         <View style={s.saleInfoColumn}>
           <View style={s.saleMetaBlock}>
             <Text style={s.saleMetaLabel}>PROVEEDOR</Text>
-            <Text style={s.saleMetaValue} numberOfLines={1}>{supplierLabel}</Text>
+            <Text style={s.saleMetaValue} numberOfLines={1}>
+              {supplierLabel}
+            </Text>
           </View>
         </View>
 
@@ -43,11 +45,22 @@ export const PurchaseCard = memo(function PurchaseCard({
             <Ionicons name="wallet-outline" size={20} color="#111827" />
             <View style={s.paymentPill}>
               {isBankPaymentMethod(purchase.payment_method) ? (
-                <Image source={getBankLogoSource(purchase.payment_method)!} style={s.paymentIconLogo} resizeMode="contain" />
+                <Image
+                  source={getBankLogoSource(purchase.payment_method)!}
+                  style={s.paymentIconLogo}
+                  resizeMode="contain"
+                />
               ) : (
-                <Ionicons name={getPaymentMethodTheme(purchase.payment_method).icon} size={13} color="#166534" style={s.paymentIcon} />
+                <Ionicons
+                  name={getPaymentMethodTheme(purchase.payment_method).icon}
+                  size={13}
+                  color="#166534"
+                  style={s.paymentIcon}
+                />
               )}
-              <Text style={s.paymentPillText}>{getPaymentMethodLabel(purchase.payment_method)}</Text>
+              <Text style={s.paymentPillText}>
+                {getPaymentMethodLabel(purchase.payment_method)}
+              </Text>
             </View>
           </View>
           <View style={s.saleTotalBlock}>
@@ -58,7 +71,10 @@ export const PurchaseCard = memo(function PurchaseCard({
       </View>
 
       <View style={s.saleActionRow}>
-        <Pressable style={[s.saleDetailsButton, s.saleActionHalf]} onPress={() => onViewDetails(purchase)}>
+        <Pressable
+          style={[s.saleDetailsButton, s.saleActionHalf]}
+          onPress={() => onViewDetails(purchase)}
+        >
           <Ionicons name="eye-outline" size={20} color="#D1D5DB" />
           <Text style={s.saleDetailsText}>Ver Detalles</Text>
         </Pressable>

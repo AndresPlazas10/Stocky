@@ -1,6 +1,6 @@
 import type { ReportesPeriod } from '../../domain/reportes/contracts';
 
-export const PERIOD_OPTIONS: Array<{ value: ReportesPeriod; label: string }> = [
+export const PERIOD_OPTIONS: { value: ReportesPeriod; label: string }[] = [
   { value: 'today', label: 'Hoy' },
   { value: '7d', label: '7 dias' },
   { value: '30d', label: '30 dias' },

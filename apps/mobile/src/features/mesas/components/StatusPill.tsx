@@ -8,22 +8,22 @@ interface StatusPillProps {
 export function StatusPill({ occupied, lockedByOther }: StatusPillProps) {
   const locked = lockedByOther;
   return (
-    <View style={[
-      styles.pill,
-      locked ? styles.locked : (occupied ? styles.occupied : styles.available),
-    ]}
+    <View
+      style={[styles.pill, locked ? styles.locked : occupied ? styles.occupied : styles.available]}
     >
-      <View style={[
-        styles.dot,
-        locked ? styles.dotLocked : (occupied ? styles.dotOccupied : styles.dotAvailable),
-      ]}
+      <View
+        style={[
+          styles.dot,
+          locked ? styles.dotLocked : occupied ? styles.dotOccupied : styles.dotAvailable,
+        ]}
       />
-      <Text style={[
-        styles.text,
-        locked ? styles.textLocked : (occupied ? styles.textOccupied : styles.textAvailable),
-      ]}
+      <Text
+        style={[
+          styles.text,
+          locked ? styles.textLocked : occupied ? styles.textOccupied : styles.textAvailable,
+        ]}
       >
-        {locked ? 'En uso' : (occupied ? 'Ocupada' : 'Disponible')}
+        {locked ? 'En uso' : occupied ? 'Ocupada' : 'Disponible'}
       </Text>
     </View>
   );

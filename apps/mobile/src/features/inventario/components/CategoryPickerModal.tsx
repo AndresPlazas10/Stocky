@@ -32,7 +32,11 @@ export function CategoryPickerModal({ visible, selectedCategory, onSelect, onClo
             style={[styles.modalOptionItem, selected && styles.modalOptionItemSelected]}
             onPress={() => onSelect(category)}
           >
-            <Text style={[styles.modalOptionItemText, selected && styles.modalOptionItemTextSelected]}>{category}</Text>
+            <Text
+              style={[styles.modalOptionItemText, selected && styles.modalOptionItemTextSelected]}
+            >
+              {category}
+            </Text>
           </Pressable>
         );
       })}

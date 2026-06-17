@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   startOfDay,
   startOfMonth,
   formatDayKey,
   parseDayKey,
   clampDate,
-  capitalizeLabel,
   formatDayLabelFromKey,
   getRecordDayKey,
 } from '../../../utils/dateHelpers';
@@ -16,7 +15,7 @@ const PAGE_SIZE = 20;
 export function useCompraFilters(purchases: CompraRecord[], supplierNameById: Map<string, string>) {
   const [dayFilter, setDayFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [rawPage, setRawPage] = useState(1);
   const [dayCalendarMonth, setDayCalendarMonth] = useState<Date>(() => startOfMonth(new Date()));
   const [showDayFilterModal, setShowDayFilterModal] = useState(false);
   const [showSupplierFilterModal, setShowSupplierFilterModal] = useState(false);
@@ -38,6 +37,17 @@ export function useCompraFilters(purchases: CompraRecord[], supplierNameById: Ma
   const minSelectableDate = parseDayKey(minSelectableDayKey) || startOfDay(new Date());
   const maxSelectableDate = parseDayKey(maxSelectableDayKey) || startOfDay(new Date());
 
+  const effectiveDayFilter = useMemo(() => {
+    if (dayFilter === 'all') return 'all';
+    const selected = parseDayKey(dayFilter);
+    if (!selected) return 'all';
+    const minTs = startOfDay(minSelectableDate).getTime();
+    const maxTs = startOfDay(maxSelectableDate).getTime();
+    const selectedTs = startOfDay(selected).getTime();
+    if (selectedTs < minTs || selectedTs > maxTs) return 'all';
+    return dayFilter;
+  }, [dayFilter, maxSelectableDate, minSelectableDate]);
+
   const supplierOptions = useMemo(() => {
     const unique = Array.from(
       new Set(
@@ -57,17 +67,25 @@ export function useCompraFilters(purchases: CompraRecord[], supplierNameById: Ma
 
   const filteredPurchases = useMemo(() => {
     return purchases.filter((purchase) => {
-      if (dayFilter !== 'all' && getRecordDayKey(purchase.created_at) !== dayFilter) return false;
+      if (
+        effectiveDayFilter !== 'all' &&
+        getRecordDayKey(purchase.created_at) !== effectiveDayFilter
+      )
+        return false;
       if (supplierFilter !== 'all' && purchase.supplier_id !== supplierFilter) return false;
       return true;
     });
-  }, [dayFilter, purchases, supplierFilter]);
+  }, [effectiveDayFilter, purchases, supplierFilter]);
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredPurchases.length / PAGE_SIZE)), [filteredPurchases.length]);
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredPurchases.length / PAGE_SIZE)),
+    [filteredPurchases.length],
+  );
 
-  useEffect(() => {
-    setCurrentPage((prev) => Math.max(1, Math.min(prev, totalPages)));
-  }, [totalPages]);
+  const currentPage = useMemo(
+    () => Math.max(1, Math.min(rawPage, totalPages)),
+    [rawPage, totalPages],
+  );
 
   const paginatedPurchases = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
@@ -86,7 +104,9 @@ export function useCompraFilters(purchases: CompraRecord[], supplierNameById: Ma
 
   const selectedDayLabel = useMemo(() => formatDayLabelFromKey(dayFilter), [dayFilter]);
   const selectedSupplierLabel = useMemo(
-    () => supplierOptions.find((option) => option.value === supplierFilter)?.label || 'Todos los proveedores',
+    () =>
+      supplierOptions.find((option) => option.value === supplierFilter)?.label ||
+      'Todos los proveedores',
     [supplierFilter, supplierOptions],
   );
 
@@ -101,24 +121,8 @@ export function useCompraFilters(purchases: CompraRecord[], supplierNameById: Ma
   const clearFilters = useCallback(() => {
     setDayFilter('all');
     setSupplierFilter('all');
-    setCurrentPage(1);
+    setRawPage(1);
   }, []);
-
-  useEffect(() => {
-    if (dayFilter === 'all') return;
-    const selected = parseDayKey(dayFilter);
-    if (!selected) {
-      setDayFilter('all');
-      return;
-    }
-    const minTs = startOfDay(minSelectableDate).getTime();
-    const maxTs = startOfDay(maxSelectableDate).getTime();
-    const selectedTs = startOfDay(selected).getTime();
-    if (selectedTs < minTs || selectedTs > maxTs) {
-      setDayFilter('all');
-      setCurrentPage(1);
-    }
-  }, [dayFilter, maxSelectableDate, minSelectableDate]);
 
   return {
     dayFilter,
@@ -126,7 +130,7 @@ export function useCompraFilters(purchases: CompraRecord[], supplierNameById: Ma
     supplierFilter,
     setSupplierFilter,
     currentPage,
-    setCurrentPage,
+    setCurrentPage: setRawPage,
     dayCalendarMonth,
     setDayCalendarMonth,
     showDayFilterModal,

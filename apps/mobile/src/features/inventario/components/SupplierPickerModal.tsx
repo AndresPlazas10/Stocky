@@ -12,7 +12,13 @@ type Props = {
   onClose: () => void;
 };
 
-export function SupplierPickerModal({ visible, selectedSupplierId, suppliers, onSelect, onClose }: Props) {
+export function SupplierPickerModal({
+  visible,
+  selectedSupplierId,
+  suppliers,
+  onSelect,
+  onClose,
+}: Props) {
   return (
     <StockyModal
       visible={visible}
@@ -30,7 +36,14 @@ export function SupplierPickerModal({ visible, selectedSupplierId, suppliers, on
         style={[styles.modalOptionItem, !selectedSupplierId && styles.modalOptionItemSelected]}
         onPress={() => onSelect('')}
       >
-        <Text style={[styles.modalOptionItemText, !selectedSupplierId && styles.modalOptionItemTextSelected]}>Sin proveedor</Text>
+        <Text
+          style={[
+            styles.modalOptionItemText,
+            !selectedSupplierId && styles.modalOptionItemTextSelected,
+          ]}
+        >
+          Sin proveedor
+        </Text>
       </Pressable>
       {suppliers.map((supplier) => {
         const selected = selectedSupplierId === supplier.id;
@@ -40,7 +53,9 @@ export function SupplierPickerModal({ visible, selectedSupplierId, suppliers, on
             style={[styles.modalOptionItem, selected && styles.modalOptionItemSelected]}
             onPress={() => onSelect(supplier.id)}
           >
-            <Text style={[styles.modalOptionItemText, selected && styles.modalOptionItemTextSelected]}>
+            <Text
+              style={[styles.modalOptionItemText, selected && styles.modalOptionItemTextSelected]}
+            >
               {getSupplierDisplayName(supplier)}
             </Text>
           </Pressable>

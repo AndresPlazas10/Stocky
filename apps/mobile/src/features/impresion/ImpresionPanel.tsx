@@ -29,7 +29,12 @@ import {
   startDiscovery,
 } from '../../services/bluetoothPrinterService';
 import { buildSaleEscPos } from '../../services/escposService';
-import { getThermalPaperWidthMm, setThermalPaperWidthMm } from '../../utils/printer';
+import {
+  getThermalPaperWidthMm,
+  setThermalPaperWidthMm,
+  isAutoCutEnabled,
+  setAutoCutEnabled,
+} from '../../utils/printer';
 import { ensureBluetoothEnabled, BLUETOOTH_PRINT_REQUIRED_MESSAGE } from '../../utils/bluetooth';
 
 async function requestBluetoothPermissions(): Promise<boolean> {
@@ -60,6 +65,7 @@ export function ImpresionPanel({ businessName }: Props) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connected, setConnected] = useState(false);
   const [paperWidthMm, setPaperWidthMm] = useState(80);
+  const [autoCut, setAutoCut] = useState(false);
   const [isPrintingTest, setIsPrintingTest] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
 
@@ -69,16 +75,20 @@ export function ImpresionPanel({ businessName }: Props) {
       setSavedPrinter(saved);
       const pw = await getThermalPaperWidthMm();
       setPaperWidthMm(pw);
+      const ac = await isAutoCutEnabled();
+      setAutoCut(ac);
       if (saved) {
         let ok = await isPrinterConnected(saved.address);
         if (!ok) {
-          console.log('[Impresion] Printer not connected, attempting reconnect...');
+          console.warn('[Impresion] Printer not connected, attempting reconnect...');
           ok = await connectToPrinter(saved.address);
         }
         setConnected(ok);
       }
     })();
-    return () => { cancelDiscovery().catch(() => {}); };
+    return () => {
+      cancelDiscovery().catch(() => {});
+    };
   }, []);
 
   const handleScan = useCallback(async () => {
@@ -100,9 +110,11 @@ export function ImpresionPanel({ businessName }: Props) {
 
       const discovered = await startDiscovery();
       setDevices(discovered);
-      setStatusMsg(discovered.length > 0
-        ? `${discovered.length} dispositivo(s) encontrado(s)`
-        : 'No se encontraron dispositivos. Asegurate de emparejar la impresora en Ajustes > Bluetooth.');
+      setStatusMsg(
+        discovered.length > 0
+          ? `${discovered.length} dispositivo(s) encontrado(s)`
+          : 'No se encontraron dispositivos. Asegurate de emparejar la impresora en Ajustes > Bluetooth.',
+      );
     } catch (err) {
       console.error('[Impresion] Scan error:', err);
       setStatusMsg('Error: ' + (err instanceof Error ? err.message : 'Fallo al escanear'));
@@ -147,6 +159,11 @@ export function ImpresionPanel({ businessName }: Props) {
     await setThermalPaperWidthMm(mm);
   }, []);
 
+  const handleAutoCutChange = useCallback(async (enabled: boolean) => {
+    setAutoCut(enabled);
+    await setAutoCutEnabled(enabled);
+  }, []);
+
   const handlePrintTest = useCallback(async () => {
     if (!savedPrinter) {
       Alert.alert('Sin impresora', 'Conecta una impresora primero.');
@@ -166,35 +183,38 @@ export function ImpresionPanel({ businessName }: Props) {
           title: 'PRUEBA DE IMPRESION',
           businessName: String(businessName || 'Sistema Stocky'),
           dateText: new Date().toLocaleString('es-CO', {
-            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-            hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota',
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+            timeZone: 'America/Bogota',
           }),
           alignment: 'center' as const,
         },
-        metadata: [
-          { label: 'Estado', value: 'Conexion exitosa' },
-        ],
-        items: [
-          { name: 'Impresion de prueba', quantity: 1, subtotal: 0, subtotalText: '$0' },
-        ],
+        metadata: [{ label: 'Estado', value: 'Conexion exitosa' }],
+        items: [{ name: 'Impresion de prueba', quantity: 1, subtotal: 0, subtotalText: '$0' }],
         totals: { total: 0, totalText: '$0' },
         payment: { method: 'cash', methodText: 'Prueba' },
         footer: { message: 'Conexion Bluetooth exitosa!', alignment: 'center' as const },
       };
-      const escposData = buildSaleEscPos(receipt, paperWidthMm);
-      const ok = await printBytes(savedPrinter.address, escposData);
-      if (ok) {
+      const escposData = buildSaleEscPos(receipt, paperWidthMm, autoCut);
+      const result = await printBytes(savedPrinter.address, escposData);
+      if (result.ok) {
         setStatusMsg('Prueba enviada correctamente');
       } else {
+        const errorMsg = result.error || 'No se pudo imprimir. Verifica la conexion Bluetooth.';
         setStatusMsg('Error al imprimir la prueba');
-        Alert.alert('Error', 'No se pudo imprimir. Verifica la conexion Bluetooth.');
+        Alert.alert('Error', errorMsg);
       }
     } catch {
       setStatusMsg('Error inesperado');
     } finally {
       setIsPrintingTest(false);
     }
-  }, [savedPrinter, paperWidthMm, businessName]);
+  }, [savedPrinter, paperWidthMm, businessName, autoCut]);
 
   return (
     <View style={styles.container}>
@@ -209,8 +229,11 @@ export function ImpresionPanel({ businessName }: Props) {
         {savedPrinter ? (
           <View style={styles.printerInfo}>
             <View style={styles.printerRow}>
-              <Ionicons name={connected ? 'checkmark-circle' : 'close-circle'} size={20}
-                color={connected ? STOCKY_COLORS.successText : STOCKY_COLORS.errorText} />
+              <Ionicons
+                name={connected ? 'checkmark-circle' : 'close-circle'}
+                size={20}
+                color={connected ? STOCKY_COLORS.successText : STOCKY_COLORS.errorText}
+              />
               <View style={styles.printerTextCol}>
                 <Text style={styles.printerName}>{savedPrinter.name}</Text>
                 <Text style={styles.printerAddr}>{savedPrinter.address}</Text>
@@ -223,17 +246,30 @@ export function ImpresionPanel({ businessName }: Props) {
         ) : null}
 
         <View style={styles.btnRow}>
-          <Pressable style={[styles.btn, styles.btnOutline]} onPress={handleScan}
-            disabled={isScanning}>
+          <Pressable
+            style={[styles.btn, styles.btnOutline]}
+            onPress={handleScan}
+            disabled={isScanning}
+          >
             {isScanning ? (
               <ActivityIndicator size="small" color={STOCKY_COLORS.primary700} />
             ) : (
               <Text style={styles.btnOutlineText}>Escanear</Text>
             )}
           </Pressable>
-          <Pressable style={[styles.btn, styles.btnOutline]} onPress={() => {
-            BluetoothClassic.openBluetoothSettings();
-          }}>
+          <Pressable
+            style={[styles.btn, styles.btnOutline]}
+            onPress={() => {
+              if (!BluetoothClassic) {
+                Alert.alert(
+                  'Módulo Bluetooth no disponible',
+                  'Estas usando Expo Go o una build antigua. Usa una dev build de EAS generada despues de instalar react-native-bluetooth-classic.',
+                );
+                return;
+              }
+              BluetoothClassic.openBluetoothSettings();
+            }}
+          >
             <Ionicons name="settings-outline" size={16} color={STOCKY_COLORS.primary700} />
             <Text style={styles.btnOutlineText}>Ajustes BT</Text>
           </Pressable>
@@ -250,11 +286,20 @@ export function ImpresionPanel({ businessName }: Props) {
             renderItem={({ item }) => {
               const isSaved = savedPrinter?.address === item.address;
               return (
-                <Pressable style={[styles.deviceRow, isSaved && styles.deviceRowActive]}
-                  onPress={() => handleConnect(item)} disabled={isConnecting}>
-                  <Ionicons name="hardware-chip-outline" size={20} color={STOCKY_COLORS.textSecondary} />
+                <Pressable
+                  style={[styles.deviceRow, isSaved && styles.deviceRowActive]}
+                  onPress={() => handleConnect(item)}
+                  disabled={isConnecting}
+                >
+                  <Ionicons
+                    name="hardware-chip-outline"
+                    size={20}
+                    color={STOCKY_COLORS.textSecondary}
+                  />
                   <View style={styles.deviceTextCol}>
-                    <Text style={styles.deviceName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.deviceName} numberOfLines={1}>
+                      {item.name}
+                    </Text>
                     <Text style={styles.deviceAddr}>{item.address}</Text>
                   </View>
                   {isConnecting && isSaved ? (
@@ -280,20 +325,46 @@ export function ImpresionPanel({ businessName }: Props) {
         </View>
         <Text style={styles.configLabel}>Tamaño de papel</Text>
         <View style={styles.paperRow}>
-          <Pressable style={[styles.paperChip, paperWidthMm === 58 && styles.paperChipActive]}
-            onPress={() => handlePaperChange(58)}>
-            <Text style={[styles.paperChipText, paperWidthMm === 58 && styles.paperChipTextActive]}>58 mm</Text>
+          <Pressable
+            style={[styles.paperChip, paperWidthMm === 58 && styles.paperChipActive]}
+            onPress={() => handlePaperChange(58)}
+          >
+            <Text style={[styles.paperChipText, paperWidthMm === 58 && styles.paperChipTextActive]}>
+              58 mm
+            </Text>
           </Pressable>
-          <Pressable style={[styles.paperChip, paperWidthMm === 80 && styles.paperChipActive]}
-            onPress={() => handlePaperChange(80)}>
-            <Text style={[styles.paperChipText, paperWidthMm === 80 && styles.paperChipTextActive]}>80 mm</Text>
+          <Pressable
+            style={[styles.paperChip, paperWidthMm === 80 && styles.paperChipActive]}
+            onPress={() => handlePaperChange(80)}
+          >
+            <Text style={[styles.paperChipText, paperWidthMm === 80 && styles.paperChipTextActive]}>
+              80 mm
+            </Text>
           </Pressable>
         </View>
+
+        <View style={styles.cutRow}>
+          <Text style={styles.configLabel}>Cortar papel automaticamente</Text>
+          <Pressable
+            style={[styles.toggleTrack, autoCut && styles.toggleTrackActive]}
+            onPress={() => handleAutoCutChange(!autoCut)}
+          >
+            <View style={[styles.toggleThumb, autoCut && styles.toggleThumbActive]} />
+          </Pressable>
+        </View>
+        <Text style={styles.cutHint}>
+          {autoCut
+            ? 'La impresora cortara el papel al finalizar. Solo activar si tiene cutter.'
+            : 'Activalo solo si tu impresora tiene cutter automatico. La PT-210 debe dejarlo apagado.'}
+        </Text>
       </View>
 
       {savedPrinter ? (
-        <Pressable style={[styles.btn, styles.btnPrimary]} onPress={handlePrintTest}
-          disabled={isPrintingTest}>
+        <Pressable
+          style={[styles.btn, styles.btnPrimary]}
+          onPress={handlePrintTest}
+          disabled={isPrintingTest}
+        >
           {isPrintingTest ? (
             <ActivityIndicator size="small" color={STOCKY_COLORS.white} />
           ) : (
@@ -305,9 +376,7 @@ export function ImpresionPanel({ businessName }: Props) {
         </Pressable>
       ) : null}
 
-      {statusMsg ? (
-        <Text style={styles.statusText}>{statusMsg}</Text>
-      ) : null}
+      {statusMsg ? <Text style={styles.statusText}>{statusMsg}</Text> : null}
     </View>
   );
 }
@@ -472,6 +541,38 @@ const styles = StyleSheet.create({
   },
   paperChipTextActive: {
     color: STOCKY_COLORS.primary700,
+  },
+  cutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  cutHint: {
+    fontSize: 12,
+    color: STOCKY_COLORS.textMuted,
+    marginTop: 4,
+  },
+  toggleTrack: {
+    width: 48,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: STOCKY_COLORS.borderSoft || '#E5E7EB',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleTrackActive: {
+    backgroundColor: STOCKY_COLORS.successText || '#166534',
+  },
+  toggleThumb: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: STOCKY_COLORS.white,
+    transform: [{ translateX: 0 }],
+  },
+  toggleThumbActive: {
+    transform: [{ translateX: 22 }],
   },
   statusText: {
     fontSize: 13,

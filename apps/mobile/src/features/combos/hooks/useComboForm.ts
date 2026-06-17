@@ -1,10 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import type { ComboRecord } from '../../../services/combosService';
-import {
-  EMPTY_FORM_ITEM,
-  normalizeStatus,
-  type ComboFormState,
-} from '../comboUtils';
+import { COMBO_STATUS, type ComboRecord } from '../../../services/combosService';
+import { EMPTY_FORM_ITEM, normalizeStatus, type ComboFormState } from '../comboUtils';
 
 export function useComboForm() {
   const [showFormModal, setShowFormModal] = useState(false);
@@ -13,7 +9,7 @@ export function useComboForm() {
     nombre: '',
     precioVenta: '',
     descripcion: '',
-    estado: 'active' as any,
+    estado: COMBO_STATUS.ACTIVE,
     items: [{ ...EMPTY_FORM_ITEM }],
   });
   const [showProductPickerModal, setShowProductPickerModal] = useState(false);
@@ -36,7 +32,7 @@ export function useComboForm() {
       nombre: '',
       precioVenta: '',
       descripcion: '',
-      estado: 'active' as any,
+      estado: COMBO_STATUS.ACTIVE,
       items: [{ ...EMPTY_FORM_ITEM }],
     });
     setShowProductPickerModal(false);
@@ -55,12 +51,13 @@ export function useComboForm() {
       precioVenta: String(combo.precio_venta ?? ''),
       descripcion: combo.descripcion || '',
       estado: normalizeStatus(combo.estado),
-      items: (Array.isArray(combo.combo_items) ? combo.combo_items : []).length > 0
-        ? (Array.isArray(combo.combo_items) ? combo.combo_items : []).map((item) => ({
-          productoId: item.producto_id,
-          cantidad: String(item.cantidad ?? 1),
-        }))
-        : [{ ...EMPTY_FORM_ITEM }],
+      items:
+        (Array.isArray(combo.combo_items) ? combo.combo_items : []).length > 0
+          ? (Array.isArray(combo.combo_items) ? combo.combo_items : []).map((item) => ({
+              productoId: item.producto_id,
+              cantidad: String(item.cantidad ?? 1),
+            }))
+          : [{ ...EMPTY_FORM_ITEM }],
     });
     setShowFormModal(true);
   }, []);
@@ -87,14 +84,17 @@ export function useComboForm() {
     });
   }, []);
 
-  const handleItemChange = useCallback((index: number, field: 'productoId' | 'cantidad', value: string) => {
-    setForm((prev) => ({
-      ...prev,
-      items: prev.items.map((item, itemIndex) => (
-        itemIndex === index ? { ...item, [field]: value } : item
-      )),
-    }));
-  }, []);
+  const handleItemChange = useCallback(
+    (index: number, field: 'productoId' | 'cantidad', value: string) => {
+      setForm((prev) => ({
+        ...prev,
+        items: prev.items.map((item, itemIndex) =>
+          itemIndex === index ? { ...item, [field]: value } : item,
+        ),
+      }));
+    },
+    [],
+  );
 
   const openProductPicker = useCallback((rowIndex: number) => {
     setProductPickerRowIndex(rowIndex);

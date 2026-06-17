@@ -19,46 +19,48 @@ export const OrderItemRow = memo(function OrderItemRow({
   onChangeQuantity,
 }: OrderItemRowProps) {
   return (
-    <View style={styles.card}>
-      <View style={styles.topRow}>
-        <Text numberOfLines={1} style={styles.name}>{itemName}</Text>
-        <StockyMoneyText value={Number(item.subtotal || 0)} style={styles.total} />
+    <View style={styles.orderItemCard}>
+      <View style={styles.orderItemTopRow}>
+        <Text numberOfLines={1} style={styles.orderItemName}>
+          {itemName}
+        </Text>
+        <StockyMoneyText value={Number(item.subtotal || 0)} style={styles.orderItemTotal} />
       </View>
 
-      <View style={styles.metaRow}>
-        <View style={styles.unitChip}>
-          <Text style={styles.unitChipText}>
-            <StockyMoneyText value={Number(item.price || 0)} style={styles.unitChipText} />
-            {' '}por unidad
+      <View style={styles.orderItemMetaRow}>
+        <View style={styles.orderItemUnitChip}>
+          <Text style={styles.orderItemUnitChipText}>
+            <StockyMoneyText value={Number(item.price || 0)} style={styles.orderItemUnitChipText} />{' '}
+            por unidad
           </Text>
         </View>
-        <Text style={styles.subtotalLabel}>Subtotal</Text>
+        <Text style={styles.orderItemSubtotalLabel}>Subtotal</Text>
       </View>
 
-      <View style={styles.divider} />
+      <View style={styles.orderItemDivider} />
 
-      <View style={styles.controlsRow}>
-        <View style={styles.stepper}>
+      <View style={styles.orderItemControlsRow}>
+        <View style={styles.orderItemStepper}>
           <Pressable
-            style={[styles.stepperButton, busy && styles.disabled]}
+            style={[styles.orderItemStepperButton, busy && styles.actionButtonDisabled]}
             onPressIn={() => onChangeQuantity(item, -1)}
             disabled={busy || disabled}
             hitSlop={10}
             pressRetentionOffset={10}
           >
-            <Text style={styles.minusText}>-</Text>
+            <Text style={styles.orderItemMinusText}>-</Text>
           </Pressable>
 
-          <Text style={styles.qtyText}>{item.quantity}</Text>
+          <Text style={styles.orderItemQtyText}>{item.quantity}</Text>
 
           <Pressable
-            style={[styles.stepperButton, busy && styles.disabled]}
+            style={[styles.orderItemStepperButton, busy && styles.actionButtonDisabled]}
             onPressIn={() => onChangeQuantity(item, 1)}
             disabled={busy || disabled}
             hitSlop={10}
             pressRetentionOffset={10}
           >
-            <Text style={styles.plusText}>+</Text>
+            <Text style={styles.orderItemPlusText}>+</Text>
           </Pressable>
         </View>
       </View>
@@ -67,100 +69,120 @@ export const OrderItemRow = memo(function OrderItemRow({
 });
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 10,
+  orderItemCard: {
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 8,
+    shadowColor: '#111827',
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  topRow: {
+  orderItemTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    justifyContent: 'space-between',
+    gap: 10,
   },
-  name: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#111827',
+  orderItemName: {
     flex: 1,
-    marginRight: 12,
+    color: '#111827',
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '600',
   },
-  total: {
+  orderItemTotal: {
+    color: '#111827',
     fontSize: 16,
-    fontWeight: '800',
+    lineHeight: 22,
+    fontWeight: '700',
   },
-  metaRow: {
+  orderItemMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
+    justifyContent: 'space-between',
+    gap: 8,
   },
-  unitChip: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
+  orderItemUnitChip: {
+    borderRadius: 10,
+    backgroundColor: '#EEF2F7',
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  unitChipText: {
-    fontSize: 13,
+  orderItemUnitChipText: {
+    color: '#475569',
+    fontSize: 10,
     fontWeight: '600',
+  },
+  orderItemSubtotalLabel: {
     color: '#374151',
-  },
-  subtotalLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
-    color: '#6B7280',
   },
-  divider: {
+  orderItemDivider: {
     height: 1,
-    backgroundColor: '#F3F4F6',
-    marginBottom: 10,
+    backgroundColor: '#E5E7EB',
+    marginTop: 2,
   },
-  controlsRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  stepper: {
+  orderItemControlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    backgroundColor: '#F9FAFB',
+    justifyContent: 'flex-start',
+    paddingTop: 2,
+  },
+  orderItemStepper: {
+    minHeight: 44,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  stepperButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 3,
+    paddingVertical: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  orderItemStepperButton: {
+    width: 34,
+    height: 32,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: '#DCE2E8',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#111827',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 1,
   },
-  minusText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#6B7280',
+  orderItemMinusText: {
+    color: '#BE123C',
+    fontSize: 14,
+    lineHeight: 16,
+    fontWeight: '500',
   },
-  plusText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#6B7280',
+  orderItemPlusText: {
+    color: '#16A34A',
+    fontSize: 14,
+    lineHeight: 16,
+    fontWeight: '500',
   },
-  qtyText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#111827',
-    minWidth: 32,
+  orderItemQtyText: {
+    minWidth: 34,
     textAlign: 'center',
+    color: '#111827',
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: '600',
   },
-  disabled: {
+  actionButtonDisabled: {
     opacity: 0.7,
   },
 });

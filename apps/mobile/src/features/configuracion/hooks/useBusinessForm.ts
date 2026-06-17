@@ -26,11 +26,14 @@ export function useBusinessForm({
   const [savingBusiness, setSavingBusiness] = useState(false);
   const [businessForm, setBusinessForm] = useState<BusinessFormState>(createInitialBusinessForm());
 
-  const buildBusinessFormFromSnapshot = useCallback((): BusinessFormState => ({
-    nit: String(snapshot?.businessNit || ''),
-    phone: String(snapshot?.businessPhone || ''),
-    address: String(snapshot?.businessAddress || ''),
-  }), [snapshot?.businessAddress, snapshot?.businessNit, snapshot?.businessPhone]);
+  const buildBusinessFormFromSnapshot = useCallback(
+    (): BusinessFormState => ({
+      nit: String(snapshot?.businessNit || ''),
+      phone: String(snapshot?.businessPhone || ''),
+      address: String(snapshot?.businessAddress || ''),
+    }),
+    [snapshot?.businessAddress, snapshot?.businessNit, snapshot?.businessPhone],
+  );
 
   const openBusinessEditModal = useCallback(() => {
     setError(null);
@@ -78,11 +81,23 @@ export function useBusinessForm({
       await loadSnapshot();
       setShowBusinessEditModal(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo actualizar la información del negocio.');
+      setError(
+        err instanceof Error ? err.message : 'No se pudo actualizar la información del negocio.',
+      );
     } finally {
       setSavingBusiness(false);
     }
-  }, [businessForm, businessId, businessName, loadSnapshot, onRefreshBusiness, savingBusiness, snapshot?.businessName, source, setError]);
+  }, [
+    businessForm,
+    businessId,
+    businessName,
+    loadSnapshot,
+    onRefreshBusiness,
+    savingBusiness,
+    snapshot?.businessName,
+    source,
+    setError,
+  ]);
 
   return {
     showBusinessEditModal,

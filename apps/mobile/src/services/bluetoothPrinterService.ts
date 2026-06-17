@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BluetoothClassic from 'react-native-bluetooth-classic';
+import { Buffer } from 'buffer';
 
 const PRINTER_KEY = 'stocky_bt_printer';
-const CHUNK_SIZE = 512;
-const CHUNK_DELAY_MS = 50;
+const CHUNK_SIZE = 256; // PT-210 y similares funcionan mejor con chunks pequenos
+const CHUNK_DELAY_MS = 100;
+const CONNECT_DELAY_MS = 300;
 const MAX_RETRIES = 2;
 
 export interface BluetoothDevice {
@@ -19,6 +21,13 @@ export interface PrinterConfig {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function checkBluetoothModule(): string | null {
+  if (!BluetoothClassic) {
+    return 'El modulo Bluetooth nativo no esta disponible. Usa una dev build de EAS generada despues de instalar react-native-bluetooth-classic.';
+  }
+  return null;
 }
 
 export async function getSavedPrinter(): Promise<PrinterConfig | null> {
@@ -41,6 +50,11 @@ export async function clearPrinter(): Promise<void> {
 }
 
 export async function getPairedDevices(): Promise<BluetoothDevice[]> {
+  const moduleError = checkBluetoothModule();
+  if (moduleError) {
+    console.error('[BT Printer] getPairedDevices:', moduleError);
+    return [];
+  }
   try {
     const paired = await BluetoothClassic.getBondedDevices();
     return paired.map((d: { address: string; name: string }) => ({
@@ -55,6 +69,11 @@ export async function getPairedDevices(): Promise<BluetoothDevice[]> {
 }
 
 export async function startDiscovery(): Promise<BluetoothDevice[]> {
+  const moduleError = checkBluetoothModule();
+  if (moduleError) {
+    console.error('[BT Printer] startDiscovery:', moduleError);
+    return [];
+  }
   try {
     const devices = await BluetoothClassic.startDiscovery();
     const mapped: BluetoothDevice[] = [];
@@ -82,30 +101,49 @@ export async function cancelDiscovery(): Promise<void> {
 }
 
 export async function connectToPrinter(address: string): Promise<boolean> {
+  const moduleError = checkBluetoothModule();
+  if (moduleError) {
+    console.error('[BT Printer] connectToPrinter:', moduleError);
+    return false;
+  }
   try {
     await BluetoothClassic.cancelDiscovery();
   } catch (error) {
     console.error('[BT Printer] cancelDiscovery before connect failed:', error);
   }
-  await delay(300);
+
+  // Desconectar primero para evitar sockets RFCOMM duplicados
+  try {
+    await BluetoothClassic.disconnectFromDevice(address);
+    console.warn('[BT Printer] Pre-connect disconnect OK for', address);
+  } catch (error) {
+    // Es normal que falle si no habia conexion previa
+    console.warn('[BT Printer] Pre-connect disconnect skipped/failed:', error);
+  }
+
+  await delay(CONNECT_DELAY_MS);
+
+  // La PT-210 y otras impresoras termicas chinas suelen preferir conexion secure
   try {
     await BluetoothClassic.connectToDevice(address, {
       connectorType: 'rfcomm',
-      secure: false,
+      secure: true,
     });
-    console.log('[BT Printer] Connected (insecure) to', address);
+    console.warn('[BT Printer] Connected (secure) to', address);
+    await delay(CONNECT_DELAY_MS);
     return true;
-  } catch (error) {
-    console.error('[BT Printer] connectToDevice (insecure) failed:', error);
+  } catch (secureError) {
+    console.error('[BT Printer] connectToDevice (secure) failed:', secureError);
     try {
       await BluetoothClassic.connectToDevice(address, {
         connectorType: 'rfcomm',
-        secure: true,
+        secure: false,
       });
-      console.log('[BT Printer] Connected (secure) to', address);
+      console.warn('[BT Printer] Connected (insecure) to', address);
+      await delay(CONNECT_DELAY_MS);
       return true;
-    } catch (error2) {
-      console.error('[BT Printer] connectToDevice (secure fallback) failed:', error2);
+    } catch (insecureError) {
+      console.error('[BT Printer] connectToDevice (insecure fallback) failed:', insecureError);
       return false;
     }
   }
@@ -119,17 +157,25 @@ export async function disconnectFromPrinter(address: string): Promise<void> {
   }
 }
 
-export async function printBytes(address: string, data: Uint8Array): Promise<boolean> {
+export type PrintResult = { ok: true } | { ok: false; error: string };
+
+export async function printBytes(address: string, data: Uint8Array): Promise<PrintResult> {
+  const moduleError = checkBluetoothModule();
+  if (moduleError) {
+    console.error('[BT Printer] printBytes:', moduleError);
+    return { ok: false, error: moduleError };
+  }
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       if (attempt > 0) {
-        console.log(`[BT Printer] Retry attempt ${attempt}`);
+        console.warn(`[BT Printer] Retry attempt ${attempt}`);
         await delay(1000);
       }
 
       const connected = await BluetoothClassic.isDeviceConnected(address);
+      console.warn(`[BT Printer] isDeviceConnected(${address}) = ${connected}`);
       if (!connected) {
-        console.log('[BT Printer] Device not connected, attempting reconnect...');
+        console.warn('[BT Printer] Device not connected, attempting reconnect...');
         const reconnected = await connectToPrinter(address);
         if (!reconnected) {
           console.error('[BT Printer] Reconnection failed');
@@ -137,8 +183,11 @@ export async function printBytes(address: string, data: Uint8Array): Promise<boo
         }
       }
 
-      const buffer = Buffer.from(data);
-      console.log(`[BT Printer] Writing ${buffer.length} bytes to ${address}`);
+      // Algunas librerias de RN prefieren Buffer construido desde el ArrayBuffer subyacente
+      const buffer = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+      console.warn(
+        `[BT Printer] Writing ${buffer.length} bytes to ${address} (chunkSize=${CHUNK_SIZE})`,
+      );
 
       if (buffer.length <= CHUNK_SIZE) {
         await BluetoothClassic.writeToDevice(address, buffer);
@@ -146,6 +195,7 @@ export async function printBytes(address: string, data: Uint8Array): Promise<boo
         for (let offset = 0; offset < buffer.length; offset += CHUNK_SIZE) {
           const end = Math.min(offset + CHUNK_SIZE, buffer.length);
           const chunk = buffer.subarray(offset, end);
+          console.warn(`[BT Printer] Writing chunk ${offset}-${end}`);
           await BluetoothClassic.writeToDevice(address, chunk);
           if (end < buffer.length) {
             await delay(CHUNK_DELAY_MS);
@@ -153,15 +203,25 @@ export async function printBytes(address: string, data: Uint8Array): Promise<boo
         }
       }
 
-      return true;
+      console.warn('[BT Printer] Write OK');
+      return { ok: true };
     } catch (error) {
-      console.error(`[BT Printer] printBytes attempt ${attempt + 1} failed:`, error);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[BT Printer] printBytes attempt ${attempt + 1} failed:`, message, error);
+      if (attempt === MAX_RETRIES) {
+        return { ok: false, error: message };
+      }
     }
   }
-  return false;
+  return { ok: false, error: 'No se pudo conectar ni enviar datos a la impresora.' };
 }
 
 export async function isPrinterConnected(address: string): Promise<boolean> {
+  const moduleError = checkBluetoothModule();
+  if (moduleError) {
+    console.error('[BT Printer] isPrinterConnected:', moduleError);
+    return false;
+  }
   try {
     return await BluetoothClassic.isDeviceConnected(address);
   } catch (error) {

@@ -52,7 +52,7 @@ export function StockyDeleteConfirmModal({
       sheetStyle={styles.sheet}
       contentContainerStyle={styles.content}
       footerStyle={styles.footer}
-      headerSlot={(
+      headerSlot={
         <LinearGradient
           colors={['#DC2626', '#B91C1C']}
           start={{ x: 0, y: 0 }}
@@ -69,13 +69,21 @@ export function StockyDeleteConfirmModal({
             <Ionicons name="close" size={19} color="#FEE2E2" />
           </Pressable>
         </LinearGradient>
-      )}
-      footer={(
+      }
+      footer={
         <View style={styles.actionsRow}>
-          <Pressable style={[styles.cancelButton, disableCancel && styles.disabled]} onPress={onCancel} disabled={disableCancel}>
+          <Pressable
+            style={[styles.cancelButton, disableCancel && styles.disabled]}
+            onPress={onCancel}
+            disabled={disableCancel}
+          >
             <Text style={styles.cancelText}>{cancelText}</Text>
           </Pressable>
-          <Pressable style={[styles.confirmWrap, disableConfirm && styles.disabled]} onPress={onConfirm} disabled={disableConfirm}>
+          <Pressable
+            style={[styles.confirmWrap, disableConfirm && styles.disabled]}
+            onPress={onConfirm}
+            disabled={disableConfirm}
+          >
             <LinearGradient
               colors={disableConfirm ? ['#9CA3AF', '#94A3B8'] : ['#DC2626', '#B91C1C']}
               start={{ x: 0, y: 0 }}
@@ -91,7 +99,7 @@ export function StockyDeleteConfirmModal({
             </LinearGradient>
           </Pressable>
         </View>
-      )}
+      }
     >
       <View style={styles.messageCard}>
         <Text style={styles.messageText}>{message}</Text>
@@ -105,7 +113,9 @@ export function StockyDeleteConfirmModal({
           </View>
           <View style={styles.itemTextWrap}>
             <Text style={styles.itemLabel}>Elemento seleccionado</Text>
-            <Text style={styles.itemValue} numberOfLines={2}>{itemLabel}</Text>
+            <Text style={styles.itemValue} numberOfLines={2}>
+              {itemLabel}
+            </Text>
           </View>
         </View>
       ) : null}

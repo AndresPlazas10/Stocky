@@ -36,29 +36,7 @@ type UseMesaOrderStateParams = {
   ) => Promise<MesaOrderCatalogItem[]>;
 };
 
-async function readCatalogFromStorage(
-  businessId: string,
-): Promise<StoredCatalogSnapshot | null> {
-  const storageKey = `${CATALOG_STORAGE_PREFIX}${businessId}`;
-  try {
-    const raw = await AsyncStorage.getItem(storageKey);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredCatalogSnapshot;
-    if (!parsed || !Array.isArray(parsed.items)) return null;
-    const cachedAt = Number(parsed.cachedAt || 0);
-    return {
-      cachedAt: Number.isFinite(cachedAt) ? cachedAt : 0,
-      items: parsed.items,
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function writeCatalogToStorage(
-  businessId: string,
-  items: MesaOrderCatalogItem[],
-) {
+async function writeCatalogToStorage(businessId: string, items: MesaOrderCatalogItem[]) {
   const storageKey = `${CATALOG_STORAGE_PREFIX}${businessId}`;
   const payload: StoredCatalogSnapshot = {
     cachedAt: Date.now(),
@@ -82,13 +60,10 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
   const [searchCatalog, setSearchCatalog] = useState('');
   const deferredSearch = useDeferredValue(searchCatalog);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [mutatingOrderItemId, setMutatingOrderItemId] = useState<string | null>(
-    null,
-  );
+  const [mutatingOrderItemId, setMutatingOrderItemId] = useState<string | null>(null);
   const [releasingEmptyOrder, setReleasingEmptyOrder] = useState(false);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
-  const [showCloseOrderChoiceModal, setShowCloseOrderChoiceModal] =
-    useState(false);
+  const [showCloseOrderChoiceModal, setShowCloseOrderChoiceModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showSplitBillModal, setShowSplitBillModal] = useState(false);
   const [showPaymentMethodMenu, setShowPaymentMethodMenu] = useState(false);
@@ -102,15 +77,10 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
   const catalogBusinessIdRef = useRef<string | null>(null);
   const catalogUpdatedAtRef = useRef(0);
   const catalogItemsRef = useRef<MesaOrderCatalogItem[]>([]);
-  const catalogLoadPromiseRef =
-    useRef<Promise<MesaOrderCatalogItem[]> | null>(null);
+  const catalogLoadPromiseRef = useRef<Promise<MesaOrderCatalogItem[]> | null>(null);
   const orderModalOpenIntentRef = useRef(false);
-  const pendingQuantityUpdatesRef = useRef(
-    new Map<string, PendingQuantityUpdate>(),
-  );
-  const quantitySyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const pendingQuantityUpdatesRef = useRef(new Map<string, PendingQuantityUpdate>());
+  const quantitySyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const ensureCatalogLoaded = useCallback(
     async (businessId: string, options?: { forceRefresh?: boolean }) => {
@@ -119,17 +89,13 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
       const forceRefresh = options?.forceRefresh === true;
       const localCatalog = catalogItemsRef.current;
 
-      const catalogAgeMs =
-        Date.now() - Number(catalogUpdatedAtRef.current || 0);
+      const catalogAgeMs = Date.now() - Number(catalogUpdatedAtRef.current || 0);
       const hasLocalCatalogForBusiness =
         !forceRefresh &&
         catalogBusinessIdRef.current === normalizedBusinessId &&
         localCatalog.length > 0;
 
-      if (
-        hasLocalCatalogForBusiness &&
-        catalogAgeMs <= CATALOG_LOCAL_TTL_MS
-      ) {
+      if (hasLocalCatalogForBusiness && catalogAgeMs <= CATALOG_LOCAL_TTL_MS) {
         return localCatalog;
       }
 
@@ -184,7 +150,9 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
 
   const filteredCatalog = useMemo(() => {
     const source = Array.isArray(catalogItems) ? catalogItems : [];
-    const search = String(deferredSearch || '').trim().toLowerCase();
+    const search = String(deferredSearch || '')
+      .trim()
+      .toLowerCase();
 
     if (!search) {
       return [];
@@ -192,7 +160,9 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
 
     return source
       .filter((item) => {
-        const byName = String(item.name || '').toLowerCase().includes(search);
+        const byName = String(item.name || '')
+          .toLowerCase()
+          .includes(search);
         return byName;
       })
       .slice(0, 80);
@@ -200,10 +170,7 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
 
   const hasCatalogQuery = String(searchCatalog || '').trim().length > 0;
 
-  const catalogLookup = useMemo(
-    () => buildCatalogLookup(catalogItems),
-    [catalogItems],
-  );
+  const catalogLookup = useMemo(() => buildCatalogLookup(catalogItems), [catalogItems]);
 
   const { insufficientItems, insufficientComboComponents } = useMemo(() => {
     if (loadingOrder) {
@@ -232,10 +199,7 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
     return null;
   }, [insufficientComboComponents, insufficientItems]);
 
-  const orderTotal = useMemo(
-    () => calculateOrderTotal(orderItems),
-    [orderItems],
-  );
+  const orderTotal = useMemo(() => calculateOrderTotal(orderItems), [orderItems]);
 
   const orderModalTitle = selectedMesa
     ? `${mesaDisplayName(selectedMesa)} - Orden`

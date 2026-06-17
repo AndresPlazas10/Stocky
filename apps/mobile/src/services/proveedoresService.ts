@@ -1,7 +1,10 @@
 import { getSupabaseClient } from '../lib/supabase';
+import { normalizeReference, normalizeText } from '../utils/normalization';
+import { wrapDbError } from '../utils/supabaseErrors';
 import type { SupabaseErrorLike } from '../types/errors';
 
-const BASE_SUPPLIER_COLUMNS = 'id,business_id,business_name,contact_name,email,phone,address,notes,created_at';
+const BASE_SUPPLIER_COLUMNS =
+  'id,business_id,business_name,contact_name,email,phone,address,notes,created_at';
 
 export type SupplierTaxColumn = 'nit' | 'tax_id';
 
@@ -28,24 +31,12 @@ export type ProveedorFormPayload = {
   nit?: string | null;
 };
 
-function normalizeText(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
-function normalizeReference(value: unknown): string | null {
-  const normalized = normalizeText(value);
-  if (!normalized) return null;
-  const lower = normalized.toLowerCase();
-  if (lower === 'null' || lower === 'undefined') return null;
-  return normalized;
-}
-
-function isMissingSupplierColumnError(err: any, columnName: string): boolean {
+function isMissingSupplierColumnError(err: SupabaseErrorLike, columnName: string): boolean {
   const text = `${err?.message || ''} ${err?.details || ''} ${err?.hint || ''}`.toLowerCase();
   return (
-    err?.code === '42703'
-    || err?.code === 'PGRST204'
-    || (text.includes('column') && text.includes(String(columnName || '').toLowerCase()))
+    err?.code === '42703' ||
+    err?.code === 'PGRST204' ||
+    (text.includes('column') && text.includes(String(columnName || '').toLowerCase()))
   );
 }
 
@@ -67,7 +58,7 @@ function buildSupplierPayload({
   };
 }
 
-function normalizeProveedor(row: any): ProveedorRecord {
+function normalizeProveedor(row: Record<string, unknown>): ProveedorRecord {
   return {
     id: normalizeText(row?.id),
     business_id: normalizeText(row?.business_id),
@@ -82,12 +73,6 @@ function normalizeProveedor(row: any): ProveedorRecord {
   };
 }
 
-function wrapDbError(errorLike: SupabaseErrorLike, fallbackMessage: string): Error & { code?: string } {
-  const wrapped: Error & { code?: string } = new Error(errorLike?.message || fallbackMessage);
-  wrapped.code = normalizeReference(errorLike?.code) || undefined;
-  return wrapped;
-}
-
 export async function listSuppliersForManagement({
   businessId,
   preferredTaxColumn = 'nit',
@@ -99,14 +84,13 @@ export async function listSuppliersForManagement({
   limit?: number;
   offset?: number;
 }): Promise<{ suppliers: ProveedorRecord[]; taxColumn: SupplierTaxColumn }> {
-  const candidates: SupplierTaxColumn[] = preferredTaxColumn === 'nit'
-    ? ['nit', 'tax_id']
-    : ['tax_id', 'nit'];
+  const candidates: SupplierTaxColumn[] =
+    preferredTaxColumn === 'nit' ? ['nit', 'tax_id'] : ['tax_id', 'nit'];
   const client = getSupabaseClient();
 
-  let data: any[] = [];
+  let data: Record<string, unknown>[] = [];
   let resolvedTaxColumn: SupplierTaxColumn = preferredTaxColumn;
-  let lastError: any = null;
+  let lastError: SupabaseErrorLike | null = null;
 
   for (const column of candidates) {
     let query = client
@@ -183,11 +167,13 @@ export async function saveSupplierWithTaxFallback({
 
     return client
       .from('suppliers')
-      .insert([{
-        business_id: businessId,
-        created_at: new Date().toISOString(),
-        ...payload,
-      }])
+      .insert([
+        {
+          business_id: businessId,
+          created_at: new Date().toISOString(),
+          ...payload,
+        },
+      ])
       .select(selectColumns)
       .maybeSingle();
   };
@@ -214,7 +200,7 @@ export async function saveSupplierWithTaxFallback({
   }
 
   return {
-    supplier: data ? normalizeProveedor(data) : null,
+    supplier: data ? normalizeProveedor(data as unknown as Record<string, unknown>) : null,
     taxColumn: resolvedTaxColumn,
   };
 }
@@ -231,10 +217,7 @@ export async function deleteSupplierById({
   }
 
   const client = getSupabaseClient();
-  let query = client
-    .from('suppliers')
-    .delete()
-    .eq('id', supplierId);
+  let query = client.from('suppliers').delete().eq('id', supplierId);
 
   if (businessId) {
     query = query.eq('business_id', businessId);

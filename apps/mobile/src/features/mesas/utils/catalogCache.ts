@@ -9,7 +9,9 @@ type StoredCatalogSnapshot = {
   items: MesaOrderCatalogItem[];
 };
 
-export async function readCatalogFromStorage(businessId: string): Promise<StoredCatalogSnapshot | null> {
+export async function readCatalogFromStorage(
+  businessId: string,
+): Promise<StoredCatalogSnapshot | null> {
   const storageKey = `${CATALOG_STORAGE_PREFIX}${businessId}`;
   try {
     const raw = await AsyncStorage.getItem(storageKey);

@@ -1,6 +1,9 @@
-const rawPerfAuditFlag = String(process.env.EXPO_PUBLIC_PERF_AUDIT || '').trim().toLowerCase();
+const rawPerfAuditFlag = String(process.env.EXPO_PUBLIC_PERF_AUDIT || '')
+  .trim()
+  .toLowerCase();
 
-export const PERF_AUDIT_ENABLED = __DEV__ || rawPerfAuditFlag === '1' || rawPerfAuditFlag === 'true';
+export const PERF_AUDIT_ENABLED =
+  __DEV__ || rawPerfAuditFlag === '1' || rawPerfAuditFlag === 'true';
 
 function sanitizePayload(payload?: Record<string, unknown>) {
   if (!payload) return {};
@@ -13,8 +16,9 @@ function sanitizePayload(payload?: Record<string, unknown>) {
 
 export function perfMark(label: string, payload?: Record<string, unknown>) {
   if (!PERF_AUDIT_ENABLED) return;
+  if (!__DEV__) return;
   const event = sanitizePayload(payload);
-  console.info(`[perf] ${label}`, {
+  console.warn(`[perf] ${label}`, {
     ts: Date.now(),
     ...event,
   });

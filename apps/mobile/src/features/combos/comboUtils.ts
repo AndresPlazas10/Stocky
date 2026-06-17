@@ -31,17 +31,23 @@ export function createInitialForm(): ComboFormState {
 }
 
 export function normalizeRole(value: unknown): string {
-  return String(value || '').trim().toLowerCase();
+  return String(value || '')
+    .trim()
+    .toLowerCase();
 }
 
 export function normalizeStatus(value: unknown): ComboStatus {
-  return String(value || '').trim().toLowerCase() === COMBO_STATUS.INACTIVE
+  return String(value || '')
+    .trim()
+    .toLowerCase() === COMBO_STATUS.INACTIVE
     ? COMBO_STATUS.INACTIVE
     : COMBO_STATUS.ACTIVE;
 }
 
 export function parseComboMoneyText(value: string): number {
-  const raw = String(value || '').trim().replace(/\s+/g, '');
+  const raw = String(value || '')
+    .trim()
+    .replace(/\s+/g, '');
   if (!raw) return NaN;
   if (raw.includes(',')) {
     return Number(raw.replace(/\./g, '').replace(',', '.'));

@@ -2,7 +2,14 @@ import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StockyModal } from './StockyModal';
-import { startOfDay, startOfMonth, addMonths, formatDayKey, capitalizeLabel, formatDayLabelFromKey } from '../utils/dateHelpers';
+import {
+  startOfDay,
+  startOfMonth,
+  addMonths,
+  formatDayKey,
+  capitalizeLabel,
+  formatDayLabelFromKey,
+} from '../utils/dateHelpers';
 
 const WEEKDAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
@@ -40,12 +47,19 @@ export function DayFilterCalendarModal({
   onMonthChange,
 }: Props) {
   const currentCalendarMonthLabel = useMemo(
-    () => capitalizeLabel(new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' }).format(dayCalendarMonth)),
+    () =>
+      capitalizeLabel(
+        new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' }).format(
+          dayCalendarMonth,
+        ),
+      ),
     [dayCalendarMonth],
   );
 
-  const canGoPrevMonth = startOfMonth(addMonths(dayCalendarMonth, -1)) >= startOfMonth(minSelectableDate);
-  const canGoNextMonth = startOfMonth(addMonths(dayCalendarMonth, 1)) <= startOfMonth(maxSelectableDate);
+  const canGoPrevMonth =
+    startOfMonth(addMonths(dayCalendarMonth, -1)) >= startOfMonth(minSelectableDate);
+  const canGoNextMonth =
+    startOfMonth(addMonths(dayCalendarMonth, 1)) <= startOfMonth(maxSelectableDate);
 
   const calendarDayCells = useMemo(() => {
     const monthStart = startOfMonth(dayCalendarMonth);
@@ -53,7 +67,7 @@ export function DayFilterCalendarModal({
     const month = monthStart.getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const weekdayOffset = (monthStart.getDay() + 6) % 7;
-    const cells: Array<CalendarCell | null> = [];
+    const cells: (CalendarCell | null)[] = [];
 
     for (let i = 0; i < weekdayOffset; i++) cells.push(null);
 
@@ -85,7 +99,8 @@ export function DayFilterCalendarModal({
     >
       <View style={styles.calendarRangeHint}>
         <Text style={styles.calendarRangeHintText}>
-          Desde {formatDayLabelFromKey(minSelectableDayKey)} hasta {formatDayLabelFromKey(maxSelectableDayKey)}
+          Desde {formatDayLabelFromKey(minSelectableDayKey)} hasta{' '}
+          {formatDayLabelFromKey(maxSelectableDayKey)}
         </Text>
       </View>
 
@@ -165,14 +180,46 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   calendarRangeHintText: { color: '#475569', fontSize: 12, fontWeight: '500' },
-  calendarHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 },
-  calendarNavButton: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: '#D1D5DB', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  calendarMonthLabel: { flex: 1, textAlign: 'center', color: '#111827', fontSize: 16, fontWeight: '700' },
+  calendarHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 8,
+  },
+  calendarNavButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarMonthLabel: {
+    flex: 1,
+    textAlign: 'center',
+    color: '#111827',
+    fontSize: 16,
+    fontWeight: '700',
+  },
   calendarWeekRow: { flexDirection: 'row', marginBottom: 4 },
-  calendarWeekDayCell: { width: '14.2857%', alignItems: 'center', justifyContent: 'center', paddingVertical: 4 },
+  calendarWeekDayCell: {
+    width: '14.2857%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
   calendarWeekDayText: { color: '#64748B', fontSize: 11, fontWeight: '700' },
   calendarGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -2 },
-  calendarDayCell: { width: '14.2857%', aspectRatio: 1, padding: 2, alignItems: 'center', justifyContent: 'center' },
+  calendarDayCell: {
+    width: '14.2857%',
+    aspectRatio: 1,
+    padding: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   calendarDayCellEmpty: { width: '14.2857%', aspectRatio: 1, padding: 2 },
   calendarDayCellDisabled: { opacity: 0.3 },
   calendarDayCellSelected: { borderRadius: 10, backgroundColor: '#4F46E5' },

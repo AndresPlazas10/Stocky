@@ -6,6 +6,7 @@ import {
   type SupplierTaxColumn,
 } from '../../../services/proveedoresService';
 import { invalidatePurchaseCatalogCache } from '../../../services/comprasService';
+import { getErrorCode, getErrorMessage } from '../../../utils/error';
 import type { ProveedorFormState } from '../proveedoresUtils';
 
 interface UseProveedorMutationsParams {
@@ -74,13 +75,27 @@ export function useProveedorMutations({
     } finally {
       setSaving(false);
     }
-  }, [businessId, canManageSuppliers, closeFormModal, editingSupplier?.id, form, refreshSuppliers, saving, setTaxColumn, taxColumn, setError]);
+  }, [
+    businessId,
+    canManageSuppliers,
+    closeFormModal,
+    editingSupplier,
+    form,
+    refreshSuppliers,
+    saving,
+    setTaxColumn,
+    taxColumn,
+    setError,
+  ]);
 
-  const askDeleteSupplier = useCallback((supplier: ProveedorRecord) => {
-    if (!canManageSuppliers) return;
-    setSupplierToDelete(supplier);
-    setShowDeleteModal(true);
-  }, [canManageSuppliers]);
+  const askDeleteSupplier = useCallback(
+    (supplier: ProveedorRecord) => {
+      if (!canManageSuppliers) return;
+      setSupplierToDelete(supplier);
+      setShowDeleteModal(true);
+    },
+    [canManageSuppliers],
+  );
 
   const confirmDeleteSupplier = useCallback(async () => {
     if (!supplierToDelete?.id || deleting || !canManageSuppliers) return;
@@ -95,11 +110,11 @@ export function useProveedorMutations({
       setSupplierToDelete(null);
       invalidatePurchaseCatalogCache(businessId);
       await refreshSuppliers();
-    } catch (err: any) {
-      if (String(err?.code || '') === '23503') {
+    } catch (err) {
+      if (String(getErrorCode(err) || '') === '23503') {
         setError('No se puede eliminar este proveedor porque tiene compras asociadas.');
       } else {
-        setError(err instanceof Error ? err.message : 'No se pudo eliminar el proveedor.');
+        setError(getErrorMessage(err));
       }
     } finally {
       setDeleting(false);

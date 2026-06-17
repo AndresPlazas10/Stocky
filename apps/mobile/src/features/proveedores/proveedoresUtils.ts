@@ -23,7 +23,9 @@ export const INITIAL_FORM: ProveedorFormState = {
 };
 
 export function normalizeRole(value: unknown): string {
-  return String(value || '').trim().toLowerCase();
+  return String(value || '')
+    .trim()
+    .toLowerCase();
 }
 
 export function createFormFromSupplier(supplier: ProveedorRecord): ProveedorFormState {

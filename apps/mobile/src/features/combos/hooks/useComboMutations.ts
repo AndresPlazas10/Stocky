@@ -8,11 +8,7 @@ import {
   type ComboRecord,
   type ComboStatus,
 } from '../../../services/combosService';
-import {
-  normalizeStatus,
-  parseComboMoneyText,
-  type ComboFormState,
-} from '../comboUtils';
+import { normalizeStatus, parseComboMoneyText, type ComboFormState } from '../comboUtils';
 
 interface UseComboMutationsParams {
   businessId: string;
@@ -59,8 +55,9 @@ export function useComboMutations({
         throw new Error('El precio de venta debe ser mayor a 0.');
       }
 
-      const selectedItems = (Array.isArray(form.items) ? form.items : []).filter((item) =>
-        String(item.productoId || '').trim().length > 0);
+      const selectedItems = (Array.isArray(form.items) ? form.items : []).filter(
+        (item) => String(item.productoId || '').trim().length > 0,
+      );
 
       if (selectedItems.length === 0) {
         throw new Error('Debes agregar al menos un producto al combo.');
@@ -103,14 +100,27 @@ export function useComboMutations({
     } finally {
       setSaving(false);
     }
-  }, [businessId, canManageCombos, closeFormModal, editingCombo?.id, form, hasDuplicateProducts, refreshCombos, saving, setError]);
+  }, [
+    businessId,
+    canManageCombos,
+    closeFormModal,
+    editingCombo,
+    form,
+    hasDuplicateProducts,
+    refreshCombos,
+    saving,
+    setError,
+  ]);
 
-  const askDeleteCombo = useCallback((combo: ComboRecord) => {
-    if (!canManageCombos) return;
-    setError(null);
-    setComboToDelete(combo);
-    setShowDeleteModal(true);
-  }, [canManageCombos, setError]);
+  const askDeleteCombo = useCallback(
+    (combo: ComboRecord) => {
+      if (!canManageCombos) return;
+      setError(null);
+      setComboToDelete(combo);
+      setShowDeleteModal(true);
+    },
+    [canManageCombos, setError],
+  );
 
   const confirmDeleteCombo = useCallback(async () => {
     if (!comboToDelete?.id || deleting || !canManageCombos) return;
@@ -134,11 +144,11 @@ export function useComboMutations({
             comboId: comboToDelete.id,
             status: COMBO_STATUS.INACTIVE,
           });
-          setCombos((prev) => prev.map((item) => (
-            item.id === comboToDelete.id
-              ? { ...item, estado: COMBO_STATUS.INACTIVE }
-              : item
-          )));
+          setCombos((prev) =>
+            prev.map((item) =>
+              item.id === comboToDelete.id ? { ...item, estado: COMBO_STATUS.INACTIVE } : item,
+            ),
+          );
           setShowDeleteModal(false);
           setComboToDelete(null);
           return;
@@ -153,33 +163,33 @@ export function useComboMutations({
     }
   }, [businessId, canManageCombos, comboToDelete, deleting, refreshCombos, setCombos, setError]);
 
-  const toggleComboStatus = useCallback(async (combo: ComboRecord) => {
-    if (!canManageCombos || updatingStatusId) return;
+  const toggleComboStatus = useCallback(
+    async (combo: ComboRecord) => {
+      if (!canManageCombos || updatingStatusId) return;
 
-    const currentStatus = normalizeStatus(combo.estado);
-    const nextStatus: ComboStatus = currentStatus === COMBO_STATUS.ACTIVE
-      ? COMBO_STATUS.INACTIVE
-      : COMBO_STATUS.ACTIVE;
+      const currentStatus = normalizeStatus(combo.estado);
+      const nextStatus: ComboStatus =
+        currentStatus === COMBO_STATUS.ACTIVE ? COMBO_STATUS.INACTIVE : COMBO_STATUS.ACTIVE;
 
-    setUpdatingStatusId(combo.id);
-    setError(null);
-    try {
-      await setComboStatusByBusinessAndId({
-        businessId,
-        comboId: combo.id,
-        status: nextStatus,
-      });
-      setCombos((prev) => prev.map((item) => (
-        item.id === combo.id
-          ? { ...item, estado: nextStatus }
-          : item
-      )));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo actualizar el estado del combo.');
-    } finally {
-      setUpdatingStatusId(null);
-    }
-  }, [businessId, canManageCombos, updatingStatusId, setCombos, setError]);
+      setUpdatingStatusId(combo.id);
+      setError(null);
+      try {
+        await setComboStatusByBusinessAndId({
+          businessId,
+          comboId: combo.id,
+          status: nextStatus,
+        });
+        setCombos((prev) =>
+          prev.map((item) => (item.id === combo.id ? { ...item, estado: nextStatus } : item)),
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No se pudo actualizar el estado del combo.');
+      } finally {
+        setUpdatingStatusId(null);
+      }
+    },
+    [businessId, canManageCombos, updatingStatusId, setCombos, setError],
+  );
 
   const closeDeleteModal = useCallback(() => {
     if (deleting) return;

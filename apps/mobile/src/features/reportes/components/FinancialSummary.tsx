@@ -9,7 +9,12 @@ interface FinancialSummaryProps {
   grossPercent: number;
 }
 
-export function FinancialSummary({ ventasTotal, comprasTotal, grossResult, grossPercent }: FinancialSummaryProps) {
+export function FinancialSummary({
+  ventasTotal,
+  comprasTotal,
+  grossResult,
+  grossPercent,
+}: FinancialSummaryProps) {
   return (
     <View style={s.blockCard}>
       <Text style={s.sectionTitle}>Resumen financiero</Text>

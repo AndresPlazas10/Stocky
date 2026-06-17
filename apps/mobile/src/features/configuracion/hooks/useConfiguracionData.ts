@@ -41,7 +41,8 @@ export function useConfiguracionData({
   }, [businessId, businessName, source, userId, userEmail]);
 
   useEffect(() => {
-    loadSnapshot();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial de datos
+    void loadSnapshot();
   }, [loadSnapshot]);
 
   return {

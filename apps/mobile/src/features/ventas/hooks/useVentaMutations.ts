@@ -12,7 +12,12 @@ import { isAutoPrintReceiptEnabled } from '../../../utils/printer';
 import { calculateCashChange } from '../../../services/mesaOrderService';
 import { cartReferenceKey } from './useVentaCart';
 import type { PaymentMethod } from '../../../utils/paymentMethods';
-import type { VentaCartItem, VentaRecord } from '../../../services/ventasService';
+import type { MesaOrderCatalogItem } from '../../../services/mesaOrderService';
+import type {
+  VentaCartItem,
+  VentaDetailRecord,
+  VentaRecord,
+} from '../../../services/ventasService';
 
 interface UseVentaMutationsParams {
   businessId: string;
@@ -21,17 +26,17 @@ interface UseVentaMutationsParams {
   paymentMethod: PaymentMethod;
   amountReceived: string;
   cartTotal: number;
-  catalogItems: any[];
+  catalogItems: MesaOrderCatalogItem[];
   selectedVenta: VentaRecord | null;
   canDeleteSales: boolean;
   clearCart: () => void;
   refreshSales: () => Promise<void>;
-  setCatalogItems: (items: any[]) => void;
-  showPrintModalForSale: (record: VentaRecord, details: any[]) => void;
+  setCatalogItems: (items: MesaOrderCatalogItem[]) => void;
+  showPrintModalForSale: (record: VentaRecord, details: VentaDetailRecord[]) => void;
   setShowCreateSaleModal: (show: boolean) => void;
   setShowVentaDetails: (show: boolean) => void;
   setSelectedVenta: (venta: VentaRecord | null) => void;
-  setSelectedVentaDetails: (details: any[]) => void;
+  setSelectedVentaDetails: (details: VentaDetailRecord[]) => void;
   setVentas: (ventas: VentaRecord[] | ((prev: VentaRecord[]) => VentaRecord[])) => void;
   setError: (error: string | null) => void;
 }
@@ -64,7 +69,8 @@ export function useVentaMutations({
 
   const cashChangeData = (() => {
     if (paymentMethod !== 'cash') return null;
-    if (String(amountReceived || '').trim() === '') return { isValid: false, reason: 'empty' as const, change: 0, paid: 0 };
+    if (String(amountReceived || '').trim() === '')
+      return { isValid: false, reason: 'empty' as const, change: 0, paid: 0 };
     return calculateCashChange(cartTotal, amountReceived);
   })();
 
@@ -95,7 +101,9 @@ export function useVentaMutations({
 
     if (insufficientItems.length > 0) {
       const first = insufficientItems[0];
-      setError(`Stock insuficiente para "${first.product_name}" (disp: ${first.available_stock}, req: ${first.quantity}).`);
+      setError(
+        `Stock insuficiente para "${first.product_name}" (disp: ${first.available_stock}, req: ${first.quantity}).`,
+      );
       return;
     }
 
@@ -108,17 +116,22 @@ export function useVentaMutations({
     }
 
     if (paymentMethod === 'cash' && !cashChangeData?.isValid) {
-      setError(cashChangeData?.reason === 'insufficient'
-        ? 'El monto recibido es menor al total.'
-        : 'Ingresa un monto recibido válido.');
+      setError(
+        cashChangeData?.reason === 'insufficient'
+          ? 'El monto recibido es menor al total.'
+          : 'Ingresa un monto recibido válido.',
+      );
       return;
     }
 
     setSubmitting(true);
     try {
-      const idempotencySeed = `${paymentMethod}:${cart.map((item) => `${cartReferenceKey(item)}:${item.quantity}`).sort().join('|')}`;
+      const idempotencySeed = `${paymentMethod}:${cart
+        .map((item) => `${cartReferenceKey(item)}:${item.quantity}`)
+        .sort()
+        .join('|')}`;
       const amount = paymentMethod === 'cash' ? Number(cashChangeData?.paid || 0) : null;
-      const breakdown: Array<{ denomination: number; count: number }> = [];
+      const breakdown: { denomination: number; count: number }[] = [];
       const cartSnapshot = Array.isArray(cart) ? [...cart] : [];
       const createdAt = new Date().toISOString();
 
@@ -135,19 +148,24 @@ export function useVentaMutations({
       if (autoPrintEnabled) {
         try {
           const detailsFromSale = result.saleId ? await listVentaDetails(result.saleId) : [];
-          const details = Array.isArray(detailsFromSale) && detailsFromSale.length > 0
-            ? detailsFromSale
-            : cartSnapshot.map((item, index) => ({
-                id: `${result.saleId || 'tmp-sale'}:${index + 1}`,
-                sale_id: result.saleId || 'tmp-sale',
-                quantity: Number(item.quantity || 0),
-                unit_price: Number(item.unit_price || 0),
-                subtotal: Number(item.subtotal || (Number(item.quantity || 0) * Number(item.unit_price || 0))),
-                product_id: item.product_id || null,
-                combo_id: item.combo_id || null,
-                products: item.product_id ? { name: item.name, code: item.code || undefined } : null,
-                combos: item.combo_id ? { nombre: item.name } : null,
-              }));
+          const details =
+            Array.isArray(detailsFromSale) && detailsFromSale.length > 0
+              ? detailsFromSale
+              : cartSnapshot.map((item, index) => ({
+                  id: `${result.saleId || 'tmp-sale'}:${index + 1}`,
+                  sale_id: result.saleId || 'tmp-sale',
+                  quantity: Number(item.quantity || 0),
+                  unit_price: Number(item.unit_price || 0),
+                  subtotal: Number(
+                    item.subtotal || Number(item.quantity || 0) * Number(item.unit_price || 0),
+                  ),
+                  product_id: item.product_id || null,
+                  combo_id: item.combo_id || null,
+                  products: item.product_id
+                    ? { name: item.name, code: item.code || undefined }
+                    : null,
+                  combos: item.combo_id ? { nombre: item.name } : null,
+                }));
 
           const fallbackTotal = details.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
           const saleForPrint: VentaRecord = {
@@ -159,9 +177,10 @@ export function useVentaMutations({
             total: Number(result.total || fallbackTotal),
             created_at: createdAt,
             amount_received: amount,
-            change_amount: (paymentMethod === 'cash' && Number.isFinite(amount))
-              ? Math.max(Number(amount) - Number(result.total || fallbackTotal), 0)
-              : null,
+            change_amount:
+              paymentMethod === 'cash' && Number.isFinite(amount)
+                ? Math.max(Number(amount) - Number(result.total || fallbackTotal), 0)
+                : null,
             change_breakdown: [],
           };
 
@@ -173,7 +192,12 @@ export function useVentaMutations({
 
       clearCart();
       setShowCreateSaleModal(false);
-      await Promise.all([refreshSales(), import('../../../services/ventasService').then(m => m.listVentasCatalog(businessId, { forceRefresh: true })).then(setCatalogItems)]);
+      await Promise.all([
+        refreshSales(),
+        import('../../../services/ventasService')
+          .then((m) => m.listVentasCatalog(businessId, { forceRefresh: true }))
+          .then(setCatalogItems),
+      ]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al crear la venta.');
     } finally {
@@ -195,11 +219,14 @@ export function useVentaMutations({
     submitting,
   ]);
 
-  const askDeleteVenta = useCallback((venta: VentaRecord) => {
-    if (!canDeleteSales) return;
-    setVentaToDelete(venta);
-    setShowDeleteVentaModal(true);
-  }, [canDeleteSales]);
+  const askDeleteVenta = useCallback(
+    (venta: VentaRecord) => {
+      if (!canDeleteSales) return;
+      setVentaToDelete(venta);
+      setShowDeleteVentaModal(true);
+    },
+    [canDeleteSales],
+  );
 
   const confirmDeleteVenta = useCallback(async () => {
     if (!canDeleteSales || !ventaToDelete?.id) return;
@@ -226,7 +253,17 @@ export function useVentaMutations({
     } finally {
       setDeletingVenta(false);
     }
-  }, [businessId, canDeleteSales, selectedVenta?.id, ventaToDelete, setVentas, setShowVentaDetails, setSelectedVenta, setSelectedVentaDetails, setError]);
+  }, [
+    businessId,
+    canDeleteSales,
+    selectedVenta,
+    ventaToDelete,
+    setVentas,
+    setShowVentaDetails,
+    setSelectedVenta,
+    setSelectedVentaDetails,
+    setError,
+  ]);
 
   return {
     submitting,
