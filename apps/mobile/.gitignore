@@ -30,13 +30,20 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# Environment & secrets
 .env
-.env*.local
-# google-services.json (tracked for EAS Build)
+.env.*
+!.env.example
+
+# Firebase
+google-services.json
+!google-services.example.json
 
 # typescript
 *.tsbuildinfo
+
+# test coverage
+coverage/
 
 # generated native folders
 /ios
