@@ -2,19 +2,40 @@
   "extends": [
     "expo",
     "eslint:recommended",
-    "plugin:@typescript-eslint/recommended"
+    "plugin:@typescript-eslint/recommended",
+    "plugin:prettier/recommended"
   ],
   "parser": "@typescript-eslint/parser",
   "plugins": ["@typescript-eslint"],
   "rules": {
     "no-unused-vars": "off",
-    "@typescript-eslint/no-unused-vars": ["warn", {
-      "varsIgnorePattern": "^[A-Z_]",
-      "argsIgnorePattern": "^_",
-      "caughtErrorsIgnorePattern": "^_"
-    }],
-    "no-empty": ["warn", { "allowEmptyCatch": true }],
-    "no-console": ["warn", { "allow": ["warn", "error"] }]
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      {
+        "varsIgnorePattern": "^[A-Z_]",
+        "argsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ],
+    "no-empty": ["error", { "allowEmptyCatch": false }],
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-require-imports": "warn",
+    "prettier/prettier": "error",
+    "react-hooks/set-state-in-effect": "warn",
+    "react-hooks/refs": "warn",
+    "react-hooks/static-components": "warn",
+    "react-hooks/use-memo": "warn",
+    "react-hooks/preserve-manual-memoization": "warn",
+    "react-hooks/immutability": "warn",
+    "react-hooks/globals": "warn",
+    "react-hooks/error-boundaries": "warn",
+    "react-hooks/purity": "warn",
+    "react-hooks/set-state-in-render": "warn",
+    "react-hooks/config": "warn",
+    "react-hooks/gating": "warn",
+    "react-hooks/incompatible-library": "warn",
+    "react-hooks/unsupported-syntax": "warn"
   },
   "ignorePatterns": [
     "node_modules/",
@@ -22,6 +43,7 @@
     "ios/",
     ".expo/",
     "dist/",
-    "build/"
+    "build/",
+    "coverage/"
   ]
 }
