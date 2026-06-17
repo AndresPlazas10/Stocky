@@ -38,12 +38,11 @@ async function optimize({ file, width }) {
     pipeline.flatten({ background: '#FFFFFF' });
   }
 
-  await pipeline
-    [isJpeg ? 'jpeg' : 'png']({
-      quality: isJpeg ? 85 : undefined,
-      compressionLevel: 9,
-    })
-    .toFile(tempFile);
+  const encoder = isJpeg ? 'jpeg' : 'png';
+  await pipeline[encoder]({
+    quality: isJpeg ? 85 : undefined,
+    compressionLevel: 9,
+  }).toFile(tempFile);
 
   const originalSize = fs.statSync(file).size;
   const newSize = fs.statSync(tempFile).size;
