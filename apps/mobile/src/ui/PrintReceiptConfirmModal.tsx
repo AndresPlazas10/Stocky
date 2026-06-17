@@ -1,12 +1,5 @@
 import type { PropsWithChildren } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  Pressable,
-  ActivityIndicator,
-  TextInput,
-} from 'react-native';
+import { StyleSheet, Text, View, Pressable, ActivityIndicator, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StockyModal } from './StockyModal';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../theme/tokens';
@@ -77,18 +70,12 @@ export function PrintReceiptConfirmModal({
       <View style={styles.headerIcon}>
         <View style={styles.iconOuterRing}>
           <View style={styles.iconContainer}>
-            <Ionicons
-              name="receipt-outline"
-              size={34}
-              color="#7C3AED"
-            />
+            <Ionicons name="receipt-outline" size={34} color="#7C3AED" />
           </View>
         </View>
       </View>
       <Text style={styles.title}>¿Imprimir comprobante?</Text>
-      <Text style={styles.description}>
-        Se enviará a la impresora térmica configurada.
-      </Text>
+      <Text style={styles.description}>Se enviará a la impresora térmica configurada.</Text>
       <Text style={styles.fieldLabel}>Cliente (opcional)</Text>
       <TextInput
         style={styles.customerInput}
@@ -211,4 +198,3 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F3FF',
   },
 });
-

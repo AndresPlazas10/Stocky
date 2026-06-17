@@ -25,7 +25,12 @@ type Props = {
   source: 'owner' | 'employee';
 };
 
-export function InventarioPanel({ businessId, businessName, userId, source }: Props) {
+export function InventarioPanel({
+  businessId,
+  businessName: _businessName,
+  userId,
+  source,
+}: Props) {
   const {
     loading,
     refreshing,
@@ -35,7 +40,6 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
     suppliers,
     hasMoreProducts,
     loadingMore,
-    suppliersRef,
     inventoryRealtimeRefreshTimerRef,
     inventorySuppliersRefreshTimerRef,
     loadData,
@@ -90,22 +94,43 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
     channelKey: 'inventario',
     businessId,
     tables: [
-      { table: 'products', filter: businessId ? `business_id=eq.${businessId}` : undefined, onEvent: scheduleProductsRefresh },
-      { table: 'suppliers', filter: businessId ? `business_id=eq.${businessId}` : undefined, onEvent: scheduleSuppliersRefresh },
+      {
+        table: 'products',
+        filter: businessId ? `business_id=eq.${businessId}` : undefined,
+        onEvent: scheduleProductsRefresh,
+      },
+      {
+        table: 'suppliers',
+        filter: businessId ? `business_id=eq.${businessId}` : undefined,
+        onEvent: scheduleSuppliersRefresh,
+      },
     ],
-    onSubscribed: () => { scheduleProductsRefresh(); scheduleSuppliersRefresh(); },
-    onPollTick: () => { scheduleProductsRefresh(); scheduleSuppliersRefresh(); },
+    onSubscribed: () => {
+      scheduleProductsRefresh();
+      scheduleSuppliersRefresh();
+    },
+    onPollTick: () => {
+      scheduleProductsRefresh();
+      scheduleSuppliersRefresh();
+    },
     onCleanup: () => {
-      if (inventoryRealtimeRefreshTimerRef.current) { clearTimeout(inventoryRealtimeRefreshTimerRef.current); inventoryRealtimeRefreshTimerRef.current = null; }
-      if (inventorySuppliersRefreshTimerRef.current) { clearTimeout(inventorySuppliersRefreshTimerRef.current); inventorySuppliersRefreshTimerRef.current = null; }
+      if (inventoryRealtimeRefreshTimerRef.current) {
+        clearTimeout(inventoryRealtimeRefreshTimerRef.current);
+        inventoryRealtimeRefreshTimerRef.current = null;
+      }
+      if (inventorySuppliersRefreshTimerRef.current) {
+        clearTimeout(inventorySuppliersRefreshTimerRef.current);
+        inventorySuppliersRefreshTimerRef.current = null;
+      }
     },
   });
 
-  const suspendBackgroundList = form.showFormModal
-    || form.showUnitModal
-    || form.showSupplierModal
-    || mutations.showDeleteModal
-    || mutations.showDeactivateModal;
+  const suspendBackgroundList =
+    form.showFormModal ||
+    form.showUnitModal ||
+    form.showSupplierModal ||
+    mutations.showDeleteModal ||
+    mutations.showDeactivateModal;
 
   if (loading) {
     return (
@@ -144,20 +169,24 @@ export function InventarioPanel({ businessId, businessName, userId, source }: Pr
             refreshing={refreshing}
           />
         }
-        ListEmptyComponent={!suspendBackgroundList ? (
-          <Text style={styles.emptyText}>No hay productos para la busqueda actual.</Text>
-        ) : null}
+        ListEmptyComponent={
+          !suspendBackgroundList ? (
+            <Text style={styles.emptyText}>No hay productos para la busqueda actual.</Text>
+          ) : null
+        }
         ItemSeparatorComponent={() => <View style={styles.listItemSeparator} />}
-        ListFooterComponent={!suspendBackgroundList && hasMoreProducts ? (
-          <View style={styles.loadMoreWrap}>
-            <Text style={styles.loadMoreHint}>Mostrando {products.length} productos</Text>
-            <StockyButton onPress={loadMoreProducts} loading={loadingMore} variant="ghost">
-              Cargar más productos
-            </StockyButton>
-          </View>
-        ) : (
-          <View style={styles.listFooterSpacer} />
-        )}
+        ListFooterComponent={
+          !suspendBackgroundList && hasMoreProducts ? (
+            <View style={styles.loadMoreWrap}>
+              <Text style={styles.loadMoreHint}>Mostrando {products.length} productos</Text>
+              <StockyButton onPress={loadMoreProducts} loading={loadingMore} variant="ghost">
+                Cargar más productos
+              </StockyButton>
+            </View>
+          ) : (
+            <View style={styles.listFooterSpacer} />
+          )
+        }
         renderItem={({ item }) => (
           <ProductCard
             product={item}

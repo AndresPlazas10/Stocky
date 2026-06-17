@@ -8,7 +8,11 @@ interface LegalSectionProps {
   onOpenDeleteAccountInfo: () => void;
 }
 
-export function LegalSection({ onOpenTerms, onOpenPrivacy, onOpenDeleteAccountInfo }: LegalSectionProps) {
+export function LegalSection({
+  onOpenTerms,
+  onOpenPrivacy,
+  onOpenDeleteAccountInfo,
+}: LegalSectionProps) {
   return (
     <View style={styles.legalCard}>
       <View style={styles.legalHeader}>
@@ -49,7 +53,9 @@ export function LegalSection({ onOpenTerms, onOpenPrivacy, onOpenDeleteAccountIn
           </View>
           <View style={styles.legalButtonTextWrap}>
             <Text style={styles.legalButtonTitle}>Eliminar cuenta</Text>
-            <Text style={styles.legalButtonSubtitle}>Opciones para solicitar la eliminación de datos</Text>
+            <Text style={styles.legalButtonSubtitle}>
+              Opciones para solicitar la eliminación de datos
+            </Text>
           </View>
           <Ionicons name="open-outline" size={18} color="#DC2626" />
         </Pressable>

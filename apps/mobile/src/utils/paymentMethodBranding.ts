@@ -9,7 +9,9 @@ const BANK_LOGOS: Record<string, ImageSourcePropType> = {
 };
 
 export function normalizePaymentMethod(method: unknown): string {
-  return String(method || '').trim().toLowerCase();
+  return String(method || '')
+    .trim()
+    .toLowerCase();
 }
 
 export function isBankPaymentMethod(method: unknown): boolean {

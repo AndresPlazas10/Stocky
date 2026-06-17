@@ -8,8 +8,13 @@ import { STOCKY_COLORS } from '../../theme/tokens';
 import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
 import { DayFilterCalendarModal } from '../../ui/DayFilterCalendarModal';
 import { RecordFilterCard } from '../../ui/RecordFilterCard';
-import { formatCop } from '../../services/mesasService';
-import { listRecentCompras, listCompraDetails, type CompraRecord } from '../../services/comprasService';
+import { formatCop } from '../../utils/money';
+import { getErrorMessage } from '../../utils/error';
+import {
+  listRecentCompras,
+  listCompraDetails,
+  type CompraRecord,
+} from '../../services/comprasService';
 import { useSupabaseRealtime } from '../../hooks/useSupabaseRealtime';
 import { useCompraCart } from './hooks/useCompraCart';
 import { useCompraCatalog } from './hooks/useCompraCatalog';
@@ -33,7 +38,7 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
   const [loading, setLoading] = useState(true);
   const [loadingPurchases, setLoadingPurchases] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
   const [purchases, setPurchases] = useState<CompraRecord[]>([]);
   const [showCreatePurchaseModal, setShowCreatePurchaseModal] = useState(false);
   const [showFiltersExpanded, setShowFiltersExpanded] = useState(false);
@@ -43,18 +48,9 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
   const purchasesRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const catalogRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const {
-    cart,
-    setCart,
-    cartTotal,
-    addProductToCart,
-    updateCartQuantity,
-    clearCart,
-  } = useCompraCart();
+  const { cart, setCart, cartTotal, addProductToCart, updateCartQuantity } = useCompraCart();
 
   const {
-    products,
-    setProducts,
     suppliers,
     loadingCatalog,
     productSearch,
@@ -111,7 +107,6 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
     showPurchaseDetailsRef,
     openPurchaseDetails,
     closePurchaseDetails,
-    refreshDetailsForCurrentPurchase,
   } = useCompraDetails();
 
   const clearForm = useCallback(() => {
@@ -128,7 +123,9 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
       const purchasesResult = await listRecentCompras(businessId, 50, { forceRefresh: true });
       setPurchases(purchasesResult);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo refrescar el historial de compras.');
+      setError(
+        err instanceof Error ? err.message : 'No se pudo refrescar el historial de compras.',
+      );
     } finally {
       setLoadingPurchases(false);
     }
@@ -138,7 +135,9 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
     try {
       const purchasesResult = await listRecentCompras(businessId, 50, { forceRefresh: true });
       setPurchases(purchasesResult);
-    } catch {}
+    } catch (err) {
+      console.error('[Compras] error al refrescar compras silenciosamente:', getErrorMessage(err));
+    }
   }, [businessId]);
 
   const {
@@ -205,7 +204,9 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
         .eq('is_active', true)
         .maybeSingle();
       if (roleError) throw roleError;
-      const role = String(data?.role || '').trim().toLowerCase();
+      const role = String(data?.role || '')
+        .trim()
+        .toLowerCase();
       setCanDeletePurchases(role === 'admin' || role.includes('admin'));
     } catch {
       setCanDeletePurchases(false);
@@ -215,8 +216,10 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
   }, [businessId, source, userId]);
 
   useEffect(() => {
-    loadInitialData();
-    checkDeletePermission();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial de datos
+    void loadInitialData();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial de datos
+    void checkDeletePermission();
   }, [checkDeletePermission, loadInitialData]);
 
   const schedulePurchasesRefresh = useCallback(() => {
@@ -231,7 +234,12 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
           .catch(() => {});
       }
     }, 120);
-  }, [refreshPurchasesSilently, selectedPurchaseIdRef, showPurchaseDetailsRef, setSelectedPurchaseDetails]);
+  }, [
+    refreshPurchasesSilently,
+    selectedPurchaseIdRef,
+    showPurchaseDetailsRef,
+    setSelectedPurchaseDetails,
+  ]);
 
   const scheduleCatalogRefresh = useCallback(() => {
     if (catalogRealtimeRefreshTimerRef.current) return;
@@ -245,16 +253,40 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
     channelKey: 'compras',
     businessId,
     tables: [
-      { table: 'purchases', filter: businessId ? `business_id=eq.${businessId}` : undefined, onEvent: schedulePurchasesRefresh },
+      {
+        table: 'purchases',
+        filter: businessId ? `business_id=eq.${businessId}` : undefined,
+        onEvent: schedulePurchasesRefresh,
+      },
       { table: 'purchase_details', onEvent: schedulePurchasesRefresh },
-      { table: 'products', filter: businessId ? `business_id=eq.${businessId}` : undefined, onEvent: scheduleCatalogRefresh },
-      { table: 'suppliers', filter: businessId ? `business_id=eq.${businessId}` : undefined, onEvent: scheduleCatalogRefresh },
+      {
+        table: 'products',
+        filter: businessId ? `business_id=eq.${businessId}` : undefined,
+        onEvent: scheduleCatalogRefresh,
+      },
+      {
+        table: 'suppliers',
+        filter: businessId ? `business_id=eq.${businessId}` : undefined,
+        onEvent: scheduleCatalogRefresh,
+      },
     ],
-    onSubscribed: () => { schedulePurchasesRefresh(); scheduleCatalogRefresh(); },
-    onPollTick: () => { schedulePurchasesRefresh(); scheduleCatalogRefresh(); },
+    onSubscribed: () => {
+      schedulePurchasesRefresh();
+      scheduleCatalogRefresh();
+    },
+    onPollTick: () => {
+      schedulePurchasesRefresh();
+      scheduleCatalogRefresh();
+    },
     onCleanup: () => {
-      if (purchasesRealtimeRefreshTimerRef.current) { clearTimeout(purchasesRealtimeRefreshTimerRef.current); purchasesRealtimeRefreshTimerRef.current = null; }
-      if (catalogRealtimeRefreshTimerRef.current) { clearTimeout(catalogRealtimeRefreshTimerRef.current); catalogRealtimeRefreshTimerRef.current = null; }
+      if (purchasesRealtimeRefreshTimerRef.current) {
+        clearTimeout(purchasesRealtimeRefreshTimerRef.current);
+        purchasesRealtimeRefreshTimerRef.current = null;
+      }
+      if (catalogRealtimeRefreshTimerRef.current) {
+        clearTimeout(catalogRealtimeRefreshTimerRef.current);
+        catalogRealtimeRefreshTimerRef.current = null;
+      }
     },
   });
 
@@ -264,7 +296,9 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
       setError(null);
       listRecentCompras(businessId, 50, { forceRefresh: true })
         .then(setPurchases)
-        .catch((err) => setError(err instanceof Error ? err.message : 'No se pudo refrescar el historial.'))
+        .catch((err) =>
+          setError(err instanceof Error ? err.message : 'No se pudo refrescar el historial.'),
+        )
         .finally(() => setLoadingPurchases(false));
     }, [businessId]),
   );
@@ -274,13 +308,16 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
     void loadCatalogData(true);
   }, [loadCatalogData]);
 
-  const resolvePurchaseSupplierLabel = useCallback((purchase: CompraRecord) => {
-    const embedded = purchase.supplier?.business_name || purchase.supplier?.contact_name;
-    if (embedded) return embedded;
-    const sid = String(purchase.supplier_id || '').trim();
-    if (!sid) return 'Sin proveedor';
-    return supplierNameById.get(sid) || 'Sin proveedor';
-  }, [supplierNameById]);
+  const resolvePurchaseSupplierLabel = useCallback(
+    (purchase: CompraRecord) => {
+      const embedded = purchase.supplier?.business_name || purchase.supplier?.contact_name;
+      if (embedded) return embedded;
+      const sid = String(purchase.supplier_id || '').trim();
+      if (!sid) return 'Sin proveedor';
+      return supplierNameById.get(sid) || 'Sin proveedor';
+    },
+    [supplierNameById],
+  );
 
   return (
     <>
@@ -348,7 +385,9 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
               <Ionicons name="chevron-back" size={19} color={canPrevPage ? '#4F46E5' : '#9CA3AF'} />
             </Pressable>
             <View style={s.paginationPageBadge}>
-              <Text style={s.paginationPageText}>Pagina {currentPage} de {totalPages}</Text>
+              <Text style={s.paginationPageText}>
+                Pagina {currentPage} de {totalPages}
+              </Text>
             </View>
             <Pressable
               style={[
@@ -359,7 +398,11 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
               onPress={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
               disabled={!canNextPage}
             >
-              <Ionicons name="chevron-forward" size={19} color={canNextPage ? '#4F46E5' : '#9CA3AF'} />
+              <Ionicons
+                name="chevron-forward"
+                size={19}
+                color={canNextPage ? '#4F46E5' : '#9CA3AF'}
+              />
             </Pressable>
           </View>
         </View>
@@ -413,7 +456,11 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
         maxSelectableDate={maxSelectableDate}
         minSelectableDayKey={minSelectableDayKey}
         maxSelectableDayKey={maxSelectableDayKey}
-        onSelectDay={(key: string) => { setDayFilter(key); setCurrentPage(1); setShowDayFilterModal(false); }}
+        onSelectDay={(key: string) => {
+          setDayFilter(key);
+          setCurrentPage(1);
+          setShowDayFilterModal(false);
+        }}
         onClose={() => setShowDayFilterModal(false)}
         onMonthChange={setDayCalendarMonth}
       />

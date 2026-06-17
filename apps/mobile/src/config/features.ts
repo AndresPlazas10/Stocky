@@ -1,7 +1,9 @@
 import type { SectionId } from '../navigation/sections';
 
 function parseFlag(value: string | undefined, defaultValue: boolean): boolean {
-  const normalized = String(value || '').trim().toLowerCase();
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
   if (!normalized) return defaultValue;
   if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
   if (['0', 'false', 'no', 'off'].includes(normalized)) return false;

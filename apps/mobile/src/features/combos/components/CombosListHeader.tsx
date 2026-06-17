@@ -41,7 +41,10 @@ export const CombosListHeader = memo(function CombosListHeader({
         </View>
 
         <Pressable
-          style={[styles.heroCreateButton, (!canManageCombos || checkingPermissions) && styles.buttonDisabled]}
+          style={[
+            styles.heroCreateButton,
+            (!canManageCombos || checkingPermissions) && styles.buttonDisabled,
+          ]}
           onPress={onOpenCreate}
           disabled={!canManageCombos || checkingPermissions}
         >

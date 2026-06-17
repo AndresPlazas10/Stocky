@@ -32,7 +32,11 @@ export function UnitPickerModal({ visible, selectedUnit, onSelect, onClose }: Pr
             style={[styles.modalOptionItem, selected && styles.modalOptionItemSelected]}
             onPress={() => onSelect(unit.value)}
           >
-            <Text style={[styles.modalOptionItemText, selected && styles.modalOptionItemTextSelected]}>{unit.label}</Text>
+            <Text
+              style={[styles.modalOptionItemText, selected && styles.modalOptionItemTextSelected]}
+            >
+              {unit.label}
+            </Text>
           </Pressable>
         );
       })}

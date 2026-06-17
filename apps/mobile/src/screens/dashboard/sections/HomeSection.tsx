@@ -4,7 +4,12 @@ import { STOCKY_COLORS } from '../../../theme/tokens';
 import { useDashboardContext } from '../DashboardContext';
 
 export function HomeSection() {
-  const { session, businessContext, businessError, loadingBusiness } = useDashboardContext();
+  const {
+    session,
+    businessContext,
+    businessError: _businessError,
+    loadingBusiness,
+  } = useDashboardContext();
 
   return (
     <View style={styles.container}>
@@ -14,10 +19,7 @@ export function HomeSection() {
         </View>
       ) : null}
 
-      <MesasPanel
-        session={session}
-        businessContext={businessContext}
-      />
+      <MesasPanel session={session} businessContext={businessContext} />
     </View>
   );
 }

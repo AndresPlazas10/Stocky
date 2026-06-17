@@ -24,15 +24,17 @@ export const ProductCard = memo(function ProductCard({
   askDeleteProduct,
   activateProduct,
 }: Props) {
-  const lowStock = product.manage_stock !== false
-    && Number(product.stock || 0) <= Number(product.min_stock || 5);
+  const lowStock =
+    product.manage_stock !== false && Number(product.stock || 0) <= Number(product.min_stock || 5);
 
   return (
     <View style={styles.productCard}>
       <View style={styles.productHeader}>
         <View style={styles.productNameRow}>
           <Ionicons name="cube-outline" size={24} color="#111827" />
-          <Text style={styles.productName} numberOfLines={1}>{product.name}</Text>
+          <Text style={styles.productName} numberOfLines={1}>
+            {product.name}
+          </Text>
         </View>
       </View>
 
@@ -98,7 +100,9 @@ export const ProductCard = memo(function ProductCard({
             </View>
             <View style={styles.stockPill}>
               <Text style={[styles.stockText, lowStock && styles.lowStockText]}>
-                {product.manage_stock !== false ? `${product.stock} ${product.unit}` : 'Sin control'}
+                {product.manage_stock !== false
+                  ? `${product.stock} ${product.unit}`
+                  : 'Sin control'}
               </Text>
             </View>
           </View>
@@ -111,7 +115,9 @@ export const ProductCard = memo(function ProductCard({
               <Text style={styles.metricLabel}>MÍNIMO</Text>
             </View>
             <Text style={styles.minValue}>
-              {product.manage_stock !== false ? `${product.min_stock} ${product.unit}` : 'No aplica'}
+              {product.manage_stock !== false
+                ? `${product.min_stock} ${product.unit}`
+                : 'No aplica'}
             </Text>
           </View>
         </View>
@@ -121,13 +127,19 @@ export const ProductCard = memo(function ProductCard({
         <>
           <View style={styles.divider} />
           <View style={styles.productActionsRow}>
-            <Pressable style={[styles.editButton, styles.productActionHalf]} onPress={() => openEditModal(product)}>
+            <Pressable
+              style={[styles.editButton, styles.productActionHalf]}
+              onPress={() => openEditModal(product)}
+            >
               <Ionicons name="create-outline" size={18} color="#DDE6FF" />
               <Text style={styles.editButtonText}>Editar</Text>
             </Pressable>
 
             {product.is_active ? (
-              <Pressable style={[styles.deleteButton, styles.productActionHalf]} onPress={() => askDeleteProduct(product)}>
+              <Pressable
+                style={[styles.deleteButton, styles.productActionHalf]}
+                onPress={() => askDeleteProduct(product)}
+              >
                 <Ionicons name="trash-outline" size={18} color="#FFE4E6" />
                 <Text style={styles.deleteButtonText}>Eliminar</Text>
               </Pressable>

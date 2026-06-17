@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '../../lib/supabase';
+import { normalizeNumber, normalizeReference, normalizeText } from '../../utils/normalization';
 import type {
   ReportesPaymentBreakdownItem,
   ReportesPeriod,
@@ -27,33 +28,16 @@ type ReportesCompraRow = {
 
 const PAGE_SIZE = 500;
 
-function normalizeText(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
-function normalizeReference(value: unknown): string | null {
-  const normalized = normalizeText(value);
-  if (!normalized) return null;
-  const lower = normalized.toLowerCase();
-  if (lower === 'null' || lower === 'undefined') return null;
-  return normalized;
-}
-
-function normalizeNumber(value: unknown, fallback = 0): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 function resolvePeriodStart(period: ReportesPeriod): Date | null {
   const now = new Date();
   if (period === 'today') {
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   }
   if (period === '7d') {
-    return new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+    return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   }
   if (period === '30d') {
-    return new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+    return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   }
   return null;
 }
@@ -65,7 +49,7 @@ function isWithinPeriod(createdAt: string | null, periodStart: Date | null) {
   return Number.isFinite(ts) && ts >= periodStart.getTime();
 }
 
-function normalizeVentaRow(row: any): ReportesVentaRow {
+function normalizeVentaRow(row: Record<string, unknown>): ReportesVentaRow {
   return {
     id: normalizeText(row?.id),
     total: normalizeNumber(row?.total, 0),
@@ -75,7 +59,7 @@ function normalizeVentaRow(row: any): ReportesVentaRow {
   };
 }
 
-function normalizeCompraRow(row: any): ReportesCompraRow {
+function normalizeCompraRow(row: Record<string, unknown>): ReportesCompraRow {
   return {
     id: normalizeText(row?.id),
     total: normalizeNumber(row?.total, 0),
@@ -137,17 +121,17 @@ function buildTopSellers(ventas: ReportesVentaRow[]): ReportesSellerBreakdownIte
     .slice(0, 5);
 }
 
-function filterByPeriod<T extends { created_at: string | null }>(rows: T[], period: ReportesPeriod) {
+function filterByPeriod<T extends { created_at: string | null }>(
+  rows: T[],
+  period: ReportesPeriod,
+) {
   const periodStart = resolvePeriodStart(period);
   return rows.filter((row) => isWithinPeriod(row.created_at, periodStart));
 }
 
 async function fetchVentasForReportes(
   businessId: string,
-  {
-    period = '30d',
-    limit = null,
-  }: ListReportesOptions = {},
+  { period = '30d', limit = null }: ListReportesOptions = {},
 ): Promise<ReportesVentaRow[]> {
   const client = getSupabaseClient();
   const periodStart = resolvePeriodStart(period);
@@ -155,8 +139,9 @@ async function fetchVentasForReportes(
 
   const rows: ReportesVentaRow[] = [];
   let page = 0;
+  let hasMore = true;
 
-  while (true) {
+  while (hasMore) {
     const from = page * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
     let query = client
@@ -176,9 +161,13 @@ async function fetchVentasForReportes(
     const chunk = (Array.isArray(data) ? data : []).map(normalizeVentaRow);
     rows.push(...chunk);
 
-    if (chunk.length < PAGE_SIZE) break;
-    if (limit !== null && rows.length >= limit) break;
-    page += 1;
+    if (chunk.length < PAGE_SIZE) {
+      hasMore = false;
+    } else if (limit !== null && rows.length >= limit) {
+      hasMore = false;
+    } else {
+      page += 1;
+    }
   }
 
   if (limit !== null) {
@@ -189,10 +178,7 @@ async function fetchVentasForReportes(
 
 async function fetchComprasForReportes(
   businessId: string,
-  {
-    period = '30d',
-    limit = null,
-  }: ListReportesOptions = {},
+  { period = '30d', limit = null }: ListReportesOptions = {},
 ): Promise<ReportesCompraRow[]> {
   const client = getSupabaseClient();
   const periodStart = resolvePeriodStart(period);
@@ -200,8 +186,9 @@ async function fetchComprasForReportes(
 
   const rows: ReportesCompraRow[] = [];
   let page = 0;
+  let hasMore = true;
 
-  while (true) {
+  while (hasMore) {
     const from = page * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
     let query = client
@@ -221,9 +208,13 @@ async function fetchComprasForReportes(
     const chunk = (Array.isArray(data) ? data : []).map(normalizeCompraRow);
     rows.push(...chunk);
 
-    if (chunk.length < PAGE_SIZE) break;
-    if (limit !== null && rows.length >= limit) break;
-    page += 1;
+    if (chunk.length < PAGE_SIZE) {
+      hasMore = false;
+    } else if (limit !== null && rows.length >= limit) {
+      hasMore = false;
+    } else {
+      page += 1;
+    }
   }
 
   if (limit !== null) {
@@ -234,10 +225,7 @@ async function fetchComprasForReportes(
 
 export async function listReportesByBusinessId(
   businessId: string,
-  {
-    period = '30d',
-    limit = null,
-  }: ListReportesOptions = {},
+  { period = '30d', limit = null }: ListReportesOptions = {},
 ): Promise<ReportesSnapshot> {
   const [ventasRaw, comprasRaw] = await Promise.all([
     fetchVentasForReportes(businessId, { period, limit }),
@@ -267,20 +255,14 @@ export async function listReportesByBusinessId(
 
 export async function listComprasForReportes(
   businessId: string,
-  {
-    period = '30d',
-    limit = null,
-  }: ListReportesOptions = {},
+  { period = '30d', limit = null }: ListReportesOptions = {},
 ): Promise<ReportesCompraRow[]> {
   return fetchComprasForReportes(businessId, { period, limit });
 }
 
 export async function listVentasForReportes(
   businessId: string,
-  {
-    period = '30d',
-    limit = null,
-  }: ListReportesOptions = {},
+  { period = '30d', limit = null }: ListReportesOptions = {},
 ): Promise<ReportesVentaRow[]> {
   return fetchVentasForReportes(businessId, { period, limit });
 }

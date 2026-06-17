@@ -1,6 +1,7 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import type { SectionId } from '../../navigation/sections';
+import { SECTION_IDS } from '../../navigation/sections';
 import { SectionHost } from './sections/SectionHost';
 import { StockyBackground } from '../../ui/StockyBackground';
 
@@ -9,14 +10,16 @@ type Props = {
 };
 
 export function DashboardSectionScreen({ sectionId: propSectionId }: Props = {}) {
-  const route = useRoute<any>();
-  const sectionId = propSectionId || (route?.params?.sectionId as SectionId);
+  const route = useRoute();
+  const routeSectionId = SECTION_IDS.includes(route?.name as SectionId)
+    ? (route?.name as SectionId)
+    : undefined;
+  const sectionId = propSectionId || routeSectionId;
 
   if (!sectionId) return null;
 
-  const useNativeSectionScroll = sectionId === 'inventario'
-    || sectionId === 'combos'
-    || sectionId === 'proveedores';
+  const useNativeSectionScroll =
+    sectionId === 'inventario' || sectionId === 'combos' || sectionId === 'proveedores';
 
   return (
     <StockyBackground>

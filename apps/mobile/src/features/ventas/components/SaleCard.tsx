@@ -34,7 +34,9 @@ export const SaleCard = memo(function SaleCard({
         <View style={s.saleInfoColumn}>
           <View style={s.saleMetaBlock}>
             <Text style={s.saleMetaLabel}>CLIENTE</Text>
-            <Text style={s.saleMetaValue} numberOfLines={1}>Venta general</Text>
+            <Text style={s.saleMetaValue} numberOfLines={1}>
+              Venta general
+            </Text>
           </View>
           <View style={s.saleMetaBlock}>
             <Text style={s.saleMetaLabel}>VENDEDOR</Text>
@@ -49,9 +51,18 @@ export const SaleCard = memo(function SaleCard({
             <Ionicons name="wallet-outline" size={20} color="#111827" />
             <View style={s.paymentPill}>
               {isBankPaymentMethod(venta.payment_method) ? (
-                <Image source={getBankLogoSource(venta.payment_method)!} style={s.paymentIconLogo} resizeMode="contain" />
+                <Image
+                  source={getBankLogoSource(venta.payment_method)!}
+                  style={s.paymentIconLogo}
+                  resizeMode="contain"
+                />
               ) : (
-                <Ionicons name={getPaymentMethodTheme(venta.payment_method).icon} size={13} color="#166534" style={s.paymentIcon} />
+                <Ionicons
+                  name={getPaymentMethodTheme(venta.payment_method).icon}
+                  size={13}
+                  color="#166534"
+                  style={s.paymentIcon}
+                />
               )}
               <Text style={s.paymentPillText}>{getPaymentMethodLabel(venta.payment_method)}</Text>
             </View>
@@ -64,7 +75,10 @@ export const SaleCard = memo(function SaleCard({
       </View>
 
       <View style={s.saleActionRow}>
-        <Pressable style={[s.saleDetailsButton, s.saleActionHalf]} onPress={() => onViewDetails(venta)}>
+        <Pressable
+          style={[s.saleDetailsButton, s.saleActionHalf]}
+          onPress={() => onViewDetails(venta)}
+        >
           <Ionicons name="eye-outline" size={20} color="#D1D5DB" />
           <Text style={s.saleDetailsText}>Ver Detalles</Text>
         </Pressable>

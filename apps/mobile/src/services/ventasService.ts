@@ -1,11 +1,17 @@
+import type { PostgrestError } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../lib/supabase';
-import { notifyAdminLowStock, notifyAdminSaleRegistered } from '../notifications/mobileNotificationsService';
+import {
+  notifyAdminLowStock,
+  notifyAdminSaleRegistered,
+} from '../notifications/mobileNotificationsService';
 import {
   listCatalogItems,
   type ListCatalogItemsOptions,
   type MesaOrderCatalogItem,
 } from './mesaOrderService';
 import type { CashChangeEntry, PaymentMethod } from './mesaCheckoutService';
+import { normalizeNumber, normalizeReference, normalizeText } from '../utils/normalization';
+import { isFunctionUnavailableError, isMissingColumnError } from '../utils/supabaseErrors';
 import type { SupabaseErrorLike } from '../types/errors';
 
 export type VentaRecord = {
@@ -60,110 +66,76 @@ type SellerContext = {
 const SELLER_CONTEXT_CACHE_TTL_MS = 60_000;
 const DEFAULT_SALES_HISTORY_CACHE_TTL_MS = 15_000;
 const DEFAULT_FIRST_VENTA_DAY_CACHE_TTL_MS = 5 * 60_000;
-const sellerContextCacheByKey = new Map<string, {
-  value: SellerContext;
-  expiresAt: number;
-}>();
+const sellerContextCacheByKey = new Map<
+  string,
+  {
+    value: SellerContext;
+    expiresAt: number;
+  }
+>();
 const sellerContextInFlightByKey = new Map<string, Promise<SellerContext>>();
-const salesHistoryCacheByKey = new Map<string, {
-  items: VentaRecord[];
-  cachedAt: number;
-}>();
+const salesHistoryCacheByKey = new Map<
+  string,
+  {
+    items: VentaRecord[];
+    cachedAt: number;
+  }
+>();
 const salesHistoryInFlightByKey = new Map<string, Promise<VentaRecord[]>>();
-const firstVentaDayCacheByBusinessId = new Map<string, {
-  dayKey: string | null;
-  cachedAt: number;
-}>();
+const firstVentaDayCacheByBusinessId = new Map<
+  string,
+  {
+    dayKey: string | null;
+    cachedAt: number;
+  }
+>();
 const firstVentaDayInFlightByBusinessId = new Map<string, Promise<string | null>>();
 let recentSalesRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
 
-function normalizeText(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
-function normalizeNumber(value: unknown, fallback = 0): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function normalizeReference(value: unknown): string | null {
-  const normalized = normalizeText(value);
-  if (!normalized) return null;
-  const lower = normalized.toLowerCase();
-  if (lower === 'null' || lower === 'undefined') return null;
-  return normalized;
-}
-
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function isFunctionUnavailableError(errorLike: SupabaseErrorLike, functionName: string) {
-  const message = String(errorLike?.message || '').toLowerCase();
-  if (!message) return false;
-
-  return message.includes(String(functionName || '').toLowerCase())
-    && (
-      message.includes('does not exist')
-      || message.includes('could not find the function')
-      || message.includes('schema cache')
-      || message.includes('pgrst202')
-      || message.includes('not found')
-    );
-}
-
-function isMissingColumnError(
-  errorLike: SupabaseErrorLike,
-  { tableName, columnName }: { tableName: string; columnName: string },
-) {
-  const message = String(errorLike?.message || '').toLowerCase();
-  return (
-    message.includes('column')
-    && message.includes(`"${String(columnName || '').toLowerCase()}"`)
-    && message.includes('relation')
-    && message.includes(`"${String(tableName || '').toLowerCase()}"`)
-    && message.includes('does not exist')
-  );
 }
 
 function isMissingListRecentSalesMobileRpcError(errorLike: SupabaseErrorLike) {
   const code = String(errorLike?.code || '').toLowerCase();
   const message = String(errorLike?.message || '').toLowerCase();
   return (
-    code === 'pgrst202'
-    || code === '42883'
-    || (
-      message.includes('list_recent_sales_mobile')
-      && (
-        message.includes('does not exist')
-        || message.includes('could not find the function')
-        || message.includes('schema cache')
-        || message.includes('not found')
-      )
-    )
+    code === 'pgrst202' ||
+    code === '42883' ||
+    (message.includes('list_recent_sales_mobile') &&
+      (message.includes('does not exist') ||
+        message.includes('could not find the function') ||
+        message.includes('schema cache') ||
+        message.includes('not found')))
   );
 }
 
 function isAdminRole(roleLike: unknown) {
   const role = normalizeText(roleLike).toLowerCase();
-  return role === 'owner'
-    || role === 'admin'
-    || role === 'administrador'
-    || role === 'propietario'
-    || role.includes('admin');
+  return (
+    role === 'owner' ||
+    role === 'admin' ||
+    role === 'administrador' ||
+    role === 'propietario' ||
+    role.includes('admin')
+  );
 }
 
-function resolveUserDisplayName(user: any): string | null {
+function resolveUserDisplayName(user: unknown): string | null {
   if (!user || typeof user !== 'object') return null;
-  const metadata = user?.user_metadata && typeof user.user_metadata === 'object'
-    ? user.user_metadata
-    : {};
+  const userRecord = user as Record<string, unknown>;
+  const metadata =
+    userRecord.user_metadata &&
+    typeof userRecord.user_metadata === 'object' &&
+    userRecord.user_metadata !== null
+      ? (userRecord.user_metadata as Record<string, unknown>)
+      : {};
   const candidates = [
     metadata?.full_name,
     metadata?.name,
     metadata?.display_name,
-    user?.full_name,
-    user?.email,
+    userRecord?.full_name,
+    userRecord?.email,
   ];
 
   for (const candidate of candidates) {
@@ -174,13 +146,7 @@ function resolveUserDisplayName(user: any): string | null {
   return null;
 }
 
-function buildIdempotencyKey({
-  businessId,
-  seed,
-}: {
-  businessId: string;
-  seed: string;
-}) {
+function buildIdempotencyKey({ businessId, seed }: { businessId: string; seed: string }) {
   return `stocky:mobile:sale:${businessId}:${seed}`;
 }
 
@@ -198,7 +164,7 @@ async function resolveAccessToken(): Promise<string | null> {
   return session?.access_token ? String(session.access_token) : null;
 }
 
-function normalizeCashBreakdown(breakdown: CashChangeEntry[] | null | undefined) {
+function normalizeCashBreakdown(breakdown: unknown) {
   return (Array.isArray(breakdown) ? breakdown : [])
     .map((entry) => ({
       denomination: Math.round(normalizeNumber(entry?.denomination, 0)),
@@ -237,17 +203,14 @@ async function resolveSellerContext(businessId: string) {
         .eq('business_id', normalizedBusinessId)
         .eq('is_active', true)
         .maybeSingle(),
-      client
-        .from('businesses')
-        .select('created_by')
-        .eq('id', normalizedBusinessId)
-        .maybeSingle(),
+      client.from('businesses').select('created_by').eq('id', normalizedBusinessId).maybeSingle(),
     ]);
 
     if (employeeResult.error) throw employeeResult.error;
     if (businessResult.error) throw businessResult.error;
 
-    const isOwner = normalizeReference(businessResult.data?.created_by) === normalizeReference(user.id);
+    const isOwner =
+      normalizeReference(businessResult.data?.created_by) === normalizeReference(user.id);
     const isAdmin = isAdminRole(employeeResult.data?.role);
     const employeeName = normalizeReference(employeeResult.data?.full_name);
     const userDisplayName = resolveUserDisplayName(user);
@@ -255,9 +218,8 @@ async function resolveSellerContext(businessId: string) {
     const isEmployee = !isOwner && !isAdmin;
     return {
       userId: user.id,
-      sellerName: isOwner || isAdmin
-        ? 'Administrador'
-        : (employeeName || userDisplayName || 'Vendedor'),
+      sellerName:
+        isOwner || isAdmin ? 'Administrador' : employeeName || userDisplayName || 'Vendedor',
       isEmployee,
     };
   })();
@@ -276,18 +238,19 @@ async function resolveSellerContext(businessId: string) {
   }
 }
 
-function normalizeVentaRecord(row: any): VentaRecord {
+function normalizeVentaRecord(row: Record<string, unknown>): VentaRecord {
   const paymentMethod = normalizeText(row?.payment_method).toLowerCase();
-  const safeMethod: PaymentMethod = paymentMethod === 'card'
-    || paymentMethod === 'transfer'
-    || paymentMethod === 'mixed'
-    || paymentMethod === 'nequi'
-    || paymentMethod === 'bancolombia'
-    || paymentMethod === 'banco_bogota'
-    || paymentMethod === 'nu'
-    || paymentMethod === 'davivienda'
-    ? paymentMethod
-    : 'cash';
+  const safeMethod: PaymentMethod =
+    paymentMethod === 'card' ||
+    paymentMethod === 'transfer' ||
+    paymentMethod === 'mixed' ||
+    paymentMethod === 'nequi' ||
+    paymentMethod === 'bancolombia' ||
+    paymentMethod === 'banco_bogota' ||
+    paymentMethod === 'nu' ||
+    paymentMethod === 'davivienda'
+      ? paymentMethod
+      : 'cash';
 
   return {
     id: normalizeText(row?.id),
@@ -297,30 +260,43 @@ function normalizeVentaRecord(row: any): VentaRecord {
     payment_method: safeMethod,
     total: normalizeNumber(row?.total, 0),
     created_at: normalizeReference(row?.created_at),
-    amount_received: row?.amount_received === null ? null : normalizeNumber(row?.amount_received, 0),
+    amount_received:
+      row?.amount_received === null ? null : normalizeNumber(row?.amount_received, 0),
     change_amount: row?.change_amount === null ? null : normalizeNumber(row?.change_amount, 0),
     change_breakdown: normalizeCashBreakdown(row?.change_breakdown),
   };
 }
 
-function normalizeVentaDetailRecord(row: any): VentaDetailRecord {
+function normalizeVentaDetailRecord(row: Record<string, unknown>): VentaDetailRecord {
+  const productRecord =
+    row.products && typeof row.products === 'object' && row.products !== null
+      ? (row.products as Record<string, unknown>)
+      : null;
+  const comboRecord =
+    row.combos && typeof row.combos === 'object' && row.combos !== null
+      ? (row.combos as Record<string, unknown>)
+      : null;
+
   return {
     id: normalizeText(row?.id),
     sale_id: normalizeText(row?.sale_id),
     quantity: normalizeNumber(row?.quantity, 0),
     unit_price: normalizeNumber(row?.unit_price, 0),
-    subtotal: normalizeNumber(row?.subtotal, normalizeNumber(row?.quantity, 0) * normalizeNumber(row?.unit_price, 0)),
+    subtotal: normalizeNumber(
+      row?.subtotal,
+      normalizeNumber(row?.quantity, 0) * normalizeNumber(row?.unit_price, 0),
+    ),
     product_id: normalizeReference(row?.product_id),
     combo_id: normalizeReference(row?.combo_id),
-    products: row?.products
+    products: productRecord
       ? {
-          name: row.products.name ? String(row.products.name) : undefined,
-          code: row.products.code ? String(row.products.code) : undefined,
+          name: productRecord.name ? String(productRecord.name) : undefined,
+          code: productRecord.code ? String(productRecord.code) : undefined,
         }
       : null,
-    combos: row?.combos
+    combos: comboRecord
       ? {
-          nombre: row.combos.nombre ? String(row.combos.nombre) : undefined,
+          nombre: comboRecord.nombre ? String(comboRecord.nombre) : undefined,
         }
       : null,
   };
@@ -399,51 +375,51 @@ export async function getFirstVentaDayKey(
 
   if (!forceRefresh) {
     const cached = firstVentaDayCacheByBusinessId.get(normalizedBusinessId);
-    if (cached && (Date.now() - cached.cachedAt) <= ttlMs) return cached.dayKey;
+    if (cached && Date.now() - cached.cachedAt <= ttlMs) return cached.dayKey;
   }
 
   const inFlight = firstVentaDayInFlightByBusinessId.get(normalizedBusinessId);
   if (inFlight) return inFlight;
 
   const request = (async () => {
-  const client = getSupabaseClient();
-  const { data, error } = await client
-    .from('sales')
-    .select('created_at')
-    .eq('business_id', normalizedBusinessId)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('sales')
+      .select('created_at')
+      .eq('business_id', normalizedBusinessId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
 
-  if (error) throw error;
+    if (error) throw error;
 
-  const rawDate = normalizeReference(data?.created_at);
-  if (!rawDate) {
+    const rawDate = normalizeReference(data?.created_at);
+    if (!rawDate) {
+      firstVentaDayCacheByBusinessId.set(normalizedBusinessId, {
+        dayKey: null,
+        cachedAt: Date.now(),
+      });
+      return null;
+    }
+
+    const parsed = new Date(rawDate);
+    if (Number.isNaN(parsed.getTime())) {
+      firstVentaDayCacheByBusinessId.set(normalizedBusinessId, {
+        dayKey: null,
+        cachedAt: Date.now(),
+      });
+      return null;
+    }
+
+    const year = parsed.getFullYear();
+    const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
+    const day = `${parsed.getDate()}`.padStart(2, '0');
+    const dayKey = `${year}-${month}-${day}`;
     firstVentaDayCacheByBusinessId.set(normalizedBusinessId, {
-      dayKey: null,
+      dayKey,
       cachedAt: Date.now(),
     });
-    return null;
-  }
-
-  const parsed = new Date(rawDate);
-  if (Number.isNaN(parsed.getTime())) {
-    firstVentaDayCacheByBusinessId.set(normalizedBusinessId, {
-      dayKey: null,
-      cachedAt: Date.now(),
-    });
-    return null;
-  }
-
-  const year = parsed.getFullYear();
-  const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
-  const day = `${parsed.getDate()}`.padStart(2, '0');
-  const dayKey = `${year}-${month}-${day}`;
-  firstVentaDayCacheByBusinessId.set(normalizedBusinessId, {
-    dayKey,
-    cachedAt: Date.now(),
-  });
-  return dayKey;
+    return dayKey;
   })();
 
   firstVentaDayInFlightByBusinessId.set(normalizedBusinessId, request);
@@ -474,7 +450,7 @@ export async function listRecentVentas(
 
   if (!forceRefresh) {
     const cached = salesHistoryCacheByKey.get(cacheKey);
-    if (cached && (Date.now() - cached.cachedAt) <= ttlMs) return cached.items;
+    if (cached && Date.now() - cached.cachedAt <= ttlMs) return cached.items;
   }
 
   const inFlight = salesHistoryInFlightByKey.get(cacheKey);
@@ -482,7 +458,8 @@ export async function listRecentVentas(
 
   const request = (async () => {
     const client = getSupabaseClient();
-    const fullSelect = 'id,business_id,user_id,seller_name,payment_method,total,created_at,amount_received,change_amount,change_breakdown';
+    const fullSelect =
+      'id,business_id,user_id,seller_name,payment_method,total,created_at,amount_received,change_amount,change_breakdown';
     const fallbackSelect = 'id,business_id,user_id,seller_name,payment_method,total,created_at';
 
     if (recentSalesRpcCompatibility !== 'unsupported') {
@@ -493,7 +470,9 @@ export async function listRecentVentas(
 
       if (!rpcResult.error) {
         recentSalesRpcCompatibility = 'supported';
-        const normalizedRpc = (Array.isArray(rpcResult.data) ? rpcResult.data : []).map(normalizeVentaRecord);
+        const normalizedRpc = (Array.isArray(rpcResult.data) ? rpcResult.data : []).map(
+          normalizeVentaRecord,
+        );
         salesHistoryCacheByKey.set(cacheKey, {
           items: normalizedRpc,
           cachedAt: Date.now(),
@@ -524,9 +503,11 @@ export async function listRecentVentas(
       return normalized;
     }
 
-    if (isMissingColumnError(full.error, { tableName: 'sales', columnName: 'amount_received' })
-      || isMissingColumnError(full.error, { tableName: 'sales', columnName: 'change_amount' })
-      || isMissingColumnError(full.error, { tableName: 'sales', columnName: 'change_breakdown' })) {
+    if (
+      isMissingColumnError(full.error, { tableName: 'sales', columnName: 'amount_received' }) ||
+      isMissingColumnError(full.error, { tableName: 'sales', columnName: 'change_amount' }) ||
+      isMissingColumnError(full.error, { tableName: 'sales', columnName: 'change_breakdown' })
+    ) {
       const fallback = await client
         .from('sales')
         .select(fallbackSelect)
@@ -535,7 +516,9 @@ export async function listRecentVentas(
         .limit(normalizedLimit);
 
       if (fallback.error) throw fallback.error;
-      const normalized = (Array.isArray(fallback.data) ? fallback.data : []).map(normalizeVentaRecord);
+      const normalized = (Array.isArray(fallback.data) ? fallback.data : []).map(
+        normalizeVentaRecord,
+      );
       salesHistoryCacheByKey.set(cacheKey, {
         items: normalized,
         cachedAt: Date.now(),
@@ -563,14 +546,16 @@ export async function listVentaDetails(saleId: string): Promise<VentaDetailRecor
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     let from = 0;
     let hasMore = true;
-    const rows: any[] = [];
+    const rows: Record<string, unknown>[] = [];
 
     try {
       while (hasMore) {
         const to = from + pageSize - 1;
         const batch = await client
           .from('sale_details')
-          .select('id,sale_id,quantity,unit_price,subtotal,product_id,combo_id,products(name,code),combos(nombre)')
+          .select(
+            'id,sale_id,quantity,unit_price,subtotal,product_id,combo_id,products(name,code),combos(nombre)',
+          )
           .eq('sale_id', saleId)
           .order('id', { ascending: true })
           .range(from, to);
@@ -620,7 +605,7 @@ export async function createVenta({
   }
 
   const saleTotal = itemsForRpc.reduce(
-    (sum, item) => sum + (normalizeNumber(item.quantity, 0) * normalizeNumber(item.unit_price, 0)),
+    (sum, item) => sum + normalizeNumber(item.quantity, 0) * normalizeNumber(item.unit_price, 0),
     0,
   );
   const hasComboItems = itemsForRpc.some((item) => Boolean(item.combo_id));
@@ -652,16 +637,22 @@ export async function createVenta({
     p_idempotency_key: idempotencyKey,
   };
 
-  let rpcData: any = null;
-  let rpcError: any = null;
+  let rpcData: unknown = null;
+  let rpcError: PostgrestError | null = null;
 
   if (hasComboItems) {
     ({ data: rpcData, error: rpcError } = await client.rpc('create_sale_complete', basePayload));
     if (rpcError && isFunctionUnavailableError(rpcError, 'create_sale_complete')) {
-      ({ data: rpcData, error: rpcError } = await client.rpc('create_sale_complete_idempotent', idempotentPayload));
+      ({ data: rpcData, error: rpcError } = await client.rpc(
+        'create_sale_complete_idempotent',
+        idempotentPayload,
+      ));
     }
   } else {
-    ({ data: rpcData, error: rpcError } = await client.rpc('create_sale_complete_idempotent', idempotentPayload));
+    ({ data: rpcData, error: rpcError } = await client.rpc(
+      'create_sale_complete_idempotent',
+      idempotentPayload,
+    ));
     if (rpcError && isFunctionUnavailableError(rpcError, 'create_sale_complete_idempotent')) {
       ({ data: rpcData, error: rpcError } = await client.rpc('create_sale_complete', basePayload));
     }
@@ -684,7 +675,10 @@ export async function createVenta({
       .from('sales')
       .update({
         amount_received: normalizedAmountReceived,
-        change_amount: normalizedAmountReceived !== null ? Math.max(normalizedAmountReceived - saleTotal, 0) : null,
+        change_amount:
+          normalizedAmountReceived !== null
+            ? Math.max(normalizedAmountReceived - saleTotal, 0)
+            : null,
         change_breakdown: normalizedChangeBreakdown,
       })
       .eq('id', saleId)
@@ -737,10 +731,7 @@ export async function deleteVentaWithDetails({
 }): Promise<void> {
   const client = getSupabaseClient();
 
-  const deleteDetails = await client
-    .from('sale_details')
-    .delete()
-    .eq('sale_id', saleId);
+  const deleteDetails = await client.from('sale_details').delete().eq('sale_id', saleId);
 
   if (deleteDetails.error) {
     throw deleteDetails.error;

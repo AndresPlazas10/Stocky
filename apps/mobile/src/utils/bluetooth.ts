@@ -6,6 +6,7 @@ export const BLUETOOTH_PRINT_REQUIRED_MESSAGE =
 
 export async function isBluetoothEnabled(): Promise<boolean> {
   try {
+    if (!BluetoothClassic) return false;
     return await BluetoothClassic.isBluetoothEnabled();
   } catch (error) {
     console.error('[BT] isBluetoothEnabled failed:', error);
@@ -18,28 +19,28 @@ export async function ensureBluetoothEnabled(): Promise<boolean> {
   if (enabled) return true;
 
   return new Promise<boolean>((resolve) => {
-    Alert.alert(
-      'Bluetooth desactivado',
-      BLUETOOTH_PRINT_REQUIRED_MESSAGE,
-      [
-        { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
-        {
-          text: 'Activar Bluetooth',
-          onPress: async () => {
-            if (Platform.OS === 'android') {
-              try {
-                const result = await BluetoothClassic.requestBluetoothEnabled();
-                resolve(result);
-              } catch {
+    Alert.alert('Bluetooth desactivado', BLUETOOTH_PRINT_REQUIRED_MESSAGE, [
+      { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
+      {
+        text: 'Activar Bluetooth',
+        onPress: async () => {
+          if (Platform.OS === 'android') {
+            try {
+              if (!BluetoothClassic) {
                 resolve(false);
+                return;
               }
-            } else {
-              await Linking.openSettings();
+              const result = await BluetoothClassic.requestBluetoothEnabled();
+              resolve(result);
+            } catch {
               resolve(false);
             }
-          },
+          } else {
+            await Linking.openSettings();
+            resolve(false);
+          }
         },
-      ],
-    );
+      },
+    ]);
   });
 }

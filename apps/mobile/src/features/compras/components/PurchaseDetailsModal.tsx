@@ -47,7 +47,7 @@ export function PurchaseDetailsModal({
       footerStyle={s.purchaseDetailsFooter}
       onClose={onClose}
       hideCloseButton
-      headerSlot={(
+      headerSlot={
         <LinearGradient
           colors={['#4338CA', '#6D28D9']}
           start={{ x: 0, y: 0 }}
@@ -61,7 +61,9 @@ export function PurchaseDetailsModal({
             <View style={s.purchaseDetailsHeaderTextWrap}>
               <Text style={s.purchaseDetailsHeaderTitle}>Detalle de compra</Text>
               <Text style={s.purchaseDetailsHeaderSubtitle}>
-                {selectedPurchase ? `ID ${selectedPurchase.id.slice(0, 8).toUpperCase()}` : 'Sin referencia'}
+                {selectedPurchase
+                  ? `ID ${selectedPurchase.id.slice(0, 8).toUpperCase()}`
+                  : 'Sin referencia'}
               </Text>
             </View>
           </View>
@@ -69,14 +71,14 @@ export function PurchaseDetailsModal({
             <Ionicons name="close" size={20} color="#EDE9FE" />
           </Pressable>
         </LinearGradient>
-      )}
-      footer={(
+      }
+      footer={
         <View style={s.modalFooter}>
           <Pressable style={s.secondaryButton} onPress={onClose}>
             <Text style={s.secondaryButtonText}>Cerrar</Text>
           </Pressable>
         </View>
-      )}
+      }
     >
       {selectedPurchase ? (
         <View style={s.purchaseDetailsHeroCard}>
@@ -114,12 +116,15 @@ export function PurchaseDetailsModal({
             </View>
             <View style={s.purchaseDetailsHeroMetaItem}>
               <Ionicons name="calendar-outline" size={14} color="#64748B" />
-              <Text style={s.purchaseDetailsHeroMetaText}>{formatDateTime(selectedPurchase.created_at)}</Text>
+              <Text style={s.purchaseDetailsHeroMetaText}>
+                {formatDateTime(selectedPurchase.created_at)}
+              </Text>
             </View>
             <View style={s.purchaseDetailsHeroMetaItem}>
               <Ionicons name="basket-outline" size={14} color="#64748B" />
               <Text style={s.purchaseDetailsHeroMetaText}>
-                {selectedPurchaseItemsCount} {selectedPurchaseItemsCount === 1 ? 'unidad' : 'unidades'}
+                {selectedPurchaseItemsCount}{' '}
+                {selectedPurchaseItemsCount === 1 ? 'unidad' : 'unidades'}
               </Text>
             </View>
           </View>
@@ -137,7 +142,8 @@ export function PurchaseDetailsModal({
         <Text style={s.purchaseDetailsItemsSectionTitle}>Productos comprados</Text>
         <View style={s.purchaseDetailsItemsCountBadge}>
           <Text style={s.purchaseDetailsItemsCountText}>
-            {selectedPurchaseDetails.length} {selectedPurchaseDetails.length === 1 ? 'item' : 'items'}
+            {selectedPurchaseDetails.length}{' '}
+            {selectedPurchaseDetails.length === 1 ? 'item' : 'items'}
           </Text>
         </View>
       </View>
@@ -160,9 +166,12 @@ export function PurchaseDetailsModal({
                   <Text style={s.purchaseDetailsQtyBadgeText}>{detail.quantity}</Text>
                 </View>
                 <View style={s.purchaseDetailsListMain}>
-                  <Text style={s.purchaseDetailsListName}>{detail.product?.name || 'Producto'}</Text>
+                  <Text style={s.purchaseDetailsListName}>
+                    {detail.product?.name || 'Producto'}
+                  </Text>
                   <Text style={s.purchaseDetailsListMeta}>
-                    <StockyMoneyText value={detail.unit_cost} style={s.purchaseDetailsListMeta} /> por unidad
+                    <StockyMoneyText value={detail.unit_cost} style={s.purchaseDetailsListMeta} />{' '}
+                    por unidad
                   </Text>
                 </View>
               </View>
@@ -172,7 +181,10 @@ export function PurchaseDetailsModal({
 
           <View style={s.purchaseDetailsListFooter}>
             <Text style={s.purchaseDetailsListFooterLabel}>Total final</Text>
-            <StockyMoneyText value={selectedPurchase?.total || 0} style={s.purchaseDetailsListFooterValue} />
+            <StockyMoneyText
+              value={selectedPurchase?.total || 0}
+              style={s.purchaseDetailsListFooterValue}
+            />
           </View>
         </View>
       ) : null}

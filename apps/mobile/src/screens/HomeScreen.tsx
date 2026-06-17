@@ -1,12 +1,6 @@
 import { useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EXPO_CONFIG } from '../config/env';
 import { getSupabaseClient } from '../lib/supabase';
@@ -48,7 +42,7 @@ export function HomeScreen({ session }: Props) {
       try {
         await deactivatePushTokenForUser(session.user.id);
       } catch (error) {
-        if (__DEV__) console.log('[notifications] failed to deactivate token on sign out', error);
+        if (__DEV__) console.warn('[notifications] failed to deactivate token on sign out', error);
       }
       await client.auth.signOut();
     } finally {
@@ -63,17 +57,15 @@ export function HomeScreen({ session }: Props) {
           <View style={styles.hero}>
             <Text style={styles.brand}>Stocky</Text>
             <Text style={styles.title}>Panel móvil</Text>
-            <Text style={styles.subtitle}>Sesión activa: {session.user.email || session.user.id}</Text>
+            <Text style={styles.subtitle}>
+              Sesión activa: {session.user.email || session.user.id}
+            </Text>
             <Text style={styles.subtitle}>Backend: {EXPO_CONFIG.apiBaseUrl}</Text>
           </View>
 
           <StockyCard title="Acciones rápidas" subtitle="Controla sesión y conectividad API">
             <View style={styles.row}>
-              <StockyButton
-                onPress={runChecks}
-                disabled={loadingChecks}
-                loading={loadingChecks}
-              >
+              <StockyButton onPress={runChecks} disabled={loadingChecks} loading={loadingChecks}>
                 Probar API v2
               </StockyButton>
               <StockyButton

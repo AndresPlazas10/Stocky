@@ -32,7 +32,10 @@ export const SupplierListHeader = memo(function SupplierListHeader({
         </View>
 
         <Pressable
-          style={[styles.heroCreateButtonWrap, (!canManageSuppliers || checkingPermissions) && styles.buttonDisabled]}
+          style={[
+            styles.heroCreateButtonWrap,
+            (!canManageSuppliers || checkingPermissions) && styles.buttonDisabled,
+          ]}
           onPress={onCreate}
           disabled={!canManageSuppliers || checkingPermissions}
         >
@@ -48,7 +51,7 @@ export const SupplierListHeader = memo(function SupplierListHeader({
         </Pressable>
       </View>
 
-      {(loading || refreshing) ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
+      {loading || refreshing ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
     </View>
   );
 });

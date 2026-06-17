@@ -1,11 +1,13 @@
 import { getSupabaseClient } from '../lib/supabase';
+import { normalizeNumber, normalizeReference, normalizeText } from '../utils/normalization';
+import { getErrorCode } from '../utils/error';
 
 export const COMBO_STATUS = {
   ACTIVE: 'active',
   INACTIVE: 'inactive',
 } as const;
 
-export type ComboStatus = typeof COMBO_STATUS[keyof typeof COMBO_STATUS];
+export type ComboStatus = (typeof COMBO_STATUS)[keyof typeof COMBO_STATUS];
 
 export type ComboProductRecord = {
   id: string;
@@ -50,23 +52,6 @@ export type ComboUpsertPayload = {
   items: ComboUpsertItem[];
 };
 
-function normalizeText(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
-function normalizeReference(value: unknown): string | null {
-  const normalized = normalizeText(value);
-  if (!normalized) return null;
-  const lower = normalized.toLowerCase();
-  if (lower === 'null' || lower === 'undefined') return null;
-  return normalized;
-}
-
-function normalizeNumber(value: unknown, fallback = 0): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 function toPositiveNumber(value: unknown, fieldName: string): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -80,7 +65,7 @@ function normalizeComboStatus(value: unknown): ComboStatus {
   return normalized === COMBO_STATUS.INACTIVE ? COMBO_STATUS.INACTIVE : COMBO_STATUS.ACTIVE;
 }
 
-function normalizeComboProduct(row: any): ComboProductRecord {
+function normalizeComboProduct(row: Record<string, unknown>): ComboProductRecord {
   return {
     id: normalizeText(row?.id),
     code: normalizeReference(row?.code),
@@ -93,17 +78,17 @@ function normalizeComboProduct(row: any): ComboProductRecord {
   };
 }
 
-function normalizeComboItem(row: any): ComboItemRecord {
+function normalizeComboItem(row: Record<string, unknown>): ComboItemRecord {
   return {
     id: normalizeText(row?.id),
     combo_id: normalizeText(row?.combo_id),
     producto_id: normalizeText(row?.producto_id),
     cantidad: normalizeNumber(row?.cantidad, 0),
-    product: row?.products ? normalizeComboProduct(row.products) : null,
+    product: row?.products ? normalizeComboProduct(row.products as Record<string, unknown>) : null,
   };
 }
 
-function normalizeComboRow(row: any): ComboRecord {
+function normalizeComboRow(row: Record<string, unknown>): ComboRecord {
   return {
     id: normalizeText(row?.id),
     business_id: normalizeText(row?.business_id),
@@ -181,7 +166,8 @@ export async function listCombosByBusiness(
   const client = getSupabaseClient();
   let query = client
     .from('combos')
-    .select(`
+    .select(
+      `
       id,
       business_id,
       nombre,
@@ -205,7 +191,8 @@ export async function listCombosByBusiness(
           manage_stock
         )
       )
-    `)
+    `,
+    )
     .eq('business_id', businessId)
     .order('nombre', { ascending: true });
 
@@ -250,16 +237,10 @@ export async function createComboByBusinessId(
     cantidad: item.cantidad,
   }));
 
-  const itemsInsert = await client
-    .from('combo_items')
-    .insert(rows);
+  const itemsInsert = await client.from('combo_items').insert(rows);
 
   if (itemsInsert.error) {
-    await client
-      .from('combos')
-      .delete()
-      .eq('id', comboId)
-      .eq('business_id', businessId);
+    await client.from('combos').delete().eq('id', comboId).eq('business_id', businessId);
     throw new Error(itemsInsert.error.message || 'No se pudieron guardar los productos del combo.');
   }
 
@@ -294,13 +275,12 @@ export async function updateComboByBusinessAndId({
     throw new Error(comboUpdate.error.message || 'No se pudo actualizar el combo.');
   }
 
-  const deleteItems = await client
-    .from('combo_items')
-    .delete()
-    .eq('combo_id', comboId);
+  const deleteItems = await client.from('combo_items').delete().eq('combo_id', comboId);
 
   if (deleteItems.error) {
-    throw new Error(deleteItems.error.message || 'No se pudieron actualizar los productos del combo.');
+    throw new Error(
+      deleteItems.error.message || 'No se pudieron actualizar los productos del combo.',
+    );
   }
 
   const rows = normalized.items.map((item) => ({
@@ -309,9 +289,7 @@ export async function updateComboByBusinessAndId({
     cantidad: item.cantidad,
   }));
 
-  const insertItems = await client
-    .from('combo_items')
-    .insert(rows);
+  const insertItems = await client.from('combo_items').insert(rows);
 
   if (insertItems.error) {
     throw new Error(insertItems.error.message || 'No se pudieron guardar los productos del combo.');
@@ -360,8 +338,10 @@ export async function deleteComboByBusinessAndId({
     .maybeSingle();
 
   if (error) {
-    if ((error as any)?.code === '23503') {
-      throw new Error('No se puede eliminar el combo porque tiene movimientos asociados. Puedes desactivarlo.');
+    if (getErrorCode(error) === '23503') {
+      throw new Error(
+        'No se puede eliminar el combo porque tiene movimientos asociados. Puedes desactivarlo.',
+      );
     }
     throw new Error(error.message || 'No se pudo eliminar el combo.');
   }

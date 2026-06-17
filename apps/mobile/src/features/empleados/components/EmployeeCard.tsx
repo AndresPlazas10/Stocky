@@ -22,7 +22,11 @@ export const EmployeeCard = memo(function EmployeeCard({
   deleting,
   onDelete,
 }: EmployeeCardProps) {
-  const initial = String(employee.full_name || '?').trim().charAt(0).toUpperCase() || '?';
+  const initial =
+    String(employee.full_name || '?')
+      .trim()
+      .charAt(0)
+      .toUpperCase() || '?';
   const isSelfUser = Boolean(employee.user_id && employee.user_id === userId);
   const deleteDisabled = !canManageEmployees || checkingPermissions || deleting || isSelfUser;
 
@@ -60,7 +64,12 @@ export const EmployeeCard = memo(function EmployeeCard({
               size={22}
               color={employee.is_active ? '#047857' : '#6B7280'}
             />
-            <Text style={[s.statusBadgeText, employee.is_active ? s.statusActiveText : s.statusInactiveText]}>
+            <Text
+              style={[
+                s.statusBadgeText,
+                employee.is_active ? s.statusActiveText : s.statusInactiveText,
+              ]}
+            >
               {employee.is_active ? 'Activo' : 'Inactivo'}
             </Text>
           </View>

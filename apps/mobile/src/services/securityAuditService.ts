@@ -15,14 +15,12 @@ export async function logSecurityEvent(params: {
     const userId = String(params.userId || '').trim();
     if (!userId) return;
 
-    await client
-      .from('security_audit_logs')
-      .insert({
-        business_id: businessId,
-        user_id: userId,
-        action,
-        metadata: params.metadata || {},
-      });
+    await client.from('security_audit_logs').insert({
+      business_id: businessId,
+      user_id: userId,
+      action,
+      metadata: params.metadata || {},
+    });
   } catch {
     // no-op
   }

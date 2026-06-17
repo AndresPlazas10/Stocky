@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { STOCKY_RADIUS } from '../../../theme/tokens';
 import type { ComboComponentShortage, StockShortage } from '../../../services/mesaOrderService';
 
 interface StockShortageBannerProps {
@@ -13,12 +14,14 @@ export function StockShortageBanner({
   if (insufficientItems.length === 0 && insufficientComboComponents.length === 0) return null;
 
   return (
-    <View style={styles.container}>
+    <View style={styles.shortageContainer}>
       {insufficientItems.length > 0 ? (
-        <View style={styles.block}>
-          <Text style={styles.title}>Stock insuficiente en productos ({insufficientItems.length})</Text>
+        <View style={styles.shortageBlock}>
+          <Text style={styles.shortageTitle}>
+            Stock insuficiente en productos ({insufficientItems.length})
+          </Text>
           {insufficientItems.slice(0, 5).map((item) => (
-            <Text key={`${item.product_id}-${item.quantity}`} style={styles.item}>
+            <Text key={`${item.product_id}-${item.quantity}`} style={styles.shortageItem}>
               {item.product_name}: disp {item.available_stock} / req {item.quantity}
             </Text>
           ))}
@@ -26,12 +29,12 @@ export function StockShortageBanner({
       ) : null}
 
       {insufficientComboComponents.length > 0 ? (
-        <View style={styles.block}>
-          <Text style={styles.title}>
+        <View style={styles.shortageBlock}>
+          <Text style={styles.shortageTitle}>
             Stock insuficiente en componentes de combos ({insufficientComboComponents.length})
           </Text>
           {insufficientComboComponents.slice(0, 5).map((item) => (
-            <Text key={item.product_id} style={styles.item}>
+            <Text key={item.product_id} style={styles.shortageItem}>
               {item.product_name}: disp {item.available_stock} / req {item.required_quantity}
             </Text>
           ))}
@@ -42,26 +45,26 @@ export function StockShortageBanner({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#FEF2F2',
-    borderRadius: 12,
+  shortageContainer: {
+    gap: 8,
+    marginTop: 4,
+  },
+  shortageBlock: {
+    borderRadius: STOCKY_RADIUS.md,
     borderWidth: 1,
-    borderColor: '#FECACA',
-    padding: 12,
-    marginBottom: 12,
+    borderColor: 'rgba(239, 68, 68, 0.35)',
+    backgroundColor: 'rgba(254, 226, 226, 0.72)',
+    padding: 10,
+    gap: 4,
   },
-  block: {
-    marginBottom: 6,
-  },
-  title: {
-    fontSize: 14,
-    fontWeight: '700',
+  shortageTitle: {
     color: '#991B1B',
-    marginBottom: 4,
-  },
-  item: {
     fontSize: 12,
+    fontWeight: '800',
+  },
+  shortageItem: {
     color: '#7F1D1D',
-    marginBottom: 2,
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

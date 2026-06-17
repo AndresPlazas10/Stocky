@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import type { ReportesSnapshot } from '../../../domain/reportes/contracts';
+import type { ReportesPeriod, ReportesSnapshot } from '../../../domain/reportes/contracts';
 import { reportesStyles as s } from '../reportesStyles';
 import { formatShortDateTime, getPeriodLabel } from '../reportesUtils';
 
@@ -9,13 +9,21 @@ interface ReportsHeroCardProps {
   businessId: string;
   businessName: string | null;
   source: 'owner' | 'employee';
-  period: string;
+  period: ReportesPeriod;
   snapshot: ReportesSnapshot | null;
   refreshing: boolean;
   onRefresh: () => void;
 }
 
-export function ReportsHeroCard({ businessId, businessName, source, period, snapshot, refreshing, onRefresh }: ReportsHeroCardProps) {
+export function ReportsHeroCard({
+  businessId,
+  businessName,
+  source,
+  period,
+  snapshot,
+  refreshing,
+  onRefresh,
+}: ReportsHeroCardProps) {
   return (
     <LinearGradient
       colors={['#0F4C81', '#2563EB']}
@@ -35,7 +43,7 @@ export function ReportsHeroCard({ businessId, businessName, source, period, snap
       </View>
 
       <View style={s.heroBottom}>
-        <Text style={s.heroMeta}>Periodo: {getPeriodLabel(period as any)}</Text>
+        <Text style={s.heroMeta}>Periodo: {getPeriodLabel(period)}</Text>
         <Text style={s.heroMeta}>
           Actualizado: {snapshot ? formatShortDateTime(snapshot.generatedAt) : 'n/a'}
         </Text>

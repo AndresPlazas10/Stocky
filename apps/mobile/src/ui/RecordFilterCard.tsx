@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../theme/tokens';
@@ -39,7 +38,11 @@ export function RecordFilterCard({
         </View>
         <Pressable style={styles.filtersToggleButton} onPress={onToggle}>
           <Text style={styles.filtersToggleText}>{expanded ? 'Cerrar' : 'Abrir'}</Text>
-          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={STOCKY_COLORS.textSecondary} />
+          <Ionicons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={16}
+            color={STOCKY_COLORS.textSecondary}
+          />
         </Pressable>
       </Pressable>
 
@@ -91,7 +94,11 @@ function FilterFieldCard({
   return (
     <View style={styles.filterFieldCard}>
       <View style={styles.filterFieldHeader}>
-        <Ionicons name={icon as any} size={14} color={STOCKY_COLORS.textMuted} />
+        <Ionicons
+          name={icon as keyof typeof Ionicons.glyphMap}
+          size={14}
+          color={STOCKY_COLORS.textMuted}
+        />
         <Text style={styles.filterFieldLabel}>{label}</Text>
       </View>
       <Pressable style={styles.filterSelectBox} onPress={onPress}>
@@ -116,15 +123,55 @@ const styles = StyleSheet.create({
   filtersHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   filtersTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   filtersTitle: { fontSize: 15, fontWeight: '600', color: STOCKY_COLORS.textPrimary },
-  filtersToggleButton: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 12, borderRadius: STOCKY_RADIUS.md, borderWidth: 1, borderColor: STOCKY_COLORS.borderSoft },
+  filtersToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: STOCKY_RADIUS.md,
+    borderWidth: 1,
+    borderColor: STOCKY_COLORS.borderSoft,
+  },
   filtersToggleText: { fontSize: 12, fontWeight: '600', color: STOCKY_COLORS.textSecondary },
   filtersSubTitle: { fontSize: 12, color: STOCKY_COLORS.textMuted },
-  filterFieldCard: { backgroundColor: STOCKY_COLORS.backgroundSoft, borderRadius: STOCKY_RADIUS.md, padding: 12, gap: 8 },
+  filterFieldCard: {
+    backgroundColor: STOCKY_COLORS.backgroundSoft,
+    borderRadius: STOCKY_RADIUS.md,
+    padding: 12,
+    gap: 8,
+  },
   filterFieldHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  filterFieldLabel: { fontSize: 11, fontWeight: '600', color: STOCKY_COLORS.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  filterSelectBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: STOCKY_COLORS.surface, borderRadius: STOCKY_RADIUS.sm, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: STOCKY_COLORS.borderSoft },
+  filterFieldLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: STOCKY_COLORS.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  filterSelectBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: STOCKY_COLORS.surface,
+    borderRadius: STOCKY_RADIUS.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: STOCKY_COLORS.borderSoft,
+  },
   filterSelectText: { fontSize: 14, fontWeight: '600', color: STOCKY_COLORS.textSecondary },
   filterSelectTextActive: { color: STOCKY_COLORS.primary700 },
-  clearFilterButton: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-end', paddingVertical: 6, paddingHorizontal: 12, borderRadius: STOCKY_RADIUS.md, borderWidth: 1, borderColor: STOCKY_COLORS.borderSoft },
+  clearFilterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-end',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: STOCKY_RADIUS.md,
+    borderWidth: 1,
+    borderColor: STOCKY_COLORS.borderSoft,
+  },
   clearFilterButtonText: { fontSize: 12, fontWeight: '600', color: STOCKY_COLORS.textMuted },
 });

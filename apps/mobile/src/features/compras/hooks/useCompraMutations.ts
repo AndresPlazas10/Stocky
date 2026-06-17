@@ -2,8 +2,8 @@ import { useCallback, useState } from 'react';
 import {
   createCompraWithRpcFallback,
   deleteCompraWithStockFallback,
-  listRecentCompras,
   type CompraCartItem,
+  type CompraDetailRecord,
   type CompraRecord,
 } from '../../../services/comprasService';
 
@@ -19,10 +19,10 @@ interface UseCompraMutationsParams {
   clearForm: () => void;
   refreshPurchases: () => Promise<void>;
   refreshProducts: () => Promise<void>;
-  setShowCreatePurchaseModal: (show: boolean) => void;
+  setShowCreatePurchaseModal: (_show: boolean) => void;
   setShowPurchaseDetails: (show: boolean) => void;
   setSelectedPurchase: (p: CompraRecord | null) => void;
-  setSelectedPurchaseDetails: (d: any[]) => void;
+  setSelectedPurchaseDetails: (d: CompraDetailRecord[]) => void;
   setPurchases: (p: CompraRecord[] | ((prev: CompraRecord[]) => CompraRecord[])) => void;
   setError: (error: string | null) => void;
 }
@@ -39,7 +39,7 @@ export function useCompraMutations({
   clearForm,
   refreshPurchases,
   refreshProducts,
-  setShowCreatePurchaseModal,
+  setShowCreatePurchaseModal: _setShowCreatePurchaseModal,
   setShowPurchaseDetails,
   setSelectedPurchase,
   setSelectedPurchaseDetails,
@@ -67,11 +67,18 @@ export function useCompraMutations({
       setError('Hay productos sin control de stock en el carrito. Retiralos para continuar.');
       return;
     }
-    if (cart.some((item) => {
-      const quantity = Number(item.quantity || 0);
-      const unitPrice = Number(item.unit_price || 0);
-      return !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice < 0;
-    })) {
+    if (
+      cart.some((item) => {
+        const quantity = Number(item.quantity || 0);
+        const unitPrice = Number(item.unit_price || 0);
+        return (
+          !Number.isFinite(quantity) ||
+          quantity <= 0 ||
+          !Number.isFinite(unitPrice) ||
+          unitPrice < 0
+        );
+      })
+    ) {
       setError('Hay productos con cantidad o precio invalido.');
       return;
     }
@@ -98,13 +105,28 @@ export function useCompraMutations({
     } finally {
       setCreatingPurchase(false);
     }
-  }, [businessId, cart, cartTotal, clearForm, creatingPurchase, paymentMethod, refreshProducts, refreshPurchases, supplierId, userId, setError]);
+  }, [
+    businessId,
+    cart,
+    cartTotal,
+    clearForm,
+    creatingPurchase,
+    paymentMethod,
+    refreshProducts,
+    refreshPurchases,
+    supplierId,
+    userId,
+    setError,
+  ]);
 
-  const askDeletePurchase = useCallback((purchase: CompraRecord) => {
-    if (!canDeletePurchases) return;
-    setPurchaseToDelete(purchase);
-    setShowDeleteModal(true);
-  }, [canDeletePurchases]);
+  const askDeletePurchase = useCallback(
+    (purchase: CompraRecord) => {
+      if (!canDeletePurchases) return;
+      setPurchaseToDelete(purchase);
+      setShowDeleteModal(true);
+    },
+    [canDeletePurchases],
+  );
 
   const confirmDeletePurchase = useCallback(async () => {
     if (!purchaseToDelete?.id || !canDeletePurchases) return;
@@ -132,7 +154,18 @@ export function useCompraMutations({
     } finally {
       setDeletingPurchase(false);
     }
-  }, [businessId, canDeletePurchases, purchaseToDelete, refreshProducts, selectedPurchase?.id, setPurchases, setShowPurchaseDetails, setSelectedPurchase, setSelectedPurchaseDetails, setError]);
+  }, [
+    businessId,
+    canDeletePurchases,
+    purchaseToDelete,
+    refreshProducts,
+    selectedPurchase,
+    setPurchases,
+    setShowPurchaseDetails,
+    setSelectedPurchase,
+    setSelectedPurchaseDetails,
+    setError,
+  ]);
 
   return {
     creatingPurchase,

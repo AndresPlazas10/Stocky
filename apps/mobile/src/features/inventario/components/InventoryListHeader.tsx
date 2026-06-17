@@ -45,7 +45,10 @@ export const InventoryListHeader = memo(function InventoryListHeader({
         </View>
 
         <Pressable
-          style={[styles.heroCreateButton, (!canManageProducts || checkingPermissions) && styles.buttonDisabled]}
+          style={[
+            styles.heroCreateButton,
+            (!canManageProducts || checkingPermissions) && styles.buttonDisabled,
+          ]}
           onPress={openCreateModal}
           disabled={!canManageProducts || checkingPermissions}
         >

@@ -13,7 +13,9 @@ export const INITIAL_FORM: EmployeeFormState = {
 export const EMPLOYEES_PAGE_SIZE = 40;
 
 export function normalizeRole(value: unknown): string {
-  return String(value || '').trim().toLowerCase();
+  return String(value || '')
+    .trim()
+    .toLowerCase();
 }
 
 export function formatRoleLabel(role: string): string {

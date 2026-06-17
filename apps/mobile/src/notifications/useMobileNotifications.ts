@@ -18,7 +18,7 @@ export function useMobileNotifications(session: Session | null) {
 
   useEffect(() => {
     if (!shouldEnableMobileNotificationsRuntime()) return;
-    configureMobileNotifications();
+    void configureMobileNotifications();
   }, []);
 
   useEffect(() => {
@@ -33,14 +33,28 @@ export function useMobileNotifications(session: Session | null) {
 
     previousUserIdRef.current = currentUserId;
 
-    if (!session) return () => { cancelled = true; };
-    if (Platform.OS === 'web') return () => { cancelled = true; };
-    if (!shouldEnableMobileNotificationsRuntime()) return () => { cancelled = true; };
+    if (!session)
+      return () => {
+        cancelled = true;
+      };
+    if (Platform.OS === 'web')
+      return () => {
+        cancelled = true;
+      };
+    if (!shouldEnableMobileNotificationsRuntime())
+      return () => {
+        cancelled = true;
+      };
 
     void registerPushTokenForSession(session).then((result) => {
       if (cancelled) return;
       if (!result.ok) {
-        if (__DEV__) console.log('[notifications] push token registration skipped', result.reason, result.message);
+        if (__DEV__)
+          console.warn(
+            '[notifications] push token registration skipped',
+            result.reason,
+            result.message,
+          );
         return;
       }
 
@@ -50,7 +64,7 @@ export function useMobileNotifications(session: Session | null) {
           if (!businessContext || businessContext.source !== 'owner') return;
           await deactivateOtherPushTokensForUser(session.user.id, result.installationId);
         } catch (error) {
-          if (__DEV__) console.log('[notifications] cleanup old tokens error', error);
+          if (__DEV__) console.warn('[notifications] cleanup old tokens error', error);
         }
       })();
     });
@@ -63,11 +77,11 @@ export function useMobileNotifications(session: Session | null) {
           if (cancelled || !businessContext || businessContext.source !== 'employee') return;
 
           const employeeName = String(
-            session.user.user_metadata?.full_name
-            || session.user.user_metadata?.name
-            || session.user.user_metadata?.username
-            || session.user.email?.split('@')[0]
-            || 'Empleado',
+            session.user.user_metadata?.full_name ||
+              session.user.user_metadata?.name ||
+              session.user.user_metadata?.username ||
+              session.user.email?.split('@')[0] ||
+              'Empleado',
           );
 
           const result = await notifyAdminEmployeeLogin({
@@ -78,14 +92,15 @@ export function useMobileNotifications(session: Session | null) {
 
           if (cancelled) return;
           if (!result.ok) {
-            if (__DEV__) console.log('[notifications] employee-login notify failed', result.message);
+            if (__DEV__)
+              console.warn('[notifications] employee-login notify failed', result.message);
             return;
           }
 
           lastEmployeeLoginNotifyKeyRef.current = notifyKey;
         } catch (error) {
           if (cancelled) return;
-          if (__DEV__) console.log('[notifications] employee-login notify error', error);
+          if (__DEV__) console.warn('[notifications] employee-login notify error', error);
         }
       })();
     }
@@ -93,26 +108,29 @@ export function useMobileNotifications(session: Session | null) {
     let receivedSub: { remove: () => void } | null = null;
     let responseSub: { remove: () => void } | null = null;
 
-    const Notifications = getMobileNotificationsModule();
-    if (!Notifications) {
-      return () => {
-        cancelled = true;
-      };
-    }
+    void (async () => {
+      const Notifications = await getMobileNotificationsModule();
+      if (cancelled || !Notifications) return;
 
-    try {
-      receivedSub = Notifications.addNotificationReceivedListener((notification) => {
-        if (cancelled) return;
-        if (__DEV__) console.log('[notifications] received', notification.request?.identifier || 'unknown');
-      });
+      try {
+        receivedSub = Notifications.addNotificationReceivedListener((notification) => {
+          if (cancelled) return;
+          if (__DEV__)
+            console.warn('[notifications] received', notification.request?.identifier || 'unknown');
+        });
 
-      responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-        if (cancelled) return;
-        if (__DEV__) console.log('[notifications] tapped', response.notification.request?.identifier || 'unknown');
-      });
-    } catch (error) {
-      if (__DEV__) console.log('[notifications] listeners skipped', error);
-    }
+        responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+          if (cancelled) return;
+          if (__DEV__)
+            console.warn(
+              '[notifications] tapped',
+              response.notification.request?.identifier || 'unknown',
+            );
+        });
+      } catch (error) {
+        if (__DEV__) console.warn('[notifications] listeners skipped', error);
+      }
+    })();
 
     return () => {
       cancelled = true;

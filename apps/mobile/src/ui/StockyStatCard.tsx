@@ -18,7 +18,9 @@ export function StockyStatCard({ label, value, icon = 'stats-chart-outline' }: P
         <Ionicons name={icon} size={18} color={STOCKY_COLORS.primary700} />
       </View>
       <Text style={styles.label}>{label}</Text>
-      <Text style={styles.value} numberOfLines={1}>{value}</Text>
+      <Text style={styles.value} numberOfLines={1}>
+        {value}
+      </Text>
     </View>
   );
 }

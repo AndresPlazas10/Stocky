@@ -7,13 +7,10 @@ import {
   type ComboProductRecord,
   type ComboRecord,
 } from '../../../services/combosService';
+import { getErrorMessage } from '../../../utils/error';
 import { normalizeRole } from '../comboUtils';
 
-export function useComboData(
-  businessId: string,
-  userId: string,
-  source: 'owner' | 'employee',
-) {
+export function useComboData(businessId: string, userId: string, source: 'owner' | 'employee') {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,14 +64,18 @@ export function useComboData(
     try {
       const nextCombos = await listCombosByBusiness(businessId);
       setCombos(nextCombos);
-    } catch {}
+    } catch (err) {
+      console.error('[Combos] error al refrescar combos silenciosamente:', getErrorMessage(err));
+    }
   }, [businessId]);
 
   const refreshProductsSilently = useCallback(async () => {
     try {
       const nextProducts = await listComboProducts(businessId);
       setProducts(nextProducts);
-    } catch {}
+    } catch (err) {
+      console.error('[Combos] error al refrescar productos silenciosamente:', getErrorMessage(err));
+    }
   }, [businessId]);
 
   const checkManagePermission = useCallback(async () => {
@@ -105,8 +106,10 @@ export function useComboData(
   }, [businessId, source, userId]);
 
   useEffect(() => {
-    loadData();
-    checkManagePermission();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial de datos
+    void loadData();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial de datos
+    void checkManagePermission();
   }, [checkManagePermission, loadData]);
 
   const scheduleCombosRefresh = useCallback(() => {
@@ -131,7 +134,11 @@ export function useComboData(
     tables: [
       { table: 'combos', filter: `business_id=eq.${businessId}`, onEvent: scheduleCombosRefresh },
       { table: 'combo_items', onEvent: scheduleCombosRefresh },
-      { table: 'products', filter: `business_id=eq.${businessId}`, onEvent: scheduleProductsRefresh },
+      {
+        table: 'products',
+        filter: `business_id=eq.${businessId}`,
+        onEvent: scheduleProductsRefresh,
+      },
     ],
     onSubscribed: scheduleCombosRefresh,
     onPollTick: scheduleCombosRefresh,

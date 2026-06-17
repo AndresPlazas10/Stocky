@@ -43,10 +43,13 @@ export const SECTION_GROUP_LABELS: Record<SectionGroup, string> = {
   sistema: 'Sistema',
 };
 
-export const SECTION_BY_ID = SECTION_META.reduce<Record<SectionId, SectionMeta>>((acc, section) => {
-  acc[section.id] = section;
-  return acc;
-}, {} as Record<SectionId, SectionMeta>);
+export const SECTION_BY_ID = SECTION_META.reduce<Record<SectionId, SectionMeta>>(
+  (acc, section) => {
+    acc[section.id] = section;
+    return acc;
+  },
+  {} as Record<SectionId, SectionMeta>,
+);
 
 export const SECTION_IDS = SECTION_META.map((section) => section.id);
 

@@ -1,13 +1,5 @@
-import { useEffect, useRef } from 'react';
-import {
-  Animated,
-  Linking,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { Animated, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 import { DashboardProvider } from './DashboardContext';
 import { AppNavigator } from '../../navigation/AppNavigator';
@@ -25,8 +17,8 @@ export function DashboardApp({
   updateNotice: AppUpdateNotice | null;
   dismissUpdateNotice: () => void;
 }) {
-  const scaleAnim = useRef(new Animated.Value(0.9)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [scaleAnim] = useState(() => new Animated.Value(0.9));
+  const [fadeAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     perfMark('dashboard_app_mounted', {
@@ -66,12 +58,7 @@ export function DashboardApp({
       <StockyErrorBoundary>
         <AppNavigator />
       </StockyErrorBoundary>
-      <Modal
-        visible={Boolean(updateNotice)}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-      >
+      <Modal visible={Boolean(updateNotice)} transparent animationType="fade" statusBarTranslucent>
         <View style={styles.overlay}>
           <Animated.View
             style={[
@@ -87,21 +74,13 @@ export function DashboardApp({
               <Text style={styles.version}>v{updateNotice?.latestVersion}</Text>
             </View>
 
-            <Text style={styles.message}>
-              {updateNotice?.message}
-            </Text>
+            <Text style={styles.message}>{updateNotice?.message}</Text>
 
             <View style={styles.actions}>
-              <Pressable
-                style={styles.downloadBtn}
-                onPress={handleDownload}
-              >
+              <Pressable style={styles.downloadBtn} onPress={handleDownload}>
                 <Text style={styles.downloadText}>Descargar</Text>
               </Pressable>
-              <Pressable
-                style={styles.dismissBtn}
-                onPress={dismissUpdateNotice}
-              >
+              <Pressable style={styles.dismissBtn} onPress={dismissUpdateNotice}>
                 <Text style={styles.dismissText}>Ahora no</Text>
               </Pressable>
             </View>

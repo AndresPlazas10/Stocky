@@ -1,4 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PropsWithChildren,
+} from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../../lib/supabase';
 import {
@@ -27,24 +36,28 @@ export function DashboardProvider({ session, children }: PropsWithChildren<{ ses
   const [businessError, setBusinessError] = useState<string | null>(null);
   const contextRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const refreshBusinessContext = useCallback(async (options?: { silent?: boolean; forceRefresh?: boolean }) => {
-    const silent = options?.silent === true;
-    if (!silent) setLoadingBusiness(true);
-    if (!silent) setBusinessError(null);
-    try {
-      const next = await resolveBusinessContext(session.user.id, {
-        forceRefresh: options?.forceRefresh === true,
-      });
-      setBusinessContext(next);
-    } catch (err) {
-      setBusinessError(err instanceof Error ? err.message : 'No se pudo cargar el negocio');
-      setBusinessContext(null);
-    } finally {
-      if (!silent) setLoadingBusiness(false);
-    }
-  }, [session.user.id]);
+  const refreshBusinessContext = useCallback(
+    async (options?: { silent?: boolean; forceRefresh?: boolean }) => {
+      const silent = options?.silent === true;
+      if (!silent) setLoadingBusiness(true);
+      if (!silent) setBusinessError(null);
+      try {
+        const next = await resolveBusinessContext(session.user.id, {
+          forceRefresh: options?.forceRefresh === true,
+        });
+        setBusinessContext(next);
+      } catch (err) {
+        setBusinessError(err instanceof Error ? err.message : 'No se pudo cargar el negocio');
+        setBusinessContext(null);
+      } finally {
+        if (!silent) setLoadingBusiness(false);
+      }
+    },
+    [session.user.id],
+  );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial de datos
     void refreshBusinessContext();
   }, [refreshBusinessContext]);
 
@@ -75,18 +88,26 @@ export function DashboardProvider({ session, children }: PropsWithChildren<{ ses
 
     const channel = client
       .channel(`mobile-dashboard-context:${session.user.id}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'employees',
-        filter: `user_id=eq.${session.user.id}`,
-      }, scheduleContextRefresh)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'businesses',
-        filter: `created_by=eq.${session.user.id}`,
-      }, scheduleContextRefresh);
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'employees',
+          filter: `user_id=eq.${session.user.id}`,
+        },
+        scheduleContextRefresh,
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'businesses',
+          filter: `created_by=eq.${session.user.id}`,
+        },
+        scheduleContextRefresh,
+      );
 
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
@@ -122,25 +143,24 @@ export function DashboardProvider({ session, children }: PropsWithChildren<{ ses
     try {
       await deactivatePushTokenForUser(session.user.id);
     } catch (error) {
-      if (__DEV__) console.log('[notifications] failed to deactivate token on sign out', error);
+      if (__DEV__) console.warn('[notifications] failed to deactivate token on sign out', error);
     }
     await client.auth.signOut();
   }, [businessContext?.businessId, session.user.id]);
 
-  const value = useMemo<DashboardContextValue>(() => ({
-    session,
-    businessContext,
-    loadingBusiness,
-    businessError,
-    refreshBusinessContext,
-    signOut,
-  }), [session, businessContext, loadingBusiness, businessError, refreshBusinessContext, signOut]);
-
-  return (
-    <DashboardContext.Provider value={value}>
-      {children}
-    </DashboardContext.Provider>
+  const value = useMemo<DashboardContextValue>(
+    () => ({
+      session,
+      businessContext,
+      loadingBusiness,
+      businessError,
+      refreshBusinessContext,
+      signOut,
+    }),
+    [session, businessContext, loadingBusiness, businessError, refreshBusinessContext, signOut],
   );
+
+  return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;
 }
 
 export function useDashboardContext() {

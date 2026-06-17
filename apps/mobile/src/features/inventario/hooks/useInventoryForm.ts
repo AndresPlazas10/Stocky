@@ -3,7 +3,12 @@ import {
   type InventoryProductRecord,
   type InventorySupplierRecord,
 } from '../../../services/inventoryService';
-import { getSupplierDisplayName, INITIAL_FORM, UNIT_OPTIONS, type ProductFormState } from '../inventoryUtils';
+import {
+  getSupplierDisplayName,
+  INITIAL_FORM,
+  UNIT_OPTIONS,
+  type ProductFormState,
+} from '../inventoryUtils';
 
 export function useInventoryForm() {
   const [showFormModal, setShowFormModal] = useState(false);
@@ -24,11 +29,14 @@ export function useInventoryForm() {
     return 'Sin proveedor';
   }, [form.supplierId]);
 
-  const getSelectedSupplierLabel = useCallback((suppliers: InventorySupplierRecord[]) => {
-    if (!form.supplierId) return 'Sin proveedor';
-    const selected = suppliers.find((item) => item.id === form.supplierId);
-    return getSupplierDisplayName(selected || null);
-  }, [form.supplierId]);
+  const getSelectedSupplierLabel = useCallback(
+    (suppliers: InventorySupplierRecord[]) => {
+      if (!form.supplierId) return 'Sin proveedor';
+      const selected = suppliers.find((item) => item.id === form.supplierId);
+      return getSupplierDisplayName(selected || null);
+    },
+    [form.supplierId],
+  );
 
   const closeFormModal = useCallback(() => {
     setShowFormModal(false);

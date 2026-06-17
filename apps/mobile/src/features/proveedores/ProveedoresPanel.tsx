@@ -1,4 +1,3 @@
-import { useCallback, useEffect } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { StockyButton } from '../../ui/StockyButton';
 import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
@@ -18,7 +17,12 @@ type Props = {
   source: 'owner' | 'employee';
 };
 
-export function ProveedoresPanel({ businessId, businessName, userId, source }: Props) {
+export function ProveedoresPanel({
+  businessId,
+  businessName: _businessName,
+  userId,
+  source,
+}: Props) {
   const {
     loading,
     refreshing,
@@ -60,7 +64,7 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
     canManageSuppliers,
     form,
     editingSupplier,
-    taxColumn: taxColumn as any,
+    taxColumn,
     setTaxColumn: () => {},
     closeFormModal,
     refreshSuppliers,
@@ -92,25 +96,29 @@ export function ProveedoresPanel({ businessId, businessName, userId, source }: P
             onCreate={openCreateModal}
           />
         }
-        ListEmptyComponent={loading ? (
-          <View style={styles.loadingBlock}>
-            <ActivityIndicator color={STOCKY_COLORS.primary900} />
-            <Text style={styles.loadingText}>Cargando proveedores...</Text>
-          </View>
-        ) : (!suspendBackgroundList ? (
-          <Text style={styles.emptyText}>No hay proveedores registrados.</Text>
-        ) : null)}
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.loadingBlock}>
+              <ActivityIndicator color={STOCKY_COLORS.primary900} />
+              <Text style={styles.loadingText}>Cargando proveedores...</Text>
+            </View>
+          ) : !suspendBackgroundList ? (
+            <Text style={styles.emptyText}>No hay proveedores registrados.</Text>
+          ) : null
+        }
         ItemSeparatorComponent={() => <View style={styles.listItemSeparator} />}
-        ListFooterComponent={!suspendBackgroundList && hasMoreSuppliers ? (
-          <View style={styles.loadMoreWrap}>
-            <Text style={styles.loadMoreHint}>Mostrando {suppliers.length} proveedores</Text>
-            <StockyButton onPress={loadMoreSuppliers} loading={loadingMore} variant="ghost">
-              Cargar más proveedores
-            </StockyButton>
-          </View>
-        ) : (
-          <View style={styles.listFooterSpacer} />
-        )}
+        ListFooterComponent={
+          !suspendBackgroundList && hasMoreSuppliers ? (
+            <View style={styles.loadMoreWrap}>
+              <Text style={styles.loadMoreHint}>Mostrando {suppliers.length} proveedores</Text>
+              <StockyButton onPress={loadMoreSuppliers} loading={loadingMore} variant="ghost">
+                Cargar más proveedores
+              </StockyButton>
+            </View>
+          ) : (
+            <View style={styles.listFooterSpacer} />
+          )
+        }
         renderItem={({ item }) => (
           <SupplierCard
             supplier={item}

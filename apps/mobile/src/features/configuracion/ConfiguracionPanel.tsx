@@ -31,11 +31,17 @@ export function ConfiguracionPanel({
   source,
   userId,
   userEmail,
-  businessError,
+  businessError: _businessError,
   onRefreshBusiness,
   onSignOut,
 }: Props) {
-  const { snapshot, loading, error, setError, loadSnapshot } = useConfiguracionData({
+  const {
+    snapshot,
+    loading,
+    error: _error,
+    setError,
+    loadSnapshot,
+  } = useConfiguracionData({
     businessId,
     businessName,
     source,
@@ -90,7 +96,9 @@ export function ConfiguracionPanel({
   const businessPhoneLabel = snapshot?.businessPhone || 'Sin teléfono';
   const businessAddressLabel = snapshot?.businessAddress || 'Sin dirección';
   const systemStatusLabel = snapshot?.connectionStatus === 'connected' ? 'Conectado' : 'Revisar';
-  const systemVersionLabel = snapshot?.clientVersion ? `Stocky ${snapshot.clientVersion}` : 'Stocky v1.0.0';
+  const systemVersionLabel = snapshot?.clientVersion
+    ? `Stocky ${snapshot.clientVersion}`
+    : 'Stocky v1.0.0';
   const profileLabel = getProfileLabel(snapshot?.source || source);
 
   return (
@@ -129,10 +137,7 @@ export function ConfiguracionPanel({
         systemStatusLabel={systemStatusLabel}
       />
 
-      <BillingSection
-        businessNameLabel={businessNameLabel}
-        onOpenSiigo={handleOpenSiigo}
-      />
+      <BillingSection businessNameLabel={businessNameLabel} onOpenSiigo={handleOpenSiigo} />
 
       <LegalSection
         onOpenTerms={handleOpenTerms}
@@ -162,7 +167,8 @@ export function ConfiguracionPanel({
       />
 
       <Text style={styles.footerText}>
-        Última actualización: {snapshot?.generatedAt ? formatShortDateTime(snapshot.generatedAt) : 'n/a'}
+        Última actualización:{' '}
+        {snapshot?.generatedAt ? formatShortDateTime(snapshot.generatedAt) : 'n/a'}
       </Text>
     </View>
   );

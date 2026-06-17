@@ -7,10 +7,7 @@ import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { formatDateTime } from '../../../utils/dateHelpers';
 import { getBankLogoSource, isBankPaymentMethod } from '../../../utils/paymentMethodBranding';
 import { getPaymentMethodLabel, getPaymentMethodTheme } from '../../../utils/paymentMethods';
-import {
-  getOrderItemName,
-  type MesaOrderItem,
-} from '../../../services/mesaOrderService';
+import { getOrderItemName, type MesaOrderItem } from '../../../services/mesaOrderService';
 import type { VentaDetailRecord, VentaRecord } from '../../../services/ventasService';
 import { ventasStyles as s } from '../ventasStyles';
 
@@ -51,7 +48,7 @@ export function SaleDetailsModal({
       contentContainerStyle={s.saleDetailsContentContainer}
       onClose={onClose}
       hideCloseButton
-      headerSlot={(
+      headerSlot={
         <LinearGradient
           colors={['#4338CA', '#6D28D9']}
           start={{ x: 0, y: 0 }}
@@ -65,7 +62,9 @@ export function SaleDetailsModal({
             <View style={s.saleDetailsHeaderTextWrap}>
               <Text style={s.saleDetailsHeaderTitle}>Detalle de venta</Text>
               <Text style={s.saleDetailsHeaderSubtitle}>
-                {selectedVenta ? `ID ${selectedVenta.id.slice(0, 8).toUpperCase()}` : 'Sin referencia'}
+                {selectedVenta
+                  ? `ID ${selectedVenta.id.slice(0, 8).toUpperCase()}`
+                  : 'Sin referencia'}
               </Text>
             </View>
           </View>
@@ -73,7 +72,7 @@ export function SaleDetailsModal({
             <Ionicons name="close" size={20} color="#EDE9FE" />
           </Pressable>
         </LinearGradient>
-      )}
+      }
     >
       {selectedVenta ? (
         <View style={s.saleDetailsHeroCard}>
@@ -89,7 +88,11 @@ export function SaleDetailsModal({
               ]}
             >
               {isBankPaymentMethod(selectedVenta.payment_method) ? (
-                <Image source={getBankLogoSource(selectedVenta.payment_method)!} style={s.saleDetailsHeroMethodLogo} resizeMode="contain" />
+                <Image
+                  source={getBankLogoSource(selectedVenta.payment_method)!}
+                  style={s.saleDetailsHeroMethodLogo}
+                  resizeMode="contain"
+                />
               ) : (
                 <Ionicons
                   name={selectedVentaPaymentTheme?.icon || 'cash-outline'}
@@ -110,11 +113,15 @@ export function SaleDetailsModal({
           <View style={s.saleDetailsHeroMetaGrid}>
             <View style={s.saleDetailsHeroMetaItem}>
               <Ionicons name="calendar-outline" size={14} color="#64748B" />
-              <Text style={s.saleDetailsHeroMetaText}>{formatDateTime(selectedVenta.created_at)}</Text>
+              <Text style={s.saleDetailsHeroMetaText}>
+                {formatDateTime(selectedVenta.created_at)}
+              </Text>
             </View>
             <View style={s.saleDetailsHeroMetaItem}>
               <Ionicons name="person-outline" size={14} color="#64748B" />
-              <Text style={s.saleDetailsHeroMetaText}>{selectedVenta.seller_name || 'Vendedor'}</Text>
+              <Text style={s.saleDetailsHeroMetaText}>
+                {selectedVenta.seller_name || 'Vendedor'}
+              </Text>
             </View>
             <View style={s.saleDetailsHeroMetaItem}>
               <Ionicons name="basket-outline" size={14} color="#64748B" />
@@ -129,7 +136,10 @@ export function SaleDetailsModal({
               <View style={s.saleDetailsHeroCashCard}>
                 <Text style={s.saleDetailsHeroCashLabel}>Recibido</Text>
                 {selectedVenta.amount_received !== null ? (
-                  <StockyMoneyText value={selectedVenta.amount_received} style={s.saleDetailsHeroCashValue} />
+                  <StockyMoneyText
+                    value={selectedVenta.amount_received}
+                    style={s.saleDetailsHeroCashValue}
+                  />
                 ) : (
                   <Text style={s.saleDetailsHeroCashEmpty}>-</Text>
                 )}
@@ -137,7 +147,10 @@ export function SaleDetailsModal({
               <View style={s.saleDetailsHeroCashCard}>
                 <Text style={s.saleDetailsHeroCashLabel}>Cambio</Text>
                 {selectedVenta.change_amount !== null ? (
-                  <StockyMoneyText value={selectedVenta.change_amount} style={s.saleDetailsHeroCashValue} />
+                  <StockyMoneyText
+                    value={selectedVenta.change_amount}
+                    style={s.saleDetailsHeroCashValue}
+                  />
                 ) : (
                   <Text style={s.saleDetailsHeroCashEmpty}>-</Text>
                 )}
@@ -189,21 +202,27 @@ export function SaleDetailsModal({
                     <Text style={s.saleDetailsQtyBadgeText}>{item.quantity}</Text>
                   </View>
                   <View style={s.saleDetailsListMain}>
-                    <Text style={s.saleDetailsListName}>{getOrderItemName(item as unknown as MesaOrderItem)}</Text>
+                    <Text style={s.saleDetailsListName}>
+                      {getOrderItemName(item as unknown as MesaOrderItem)}
+                    </Text>
                     <Text style={s.saleDetailsListMeta}>
-                      <StockyMoneyText value={item.unit_price} style={s.saleDetailsListMeta} /> por unidad
+                      <StockyMoneyText value={item.unit_price} style={s.saleDetailsListMeta} /> por
+                      unidad
                     </Text>
                   </View>
                 </View>
                 <StockyMoneyText value={item.subtotal} style={s.saleDetailsListSubtotal} />
               </View>
             )}
-            ListFooterComponent={(
+            ListFooterComponent={
               <View style={s.saleDetailsListFooter}>
                 <Text style={s.saleDetailsListFooterLabel}>Total final</Text>
-                <StockyMoneyText value={selectedVenta?.total || 0} style={s.saleDetailsListFooterValue} />
+                <StockyMoneyText
+                  value={selectedVenta?.total || 0}
+                  style={s.saleDetailsListFooterValue}
+                />
               </View>
-            )}
+            }
           />
         </View>
       ) : null}

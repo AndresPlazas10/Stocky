@@ -11,7 +11,12 @@ interface DeleteAccountModalProps {
   onConfirm: () => void;
 }
 
-export function DeleteAccountModal({ visible, deleting, onClose, onConfirm }: DeleteAccountModalProps) {
+export function DeleteAccountModal({
+  visible,
+  deleting,
+  onClose,
+  onConfirm,
+}: DeleteAccountModalProps) {
   return (
     <StockyModal
       visible={visible}
@@ -21,7 +26,7 @@ export function DeleteAccountModal({ visible, deleting, onClose, onConfirm }: De
       modalAnimationType="fade"
       sheetStyle={styles.deleteAccountSheet}
       onClose={onClose}
-      headerSlot={(
+      headerSlot={
         <LinearGradient
           colors={['#FEE2E2', '#FECACA']}
           start={{ x: 0, y: 0 }}
@@ -36,9 +41,9 @@ export function DeleteAccountModal({ visible, deleting, onClose, onConfirm }: De
             <Text style={styles.deleteAccountSubtitle}>Esta acción es permanente</Text>
           </View>
         </LinearGradient>
-      )}
+      }
       footerStyle={styles.deleteAccountFooter}
-      footer={(
+      footer={
         <View style={styles.deleteAccountFooterRow}>
           <Pressable
             style={[styles.deleteAccountCancel, deleting && styles.disabled]}
@@ -57,15 +62,13 @@ export function DeleteAccountModal({ visible, deleting, onClose, onConfirm }: De
             </Text>
           </Pressable>
         </View>
-      )}
+      }
     >
       <View style={styles.deleteAccountBody}>
         <Text style={styles.deleteAccountBodyText}>
           Al eliminar tu cuenta se revocará tu acceso y los negocios asociados quedarán suspendidos.
         </Text>
-        <Text style={styles.deleteAccountBodyText}>
-          Si estás seguro, confirma para continuar.
-        </Text>
+        <Text style={styles.deleteAccountBodyText}>Si estás seguro, confirma para continuar.</Text>
       </View>
     </StockyModal>
   );

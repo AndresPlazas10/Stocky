@@ -18,13 +18,13 @@ export function CredentialsModal({ visible, credentials, onClose }: CredentialsM
       visible={visible}
       title="Credenciales generadas"
       onClose={onClose}
-      footer={(
+      footer={
         <View style={s.modalFooterRow}>
           <Pressable style={s.modalSaveButton} onPress={onClose}>
             <Text style={s.modalSaveText}>Entendido</Text>
           </Pressable>
         </View>
-      )}
+      }
     >
       <Text style={s.credentialsTitle}>
         Comparte estas credenciales con {credentials?.fullName || 'el empleado'}:

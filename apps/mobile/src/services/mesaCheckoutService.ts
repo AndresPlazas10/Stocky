@@ -1,5 +1,10 @@
 import { getSupabaseClient } from '../lib/supabase';
-import { notifyAdminLowStock, notifyAdminSaleRegistered } from '../notifications/mobileNotificationsService';
+import {
+  notifyAdminLowStock,
+  notifyAdminSaleRegistered,
+} from '../notifications/mobileNotificationsService';
+import { normalizeNumber, normalizeReference, normalizeText } from '../utils/normalization';
+import { isFunctionUnavailableError } from '../utils/supabaseErrors';
 import type { MesaOrderItem } from './mesaOrderService';
 import type { SupabaseErrorLike } from '../types/errors';
 
@@ -39,35 +44,21 @@ export type SplitSubAccount = {
 // Prioriza cierre atómico (más rápido). Si falla, se usa fallback secuencial.
 const ENABLE_ATOMIC_SPLIT_CLOSE = true;
 const SELLER_CONTEXT_TTL_MS = 5 * 60 * 1000;
-const sellerContextCache = new Map<string, {
-  userId: string;
-  sellerName: string;
-  isEmployee: boolean;
-  expiresAt: number;
-}>();
-
-function normalizeText(value: unknown): string {
-  return String(value ?? '').trim();
-}
+const sellerContextCache = new Map<
+  string,
+  {
+    userId: string;
+    sellerName: string;
+    isEmployee: boolean;
+    expiresAt: number;
+  }
+>();
 
 function normalizeForMatch(value: unknown): string {
   return String(value ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
-}
-
-function normalizeNumber(value: unknown, fallback = 0): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function normalizeReference(value: unknown): string | null {
-  const normalized = normalizeText(value);
-  if (!normalized) return null;
-  const lower = normalized.toLowerCase();
-  if (lower === 'null' || lower === 'undefined') return null;
-  return normalized;
 }
 
 function buildIdempotencyKey({
@@ -84,28 +75,15 @@ function buildIdempotencyKey({
   return `stocky:mobile:${action}:${businessId}:${orderId || 'none'}:${tableId || 'none'}`;
 }
 
-function isFunctionUnavailableError(errorLike: SupabaseErrorLike, functionName: string) {
-  const message = normalizeForMatch(errorLike?.message || '');
-  if (!message) return false;
-
-  return message.includes(normalizeForMatch(functionName || ''))
-    && (
-      message.includes('does not exist')
-      || message.includes('could not find the function')
-      || message.includes('schema cache')
-      || message.includes('pgrst202')
-      || message.includes('not found')
-    );
-}
-
 function isOrderContextError(errorLike: SupabaseErrorLike) {
   const message = normalizeForMatch(errorLike?.message || '');
   return (
-    (message.includes('la orden') && message.includes('no esta abierta'))
-    || (message.includes('la mesa') && message.includes('no esta asociada'))
-    || (message.includes('cambio durante el cierre') || message.includes('cambio durante cierre'))
-    || (message.includes('order') && message.includes('not found'))
-    || (message.includes('table') && message.includes('not found'))
+    (message.includes('la orden') && message.includes('no esta abierta')) ||
+    (message.includes('la mesa') && message.includes('no esta asociada')) ||
+    message.includes('cambio durante el cierre') ||
+    message.includes('cambio durante cierre') ||
+    (message.includes('order') && message.includes('not found')) ||
+    (message.includes('table') && message.includes('not found'))
   );
 }
 
@@ -115,39 +93,45 @@ function isMissingColumnInRelationError(
 ) {
   const message = String(errorLike?.message || '').toLowerCase();
   return (
-    message.includes('column')
-    && message.includes(`"${String(columnName || '').toLowerCase()}"`)
-    && message.includes('relation')
-    && message.includes(`"${String(tableName || '').toLowerCase()}"`)
-    && message.includes('does not exist')
+    message.includes('column') &&
+    message.includes(`"${String(columnName || '').toLowerCase()}"`) &&
+    message.includes('relation') &&
+    message.includes(`"${String(tableName || '').toLowerCase()}"`) &&
+    message.includes('does not exist')
   );
 }
 
-function pickFirstRow(data: any) {
+function pickFirstRow(data: unknown) {
   if (Array.isArray(data)) return data[0] || null;
   return data || null;
 }
 
 function isAdminRole(roleLike: unknown) {
   const role = normalizeText(roleLike).toLowerCase();
-  return role === 'owner'
-    || role === 'admin'
-    || role === 'administrador'
-    || role === 'propietario'
-    || role.includes('admin');
+  return (
+    role === 'owner' ||
+    role === 'admin' ||
+    role === 'administrador' ||
+    role === 'propietario' ||
+    role.includes('admin')
+  );
 }
 
-function resolveUserDisplayName(user: any): string | null {
+function resolveUserDisplayName(user: unknown): string | null {
   if (!user || typeof user !== 'object') return null;
-  const metadata = user?.user_metadata && typeof user.user_metadata === 'object'
-    ? user.user_metadata
-    : {};
+  const userRecord = user as Record<string, unknown>;
+  const metadata =
+    userRecord.user_metadata &&
+    typeof userRecord.user_metadata === 'object' &&
+    userRecord.user_metadata !== null
+      ? (userRecord.user_metadata as Record<string, unknown>)
+      : {};
   const candidates = [
     metadata?.full_name,
     metadata?.name,
     metadata?.display_name,
-    user?.full_name,
-    user?.email,
+    userRecord?.full_name,
+    userRecord?.email,
   ];
 
   for (const candidate of candidates) {
@@ -183,24 +167,20 @@ async function getUserAndSellerName(businessId: string) {
       .eq('business_id', businessId)
       .eq('is_active', true)
       .maybeSingle(),
-    client
-      .from('businesses')
-      .select('created_by')
-      .eq('id', businessId)
-      .maybeSingle(),
+    client.from('businesses').select('created_by').eq('id', businessId).maybeSingle(),
   ]);
 
   if (employeeResult.error) throw employeeResult.error;
   if (businessResult.error) throw businessResult.error;
 
-  const isOwner = normalizeReference(businessResult.data?.created_by) === normalizeReference(user.id);
+  const isOwner =
+    normalizeReference(businessResult.data?.created_by) === normalizeReference(user.id);
   const isAdmin = isAdminRole(employeeResult.data?.role);
   const employeeName = normalizeReference(employeeResult.data?.full_name);
   const userDisplay = resolveUserDisplayName(user);
 
-  const sellerName = isOwner || isAdmin
-    ? 'Administrador'
-    : (employeeName || userDisplay || 'Empleado');
+  const sellerName =
+    isOwner || isAdmin ? 'Administrador' : employeeName || userDisplay || 'Empleado';
   const isEmployee = !isOwner && !isAdmin;
 
   sellerContextCache.set(cacheKey, {
@@ -223,13 +203,15 @@ async function resolveAccessToken(): Promise<string | null> {
   return session?.access_token ? String(session.access_token) : null;
 }
 
-function normalizeOrderItemsForSale(orderItems: Array<{
-  product_id?: string | null;
-  combo_id?: string | null;
-  quantity?: number;
-  price?: number;
-  unit_price?: number;
-}>) {
+function normalizeOrderItemsForSale(
+  orderItems: {
+    product_id?: string | null;
+    combo_id?: string | null;
+    quantity?: number;
+    price?: number;
+    unit_price?: number;
+  }[],
+) {
   const source = Array.isArray(orderItems) ? orderItems : [];
 
   return source.map((item) => {
@@ -293,7 +275,10 @@ async function callCreateSplitSalesCompleteWithFallback({
 }) {
   const client = getSupabaseClient();
 
-  let { data, error } = await client.rpc('create_split_sales_complete_idempotent', idempotentParams);
+  let { data, error } = await client.rpc(
+    'create_split_sales_complete_idempotent',
+    idempotentParams,
+  );
   if (error && isFunctionUnavailableError(error, 'create_split_sales_complete_idempotent')) {
     ({ data, error } = await client.rpc('create_split_sales_complete', baseParams));
   }
@@ -326,10 +311,13 @@ async function finalizeOrderAndTable({
       .eq('id', orderId)
       .eq('business_id', businessId);
 
-    if (closeWithTimestamp.error && !isMissingColumnInRelationError(closeWithTimestamp.error, {
-      tableName: 'orders',
-      columnName: 'closed_at',
-    })) {
+    if (
+      closeWithTimestamp.error &&
+      !isMissingColumnInRelationError(closeWithTimestamp.error, {
+        tableName: 'orders',
+        columnName: 'closed_at',
+      })
+    ) {
       throw closeWithTimestamp.error;
     }
 
@@ -369,8 +357,8 @@ function normalizeCashChangeBreakdown(changeBreakdown: CashChangeEntry[] | null 
     .filter((entry) => entry.denomination > 0 && entry.count > 0);
 }
 
-function computeChangeFromBreakdown(changeBreakdown: Array<{ denomination: number; count: number }>) {
-  return changeBreakdown.reduce((sum, entry) => sum + (entry.denomination * entry.count), 0);
+function computeChangeFromBreakdown(changeBreakdown: { denomination: number; count: number }[]) {
+  return changeBreakdown.reduce((sum, entry) => sum + entry.denomination * entry.count, 0);
 }
 
 async function persistSaleCashMetadata({
@@ -395,9 +383,12 @@ async function persistSaleCashMetadata({
     : null;
   const normalizedBreakdown = normalizeCashChangeBreakdown(changeBreakdown);
   const breakdownChange = computeChangeFromBreakdown(normalizedBreakdown);
-  const changeAmount = breakdownChange > 0
-    ? breakdownChange
-    : (normalizedAmountReceived !== null ? Math.max(normalizedAmountReceived - saleTotal, 0) : null);
+  const changeAmount =
+    breakdownChange > 0
+      ? breakdownChange
+      : normalizedAmountReceived !== null
+        ? Math.max(normalizedAmountReceived - saleTotal, 0)
+        : null;
 
   const client = getSupabaseClient();
   const result = await client
@@ -438,7 +429,7 @@ export async function closeOrderSingle({
   }
 
   const saleTotal = normalizedItems.reduce(
-    (sum, item) => sum + (normalizeNumber(item.quantity, 0) * normalizeNumber(item.unit_price, 0)),
+    (sum, item) => sum + normalizeNumber(item.quantity, 0) * normalizeNumber(item.unit_price, 0),
     0,
   );
 
@@ -615,7 +606,11 @@ export async function closeOrderAsSplit({
       idempotentParams: atomicIdempotentParams,
     });
 
-    if (!atomicAttempt.error && atomicAttempt.row && normalizeText(atomicAttempt.row?.status).toLowerCase() === 'success') {
+    if (
+      !atomicAttempt.error &&
+      atomicAttempt.row &&
+      normalizeText(atomicAttempt.row?.status).toLowerCase() === 'success'
+    ) {
       const totalSold = normalizeNumber(atomicAttempt.row?.total_sold, 0);
       const saleIds = Array.isArray(atomicAttempt.row?.sale_ids)
         ? atomicAttempt.row.sale_ids.map((saleId: unknown) => normalizeText(saleId)).filter(Boolean)
@@ -659,7 +654,7 @@ export async function closeOrderAsSplit({
     const sub = normalizedSubAccounts[index];
     const isLast = index === normalizedSubAccounts.length - 1;
     const subTotal = sub.items.reduce(
-      (sum, item) => sum + (normalizeNumber(item.quantity, 0) * normalizeNumber(item.unit_price, 0)),
+      (sum, item) => sum + normalizeNumber(item.quantity, 0) * normalizeNumber(item.unit_price, 0),
       0,
     );
     totalSold += subTotal;
@@ -686,7 +681,11 @@ export async function closeOrderAsSplit({
       idempotentParams: subIdempotentParams,
     });
 
-    if ((subAttempt.error || !subAttempt.row) && useOrderContext && isOrderContextError(subAttempt.error)) {
+    if (
+      (subAttempt.error || !subAttempt.row) &&
+      useOrderContext &&
+      isOrderContextError(subAttempt.error)
+    ) {
       shouldFinalizeOrderAndTable = true;
       const withoutOrderContextBase = {
         ...subBaseParams,

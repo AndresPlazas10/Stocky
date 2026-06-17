@@ -31,7 +31,11 @@ export function PaymentBreakdown({ items, ventasTotal }: PaymentBreakdownProps) 
               <View style={s.breakdownTop}>
                 <View style={s.breakdownLeft}>
                   {isBankPaymentMethod(item.method) ? (
-                    <Image source={getBankLogoSource(item.method)!} style={s.breakdownLogo} resizeMode="contain" />
+                    <Image
+                      source={getBankLogoSource(item.method)!}
+                      style={s.breakdownLogo}
+                      resizeMode="contain"
+                    />
                   ) : (
                     <Ionicons name={getPaymentMethodIcon(item.method)} size={19} color="#334155" />
                   )}
@@ -44,7 +48,9 @@ export function PaymentBreakdown({ items, ventasTotal }: PaymentBreakdownProps) 
                 <Text style={s.breakdownMeta}>{share.toFixed(1)}%</Text>
               </View>
               <View style={s.progressTrack}>
-                <View style={[s.progressFill, { width: `${Math.max(0, Math.min(100, share))}%` }]} />
+                <View
+                  style={[s.progressFill, { width: `${Math.max(0, Math.min(100, share))}%` }]}
+                />
               </View>
             </View>
           );

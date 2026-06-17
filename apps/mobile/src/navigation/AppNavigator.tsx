@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  type NavigationState,
+  type PartialState,
+} from '@react-navigation/native';
 import {
   createDrawerNavigator,
   DrawerContentScrollView,
@@ -31,7 +35,9 @@ import { perfMark } from '../utils/perfAudit';
 const Drawer = createDrawerNavigator<RootDrawerParamList>();
 const DRAWER_WIDTH = 244;
 
-function resolveActiveRouteName(state: any): string {
+function resolveActiveRouteName(
+  state: NavigationState | PartialState<NavigationState> | null | undefined,
+): string {
   if (!state || !Array.isArray(state.routes) || state.routes.length === 0) return 'unknown';
   const index = Number.isFinite(Number(state.index)) ? Number(state.index) : 0;
   const route = state.routes[index] || state.routes[0];
@@ -40,7 +46,7 @@ function resolveActiveRouteName(state: any): string {
   return String(route.name || 'unknown');
 }
 
-function Header({ navigation, route }: DrawerHeaderProps) {
+function Header({ navigation, route: _route }: DrawerHeaderProps) {
   const insets = useSafeAreaInsets();
   const { businessContext } = useDashboardContext();
 
@@ -55,7 +61,6 @@ function Header({ navigation, route }: DrawerHeaderProps) {
           {businessContext?.businessName || 'Stocky'}
         </Text>
       </View>
-
     </View>
   );
 }
@@ -73,21 +78,28 @@ function DrawerContent({
   const activeRouteName = state.routeNames[state.index];
   const roleLabel = source === 'employee' ? 'Empleado' : 'Administrador';
   const userLabel = String(
-    session.user.user_metadata?.full_name
-      || session.user.user_metadata?.name
-      || session.user.user_metadata?.username
-      || session.user.email?.split('@')[0]
-      || 'Usuario',
+    session.user.user_metadata?.full_name ||
+      session.user.user_metadata?.name ||
+      session.user.user_metadata?.username ||
+      session.user.email?.split('@')[0] ||
+      'Usuario',
   );
 
-  const grouped = useMemo(() => sections.reduce<Record<SectionGroup, SectionMeta[]>>((acc, section) => {
-    acc[section.group].push(section);
-    return acc;
-  }, {
-    principal: [],
-    gestion: [],
-    sistema: [],
-  }), [sections]);
+  const grouped = useMemo(
+    () =>
+      sections.reduce<Record<SectionGroup, SectionMeta[]>>(
+        (acc, section) => {
+          acc[section.group].push(section);
+          return acc;
+        },
+        {
+          principal: [],
+          gestion: [],
+          sistema: [],
+        },
+      ),
+    [sections],
+  );
 
   const onNavigate = (sectionId: SectionId) => {
     navigation.navigate(sectionId as never);
@@ -103,7 +115,9 @@ function DrawerContent({
     >
       <View style={styles.drawerHeaderBlock}>
         <Text style={styles.drawerBusiness}>{businessContext?.businessName || 'Stocky'}</Text>
-        <Text style={styles.drawerUser} numberOfLines={1}>{userLabel}</Text>
+        <Text style={styles.drawerUser} numberOfLines={1}>
+          {userLabel}
+        </Text>
         <View style={styles.drawerRolePill}>
           <Ionicons name="shield-checkmark-outline" size={13} color="#4338CA" />
           <Text style={styles.drawerRoleText}>{roleLabel}</Text>
@@ -224,7 +238,9 @@ export function AppNavigator() {
       >
         <Drawer.Navigator
           key={`${source}:${loadingBusiness ? 'loading' : 'ready'}`}
-          drawerContent={(props) => <DrawerContent {...props} sections={allowedSections} source={source} />}
+          drawerContent={(props) => (
+            <DrawerContent {...props} sections={allowedSections} source={source} />
+          )}
           screenOptions={{
             drawerType: 'front',
             drawerStyle: styles.drawer,
@@ -240,7 +256,6 @@ export function AppNavigator() {
               name={section.id}
               options={{ title: section.label }}
               component={DashboardSectionScreen}
-              initialParams={{ sectionId: section.id } as any}
             />
           ))}
         </Drawer.Navigator>
@@ -249,11 +264,7 @@ export function AppNavigator() {
     </View>
   );
 
-  return (
-    <View style={styles.rootShell}>
-      {content}
-    </View>
-  );
+  return <View style={styles.rootShell}>{content}</View>;
 }
 
 const styles = StyleSheet.create({

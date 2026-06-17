@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -74,22 +73,28 @@ export function SplitBillModalRN({
       contentContainerStyle={styles.modalContent}
       contentStyle={styles.modalScroll}
       bodyFlex
-      headerSlot={(
+      headerSlot={
         <View style={styles.modalHeader}>
           <View style={styles.modalHeaderIcon}>
             <Ionicons name="receipt-outline" size={20} color="#4F46E5" />
           </View>
           <View style={styles.modalHeaderTextWrap}>
             <Text style={styles.modalHeaderTitle}>Dividir cuenta</Text>
-            <Text style={styles.modalHeaderSubtitle}>Distribuye productos por cuenta y confirma.</Text>
+            <Text style={styles.modalHeaderSubtitle}>
+              Distribuye productos por cuenta y confirma.
+            </Text>
           </View>
         </View>
-      )}
+      }
       onClose={onClose}
       footerStyle={styles.modalFooter}
-      footer={(
+      footer={
         <View style={styles.footerRow}>
-          <Pressable style={styles.secondaryButton} onPress={handleSecondaryAction} disabled={submitting}>
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={handleSecondaryAction}
+            disabled={submitting}
+          >
             <Text style={styles.secondaryButtonText}>{secondaryButtonLabel}</Text>
           </Pressable>
           <Pressable
@@ -104,7 +109,11 @@ export function SplitBillModalRN({
               style={styles.actionButton}
             >
               <Ionicons
-                name={currentStep === 2 && currentAccountIndex >= accounts.length - 1 ? 'checkmark-circle-outline' : 'arrow-forward-circle-outline'}
+                name={
+                  currentStep === 2 && currentAccountIndex >= accounts.length - 1
+                    ? 'checkmark-circle-outline'
+                    : 'arrow-forward-circle-outline'
+                }
                 size={18}
                 color="#E9D5FF"
               />
@@ -112,7 +121,7 @@ export function SplitBillModalRN({
             </LinearGradient>
           </Pressable>
         </View>
-      )}
+      }
     >
       {currentStep === 1 ? <SplitBillStepper currentStep={currentStep} /> : null}
 
@@ -134,7 +143,9 @@ export function SplitBillModalRN({
           isPaymentMenuOpen={isPaymentMenuOpen}
           resolveItemName={resolveItemName}
           onTogglePaymentMenu={() => setIsPaymentMenuOpen((prev) => !prev)}
-          onSelectPaymentMethod={(method) => currentAccount && updateAccountPaymentMethod(currentAccount.id, method)}
+          onSelectPaymentMethod={(method) =>
+            currentAccount && updateAccountPaymentMethod(currentAccount.id, method)
+          }
           onAdjustQuantity={adjustItemQuantityForAccount}
           getItemExpectedQuantity={getItemExpectedQuantity}
         />

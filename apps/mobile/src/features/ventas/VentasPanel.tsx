@@ -9,7 +9,8 @@ import { StockyMoneyText } from '../../ui/StockyMoneyText';
 import { PrintReceiptConfirmModal } from '../../ui/PrintReceiptConfirmModal';
 import { DayFilterCalendarModal } from '../../ui/DayFilterCalendarModal';
 import { RecordFilterCard } from '../../ui/RecordFilterCard';
-import { formatCop } from '../../services/mesasService';
+import { formatCop } from '../../utils/money';
+import { getErrorMessage } from '../../utils/error';
 import { listRecentVentas, type VentaRecord } from '../../services/ventasService';
 import { useSupabaseRealtime } from '../../hooks/useSupabaseRealtime';
 import { useVentaCart } from './hooks/useVentaCart';
@@ -34,7 +35,7 @@ type Props = {
 export function VentasPanel({ businessId, businessName, source }: Props) {
   const [loading, setLoading] = useState(true);
   const [loadingSales, setLoadingSales] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
   const [ventas, setVentas] = useState<VentaRecord[]>([]);
   const [showCreateSaleModal, setShowCreateSaleModal] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
@@ -48,13 +49,8 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
     clearCart: clearCartBase,
   } = useVentaCart();
 
-  const {
-    paymentMethod,
-    setPaymentMethod,
-    amountReceived,
-    setAmountReceived,
-    resetPayment,
-  } = useVentaPayment(cartTotal);
+  const { paymentMethod, setPaymentMethod, amountReceived, setAmountReceived, resetPayment } =
+    useVentaPayment(cartTotal);
 
   const clearCart = useCallback(() => {
     clearCartBase();
@@ -193,14 +189,17 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
   }, [businessId, loadCatalogData]);
 
   useEffect(() => {
-    loadInitialData();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial de datos
+    void loadInitialData();
   }, [loadInitialData]);
 
   const refreshSalesSilently = useCallback(async () => {
     try {
       const recentSales = await listRecentVentas(businessId, 50, { forceRefresh: true });
       setVentas(recentSales);
-    } catch {}
+    } catch (err) {
+      console.error('[Ventas] error al refrescar ventas silenciosamente:', getErrorMessage(err));
+    }
   }, [businessId]);
 
   const scheduleSalesRefresh = useCallback(() => {
@@ -216,10 +215,22 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
     channelKey: 'ventas',
     businessId,
     tables: [
-      { table: 'sales', filter: businessId ? `business_id=eq.${businessId}` : undefined, onEvent: scheduleSalesRefresh },
+      {
+        table: 'sales',
+        filter: businessId ? `business_id=eq.${businessId}` : undefined,
+        onEvent: scheduleSalesRefresh,
+      },
       { table: 'sale_details', onEvent: scheduleSalesRefresh },
-      { table: 'products', filter: businessId ? `business_id=eq.${businessId}` : undefined, onEvent: scheduleCatalogRefresh },
-      { table: 'combos', filter: businessId ? `business_id=eq.${businessId}` : undefined, onEvent: scheduleCatalogRefresh },
+      {
+        table: 'products',
+        filter: businessId ? `business_id=eq.${businessId}` : undefined,
+        onEvent: scheduleCatalogRefresh,
+      },
+      {
+        table: 'combos',
+        filter: businessId ? `business_id=eq.${businessId}` : undefined,
+        onEvent: scheduleCatalogRefresh,
+      },
     ],
     onSubscribed: scheduleSalesRefresh,
     onPollTick: scheduleSalesRefresh,
@@ -231,14 +242,20 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
       setError(null);
       listRecentVentas(businessId, 50, { forceRefresh: true })
         .then(setVentas)
-        .catch((err) => setError(err instanceof Error ? err.message : 'No se pudo refrescar el historial.'))
+        .catch((err) =>
+          setError(err instanceof Error ? err.message : 'No se pudo refrescar el historial.'),
+        )
         .finally(() => setLoadingSales(false));
     }, [businessId]),
   );
 
   useEffect(() => {
-    const keyboardDidShow = Keyboard.addListener('keyboardDidShow', () => setIsKeyboardVisible(true));
-    const keyboardDidHide = Keyboard.addListener('keyboardDidHide', () => setIsKeyboardVisible(false));
+    const keyboardDidShow = Keyboard.addListener('keyboardDidShow', () =>
+      setIsKeyboardVisible(true),
+    );
+    const keyboardDidHide = Keyboard.addListener('keyboardDidHide', () =>
+      setIsKeyboardVisible(false),
+    );
     return () => {
       keyboardDidShow.remove();
       keyboardDidHide.remove();
@@ -319,7 +336,9 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
               <Ionicons name="chevron-back" size={19} color={canPrevPage ? '#4F46E5' : '#9CA3AF'} />
             </Pressable>
             <View style={s.paginationPageBadge}>
-              <Text style={s.paginationPageText}>Página {currentPage} de {totalPages}</Text>
+              <Text style={s.paginationPageText}>
+                Página {currentPage} de {totalPages}
+              </Text>
             </View>
             <Pressable
               style={[
@@ -330,7 +349,11 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
               onPress={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
               disabled={!canNextPage}
             >
-              <Ionicons name="chevron-forward" size={19} color={canNextPage ? '#4F46E5' : '#9CA3AF'} />
+              <Ionicons
+                name="chevron-forward"
+                size={19}
+                color={canNextPage ? '#4F46E5' : '#9CA3AF'}
+              />
             </Pressable>
           </View>
         </View>
@@ -385,7 +408,11 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         maxSelectableDate={maxSelectableDate}
         minSelectableDayKey={minSelectableDayKey}
         maxSelectableDayKey={maxSelectableDayKey}
-        onSelectDay={(key) => { setDayFilter(key); setCurrentPage(1); setShowDayFilterModal(false); }}
+        onSelectDay={(key) => {
+          setDayFilter(key);
+          setCurrentPage(1);
+          setShowDayFilterModal(false);
+        }}
         onClose={() => setShowDayFilterModal(false)}
         onMonthChange={setDayCalendarMonth}
       />

@@ -10,12 +10,12 @@ export function useVentaPayment(cartTotal: number) {
     if (paymentMethod !== 'cash') return;
     if (isAmountReceivedManual) return;
     if (cartTotal <= 0) {
-      if (amountReceived !== '') setAmountReceived('');
+      if (amountReceived !== '') setAmountReceived(''); // eslint-disable-line react-hooks/set-state-in-effect -- sincronización de monto recibido con total
       return;
     }
     const suggested = `${Math.round(Number(cartTotal || 0))}`;
     if (amountReceived !== suggested) {
-      setAmountReceived(suggested);
+      setAmountReceived(suggested); // eslint-disable-line react-hooks/set-state-in-effect -- sincronización de monto recibido con total
     }
   }, [amountReceived, cartTotal, isAmountReceivedManual, paymentMethod]);
 

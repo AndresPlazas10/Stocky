@@ -5,10 +5,14 @@ export function useInventorySearch(products: InventoryProductRecord[]) {
   const [search, setSearch] = useState('');
 
   const filteredProducts = useMemo(() => {
-    const normalizedSearch = String(search || '').trim().toLowerCase();
+    const normalizedSearch = String(search || '')
+      .trim()
+      .toLowerCase();
     return products.filter((product) => {
       if (!normalizedSearch) return true;
-      return String(product.name || '').toLowerCase().includes(normalizedSearch);
+      return String(product.name || '')
+        .toLowerCase()
+        .includes(normalizedSearch);
     });
   }, [products, search]);
 

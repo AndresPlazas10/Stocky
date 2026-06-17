@@ -51,31 +51,34 @@ export function useVentaPrint(
     setPrintCustomerName('Venta general');
   }, []);
 
-  const handlePrintSale = useCallback(async (venta: VentaRecord) => {
-    setError(null);
-    setIsPrinting(true);
+  const handlePrintSale = useCallback(
+    async (venta: VentaRecord) => {
+      setError(null);
+      setIsPrinting(true);
 
-    try {
-      const { listVentaDetails } = await import('../../../services/ventasService');
-      const details = await listVentaDetails(venta.id);
-      if (!Array.isArray(details) || details.length === 0) {
-        setError('No se pudo imprimir: la venta no tiene items.');
-        return;
+      try {
+        const { listVentaDetails } = await import('../../../services/ventasService');
+        const details = await listVentaDetails(venta.id);
+        if (!Array.isArray(details) || details.length === 0) {
+          setError('No se pudo imprimir: la venta no tiene items.');
+          return;
+        }
+
+        const result = await printSaleReceipt(venta, details, {
+          businessName: businessName ?? undefined,
+        });
+
+        if (!result.ok) {
+          setError(result.error || 'No se pudo imprimir la venta.');
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No se pudo imprimir la venta.');
+      } finally {
+        setIsPrinting(false);
       }
-
-      const result = await printSaleReceipt(venta, details, {
-        businessName: businessName ?? undefined,
-      });
-
-      if (!result.ok) {
-        setError(result.error || 'No se pudo imprimir la venta.');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo imprimir la venta.');
-    } finally {
-      setIsPrinting(false);
-    }
-  }, [businessName, setError]);
+    },
+    [businessName, setError],
+  );
 
   return {
     showPrintModal,

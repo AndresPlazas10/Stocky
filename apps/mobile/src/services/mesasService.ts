@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { EXPO_CONFIG } from '../config/env';
 import { getSupabaseClient } from '../lib/supabase';
+import { normalizeReference } from '../utils/normalization';
+
 import type { SupabaseErrorLike } from '../types/errors';
 
 export type MesaStatus = 'available' | 'occupied' | string;
@@ -69,24 +71,22 @@ let businessContextRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = '
 let openCloseRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
 let mesasSummaryFastRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
 let mesasSummaryRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
-const businessContextCacheByUserId = new Map<string, {
-  value: BusinessContext | null;
-  expiresAt: number;
-}>();
+const businessContextCacheByUserId = new Map<
+  string,
+  {
+    value: BusinessContext | null;
+    expiresAt: number;
+  }
+>();
 const businessContextInFlightByUserId = new Map<string, Promise<BusinessContext | null>>();
-const mesaEditorDisplayNameCacheByKey = new Map<string, {
-  value: string;
-  expiresAt: number;
-}>();
+const mesaEditorDisplayNameCacheByKey = new Map<
+  string,
+  {
+    value: string;
+    expiresAt: number;
+  }
+>();
 const mesaEditorDisplayNameInFlightByKey = new Map<string, Promise<string>>();
-
-function normalizeReference(value: unknown): string | null {
-  const normalized = String(value ?? '').trim();
-  if (!normalized) return null;
-  const lower = normalized.toLowerCase();
-  if (lower === 'null' || lower === 'undefined') return null;
-  return normalized;
-}
 
 function normalizeDisplayName(value: unknown, fallback = 'Usuario'): string {
   const normalized = normalizeReference(value);
@@ -103,47 +103,59 @@ function createMesaLockToken() {
 }
 
 function normalizeMesaStatus(value: unknown): MesaStatus {
-  const normalized = String(value || '').trim().toLowerCase();
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
   if (normalized === 'occupied') return 'occupied';
   if (normalized === 'available') return 'available';
   return normalized || 'available';
 }
 
-function normalizeMesaRow(row: any): MesaRecord {
+function normalizeMesaRow(row: Record<string, unknown>): MesaRecord {
   const hasOrderUnits = Boolean(row && typeof row === 'object' && 'order_units' in row);
   const rawOrderUnits = row?.order_units;
-  const normalizedOrderUnits = (
-    rawOrderUnits === null
-    || rawOrderUnits === undefined
-    || String(rawOrderUnits).trim() === ''
-  )
-    ? Number.NaN
-    : Number(rawOrderUnits);
+  const normalizedOrderUnits =
+    rawOrderUnits === null || rawOrderUnits === undefined || String(rawOrderUnits).trim() === ''
+      ? Number.NaN
+      : Number(rawOrderUnits);
   const rawSyncVersion = Number(row?.sync_version);
+  const rawTableNumber = row?.table_number;
+  const rawName = row?.name;
+  const ordersRecord =
+    row.orders && typeof row.orders === 'object' && row.orders !== null
+      ? (row.orders as Record<string, unknown>)
+      : null;
+
   return {
     id: String(row?.id || ''),
     business_id: String(row?.business_id || ''),
-    table_number: row?.table_number ?? null,
-    name: row?.name ?? null,
+    table_number:
+      typeof rawTableNumber === 'string' || typeof rawTableNumber === 'number'
+        ? rawTableNumber
+        : null,
+    name: typeof rawName === 'string' ? rawName : null,
     status: normalizeMesaStatus(row?.status),
-    current_order_id: row?.current_order_id ?? null,
-    order_units: hasOrderUnits && Number.isFinite(normalizedOrderUnits)
-      ? Math.max(0, Math.floor(normalizedOrderUnits))
-      : undefined,
+    current_order_id: row?.current_order_id ? String(row.current_order_id) : null,
+    order_units:
+      hasOrderUnits && Number.isFinite(normalizedOrderUnits)
+        ? Math.max(0, Math.floor(normalizedOrderUnits))
+        : undefined,
     sync_version: Number.isFinite(rawSyncVersion)
       ? Math.max(0, Math.floor(rawSyncVersion))
       : undefined,
-    orders: row?.orders
+    orders: ordersRecord
       ? {
-          id: row.orders.id,
-          status: row.orders.status,
-          total: Number(row.orders.total || 0),
+          id: ordersRecord.id as string | undefined,
+          status: (ordersRecord.status as string | undefined) ?? undefined,
+          total: Number(ordersRecord.total || 0),
         }
       : null,
   };
 }
 
-function normalizeBusinessContextCandidate(candidate: BusinessCandidate | null): BusinessContext | null {
+function normalizeBusinessContextCandidate(
+  candidate: BusinessCandidate | null,
+): BusinessContext | null {
   if (!candidate?.businessId) return null;
   return {
     businessId: candidate.businessId,
@@ -214,9 +226,9 @@ function isMissingNameColumnError(errorLike: SupabaseErrorLike) {
   const message = String(errorLike?.message || '').toLowerCase();
   const details = String(errorLike?.details || '').toLowerCase();
   return (
-    message.includes('column')
-    && message.includes('name')
-    && (message.includes('does not exist') || details.includes('does not exist'))
+    message.includes('column') &&
+    message.includes('name') &&
+    (message.includes('does not exist') || details.includes('does not exist'))
   );
 }
 
@@ -224,17 +236,13 @@ function isMissingListTablesWithOrderSummaryRpcError(errorLike: SupabaseErrorLik
   const code = String(errorLike?.code || '').toLowerCase();
   const message = String(errorLike?.message || '').toLowerCase();
   return (
-    code === 'pgrst202'
-    || code === '42883'
-    || (
-      message.includes('list_tables_with_order_summary')
-      && (
-        message.includes('does not exist')
-        || message.includes('could not find the function')
-        || message.includes('schema cache')
-        || message.includes('not found')
-      )
-    )
+    code === 'pgrst202' ||
+    code === '42883' ||
+    (message.includes('list_tables_with_order_summary') &&
+      (message.includes('does not exist') ||
+        message.includes('could not find the function') ||
+        message.includes('schema cache') ||
+        message.includes('not found')))
   );
 }
 
@@ -242,17 +250,13 @@ function isMissingListTablesWithOrderSummaryFastRpcError(errorLike: SupabaseErro
   const code = String(errorLike?.code || '').toLowerCase();
   const message = String(errorLike?.message || '').toLowerCase();
   return (
-    code === 'pgrst202'
-    || code === '42883'
-    || (
-      message.includes('list_tables_with_order_summary_fast')
-      && (
-        message.includes('does not exist')
-        || message.includes('could not find the function')
-        || message.includes('schema cache')
-        || message.includes('not found')
-      )
-    )
+    code === 'pgrst202' ||
+    code === '42883' ||
+    (message.includes('list_tables_with_order_summary_fast') &&
+      (message.includes('does not exist') ||
+        message.includes('could not find the function') ||
+        message.includes('schema cache') ||
+        message.includes('not found')))
   );
 }
 
@@ -260,17 +264,13 @@ function isMissingResolveMobileBusinessContextRpcError(errorLike: SupabaseErrorL
   const code = String(errorLike?.code || '').toLowerCase();
   const message = String(errorLike?.message || '').toLowerCase();
   return (
-    code === 'pgrst202'
-    || code === '42883'
-    || (
-      message.includes('resolve_mobile_business_context')
-      && (
-        message.includes('does not exist')
-        || message.includes('could not find the function')
-        || message.includes('schema cache')
-        || message.includes('not found')
-      )
-    )
+    code === 'pgrst202' ||
+    code === '42883' ||
+    (message.includes('resolve_mobile_business_context') &&
+      (message.includes('does not exist') ||
+        message.includes('could not find the function') ||
+        message.includes('schema cache') ||
+        message.includes('not found')))
   );
 }
 
@@ -280,11 +280,11 @@ function isMissingColumnInRelationError(
 ) {
   const message = String(errorLike?.message || '').toLowerCase();
   return (
-    message.includes('column')
-    && message.includes(`"${String(columnName || '').toLowerCase()}"`)
-    && message.includes('relation')
-    && message.includes(`"${String(tableName || '').toLowerCase()}"`)
-    && message.includes('does not exist')
+    message.includes('column') &&
+    message.includes(`"${String(columnName || '').toLowerCase()}"`) &&
+    message.includes('relation') &&
+    message.includes(`"${String(tableName || '').toLowerCase()}"`) &&
+    message.includes('does not exist')
   );
 }
 
@@ -296,9 +296,9 @@ function isDuplicateKeyError(errorLike: SupabaseErrorLike) {
 function isMissingTableEditLocksRelationError(errorLike: SupabaseErrorLike) {
   const message = String(errorLike?.message || '').toLowerCase();
   return (
-    message.includes('relation')
-    && message.includes('"table_edit_locks"')
-    && message.includes('does not exist')
+    message.includes('relation') &&
+    message.includes('"table_edit_locks"') &&
+    message.includes('does not exist')
   );
 }
 
@@ -309,7 +309,7 @@ function isMissingTableEditLocksColumnError(errorLike: SupabaseErrorLike, column
   });
 }
 
-function normalizeMesaEditLock(row: any): MesaEditLock {
+function normalizeMesaEditLock(row: Record<string, unknown>): MesaEditLock {
   return {
     table_id: String(row?.table_id || ''),
     business_id: String(row?.business_id || ''),
@@ -321,9 +321,10 @@ function normalizeMesaEditLock(row: any): MesaEditLock {
   };
 }
 
-function hasSyncVersionField(rows: any[]): boolean {
+function hasSyncVersionField(rows: Record<string, unknown>[]): boolean {
   return (Array.isArray(rows) ? rows : []).some(
-    (row) => row && typeof row === 'object' && Object.prototype.hasOwnProperty.call(row, 'sync_version'),
+    (row) =>
+      row && typeof row === 'object' && Object.prototype.hasOwnProperty.call(row, 'sync_version'),
   );
 }
 
@@ -337,13 +338,12 @@ async function enrichMesasWithSyncVersion(mesas: MesaRecord[]): Promise<MesaReco
   if (mesaIds.length === 0) return mesas;
 
   const client = getSupabaseClient();
-  const { data, error } = await client
-    .from('tables')
-    .select('id,sync_version')
-    .in('id', mesaIds);
+  const { data, error } = await client.from('tables').select('id,sync_version').in('id', mesaIds);
 
   if (error) {
-    if (isMissingColumnInRelationError(error, { tableName: 'tables', columnName: 'sync_version' })) {
+    if (
+      isMissingColumnInRelationError(error, { tableName: 'tables', columnName: 'sync_version' })
+    ) {
       return mesas;
     }
     throw error;
@@ -433,61 +433,6 @@ async function fetchMesasWithOrderSummaryFastRpc(businessId: string): Promise<Me
   return enrichMesasWithSyncVersion(mesas);
 }
 
-async function fetchMesaById(tableId: string, includeNameColumn: boolean) {
-  const client = getSupabaseClient();
-
-  const selectSql = includeNameColumn
-    ? `
-      id,
-      business_id,
-      table_number,
-      name,
-      status,
-      current_order_id,
-      sync_version,
-      orders:orders!current_order_id (
-        id,
-        status,
-        total
-      )
-    `
-    : `
-      id,
-      business_id,
-      table_number,
-      status,
-      current_order_id,
-      sync_version,
-      orders:orders!current_order_id (
-        id,
-        status,
-        total
-      )
-    `;
-
-  return client
-    .from('tables')
-    .select(selectSql)
-    .eq('id', tableId)
-    .maybeSingle();
-}
-
-async function fetchMesaRecordById(tableId: string): Promise<MesaRecord | null> {
-  const detailedMesa = await fetchMesaById(tableId, true);
-  if (!detailedMesa.error && detailedMesa.data) {
-    return normalizeMesaRow(detailedMesa.data);
-  }
-
-  if (isMissingNameColumnError(detailedMesa.error)) {
-    const fallbackMesa = await fetchMesaById(tableId, false);
-    if (!fallbackMesa.error && fallbackMesa.data) {
-      return normalizeMesaRow(fallbackMesa.data);
-    }
-  }
-
-  return null;
-}
-
 async function closeOpenOrdersLegacy({
   businessId,
   tableId,
@@ -517,7 +462,9 @@ async function closeOpenOrdersLegacy({
   const first = await query;
   if (!first.error) return;
 
-  if (!isMissingColumnInRelationError(first.error, { tableName: 'orders', columnName: 'closed_at' })) {
+  if (
+    !isMissingColumnInRelationError(first.error, { tableName: 'orders', columnName: 'closed_at' })
+  ) {
     throw first.error;
   }
 
@@ -563,15 +510,13 @@ async function createOpenOrderLegacy({
     return String(withTotal.data.id);
   }
 
-  if (!isMissingColumnInRelationError(withTotal.error, { tableName: 'orders', columnName: 'total' })) {
+  if (
+    !isMissingColumnInRelationError(withTotal.error, { tableName: 'orders', columnName: 'total' })
+  ) {
     throw withTotal.error;
   }
 
-  const withoutTotal = await client
-    .from('orders')
-    .insert([baseOrder])
-    .select('id')
-    .single();
+  const withoutTotal = await client.from('orders').insert([baseOrder]).select('id').single();
 
   if (withoutTotal.error) throw withoutTotal.error;
   if (!withoutTotal.data?.id) throw new Error('No se pudo crear orden abierta');
@@ -721,7 +666,9 @@ export async function resolveBusinessContext(
 
   const resolver = (async (): Promise<BusinessContext | null> => {
     const client = getSupabaseClient();
-    let preferredBusinessId = normalizeReference(await AsyncStorage.getItem(LAST_BUSINESS_ID_STORAGE_KEY));
+    let preferredBusinessId = normalizeReference(
+      await AsyncStorage.getItem(LAST_BUSINESS_ID_STORAGE_KEY),
+    );
 
     if (businessContextRpcCompatibility !== 'unsupported') {
       const rpc = await client.rpc('resolve_mobile_business_context', {
@@ -732,13 +679,22 @@ export async function resolveBusinessContext(
       if (!rpc.error) {
         businessContextRpcCompatibility = 'supported';
         const rpcRow = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
-        const candidate = normalizeBusinessContextCandidate(rpcRow ? {
-          businessId: String(rpcRow.business_id || ''),
-          businessName: rpcRow.business_name ?? null,
-          source: String(rpcRow.source || '').trim().toLowerCase() === 'employee' ? 'employee' : 'owner',
-          createdAt: rpcRow.created_at ?? null,
-          isActive: rpcRow.is_active !== false,
-        } : null);
+        const candidate = normalizeBusinessContextCandidate(
+          rpcRow
+            ? {
+                businessId: String(rpcRow.business_id || ''),
+                businessName: rpcRow.business_name ?? null,
+                source:
+                  String(rpcRow.source || '')
+                    .trim()
+                    .toLowerCase() === 'employee'
+                    ? 'employee'
+                    : 'owner',
+                createdAt: rpcRow.created_at ?? null,
+                isActive: rpcRow.is_active !== false,
+              }
+            : null,
+        );
 
         if (candidate?.businessId) {
           await AsyncStorage.setItem(LAST_BUSINESS_ID_STORAGE_KEY, candidate.businessId);
@@ -824,7 +780,8 @@ export async function resolveBusinessContext(
           businessId: latestEmployeeBusinessId,
           businessName: latestEmployeeBusinessResult.data?.name || null,
           source: 'employee',
-          createdAt: latestEmployeeRow.created_at || latestEmployeeBusinessResult.data?.created_at || null,
+          createdAt:
+            latestEmployeeRow.created_at || latestEmployeeBusinessResult.data?.created_at || null,
           isActive: latestEmployeeBusinessResult.data?.is_active !== false,
         };
       }
@@ -887,7 +844,9 @@ export async function fetchMesasByBusinessId(businessId: string): Promise<MesaRe
 
   const initial = await fetchMesasWithSelect(businessId, true);
   if (!initial.error) {
-    return (Array.isArray(initial.data) ? initial.data : []).map(normalizeMesaRow);
+    return (
+      (Array.isArray(initial.data) ? initial.data : []) as unknown as Record<string, unknown>[]
+    ).map(normalizeMesaRow);
   }
 
   if (isMissingNameColumnError(initial.error)) {
@@ -896,23 +855,23 @@ export async function fetchMesasByBusinessId(businessId: string): Promise<MesaRe
       throw fallback.error;
     }
 
-    return (Array.isArray(fallback.data) ? fallback.data : []).map(normalizeMesaRow);
+    return (
+      (Array.isArray(fallback.data) ? fallback.data : []) as unknown as Record<string, unknown>[]
+    ).map(normalizeMesaRow);
   }
 
   throw initial.error;
 }
 
-function buildMesaEditLockMap(rows: any[]): MesaEditLock[] {
+function buildMesaEditLockMap(rows: Record<string, unknown>[]): MesaEditLock[] {
   const nowTs = Date.now();
-  return (Array.isArray(rows) ? rows : [])
-    .map(normalizeMesaEditLock)
-    .filter((lock) => {
-      if (!lock.table_id || !lock.business_id || !lock.lock_owner_user_id) return false;
-      if (!lock.lock_expires_at) return true;
-      const expiresTs = Date.parse(lock.lock_expires_at);
-      if (!Number.isFinite(expiresTs)) return true;
-      return expiresTs > nowTs;
-    });
+  return (Array.isArray(rows) ? rows : []).map(normalizeMesaEditLock).filter((lock) => {
+    if (!lock.table_id || !lock.business_id || !lock.lock_owner_user_id) return false;
+    if (!lock.lock_expires_at) return true;
+    const expiresTs = Date.parse(lock.lock_expires_at);
+    if (!Number.isFinite(expiresTs)) return true;
+    return expiresTs > nowTs;
+  });
 }
 
 async function selectMesaEditLockByTableId({
@@ -925,7 +884,9 @@ async function selectMesaEditLockByTableId({
   const client = getSupabaseClient();
   const withToken = await client
     .from('table_edit_locks')
-    .select('table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at')
+    .select(
+      'table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at',
+    )
     .eq('business_id', businessId)
     .eq('table_id', tableId)
     .maybeSingle();
@@ -1019,12 +980,19 @@ export async function listActiveMesaEditLocks(businessId: string): Promise<MesaE
 
   const withFilter = await client
     .from('table_edit_locks')
-    .select('table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at')
+    .select(
+      'table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at',
+    )
     .eq('business_id', normalizedBusinessId)
     .gt('lock_expires_at', nowIso);
 
   if (!withFilter.error) {
-    return buildMesaEditLockMap(Array.isArray(withFilter.data) ? withFilter.data : []);
+    return buildMesaEditLockMap(
+      (Array.isArray(withFilter.data) ? withFilter.data : []) as unknown as Record<
+        string,
+        unknown
+      >[],
+    );
   }
 
   if (isMissingTableEditLocksRelationError(withFilter.error)) {
@@ -1057,7 +1025,9 @@ export async function listActiveMesaEditLocks(businessId: string): Promise<MesaE
     throw fallback.error;
   }
 
-  return buildMesaEditLockMap(Array.isArray(fallback.data) ? fallback.data : []);
+  return buildMesaEditLockMap(
+    (Array.isArray(fallback.data) ? fallback.data : []) as unknown as Record<string, unknown>[],
+  );
 }
 
 export async function acquireMesaEditLock({
@@ -1088,7 +1058,9 @@ export async function acquireMesaEditLock({
     };
   }
 
-  const ttl = Number.isFinite(Number(ttlSeconds)) ? Math.max(15, Math.floor(Number(ttlSeconds))) : 45;
+  const ttl = Number.isFinite(Number(ttlSeconds))
+    ? Math.max(15, Math.floor(Number(ttlSeconds)))
+    : 45;
   const now = new Date();
   const nowIso = now.toISOString();
   const lockExpiresAt = new Date(now.getTime() + ttl * 1000).toISOString();
@@ -1149,7 +1121,9 @@ export async function acquireMesaEditLock({
   const insertWithToken = await client
     .from('table_edit_locks')
     .insert([payloadWithToken])
-    .select('table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at')
+    .select(
+      'table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at',
+    )
     .maybeSingle();
 
   if (!insertWithToken.error && insertWithToken.data) {
@@ -1170,15 +1144,17 @@ export async function acquireMesaEditLock({
       const fallbackInsert = await client
         .from('table_edit_locks')
         .insert([payloadNoToken])
-        .select('table_id,business_id,lock_owner_user_id,lock_owner_name,lock_expires_at,updated_at')
+        .select(
+          'table_id,business_id,lock_owner_user_id,lock_owner_name,lock_expires_at,updated_at',
+        )
         .maybeSingle();
 
       if (!fallbackInsert.error && fallbackInsert.data) {
         inserted = normalizeMesaEditLock(fallbackInsert.data);
       } else if (fallbackInsert.error) {
         if (
-          isMissingTableEditLocksColumnError(fallbackInsert.error, 'lock_expires_at')
-          || isMissingTableEditLocksColumnError(fallbackInsert.error, 'updated_at')
+          isMissingTableEditLocksColumnError(fallbackInsert.error, 'lock_expires_at') ||
+          isMissingTableEditLocksColumnError(fallbackInsert.error, 'updated_at')
         ) {
           const legacyInsert = await client
             .from('table_edit_locks')
@@ -1195,14 +1171,14 @@ export async function acquireMesaEditLock({
         }
       }
     } else if (
-      !isDuplicateKeyError(insertWithToken.error)
-      && !isMissingTableEditLocksColumnError(insertWithToken.error, 'lock_expires_at')
-      && !isMissingTableEditLocksColumnError(insertWithToken.error, 'updated_at')
+      !isDuplicateKeyError(insertWithToken.error) &&
+      !isMissingTableEditLocksColumnError(insertWithToken.error, 'lock_expires_at') &&
+      !isMissingTableEditLocksColumnError(insertWithToken.error, 'updated_at')
     ) {
       throw insertWithToken.error;
     } else if (
-      isMissingTableEditLocksColumnError(insertWithToken.error, 'lock_expires_at')
-      || isMissingTableEditLocksColumnError(insertWithToken.error, 'updated_at')
+      isMissingTableEditLocksColumnError(insertWithToken.error, 'lock_expires_at') ||
+      isMissingTableEditLocksColumnError(insertWithToken.error, 'updated_at')
     ) {
       lockTokenSupported = false;
       const legacyInsert = await client
@@ -1234,9 +1210,7 @@ export async function acquireMesaEditLock({
   });
 
   if (existing && existing.lock_owner_user_id === normalizedUserId) {
-    const updatePayload = lockTokenSupported
-      ? payloadWithToken
-      : payloadNoToken;
+    const updatePayload = lockTokenSupported ? payloadWithToken : payloadNoToken;
 
     const updateAttempt = await client
       .from('table_edit_locks')
@@ -1244,7 +1218,9 @@ export async function acquireMesaEditLock({
       .eq('business_id', normalizedBusinessId)
       .eq('table_id', normalizedTableId)
       .eq('lock_owner_user_id', normalizedUserId)
-      .select('table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at')
+      .select(
+        'table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at',
+      )
       .maybeSingle();
 
     if (!updateAttempt.error && updateAttempt.data) {
@@ -1258,14 +1234,19 @@ export async function acquireMesaEditLock({
       };
     }
 
-    if (updateAttempt.error && isMissingTableEditLocksColumnError(updateAttempt.error, 'lock_token')) {
+    if (
+      updateAttempt.error &&
+      isMissingTableEditLocksColumnError(updateAttempt.error, 'lock_token')
+    ) {
       const fallbackUpdate = await client
         .from('table_edit_locks')
         .update(payloadNoToken)
         .eq('business_id', normalizedBusinessId)
         .eq('table_id', normalizedTableId)
         .eq('lock_owner_user_id', normalizedUserId)
-        .select('table_id,business_id,lock_owner_user_id,lock_owner_name,lock_expires_at,updated_at')
+        .select(
+          'table_id,business_id,lock_owner_user_id,lock_owner_name,lock_expires_at,updated_at',
+        )
         .maybeSingle();
 
       if (!fallbackUpdate.error && fallbackUpdate.data) {
@@ -1318,7 +1299,9 @@ export async function refreshMesaEditLockHeartbeat({
     return { ok: false, unsupported: false, lock: null, lockOwnerName: null, lost: true };
   }
 
-  const ttl = Number.isFinite(Number(ttlSeconds)) ? Math.max(15, Math.floor(Number(ttlSeconds))) : 45;
+  const ttl = Number.isFinite(Number(ttlSeconds))
+    ? Math.max(15, Math.floor(Number(ttlSeconds)))
+    : 45;
   const now = new Date();
   const payload: Record<string, unknown> = {
     lock_owner_name: normalizedUserName,
@@ -1343,7 +1326,9 @@ export async function refreshMesaEditLockHeartbeat({
   }
 
   const withToken = await query
-    .select('table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at')
+    .select(
+      'table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at',
+    )
     .maybeSingle();
 
   if (!withToken.error && withToken.data) {
@@ -1386,7 +1371,10 @@ export async function refreshMesaEditLockHeartbeat({
       };
     }
 
-    if (fallbackUpdate.error && isMissingTableEditLocksColumnError(fallbackUpdate.error, 'lock_expires_at')) {
+    if (
+      fallbackUpdate.error &&
+      isMissingTableEditLocksColumnError(fallbackUpdate.error, 'lock_expires_at')
+    ) {
       const legacyUpdate = await client
         .from('table_edit_locks')
         .update({
@@ -1496,22 +1484,22 @@ export async function releaseMesaEditLock({
 function isMissingUpdatedAtOnTablesError(errorLike: SupabaseErrorLike) {
   const message = String(errorLike?.message || '').toLowerCase();
   return (
-    message.includes('column')
-    && message.includes('"updated_at"')
-    && message.includes('relation')
-    && message.includes('"tables"')
-    && message.includes('does not exist')
+    message.includes('column') &&
+    message.includes('"updated_at"') &&
+    message.includes('relation') &&
+    message.includes('"tables"') &&
+    message.includes('does not exist')
   );
 }
 
 function isMissingOpenedAtOnTablesError(errorLike: SupabaseErrorLike) {
   const message = String(errorLike?.message || '').toLowerCase();
   return (
-    message.includes('column')
-    && message.includes('"opened_at"')
-    && message.includes('relation')
-    && message.includes('"tables"')
-    && message.includes('does not exist')
+    message.includes('column') &&
+    message.includes('"opened_at"') &&
+    message.includes('relation') &&
+    message.includes('"tables"') &&
+    message.includes('does not exist')
   );
 }
 
@@ -1562,7 +1550,11 @@ export function normalizeTableIdentifier(value: string | number | null | undefin
 }
 
 export function isMesaOccupied(status: string | null | undefined) {
-  return String(status || '').trim().toLowerCase() === 'occupied';
+  return (
+    String(status || '')
+      .trim()
+      .toLowerCase() === 'occupied'
+  );
 }
 
 export function compareMesaTableIdentifiers(left: MesaRecord, right: MesaRecord) {
@@ -1583,24 +1575,27 @@ export function resolveMesaSyncVersion(mesa: Partial<MesaRecord> | null | undefi
 
 export function mesaDisplayName(mesa: MesaRecord): string {
   if (mesa.name && String(mesa.name).trim()) return String(mesa.name).trim();
-  if (mesa.table_number !== null && mesa.table_number !== undefined && String(mesa.table_number).trim()) {
+  if (
+    mesa.table_number !== null &&
+    mesa.table_number !== undefined &&
+    String(mesa.table_number).trim()
+  ) {
     return `Mesa ${String(mesa.table_number).trim()}`;
   }
   return `Mesa ${mesa.id.slice(0, 6)}`;
 }
 
-function isInvalidIntegerTableNumberError(errorLike: SupabaseErrorLike) {
-  const code = String(errorLike?.code || '').trim();
-  const message = String(errorLike?.message || '').toLowerCase();
-  const details = String(errorLike?.details || '').toLowerCase();
+function isInvalidIntegerTableNumberError(errorLike: unknown) {
+  const err = errorLike as SupabaseErrorLike | null | undefined;
+  const code = String(err?.code || '').trim();
+  const message = String(err?.message || '').toLowerCase();
+  const details = String(err?.details || '').toLowerCase();
   return (
-    code === '22P02'
-    && (
-      message.includes('table_number')
-      || details.includes('table_number')
-      || message.includes('integer')
-      || details.includes('integer')
-    )
+    code === '22P02' &&
+    (message.includes('table_number') ||
+      details.includes('table_number') ||
+      message.includes('integer') ||
+      details.includes('integer'))
   );
 }
 
@@ -1666,7 +1661,7 @@ export async function createMesa({
       businessId,
       tableNumber: normalizedIdentifier,
     });
-  } catch (firstError: any) {
+  } catch (firstError) {
     // Some DBs still keep table_number as integer. If user entered only digits, retry as number.
     if (isInvalidIntegerTableNumberError(firstError) && /^\d+$/.test(normalizedIdentifier)) {
       return insertMesaWithFallbackSelect({
@@ -1747,9 +1742,9 @@ export async function openCloseMesa({
     });
 
     const raw = await response.text();
-    let payload: any = null;
+    let payload: Record<string, unknown> | null = null;
     try {
-      payload = raw ? JSON.parse(raw) : null;
+      payload = raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
     } catch {
       payload = { error: raw || 'Unexpected response' };
     }
@@ -1763,11 +1758,12 @@ export async function openCloseMesa({
       );
     }
 
-    if (!payload?.data?.id) {
+    const payloadData = payload?.data;
+    if (!payloadData || typeof payloadData !== 'object' || !('id' in payloadData)) {
       throw new Error('Invalid API response for open/close table');
     }
 
-    return normalizeMesaRow(payload.data);
+    return normalizeMesaRow(payloadData as Record<string, unknown>);
   }
 
   try {
@@ -1789,9 +1785,9 @@ export async function openCloseMesa({
       }
 
       if (
-        isMissingOpenedAtOnTablesError(error)
-        || isMissingUpdatedAtOnTablesError(error)
-        || isMissingNameColumnError(error)
+        isMissingOpenedAtOnTablesError(error) ||
+        isMissingUpdatedAtOnTablesError(error) ||
+        isMissingNameColumnError(error)
       ) {
         openCloseRpcCompatibility = 'unsupported';
       }
@@ -1828,20 +1824,4 @@ export async function openCloseMesa({
   } catch (fatalError) {
     throw new Error(formatErrorMessage(fatalError, 'No se pudo abrir/cerrar la mesa'));
   }
-}
-
-const COP_FORMATTER = new Intl.NumberFormat('es-CO', {
-  maximumFractionDigits: 0,
-});
-
-export function formatCopAmount(value: number | null | undefined): string {
-  const amount = Number(value || 0);
-  const absoluteAmount = Math.abs(Math.round(amount));
-  const formattedAmount = COP_FORMATTER.format(absoluteAmount);
-  const sign = amount < 0 ? '-' : '';
-  return `${sign}$ ${formattedAmount}`;
-}
-
-export function formatCop(value: number | null | undefined): string {
-  return formatCopAmount(value);
 }

@@ -11,7 +11,7 @@ type Props = PropsWithChildren<{
 export function StockyCard({ title, subtitle, rightSlot, children }: Props) {
   return (
     <View style={styles.card}>
-      {(title || subtitle || rightSlot) ? (
+      {title || subtitle || rightSlot ? (
         <View style={styles.header}>
           <View style={styles.headerText}>
             {title ? <Text style={styles.title}>{title}</Text> : null}

@@ -38,7 +38,7 @@ export function BusinessEditModal({
       sheetStyle={styles.businessEditSheet}
       onClose={onClose}
       hideCloseButton
-      headerSlot={(
+      headerSlot={
         <LinearGradient
           colors={['#4F46E5', '#7C3AED']}
           start={{ x: 0, y: 0 }}
@@ -51,16 +51,18 @@ export function BusinessEditModal({
             </View>
             <View style={styles.businessEditHeaderTextWrap}>
               <Text style={styles.businessEditHeaderTitle}>Editar Negocio</Text>
-              <Text style={styles.businessEditHeaderSubtitle}>Actualiza NIT, teléfono y dirección</Text>
+              <Text style={styles.businessEditHeaderSubtitle}>
+                Actualiza NIT, teléfono y dirección
+              </Text>
             </View>
           </View>
           <Pressable style={styles.businessEditHeaderClose} onPress={onClose} disabled={saving}>
             <Ionicons name="close" size={24} color="#E5E7EB" />
           </Pressable>
         </LinearGradient>
-      )}
+      }
       footerStyle={styles.businessEditFooter}
-      footer={(
+      footer={
         <View style={styles.businessEditFooterRow}>
           <Pressable
             style={[styles.businessEditCancelButton, saving && styles.disabled]}
@@ -80,12 +82,18 @@ export function BusinessEditModal({
               end={{ x: 1, y: 0 }}
               style={styles.businessEditSaveButton}
             >
-              {saving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="save-outline" size={17} color="#FFFFFF" />}
-              <Text style={styles.businessEditSaveText}>{saving ? 'Guardando...' : 'Guardar Cambios'}</Text>
+              {saving ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="save-outline" size={17} color="#FFFFFF" />
+              )}
+              <Text style={styles.businessEditSaveText}>
+                {saving ? 'Guardando...' : 'Guardar Cambios'}
+              </Text>
             </LinearGradient>
           </Pressable>
         </View>
-      )}
+      }
     >
       <View style={styles.businessEditFields}>
         <View style={styles.businessEditField}>

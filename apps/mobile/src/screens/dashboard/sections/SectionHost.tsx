@@ -21,43 +21,83 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   const enabled = isSectionEnabled(sectionId);
 
   if (sectionId === 'home') {
-    return <StockyErrorBoundary><HomeSection /></StockyErrorBoundary>;
+    return (
+      <StockyErrorBoundary>
+        <HomeSection />
+      </StockyErrorBoundary>
+    );
   }
 
   if (sectionId === 'ventas' && enabled) {
-    return <StockyErrorBoundary><VentasSection /></StockyErrorBoundary>;
+    return (
+      <StockyErrorBoundary>
+        <VentasSection />
+      </StockyErrorBoundary>
+    );
   }
 
   if (sectionId === 'compras' && enabled) {
-    return <StockyErrorBoundary><ComprasSection /></StockyErrorBoundary>;
+    return (
+      <StockyErrorBoundary>
+        <ComprasSection />
+      </StockyErrorBoundary>
+    );
   }
 
   if (sectionId === 'inventario' && enabled) {
-    return <StockyErrorBoundary><InventarioSection /></StockyErrorBoundary>;
+    return (
+      <StockyErrorBoundary>
+        <InventarioSection />
+      </StockyErrorBoundary>
+    );
   }
 
   if (sectionId === 'combos' && enabled) {
-    return <StockyErrorBoundary><CombosSection /></StockyErrorBoundary>;
+    return (
+      <StockyErrorBoundary>
+        <CombosSection />
+      </StockyErrorBoundary>
+    );
   }
 
   if (sectionId === 'proveedores' && enabled) {
-    return <StockyErrorBoundary><ProveedoresSection /></StockyErrorBoundary>;
+    return (
+      <StockyErrorBoundary>
+        <ProveedoresSection />
+      </StockyErrorBoundary>
+    );
   }
 
   if (sectionId === 'empleados' && enabled) {
-    return <StockyErrorBoundary><EmpleadosSection /></StockyErrorBoundary>;
+    return (
+      <StockyErrorBoundary>
+        <EmpleadosSection />
+      </StockyErrorBoundary>
+    );
   }
 
   if (sectionId === 'reportes' && enabled) {
-    return <StockyErrorBoundary><ReportesSection /></StockyErrorBoundary>;
+    return (
+      <StockyErrorBoundary>
+        <ReportesSection />
+      </StockyErrorBoundary>
+    );
   }
 
   if (sectionId === 'configuracion' && enabled) {
-    return <StockyErrorBoundary><ConfiguracionSection /></StockyErrorBoundary>;
+    return (
+      <StockyErrorBoundary>
+        <ConfiguracionSection />
+      </StockyErrorBoundary>
+    );
   }
 
   if (sectionId === 'impresion' && enabled) {
-    return <StockyErrorBoundary><ImpresionSection /></StockyErrorBoundary>;
+    return (
+      <StockyErrorBoundary>
+        <ImpresionSection />
+      </StockyErrorBoundary>
+    );
   }
 
   return (

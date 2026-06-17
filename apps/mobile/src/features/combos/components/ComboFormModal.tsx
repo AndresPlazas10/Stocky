@@ -27,7 +27,7 @@ type Props = {
 export function ComboFormModal({
   visible,
   saving,
-  error,
+  error: _error,
   editingCombo,
   form,
   productsById,
@@ -54,7 +54,7 @@ export function ComboFormModal({
       perfTag="combos.form_combo"
       onClose={onClose}
       hideCloseButton
-      headerSlot={(
+      headerSlot={
         <View style={styles.comboFormHeader}>
           <LinearGradient
             colors={['#4F46E5', '#7C3AED']}
@@ -62,20 +62,32 @@ export function ComboFormModal({
             end={{ x: 1, y: 1 }}
             style={styles.comboFormHeaderIconWrap}
           >
-            <Ionicons name={editingCombo ? 'create-outline' : 'layers-outline'} size={30} color="#D1D5DB" />
+            <Ionicons
+              name={editingCombo ? 'create-outline' : 'layers-outline'}
+              size={30}
+              color="#D1D5DB"
+            />
           </LinearGradient>
           <Text style={styles.comboFormHeaderTitle}>
             {editingCombo ? 'Editar Combo' : 'Nuevo Combo'}
           </Text>
-          <Pressable style={[styles.comboFormHeaderClose, saving && styles.buttonDisabled]} onPress={onClose} disabled={saving}>
+          <Pressable
+            style={[styles.comboFormHeaderClose, saving && styles.buttonDisabled]}
+            onPress={onClose}
+            disabled={saving}
+          >
             <Ionicons name="close" size={34} color="#111827" />
           </Pressable>
         </View>
-      )}
+      }
       footerStyle={styles.comboFormFooter}
-      footer={(
+      footer={
         <View style={styles.comboFormFooterRow}>
-          <Pressable style={[styles.comboFormCancelButton, saving && styles.buttonDisabled]} onPress={onClose} disabled={saving}>
+          <Pressable
+            style={[styles.comboFormCancelButton, saving && styles.buttonDisabled]}
+            onPress={onClose}
+            disabled={saving}
+          >
             <Text style={styles.comboFormCancelButtonText}>Cancelar</Text>
           </Pressable>
           <Pressable
@@ -85,11 +97,11 @@ export function ComboFormModal({
           >
             {saving ? <ActivityIndicator size="small" color="#F5F3FF" /> : null}
             <Text style={styles.comboFormSaveButtonText}>
-              {saving ? 'Guardando...' : (editingCombo ? 'Actualizar' : 'Guardar')}
+              {saving ? 'Guardando...' : editingCombo ? 'Actualizar' : 'Guardar'}
             </Text>
           </Pressable>
         </View>
-      )}
+      }
     >
       <View style={styles.comboFormFields}>
         <View style={styles.comboFormRow}>
@@ -144,8 +156,17 @@ export function ComboFormModal({
               return (
                 <View key={`combo-item-${index}`} style={styles.comboItemRowWrap}>
                   <View style={styles.comboItemEditorRow}>
-                    <Pressable style={styles.comboItemSelect} onPress={() => onOpenProductPicker(index)}>
-                      <Text style={[styles.comboItemSelectText, !item.productoId && styles.comboItemSelectPlaceholder]} numberOfLines={1}>
+                    <Pressable
+                      style={styles.comboItemSelect}
+                      onPress={() => onOpenProductPicker(index)}
+                    >
+                      <Text
+                        style={[
+                          styles.comboItemSelectText,
+                          !item.productoId && styles.comboItemSelectPlaceholder,
+                        ]}
+                        numberOfLines={1}
+                      >
                         {selectedProduct?.name || 'Selecciona un producto'}
                       </Text>
                       <Ionicons name="chevron-down" size={18} color="#64748B" />
@@ -161,7 +182,10 @@ export function ComboFormModal({
                     />
 
                     <Pressable
-                      style={[styles.comboItemRemoveButton, form.items.length <= 1 && styles.buttonDisabled]}
+                      style={[
+                        styles.comboItemRemoveButton,
+                        form.items.length <= 1 && styles.buttonDisabled,
+                      ]}
                       onPress={() => onRemoveItemRow(index)}
                       disabled={form.items.length <= 1}
                     >
@@ -170,7 +194,9 @@ export function ComboFormModal({
                   </View>
 
                   <Text style={styles.comboItemMeta} numberOfLines={1}>
-                    {selectedProduct ? `${selectedProduct.code || 'Sin código'} · Stock: ${selectedProduct.stock}` : 'Producto requerido'}
+                    {selectedProduct
+                      ? `${selectedProduct.code || 'Sin código'} · Stock: ${selectedProduct.stock}`
+                      : 'Producto requerido'}
                   </Text>
                 </View>
               );
@@ -178,7 +204,9 @@ export function ComboFormModal({
           </View>
 
           {hasDuplicateProducts ? (
-            <Text style={styles.comboFieldError}>No se permiten productos repetidos en el combo.</Text>
+            <Text style={styles.comboFieldError}>
+              No se permiten productos repetidos en el combo.
+            </Text>
           ) : null}
         </View>
 
@@ -190,7 +218,8 @@ export function ComboFormModal({
               const quantity = Number(String(item.cantidad || '').replace(',', '.'));
               return (
                 <Text key={`combo-summary-${index}`} style={styles.comboSummaryText}>
-                  {Number.isFinite(quantity) && quantity > 0 ? quantity : 0} x {product?.name || 'Producto sin seleccionar'}
+                  {Number.isFinite(quantity) && quantity > 0 ? quantity : 0} x{' '}
+                  {product?.name || 'Producto sin seleccionar'}
                 </Text>
               );
             })}

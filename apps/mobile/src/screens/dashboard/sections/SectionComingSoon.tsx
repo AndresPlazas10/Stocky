@@ -19,7 +19,6 @@ export function SectionComingSoon({ sectionId, disabledByFlag, onGoHome }: Props
       title={section.label}
       subtitle={disabledByFlag ? 'Módulo desactivado por feature flag' : 'Módulo en construcción'}
     >
-
       <View style={styles.checklist}>
         <Text style={styles.title}>Checklist de paridad</Text>
         <Text style={styles.item}>- Jerarquía visual y estructura 1:1 con web móvil</Text>
@@ -28,7 +27,9 @@ export function SectionComingSoon({ sectionId, disabledByFlag, onGoHome }: Props
         <Text style={styles.item}>- Validación cruzada web vs RN con mismo negocio</Text>
       </View>
 
-      <StockyButton variant="secondary" onPress={onGoHome}>Volver a Inicio</StockyButton>
+      <StockyButton variant="secondary" onPress={onGoHome}>
+        Volver a Inicio
+      </StockyButton>
     </StockyCard>
   );
 }

@@ -14,7 +14,7 @@ interface PaymentPieChartProps {
   data: PaymentPieDataItem[];
   width: number;
   height: number;
-  chartConfig: Record<string, any>;
+  chartConfig: Record<string, unknown>;
 }
 
 export function PaymentPieChart({ data, width, height, chartConfig }: PaymentPieChartProps) {

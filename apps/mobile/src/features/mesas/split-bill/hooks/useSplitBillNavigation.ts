@@ -6,7 +6,18 @@ interface UseSplitBillNavigationParams {
   accountsCount: number;
   submitting: boolean;
   canConfirm: boolean;
-  subAccounts: Array<{ id: number; items: SplitSubAccount['items']; total: number; paymentMethod: string; cashInfo: { isValid: boolean; paid: number | null; change: number; breakdown: Array<{ denomination: number; count: number }> } }>;
+  subAccounts: {
+    id: number;
+    items: SplitSubAccount['items'];
+    total: number;
+    paymentMethod: string;
+    cashInfo: {
+      isValid: boolean;
+      paid: number | null;
+      change: number;
+      breakdown: { denomination: number; count: number }[];
+    };
+  }[];
   onBack: () => void;
   onConfirm: (payload: { subAccounts: SplitSubAccount[] }) => void;
 }
@@ -24,17 +35,17 @@ export function useSplitBillNavigation({
   const [isPaymentMenuOpen, setIsPaymentMenuOpen] = useState(false);
 
   useEffect(() => {
-    setCurrentStep(1);
-    setCurrentAccountIndex(0);
-    setIsPaymentMenuOpen(false);
+    setCurrentStep(1); // eslint-disable-line react-hooks/set-state-in-effect -- reset de navegación al cambiar cuentas
+    setCurrentAccountIndex(0); // eslint-disable-line react-hooks/set-state-in-effect -- reset de navegación al cambiar cuentas
+    setIsPaymentMenuOpen(false); // eslint-disable-line react-hooks/set-state-in-effect -- reset de navegación al cambiar cuentas
   }, [accountsCount]);
 
   useEffect(() => {
-    setCurrentAccountIndex((prev) => Math.min(prev, Math.max(0, accountsCount - 1)));
+    setCurrentAccountIndex((prev) => Math.min(prev, Math.max(0, accountsCount - 1))); // eslint-disable-line react-hooks/set-state-in-effect -- clamp de índice al cambiar cuentas
   }, [accountsCount]);
 
   useEffect(() => {
-    setIsPaymentMenuOpen(false);
+    setIsPaymentMenuOpen(false); // eslint-disable-line react-hooks/set-state-in-effect -- cerrar menú al cambiar paso/cuenta
   }, [currentStep, currentAccountIndex]);
 
   const currentAccount = useMemo(
@@ -44,10 +55,10 @@ export function useSplitBillNavigation({
 
   const isLastAccountStep = currentAccountIndex >= accountsCount - 1;
   const isCurrentCashInvalid = Boolean(
-    currentAccount
-    && currentAccount.paymentMethod === 'cash'
-    && currentAccount.items.length > 0
-    && !currentAccount.cashInfo.isValid,
+    currentAccount &&
+    currentAccount.paymentMethod === 'cash' &&
+    currentAccount.items.length > 0 &&
+    !currentAccount.cashInfo.isValid,
   );
   const hasCurrentAccountItems = (currentAccount?.items.length || 0) > 0;
 
@@ -99,13 +110,23 @@ export function useSplitBillNavigation({
     setCurrentStep(1);
   };
 
-  const primaryButtonLabel = currentStep === 1
-    ? 'Iniciar división'
-    : (isLastAccountStep ? (submitting ? 'Procesando...' : 'Terminar venta') : 'Siguiente cuenta');
+  const primaryButtonLabel =
+    currentStep === 1
+      ? 'Iniciar división'
+      : isLastAccountStep
+        ? submitting
+          ? 'Procesando...'
+          : 'Terminar venta'
+        : 'Siguiente cuenta';
   const secondaryButtonLabel = currentStep === 1 ? 'Volver' : 'Atrás';
-  const isPrimaryDisabled = currentStep === 1
-    ? false
-    : (submitting || !currentAccount || isCurrentCashInvalid || !hasCurrentAccountItems || (isLastAccountStep && !canConfirm));
+  const isPrimaryDisabled =
+    currentStep === 1
+      ? false
+      : submitting ||
+        !currentAccount ||
+        isCurrentCashInvalid ||
+        !hasCurrentAccountItems ||
+        (isLastAccountStep && !canConfirm);
 
   return {
     currentStep,

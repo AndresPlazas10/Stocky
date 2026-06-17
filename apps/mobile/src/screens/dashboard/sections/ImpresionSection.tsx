@@ -3,9 +3,5 @@ import { ImpresionPanel } from '../../../features/impresion/ImpresionPanel';
 
 export function ImpresionSection() {
   const { businessContext } = useDashboardContext();
-  return (
-    <ImpresionPanel
-      businessName={businessContext?.businessName ?? undefined}
-    />
-  );
+  return <ImpresionPanel businessName={businessContext?.businessName ?? undefined} />;
 }

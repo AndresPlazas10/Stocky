@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getSupabaseClient } from '../lib/supabase';
+import { getErrorMessage } from '../utils/error';
 
 type AuthMode = 'signin' | 'signup';
 
@@ -37,7 +38,9 @@ type SignUpForm = {
 };
 
 function normalizeUsername(value: string) {
-  return String(value || '').trim().toLowerCase();
+  return String(value || '')
+    .trim()
+    .toLowerCase();
 }
 
 function normalizeUsernameToEmail(username: string) {
@@ -54,17 +57,21 @@ function normalizeOptional(value: string) {
 }
 
 function isMissingCreateBusinessRpc(errorLike: unknown) {
-  const message = String((errorLike as any)?.message || '').toLowerCase();
-  return message.includes('create_business_for_current_user')
-    && (message.includes('does not exist') || message.includes('not found'));
+  const message = getErrorMessage(errorLike).toLowerCase();
+  return (
+    message.includes('create_business_for_current_user') &&
+    (message.includes('does not exist') || message.includes('not found'))
+  );
 }
 
 function mapSignUpError(errorLike: unknown): Error {
-  const errorMsg = String((errorLike as any)?.message || '');
+  const errorMsg = getErrorMessage(errorLike);
   const lower = errorMsg.toLowerCase();
 
   if (lower.includes('already registered') || errorMsg === 'User already registered') {
-    return new Error('❌ Ya existe una cuenta con este nombre de usuario. Intenta con otro nombre.');
+    return new Error(
+      '❌ Ya existe una cuenta con este nombre de usuario. Intenta con otro nombre.',
+    );
   }
   if (lower.includes('password')) {
     return new Error('❌ La contraseña debe tener al menos 6 caracteres');
@@ -105,7 +112,7 @@ async function createBusinessWithFallback({
   });
 
   if (!rpcResult.error) {
-    const rpcData = rpcResult.data as any;
+    const rpcData = rpcResult.data as Record<string, unknown>;
     const businessId = String(rpcData?.id || '').trim();
     if (!businessId) {
       throw new Error('❌ Error al crear el negocio');
@@ -189,7 +196,11 @@ function AuthInput({
         />
         {showToggle ? (
           <Pressable onPress={onToggleVisibility} hitSlop={8}>
-            <Ionicons name={isVisible ? 'eye-off-outline' : 'eye-outline'} size={24} color="#9CA3AF" />
+            <Ionicons
+              name={isVisible ? 'eye-off-outline' : 'eye-outline'}
+              size={24}
+              color="#9CA3AF"
+            />
           </Pressable>
         ) : null}
       </View>
@@ -232,10 +243,12 @@ export function AuthScreen() {
       return signInForm.username.trim().length > 2 && signInForm.password.trim().length >= 6;
     }
 
-    return signUpForm.name.trim().length > 1
-      && signUpForm.username.trim().length >= 3
-      && signUpForm.password.trim().length >= 6
-      && signUpForm.confirmPassword.trim().length >= 6;
+    return (
+      signUpForm.name.trim().length > 1 &&
+      signUpForm.username.trim().length >= 3 &&
+      signUpForm.password.trim().length >= 6 &&
+      signUpForm.confirmPassword.trim().length >= 6
+    );
   }, [isSignIn, signInForm.password, signInForm.username, signUpForm]);
 
   const submitSignIn = async () => {
@@ -293,7 +306,9 @@ export function AuthScreen() {
     }
 
     if (!/^[a-z0-9_]{3,20}$/.test(username)) {
-      throw new Error('❌ El usuario debe tener entre 3-20 caracteres (solo letras, números y guiones bajos)');
+      throw new Error(
+        '❌ El usuario debe tener entre 3-20 caracteres (solo letras, números y guiones bajos)',
+      );
     }
 
     const client = getSupabaseClient();
@@ -350,7 +365,9 @@ export function AuthScreen() {
       }
 
       if (!authResult.data?.session) {
-        throw new Error('⚠️ Supabase requiere confirmación de email. Desactiva "Confirm email" para este flujo.');
+        throw new Error(
+          '⚠️ Supabase requiere confirmación de email. Desactiva "Confirm email" para este flujo.',
+        );
       }
 
       const userId = authResult.data.user.id;
@@ -365,20 +382,20 @@ export function AuthScreen() {
         phone: signUpForm.phone,
         email,
         username,
-      }).then((business) =>
-        client
-          .from('employees')
-          .insert([
+      })
+        .then((business) =>
+          client.from('employees').insert([
             {
               user_id: userId,
               business_id: business.id,
               role: 'owner',
               full_name: `${name} (Propietario)`,
             },
-          ])
-      ).catch((err) => {
-        console.error('[Auth] Background setup failed', err);
-      });
+          ]),
+        )
+        .catch((err) => {
+          console.error('[Auth] Background setup failed', err);
+        });
     } catch (err) {
       try {
         await client.auth.signOut();
@@ -449,164 +466,177 @@ export function AuthScreen() {
             automaticallyAdjustKeyboardInsets
           >
             <View style={cardStyle}>
-            <LinearGradient
-              colors={['#4F46E5', '#A21CAF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.logoBox}
-            >
-              <Ionicons name={isSignIn ? 'storefront-outline' : 'business-outline'} size={44} color="#FFFFFF" />
-            </LinearGradient>
-
-            <Text style={styles.title}>{isSignIn ? 'Iniciar Sesión' : 'Registrar Negocio'}</Text>
-            <Text style={styles.subtitle}>
-              {isSignIn
-                ? 'Ingresa tus credenciales para acceder'
-                : 'Completa la información de tu negocio para comenzar'}
-            </Text>
-
-            {isSignIn ? (
-              <Pressable
-                onPress={() => Linking.openURL('https://www.stockypos.app')}
-                style={styles.registerPromptWrap}
-              >
-                <Text style={styles.registerPromptText}>
-                  ¿No has registrado tu negocio? Registrate gratis en www.stockypos.app
-                </Text>
-              </Pressable>
-            ) : null}
-
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-            {message ? <Text style={styles.message}>{message}</Text> : null}
-
-            {isSignIn ? (
-              <>
-                <AuthInput
-                  label="Usuario"
-                  value={signInForm.username}
-                  onChangeText={(next) => setSignInForm((prev) => ({ ...prev, username: next }))}
-                  placeholder="Tu nombre de usuario"
-                  icon="person-outline"
-                  autoCapitalize="none"
-                />
-
-                <AuthInput
-                  label="Contraseña"
-                  value={signInForm.password}
-                  onChangeText={(next) => setSignInForm((prev) => ({ ...prev, password: next }))}
-                  placeholder="Tu contraseña"
-                  icon="lock-closed-outline"
-                  secure
-                  showToggle
-                  isVisible={showSignInPassword}
-                  onToggleVisibility={() => setShowSignInPassword((prev) => !prev)}
-                />
-              </>
-            ) : (
-              <>
-                <AuthInput
-                  label="Nombre del negocio"
-                  value={signUpForm.name}
-                  onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, name: next }))}
-                  placeholder="Ej: Mi Cafetería"
-                  icon="storefront-outline"
-                  autoCapitalize="words"
-                />
-
-                <AuthInput
-                  label="Usuario"
-                  value={signUpForm.username}
-                  onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, username: next }))}
-                  placeholder="usuario_negocio"
-                  icon="person-outline"
-                  autoCapitalize="none"
-                />
-
-                <AuthInput
-                  label="NIT (opcional)"
-                  value={signUpForm.nit}
-                  onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, nit: next }))}
-                  placeholder="900.123.456-7"
-                  icon="business-outline"
-                />
-
-                <AuthInput
-                  label="Teléfono"
-                  value={signUpForm.phone}
-                  onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, phone: next }))}
-                  placeholder="+57 300 123 4567"
-                  icon="call-outline"
-                  keyboardType="phone-pad"
-                />
-
-                <AuthInput
-                  label="Dirección"
-                  value={signUpForm.address}
-                  onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, address: next }))}
-                  placeholder="Calle 123 #45-67"
-                  icon="location-outline"
-                  autoCapitalize="words"
-                />
-
-                <AuthInput
-                  label="Contraseña"
-                  value={signUpForm.password}
-                  onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, password: next }))}
-                  placeholder="Mínimo 6 caracteres"
-                  icon="lock-closed-outline"
-                  secure
-                  showToggle
-                  isVisible={showSignUpPassword}
-                  onToggleVisibility={() => setShowSignUpPassword((prev) => !prev)}
-                />
-
-                <AuthInput
-                  label="Confirmar contraseña"
-                  value={signUpForm.confirmPassword}
-                  onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, confirmPassword: next }))}
-                  placeholder="Repite la contraseña"
-                  icon="lock-closed-outline"
-                  secure
-                  showToggle
-                  isVisible={showSignUpConfirmPassword}
-                  onToggleVisibility={() => setShowSignUpConfirmPassword((prev) => !prev)}
-                />
-              </>
-            )}
-
-            <Pressable onPress={submit} disabled={!canSubmit || loading} style={styles.submitWrap}>
               <LinearGradient
-                colors={(!canSubmit || loading) ? ['#7D8AA7', '#9CA3AF'] : ['#4F46E5', '#A21CAF']}
+                colors={['#4F46E5', '#A21CAF']}
                 start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.submitButton}
+                end={{ x: 1, y: 1 }}
+                style={styles.logoBox}
               >
-                {loading ? <ActivityIndicator color="#FFFFFF" /> : null}
-                <Text style={styles.submitText}>
-                  {isSignIn ? 'Iniciar Sesión' : 'Registrar Negocio'}
-                </Text>
+                <Ionicons
+                  name={isSignIn ? 'storefront-outline' : 'business-outline'}
+                  size={44}
+                  color="#FFFFFF"
+                />
               </LinearGradient>
-            </Pressable>
 
-            {!allowSignUp ? (
-              <Pressable
-                onPress={() => Linking.openURL('https://wa.me/573188246925')}
-                style={styles.signInHelperWrap}
-              >
-                <Text style={styles.signInHelper}>
-                  ¿Tienes problemas con el acceso? Escríbenos a nuestro correo soporte@stockypos.app y te responderemos con gusto.
-                </Text>
-              </Pressable>
-            ) : (
-              <View style={styles.switchRow}>
-                <Text style={styles.switchPrompt}>
-                  {isSignIn ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
-                </Text>
-                <Pressable onPress={switchMode}>
-                  <Text style={styles.switchAction}>{isSignIn ? 'Registrar negocio' : 'Iniciar sesión'}</Text>
+              <Text style={styles.title}>{isSignIn ? 'Iniciar Sesión' : 'Registrar Negocio'}</Text>
+              <Text style={styles.subtitle}>
+                {isSignIn
+                  ? 'Ingresa tus credenciales para acceder'
+                  : 'Completa la información de tu negocio para comenzar'}
+              </Text>
+
+              {isSignIn ? (
+                <Pressable
+                  onPress={() => Linking.openURL('https://www.stockypos.app')}
+                  style={styles.registerPromptWrap}
+                >
+                  <Text style={styles.registerPromptText}>
+                    ¿No has registrado tu negocio? Registrate gratis en www.stockypos.app
+                  </Text>
                 </Pressable>
-              </View>
-            )}
+              ) : null}
+
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+              {message ? <Text style={styles.message}>{message}</Text> : null}
+
+              {isSignIn ? (
+                <>
+                  <AuthInput
+                    label="Usuario"
+                    value={signInForm.username}
+                    onChangeText={(next) => setSignInForm((prev) => ({ ...prev, username: next }))}
+                    placeholder="Tu nombre de usuario"
+                    icon="person-outline"
+                    autoCapitalize="none"
+                  />
+
+                  <AuthInput
+                    label="Contraseña"
+                    value={signInForm.password}
+                    onChangeText={(next) => setSignInForm((prev) => ({ ...prev, password: next }))}
+                    placeholder="Tu contraseña"
+                    icon="lock-closed-outline"
+                    secure
+                    showToggle
+                    isVisible={showSignInPassword}
+                    onToggleVisibility={() => setShowSignInPassword((prev) => !prev)}
+                  />
+                </>
+              ) : (
+                <>
+                  <AuthInput
+                    label="Nombre del negocio"
+                    value={signUpForm.name}
+                    onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, name: next }))}
+                    placeholder="Ej: Mi Cafetería"
+                    icon="storefront-outline"
+                    autoCapitalize="words"
+                  />
+
+                  <AuthInput
+                    label="Usuario"
+                    value={signUpForm.username}
+                    onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, username: next }))}
+                    placeholder="usuario_negocio"
+                    icon="person-outline"
+                    autoCapitalize="none"
+                  />
+
+                  <AuthInput
+                    label="NIT (opcional)"
+                    value={signUpForm.nit}
+                    onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, nit: next }))}
+                    placeholder="900.123.456-7"
+                    icon="business-outline"
+                  />
+
+                  <AuthInput
+                    label="Teléfono"
+                    value={signUpForm.phone}
+                    onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, phone: next }))}
+                    placeholder="+57 300 123 4567"
+                    icon="call-outline"
+                    keyboardType="phone-pad"
+                  />
+
+                  <AuthInput
+                    label="Dirección"
+                    value={signUpForm.address}
+                    onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, address: next }))}
+                    placeholder="Calle 123 #45-67"
+                    icon="location-outline"
+                    autoCapitalize="words"
+                  />
+
+                  <AuthInput
+                    label="Contraseña"
+                    value={signUpForm.password}
+                    onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, password: next }))}
+                    placeholder="Mínimo 6 caracteres"
+                    icon="lock-closed-outline"
+                    secure
+                    showToggle
+                    isVisible={showSignUpPassword}
+                    onToggleVisibility={() => setShowSignUpPassword((prev) => !prev)}
+                  />
+
+                  <AuthInput
+                    label="Confirmar contraseña"
+                    value={signUpForm.confirmPassword}
+                    onChangeText={(next) =>
+                      setSignUpForm((prev) => ({ ...prev, confirmPassword: next }))
+                    }
+                    placeholder="Repite la contraseña"
+                    icon="lock-closed-outline"
+                    secure
+                    showToggle
+                    isVisible={showSignUpConfirmPassword}
+                    onToggleVisibility={() => setShowSignUpConfirmPassword((prev) => !prev)}
+                  />
+                </>
+              )}
+
+              <Pressable
+                onPress={submit}
+                disabled={!canSubmit || loading}
+                style={styles.submitWrap}
+              >
+                <LinearGradient
+                  colors={!canSubmit || loading ? ['#7D8AA7', '#9CA3AF'] : ['#4F46E5', '#A21CAF']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.submitButton}
+                >
+                  {loading ? <ActivityIndicator color="#FFFFFF" /> : null}
+                  <Text style={styles.submitText}>
+                    {isSignIn ? 'Iniciar Sesión' : 'Registrar Negocio'}
+                  </Text>
+                </LinearGradient>
+              </Pressable>
+
+              {!allowSignUp ? (
+                <Pressable
+                  onPress={() => Linking.openURL('https://wa.me/573188246925')}
+                  style={styles.signInHelperWrap}
+                >
+                  <Text style={styles.signInHelper}>
+                    ¿Tienes problemas con el acceso? Escríbenos a nuestro correo
+                    soporte@stockypos.app y te responderemos con gusto.
+                  </Text>
+                </Pressable>
+              ) : (
+                <View style={styles.switchRow}>
+                  <Text style={styles.switchPrompt}>
+                    {isSignIn ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
+                  </Text>
+                  <Pressable onPress={switchMode}>
+                    <Text style={styles.switchAction}>
+                      {isSignIn ? 'Registrar negocio' : 'Iniciar sesión'}
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
           </ScrollView>
         </KeyboardAvoidingView>

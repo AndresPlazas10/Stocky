@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   startOfDay,
   startOfMonth,
@@ -16,7 +16,7 @@ const PAGE_SIZE = 20;
 export function useVentaFilters(ventas: VentaRecord[], firstVentaDayKey: string | null) {
   const [dayFilter, setDayFilter] = useState('all');
   const [sellerFilter, setSellerFilter] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [rawPage, setRawPage] = useState(1);
   const [dayCalendarMonth, setDayCalendarMonth] = useState<Date>(() => startOfMonth(new Date()));
   const [showDayFilterModal, setShowDayFilterModal] = useState(false);
   const [showSellerFilterModal, setShowSellerFilterModal] = useState(false);
@@ -25,9 +25,7 @@ export function useVentaFilters(ventas: VentaRecord[], firstVentaDayKey: string 
   const fallbackFirstVentaDayKey = useMemo(() => {
     const unique = Array.from(
       new Set(
-        ventas
-          .map((venta) => getRecordDayKey(venta.created_at))
-          .filter((value) => Boolean(value)),
+        ventas.map((venta) => getRecordDayKey(venta.created_at)).filter((value) => Boolean(value)),
       ),
     ).sort((a, b) => a.localeCompare(b));
     return unique[0] || null;
@@ -37,13 +35,30 @@ export function useVentaFilters(ventas: VentaRecord[], firstVentaDayKey: string 
   const maxSelectableDayKey = todayDayKey;
   const minSelectableDate = parseDayKey(minSelectableDayKey) || startOfDay(new Date());
   const maxSelectableDate = parseDayKey(maxSelectableDayKey) || startOfDay(new Date());
+
+  const effectiveDayFilter = useMemo(() => {
+    if (dayFilter === 'all') return 'all';
+    const selected = parseDayKey(dayFilter);
+    if (!selected) return 'all';
+    const minTs = startOfDay(minSelectableDate).getTime();
+    const maxTs = startOfDay(maxSelectableDate).getTime();
+    const selectedTs = startOfDay(selected).getTime();
+    if (selectedTs < minTs || selectedTs > maxTs) return 'all';
+    return dayFilter;
+  }, [dayFilter, maxSelectableDate, minSelectableDate]);
+
   const minSelectableMonth = startOfMonth(minSelectableDate);
   const maxSelectableMonth = startOfMonth(maxSelectableDate);
   const currentCalendarMonth = startOfMonth(dayCalendarMonth);
   const canGoPrevMonth = currentCalendarMonth.getTime() > minSelectableMonth.getTime();
   const canGoNextMonth = currentCalendarMonth.getTime() < maxSelectableMonth.getTime();
   const currentCalendarMonthLabel = useMemo(
-    () => capitalizeLabel(new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' }).format(dayCalendarMonth)),
+    () =>
+      capitalizeLabel(
+        new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' }).format(
+          dayCalendarMonth,
+        ),
+      ),
     [dayCalendarMonth],
   );
 
@@ -53,7 +68,13 @@ export function useVentaFilters(ventas: VentaRecord[], firstVentaDayKey: string 
     const month = monthStart.getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const weekdayOffset = (monthStart.getDay() + 6) % 7;
-    const cells: Array<{ key: string; day: number; disabled: boolean; selected: boolean; isToday: boolean } | null> = [];
+    const cells: ({
+      key: string;
+      day: number;
+      disabled: boolean;
+      selected: boolean;
+      isToday: boolean;
+    } | null)[] = [];
 
     for (let index = 0; index < weekdayOffset; index += 1) {
       cells.push(null);
@@ -102,17 +123,26 @@ export function useVentaFilters(ventas: VentaRecord[], firstVentaDayKey: string 
 
   const filteredVentas = useMemo(() => {
     return ventas.filter((venta) => {
-      if (dayFilter !== 'all' && getRecordDayKey(venta.created_at) !== dayFilter) return false;
-      if (sellerFilter !== 'all' && String(venta.seller_name || 'Administrador').trim() !== sellerFilter) return false;
+      if (effectiveDayFilter !== 'all' && getRecordDayKey(venta.created_at) !== effectiveDayFilter)
+        return false;
+      if (
+        sellerFilter !== 'all' &&
+        String(venta.seller_name || 'Administrador').trim() !== sellerFilter
+      )
+        return false;
       return true;
     });
-  }, [dayFilter, sellerFilter, ventas]);
+  }, [effectiveDayFilter, sellerFilter, ventas]);
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredVentas.length / PAGE_SIZE)), [filteredVentas.length]);
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredVentas.length / PAGE_SIZE)),
+    [filteredVentas.length],
+  );
 
-  useEffect(() => {
-    setCurrentPage((prev) => Math.max(1, Math.min(prev, totalPages)));
-  }, [totalPages]);
+  const currentPage = useMemo(
+    () => Math.max(1, Math.min(rawPage, totalPages)),
+    [rawPage, totalPages],
+  );
 
   const paginatedVentas = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
@@ -131,7 +161,9 @@ export function useVentaFilters(ventas: VentaRecord[], firstVentaDayKey: string 
 
   const selectedDayLabel = useMemo(() => formatDayLabelFromKey(dayFilter), [dayFilter]);
   const selectedSellerLabel = useMemo(
-    () => sellerOptions.find((option) => option.value === sellerFilter)?.label || 'Todos los vendedores',
+    () =>
+      sellerOptions.find((option) => option.value === sellerFilter)?.label ||
+      'Todos los vendedores',
     [sellerFilter, sellerOptions],
   );
 
@@ -146,24 +178,8 @@ export function useVentaFilters(ventas: VentaRecord[], firstVentaDayKey: string 
   const clearFilters = useCallback(() => {
     setDayFilter('all');
     setSellerFilter('all');
-    setCurrentPage(1);
+    setRawPage(1);
   }, []);
-
-  useEffect(() => {
-    if (dayFilter === 'all') return;
-    const selected = parseDayKey(dayFilter);
-    if (!selected) {
-      setDayFilter('all');
-      return;
-    }
-    const minTs = startOfDay(minSelectableDate).getTime();
-    const maxTs = startOfDay(maxSelectableDate).getTime();
-    const selectedTs = startOfDay(selected).getTime();
-    if (selectedTs < minTs || selectedTs > maxTs) {
-      setDayFilter('all');
-      setCurrentPage(1);
-    }
-  }, [dayFilter, maxSelectableDate, minSelectableDate]);
 
   return {
     dayFilter,
@@ -171,7 +187,7 @@ export function useVentaFilters(ventas: VentaRecord[], firstVentaDayKey: string 
     sellerFilter,
     setSellerFilter,
     currentPage,
-    setCurrentPage,
+    setCurrentPage: setRawPage,
     dayCalendarMonth,
     setDayCalendarMonth,
     showDayFilterModal,

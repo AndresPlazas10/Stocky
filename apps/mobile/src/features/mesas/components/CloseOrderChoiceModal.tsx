@@ -6,19 +6,21 @@ import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 
 interface CloseOrderChoiceModalProps {
   visible: boolean;
-  isClosing: boolean;
   orderTotal: number;
+  isClosingOrder: boolean;
+  releasingEmptyOrder: boolean;
   onClose: () => void;
-  onPayTogether: () => void;
+  onPayAllTogether: () => void;
   onSplitBill: () => void;
 }
 
 export function CloseOrderChoiceModal({
   visible,
-  isClosing,
   orderTotal,
+  isClosingOrder,
+  releasingEmptyOrder,
   onClose,
-  onPayTogether,
+  onPayAllTogether,
   onSplitBill,
 }: CloseOrderChoiceModalProps) {
   return (
@@ -29,7 +31,7 @@ export function CloseOrderChoiceModal({
       centeredOffsetY={8}
       modalAnimationType="fade"
       sheetStyle={styles.sheet}
-      headerSlot={(
+      headerSlot={
         <View style={styles.header}>
           <View style={styles.titleRow}>
             <Ionicons name="card-outline" size={24} color="#111827" />
@@ -39,17 +41,17 @@ export function CloseOrderChoiceModal({
             Total: <StockyMoneyText value={orderTotal} style={styles.totalText} />
           </Text>
         </View>
-      )}
+      }
       contentContainerStyle={styles.content}
       onClose={() => {
-        if (isClosing) return;
+        if (isClosingOrder || releasingEmptyOrder) return;
         onClose();
       }}
     >
       <Pressable
-        style={[styles.primaryButton, isClosing && styles.disabled]}
-        onPress={onPayTogether}
-        disabled={isClosing}
+        style={[styles.primaryButton, (isClosingOrder || releasingEmptyOrder) && styles.disabled]}
+        onPress={onPayAllTogether}
+        disabled={isClosingOrder || releasingEmptyOrder}
       >
         <LinearGradient
           colors={['#4F46E5', '#7C3AED']}
@@ -63,9 +65,9 @@ export function CloseOrderChoiceModal({
       </Pressable>
 
       <Pressable
-        style={[styles.secondaryButton, isClosing && styles.disabled]}
+        style={[styles.secondaryButton, (isClosingOrder || releasingEmptyOrder) && styles.disabled]}
         onPress={onSplitBill}
-        disabled={isClosing}
+        disabled={isClosingOrder || releasingEmptyOrder}
       >
         <Ionicons name="layers-outline" size={23} color="#111827" />
         <Text style={styles.secondaryText}>Dividir cuenta</Text>
@@ -74,7 +76,7 @@ export function CloseOrderChoiceModal({
       <Pressable
         style={styles.cancelButton}
         onPress={onClose}
-        disabled={isClosing}
+        disabled={isClosingOrder || releasingEmptyOrder}
       >
         <Text style={styles.cancelText}>Cancelar</Text>
       </Pressable>

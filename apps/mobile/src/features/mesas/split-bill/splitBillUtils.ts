@@ -2,9 +2,11 @@ import type { MesaOrderItem } from '../../../services/mesaOrderService';
 import type { PaymentMethod, SplitSubAccount } from '../../../services/mesaCheckoutService';
 
 export const MAX_SUB_ACCOUNTS = 10;
-export const COLOMBIAN_DENOMINATIONS = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50];
+export const COLOMBIAN_DENOMINATIONS = [
+  100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50,
+];
 
-export const PAYMENT_OPTIONS: Array<{ value: PaymentMethod; label: string }> = [
+export const PAYMENT_OPTIONS: { value: PaymentMethod; label: string }[] = [
   { value: 'cash', label: 'Efectivo' },
   { value: 'card', label: 'Tarjeta' },
   { value: 'transfer', label: 'Transferencia' },
@@ -30,16 +32,13 @@ export function getPaymentOptionIcon(method: PaymentMethod): string {
   if (method === 'card') return 'card-outline';
   if (method === 'transfer') return 'swap-horizontal-outline';
   if (method === 'mixed') return 'wallet-outline';
-  if (['nequi', 'bancolombia', 'banco_bogota', 'nu', 'davivienda'].includes(method)) return 'business-outline';
+  if (['nequi', 'bancolombia', 'banco_bogota', 'nu', 'davivienda'].includes(method))
+    return 'business-outline';
   return 'help-circle-outline';
 }
 
 export function getPaymentOptionLabel(method: PaymentMethod): string {
   return PAYMENT_OPTIONS.find((option) => option.value === method)?.label || 'Seleccionar';
-}
-
-export function formatCopAmount(value: number): string {
-  return `$ ${new Intl.NumberFormat('es-CO').format(Math.max(0, Math.round(Number(value) || 0)))}`;
 }
 
 export function parseCopAmount(value: string | number | null | undefined): number {
@@ -72,12 +71,16 @@ export function calculateCashChange(total: number, paidValue: string | number | 
   const normalizedTotal = Math.round(Number(total) || 0);
   const normalizedPaid = parseCopAmount(paidValue);
 
-  if (normalizedTotal <= 0 || !Number.isFinite(normalizedPaid) || normalizedPaid < normalizedTotal) {
+  if (
+    normalizedTotal <= 0 ||
+    !Number.isFinite(normalizedPaid) ||
+    normalizedPaid < normalizedTotal
+  ) {
     return { isValid: false, change: 0, breakdown: [], paid: null as number | null };
   }
 
   let remaining = normalizedPaid - normalizedTotal;
-  const breakdown: Array<{ denomination: number; count: number }> = [];
+  const breakdown: { denomination: number; count: number }[] = [];
   for (const denomination of COLOMBIAN_DENOMINATIONS) {
     const count = Math.floor(remaining / denomination);
     if (count > 0) {
@@ -110,7 +113,11 @@ export function createSubAccounts(
   accounts: AccountState[],
   orderItems: MesaOrderItem[],
   itemAssignments: ItemAssignments,
-): Array<AccountState & { items: SplitSubAccount['items']; total: number; cashInfo: ReturnType<typeof calculateCashChange> }> {
+): (AccountState & {
+  items: SplitSubAccount['items'];
+  total: number;
+  cashInfo: ReturnType<typeof calculateCashChange>;
+})[] {
   return accounts.map((account) => {
     const items: SplitSubAccount['items'] = [];
     orderItems.forEach((item) => {
@@ -126,12 +133,16 @@ export function createSubAccounts(
       });
     });
 
-    const total = items.reduce((sum: number, item: any) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0);
+    const total = items.reduce(
+      (sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price || 0),
+      0,
+    );
     const roundedTotal = Math.round(total);
     const cashInput = account.amountReceived === '' ? String(roundedTotal) : account.amountReceived;
-    const cashInfo = account.paymentMethod === 'cash'
-      ? calculateCashChange(roundedTotal, cashInput)
-      : { isValid: true, change: 0, breakdown: [], paid: null as number | null };
+    const cashInfo =
+      account.paymentMethod === 'cash'
+        ? calculateCashChange(roundedTotal, cashInput)
+        : { isValid: true, change: 0, breakdown: [], paid: null as number | null };
 
     return {
       ...account,

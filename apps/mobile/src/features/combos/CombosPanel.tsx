@@ -18,7 +18,7 @@ type Props = {
   source: 'owner' | 'employee';
 };
 
-export function CombosPanel({ businessId, businessName, userId, source }: Props) {
+export function CombosPanel({ businessId, businessName: _businessName, userId, source }: Props) {
   const {
     loading,
     refreshing,
@@ -31,19 +31,10 @@ export function CombosPanel({ businessId, businessName, userId, source }: Props)
     canManageCombos,
     checkingPermissions,
     refreshCombos,
-    refreshProductsSilently,
   } = useComboData(businessId, userId, source);
 
-  const {
-    search,
-    setSearch,
-    statusFilter,
-    setStatusFilter,
-    productSearch,
-    setProductSearch,
-    filteredCombos,
-    filterProductCatalog,
-  } = useComboSearch(combos);
+  const { productSearch, setProductSearch, filteredCombos, filterProductCatalog } =
+    useComboSearch(combos);
 
   const {
     showFormModal,
@@ -84,11 +75,14 @@ export function CombosPanel({ businessId, businessName, userId, source }: Props)
     setError,
   });
 
-  const handleSelectProduct = useCallback((productId: string) => {
-    if (productPickerRowIndex === null) return;
-    handleItemChange(productPickerRowIndex, 'productoId', productId);
-    closeProductPicker();
-  }, [productPickerRowIndex, handleItemChange, closeProductPicker]);
+  const handleSelectProduct = useCallback(
+    (productId: string) => {
+      if (productPickerRowIndex === null) return;
+      handleItemChange(productPickerRowIndex, 'productoId', productId);
+      closeProductPicker();
+    },
+    [productPickerRowIndex, handleItemChange, closeProductPicker],
+  );
 
   const productCatalogFiltered = filterProductCatalog(products);
 
@@ -118,9 +112,11 @@ export function CombosPanel({ businessId, businessName, userId, source }: Props)
             onOpenCreate={openCreateModal}
           />
         }
-        ListEmptyComponent={!suspendBackgroundList && !loading ? (
-          <Text style={styles.emptyText}>No hay combos para los filtros seleccionados.</Text>
-        ) : null}
+        ListEmptyComponent={
+          !suspendBackgroundList && !loading ? (
+            <Text style={styles.emptyText}>No hay combos para los filtros seleccionados.</Text>
+          ) : null
+        }
         ItemSeparatorComponent={() => <View style={styles.listItemSeparator} />}
         ListFooterComponent={<View style={styles.listFooterSpacer} />}
         renderItem={({ item }) => (

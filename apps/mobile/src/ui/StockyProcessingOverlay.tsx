@@ -1,5 +1,14 @@
-import { useEffect, useRef } from 'react';
-import { ActivityIndicator, Animated, Easing, Modal, Platform, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  Easing,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { BlurView } from 'expo-blur';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../theme/tokens';
 
@@ -9,12 +18,8 @@ type Props = {
   detail?: string | null;
 };
 
-export function StockyProcessingOverlay({
-  visible,
-  label = 'Procesando...',
-  detail,
-}: Props) {
-  const appear = useRef(new Animated.Value(0)).current;
+export function StockyProcessingOverlay({ visible, label = 'Procesando...', detail }: Props) {
+  const [appear] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     if (!visible) return;

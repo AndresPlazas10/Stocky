@@ -33,12 +33,15 @@ export function useEmpleadoMutations(params: UseEmpleadoMutationsParams) {
       }
 
       const cleanFullName = String(form.form.full_name || '').trim();
-      const cleanUsername = String(form.form.username || '').trim().toLowerCase();
+      const cleanUsername = String(form.form.username || '')
+        .trim()
+        .toLowerCase();
       const cleanPassword = String(form.form.password || '').trim();
 
       if (!cleanFullName) throw new Error('El nombre del empleado es requerido.');
       if (/^\d+$/.test(cleanFullName)) throw new Error('El nombre no puede ser solo numeros.');
-      if (!/[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(cleanFullName)) throw new Error('El nombre debe contener al menos una letra.');
+      if (!/[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(cleanFullName))
+        throw new Error('El nombre debe contener al menos una letra.');
       if (cleanFullName.length < 2) throw new Error('El nombre debe tener al menos 2 caracteres.');
 
       if (!cleanUsername) throw new Error('El username es requerido.');
@@ -48,7 +51,8 @@ export function useEmpleadoMutations(params: UseEmpleadoMutationsParams) {
       }
 
       if (!cleanPassword) throw new Error('La contraseña es requerida.');
-      if (cleanPassword.length < 6) throw new Error('La contraseña debe tener al menos 6 caracteres.');
+      if (cleanPassword.length < 6)
+        throw new Error('La contraseña debe tener al menos 6 caracteres.');
 
       const usernameTaken = await isEmployeeUsernameTaken({
         businessId,
@@ -86,11 +90,14 @@ export function useEmpleadoMutations(params: UseEmpleadoMutationsParams) {
     }
   }, [businessId, canManageEmployees, creating, form, onRefresh]);
 
-  const askDeleteEmployee = useCallback((employee: EmpleadoRecord) => {
-    if (!canManageEmployees) return;
-    form.setEmployeeToDelete(employee);
-    form.setShowDeleteModal(true);
-  }, [canManageEmployees, form]);
+  const askDeleteEmployee = useCallback(
+    (employee: EmpleadoRecord) => {
+      if (!canManageEmployees) return;
+      form.setEmployeeToDelete(employee);
+      form.setShowDeleteModal(true);
+    },
+    [canManageEmployees, form],
+  );
 
   const confirmDeleteEmployee = useCallback(async () => {
     if (!form.employeeToDelete?.id || deleting || !canManageEmployees) return;
@@ -114,7 +121,7 @@ export function useEmpleadoMutations(params: UseEmpleadoMutationsParams) {
     } finally {
       setDeleting(false);
     }
-  }, [businessId, canManageEmployees, deleting, form.employeeToDelete, form.setEmployeeToDelete, form.setShowDeleteModal, onRefresh, userId]);
+  }, [businessId, canManageEmployees, deleting, form, onRefresh, userId]);
 
   return {
     creating,

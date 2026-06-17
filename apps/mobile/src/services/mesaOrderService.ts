@@ -1,4 +1,6 @@
 import { getSupabaseClient } from '../lib/supabase';
+import { normalizeNumber, normalizeText } from '../utils/normalization';
+import { isFunctionUnavailableError, isMissingColumnError } from '../utils/supabaseErrors';
 import type { SupabaseErrorLike } from '../types/errors';
 
 export type MesaOrderProduct = {
@@ -25,7 +27,7 @@ export type MesaOrderCombo = {
   sale_price: number;
   stock: null;
   manage_stock: false;
-  combo_items: Array<{
+  combo_items: {
     producto_id: string;
     cantidad: number;
     products?: {
@@ -34,7 +36,7 @@ export type MesaOrderCombo = {
       stock?: number;
       manage_stock?: boolean;
     } | null;
-  }>;
+  }[];
 };
 
 export type MesaOrderCatalogItem = MesaOrderProduct | MesaOrderCombo;
@@ -92,29 +94,25 @@ export type MesaOpenOrderSnapshot = {
 };
 
 const DEFAULT_CATALOG_CACHE_TTL_MS = 60_000;
-const catalogCacheByBusinessId = new Map<string, {
-  items: MesaOrderCatalogItem[];
-  cachedAt: number;
-}>();
+const catalogCacheByBusinessId = new Map<
+  string,
+  {
+    items: MesaOrderCatalogItem[];
+    cachedAt: number;
+  }
+>();
 const catalogInFlightByBusinessId = new Map<string, Promise<MesaOrderCatalogItem[]>>();
 const ORDER_ITEMS_CACHE_TTL_MS = 120_000;
-const orderItemsCacheByOrderId = new Map<string, {
-  items: MesaOrderItem[];
-  cachedAt: number;
-}>();
+const orderItemsCacheByOrderId = new Map<
+  string,
+  {
+    items: MesaOrderItem[];
+    cachedAt: number;
+  }
+>();
 const orderItemsInFlightByOrderId = new Map<string, Promise<MesaOrderItem[]>>();
 let openOrderSnapshotFastRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
 let openOrderSnapshotRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
-
-function normalizeNumber(value: unknown, fallback = 0): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function normalizeText(value: unknown, fallback = ''): string {
-  const raw = String(value || '').trim();
-  return raw || fallback;
-}
 
 function normalizeBusinessId(value: unknown): string {
   return String(value || '').trim();
@@ -163,35 +161,6 @@ function mergeCatalogByName(
   return merged;
 }
 
-function isMissingColumnError(errorLike: SupabaseErrorLike, { tableName, columnName }: { tableName: string; columnName: string }) {
-  const message = String(errorLike?.message || '').toLowerCase();
-  return (
-    message.includes('column')
-    && message.includes(`"${String(columnName || '').toLowerCase()}"`)
-    && message.includes('relation')
-    && message.includes(`"${String(tableName || '').toLowerCase()}"`)
-    && message.includes('does not exist')
-  );
-}
-
-function isFunctionUnavailableError(errorLike: SupabaseErrorLike, functionName: string) {
-  const code = String(errorLike?.code || '').toLowerCase();
-  const message = String(errorLike?.message || '').toLowerCase();
-  return (
-    code === 'pgrst202'
-    || code === '42883'
-    || (
-      message.includes(String(functionName || '').toLowerCase())
-      && (
-        message.includes('does not exist')
-        || message.includes('could not find the function')
-        || message.includes('schema cache')
-        || message.includes('not found')
-      )
-    )
-  );
-}
-
 function isMissingListOpenOrderSnapshotRpcError(errorLike: SupabaseErrorLike) {
   return isFunctionUnavailableError(errorLike, 'list_open_order_snapshot');
 }
@@ -200,18 +169,18 @@ function isMissingListOpenOrderSnapshotFastRpcError(errorLike: SupabaseErrorLike
   return isFunctionUnavailableError(errorLike, 'list_open_order_snapshot_fast');
 }
 
-function normalizeJsonArray(value: unknown): any[] {
-  if (Array.isArray(value)) return value;
+function normalizeJsonArray(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) return value as Record<string, unknown>[];
   if (typeof value !== 'string') return [];
   try {
     const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? (parsed as Record<string, unknown>[]) : [];
   } catch (_error) {
     return [];
   }
 }
 
-function normalizeProduct(row: any): MesaOrderProduct {
+function normalizeProduct(row: Record<string, unknown>): MesaOrderProduct {
   const id = normalizeText(row?.id);
   return {
     id,
@@ -228,7 +197,7 @@ function normalizeProduct(row: any): MesaOrderProduct {
   };
 }
 
-function normalizeCombo(row: any): MesaOrderCombo {
+function normalizeCombo(row: Record<string, unknown>): MesaOrderCombo {
   const id = normalizeText(row?.id);
   const comboItemsSource = Array.isArray(row?.combo_items) ? row.combo_items : [];
 
@@ -243,26 +212,44 @@ function normalizeCombo(row: any): MesaOrderCombo {
     stock: null,
     manage_stock: false,
     combo_items: comboItemsSource
-      .map((item: any) => ({
-        producto_id: normalizeText(item?.producto_id),
-        cantidad: normalizeNumber(item?.cantidad, 0),
-        products: item?.products
-          ? {
-              id: item.products.id ? String(item.products.id) : undefined,
-              name: item.products.name ? String(item.products.name) : undefined,
-              stock: normalizeNumber(item.products.stock, 0),
-              manage_stock: item.products.manage_stock !== false,
-            }
-          : null,
-      }))
-      .filter((item: any) => item.producto_id && item.cantidad > 0),
+      .map((item) => {
+        const itemRecord = item as Record<string, unknown>;
+        const productRecord =
+          itemRecord.products &&
+          typeof itemRecord.products === 'object' &&
+          itemRecord.products !== null
+            ? (itemRecord.products as Record<string, unknown>)
+            : null;
+        return {
+          producto_id: normalizeText(itemRecord?.producto_id),
+          cantidad: normalizeNumber(itemRecord?.cantidad, 0),
+          products: productRecord
+            ? {
+                id: productRecord.id ? String(productRecord.id) : undefined,
+                name: productRecord.name ? String(productRecord.name) : undefined,
+                stock: normalizeNumber(productRecord.stock, 0),
+                manage_stock: productRecord.manage_stock !== false,
+              }
+            : null,
+        };
+      })
+      .filter((item) => item.producto_id && item.cantidad > 0),
   };
 }
 
-function normalizeOrderItem(row: any): MesaOrderItem {
+function normalizeOrderItem(row: Record<string, unknown>): MesaOrderItem {
   const quantity = normalizeNumber(row?.quantity, 0);
   const price = normalizeNumber(row?.price, 0);
   const subtotal = normalizeNumber(row?.subtotal, quantity * price);
+
+  const productRecord =
+    row.products && typeof row.products === 'object' && row.products !== null
+      ? (row.products as Record<string, unknown>)
+      : null;
+  const comboRecord =
+    row.combos && typeof row.combos === 'object' && row.combos !== null
+      ? (row.combos as Record<string, unknown>)
+      : null;
 
   return {
     id: normalizeText(row?.id),
@@ -272,19 +259,19 @@ function normalizeOrderItem(row: any): MesaOrderItem {
     quantity,
     price,
     subtotal,
-    products: row?.products
+    products: productRecord
       ? {
-          id: row.products.id ? String(row.products.id) : undefined,
-          name: row.products.name ? String(row.products.name) : undefined,
-          code: row.products.code ? String(row.products.code) : undefined,
-          category: row.products.category ? String(row.products.category) : undefined,
+          id: productRecord.id ? String(productRecord.id) : undefined,
+          name: productRecord.name ? String(productRecord.name) : undefined,
+          code: productRecord.code ? String(productRecord.code) : undefined,
+          category: productRecord.category ? String(productRecord.category) : undefined,
         }
       : null,
-    category: row?.products?.category ? String(row.products.category) : undefined,
-    combos: row?.combos
+    category: productRecord?.category ? String(productRecord.category) : undefined,
+    combos: comboRecord
       ? {
-          id: row.combos.id ? String(row.combos.id) : undefined,
-          nombre: row.combos.nombre ? String(row.combos.nombre) : undefined,
+          id: comboRecord.id ? String(comboRecord.id) : undefined,
+          nombre: comboRecord.nombre ? String(comboRecord.nombre) : undefined,
         }
       : null,
   };
@@ -296,7 +283,12 @@ export function getOrderItemName(item: MesaOrderItem): string {
 
 export function calculateOrderTotal(items: MesaOrderItem[]): number {
   return (Array.isArray(items) ? items : []).reduce(
-    (sum, item) => sum + normalizeNumber(item.subtotal, normalizeNumber(item.quantity, 0) * normalizeNumber(item.price, 0)),
+    (sum, item) =>
+      sum +
+      normalizeNumber(
+        item.subtotal,
+        normalizeNumber(item.quantity, 0) * normalizeNumber(item.price, 0),
+      ),
     0,
   );
 }
@@ -325,7 +317,7 @@ export function normalizeOrderItemQuantity(value: unknown): number {
   return Math.max(0, Math.floor(parsed));
 }
 
-export function normalizeOrderItemSubtotal(row: any): number {
+export function normalizeOrderItemSubtotal(row: Record<string, unknown>): number {
   const subtotal = Number(row?.subtotal);
   if (Number.isFinite(subtotal)) {
     return Math.max(0, subtotal);
@@ -336,14 +328,21 @@ export function normalizeOrderItemSubtotal(row: any): number {
   return Math.max(0, quantity * safePrice);
 }
 
-export function reconcileOrderItemsFromServer(current: MesaOrderItem[], fromServer: MesaOrderItem[]) {
+export function reconcileOrderItemsFromServer(
+  current: MesaOrderItem[],
+  fromServer: MesaOrderItem[],
+) {
   const local = Array.isArray(current) ? current : [];
   const server = Array.isArray(fromServer) ? fromServer : [];
 
   const serverById = new Map(server.map((item) => [String(item.id || ''), item]));
   const serverByIdentity = new Map<string, MesaOrderItem>();
   server.forEach((item) => {
-    const key = item.product_id ? `p:${item.product_id}` : item.combo_id ? `c:${item.combo_id}` : '';
+    const key = item.product_id
+      ? `p:${item.product_id}`
+      : item.combo_id
+        ? `c:${item.combo_id}`
+        : '';
     if (!key) return;
     if (!serverByIdentity.has(key)) {
       serverByIdentity.set(key, item);
@@ -385,9 +384,14 @@ export function reconcileOrderItemsFromServer(current: MesaOrderItem[], fromServ
   return merged;
 }
 
-export function calculateCashChange(total: number, amountReceived: string | number | null | undefined) {
+export function calculateCashChange(
+  total: number,
+  amountReceived: string | number | null | undefined,
+) {
   const normalizedTotal = Math.round(normalizeNumber(total, 0));
-  const raw = String(amountReceived ?? '').trim().replace(/\s|\$/g, '');
+  const raw = String(amountReceived ?? '')
+    .trim()
+    .replace(/\s|\$/g, '');
   const normalizedPaid = raw ? Number(raw.replace(/\./g, '').replace(',', '.')) : NaN;
 
   if (!Number.isFinite(normalizedPaid)) {
@@ -423,7 +427,8 @@ export async function listCombosForMesaOrder(businessId: string): Promise<MesaOr
   const client = getSupabaseClient();
   const { data, error } = await client
     .from('combos')
-    .select(`
+    .select(
+      `
       id,
       nombre,
       precio_venta,
@@ -432,7 +437,8 @@ export async function listCombosForMesaOrder(businessId: string): Promise<MesaOr
         producto_id,
         cantidad
       )
-    `)
+    `,
+    )
     .eq('business_id', businessId)
     .order('nombre', { ascending: true })
     .limit(200);
@@ -440,7 +446,7 @@ export async function listCombosForMesaOrder(businessId: string): Promise<MesaOr
   if (error) throw error;
 
   return (Array.isArray(data) ? data : [])
-    .filter((row: any) => String(row?.estado || 'active').toLowerCase() !== 'inactive')
+    .filter((row) => String(row?.estado || 'active').toLowerCase() !== 'inactive')
     .map(normalizeCombo);
 }
 
@@ -513,7 +519,7 @@ export async function listCatalogItems(
 
   if (!forceRefresh) {
     const cached = catalogCacheByBusinessId.get(normalizedBusinessId);
-    if (cached && (Date.now() - cached.cachedAt) <= ttlMs) {
+    if (cached && Date.now() - cached.cachedAt <= ttlMs) {
       return cached.items;
     }
   }
@@ -550,7 +556,8 @@ async function listOrderItemsBase(orderId: string) {
 
   return client
     .from('order_items')
-    .select(`
+    .select(
+      `
       id,
       order_id,
       product_id,
@@ -560,7 +567,8 @@ async function listOrderItemsBase(orderId: string) {
       subtotal,
       products:products!order_items_product_id_fkey (id,name,category),
       combos:combos!order_items_combo_id_fkey (id,nombre)
-    `)
+    `,
+    )
     .eq('order_id', orderId)
     .order('id', { ascending: true });
 }
@@ -575,7 +583,7 @@ export async function listOrderItems(
 
   if (!forceRefresh) {
     const cached = orderItemsCacheByOrderId.get(normalizedOrderId);
-    if (cached && (Date.now() - cached.cachedAt) <= ORDER_ITEMS_CACHE_TTL_MS) {
+    if (cached && Date.now() - cached.cachedAt <= ORDER_ITEMS_CACHE_TTL_MS) {
       return cached.items;
     }
     const inFlight = orderItemsInFlightByOrderId.get(normalizedOrderId);
@@ -604,7 +612,9 @@ export async function listOrderItems(
   return loadPromise;
 }
 
-export function getOrderItemsCacheSnapshot(orderId: string): { items: MesaOrderItem[]; cachedAt: number } | null {
+export function getOrderItemsCacheSnapshot(
+  orderId: string,
+): { items: MesaOrderItem[]; cachedAt: number } | null {
   const normalizedOrderId = normalizeOrderId(orderId);
   if (!normalizedOrderId) return null;
   return orderItemsCacheByOrderId.get(normalizedOrderId) || null;
@@ -636,7 +646,7 @@ export async function loadOpenOrderSnapshot(
   const forceRefresh = options?.forceRefresh === true;
   if (!forceRefresh) {
     const cached = orderItemsCacheByOrderId.get(normalizedOrderId);
-    if (cached && (Date.now() - cached.cachedAt) <= ORDER_ITEMS_CACHE_TTL_MS) {
+    if (cached && Date.now() - cached.cachedAt <= ORDER_ITEMS_CACHE_TTL_MS) {
       return {
         orderId: normalizedOrderId,
         items: cached.items,
@@ -654,7 +664,9 @@ export async function loadOpenOrderSnapshot(
 
     if (!fastRpcResult.error) {
       openOrderSnapshotFastRpcCompatibility = 'supported';
-      const fastRpcRow = Array.isArray(fastRpcResult.data) ? fastRpcResult.data[0] : fastRpcResult.data;
+      const fastRpcRow = Array.isArray(fastRpcResult.data)
+        ? fastRpcResult.data[0]
+        : fastRpcResult.data;
       const items = normalizeJsonArray(fastRpcRow?.items).map(normalizeOrderItem);
       const fallbackTotal = calculateOrderTotal(items);
       const fallbackUnits = calculateOrderUnits(items);
@@ -725,7 +737,9 @@ export async function loadOpenOrderSnapshot(
   };
 }
 
-export async function listOrderItemUnitsByOrderIds(orderIds: string[]): Promise<Record<string, number>> {
+export async function listOrderItemUnitsByOrderIds(
+  orderIds: string[],
+): Promise<Record<string, number>> {
   const normalizedIds = Array.from(
     new Set(
       (Array.isArray(orderIds) ? orderIds : [])
@@ -745,7 +759,7 @@ export async function listOrderItemUnitsByOrderIds(orderIds: string[]): Promise<
   if (error) throw error;
 
   const totals: Record<string, number> = {};
-  (Array.isArray(data) ? data : []).forEach((row: any) => {
+  (Array.isArray(data) ? data : []).forEach((row) => {
     const orderId = normalizeText(row?.order_id);
     if (!orderId) return;
     const quantity = Math.max(0, Math.floor(normalizeNumber(row?.quantity, 0)));
@@ -760,12 +774,12 @@ export async function syncOrderTotal(orderId: string): Promise<number> {
   const items = await listOrderItems(orderId);
   const total = calculateOrderTotal(items);
 
-  const withTotal = await client
-    .from('orders')
-    .update({ total })
-    .eq('id', orderId);
+  const withTotal = await client.from('orders').update({ total }).eq('id', orderId);
 
-  if (withTotal.error && !isMissingColumnError(withTotal.error, { tableName: 'orders', columnName: 'total' })) {
+  if (
+    withTotal.error &&
+    !isMissingColumnError(withTotal.error, { tableName: 'orders', columnName: 'total' })
+  ) {
     throw withTotal.error;
   }
 
@@ -774,17 +788,25 @@ export async function syncOrderTotal(orderId: string): Promise<number> {
 
 async function persistOrderTotal(orderId: string, total: number): Promise<void> {
   const client = getSupabaseClient();
-  const withTotal = await client
-    .from('orders')
-    .update({ total })
-    .eq('id', orderId);
+  const withTotal = await client.from('orders').update({ total }).eq('id', orderId);
 
-  if (withTotal.error && !isMissingColumnError(withTotal.error, { tableName: 'orders', columnName: 'total' })) {
+  if (
+    withTotal.error &&
+    !isMissingColumnError(withTotal.error, { tableName: 'orders', columnName: 'total' })
+  ) {
     throw withTotal.error;
   }
 }
 
-async function updateOrderItemSubtotal({ itemId, quantity, price }: { itemId: string; quantity: number; price: number }) {
+async function updateOrderItemSubtotal({
+  itemId,
+  quantity,
+  price,
+}: {
+  itemId: string;
+  quantity: number;
+  price: number;
+}) {
   const client = getSupabaseClient();
   const withSubtotal = await client
     .from('order_items')
@@ -793,10 +815,7 @@ async function updateOrderItemSubtotal({ itemId, quantity, price }: { itemId: st
 
   if (!withSubtotal.error) return;
 
-  const fallback = await client
-    .from('order_items')
-    .update({ quantity })
-    .eq('id', itemId);
+  const fallback = await client.from('order_items').update({ quantity }).eq('id', itemId);
 
   if (!fallback.error) return;
 
@@ -833,7 +852,11 @@ export async function addCatalogItemToOrder({
   if (existingItem?.id) {
     const nextQuantity = normalizeNumber(existingItem.quantity, 0) + safeQty;
     const itemPrice = normalizeNumber(existingItem.price, catalogItem.sale_price);
-    await updateOrderItemSubtotal({ itemId: String(existingItem.id), quantity: nextQuantity, price: itemPrice });
+    await updateOrderItemSubtotal({
+      itemId: String(existingItem.id),
+      quantity: nextQuantity,
+      price: itemPrice,
+    });
     invalidateOrderItemsCache(orderId);
     return {
       item: {
@@ -857,11 +880,7 @@ export async function addCatalogItemToOrder({
       price: catalogItem.sale_price,
     };
 
-    const insert = await client
-      .from('order_items')
-      .insert([row])
-      .select('id')
-      .single();
+    const insert = await client.from('order_items').insert([row]).select('id').single();
 
     if (insert.error) throw insert.error;
     invalidateOrderItemsCache(orderId);
@@ -953,10 +972,7 @@ export async function syncOrderItemQuantity({
   const safeQty = Math.floor(normalizeNumber(quantity, 0));
 
   if (safeQty <= 0) {
-    const { error } = await client
-      .from('order_items')
-      .delete()
-      .eq('id', itemId);
+    const { error } = await client.from('order_items').delete().eq('id', itemId);
 
     if (error) throw error;
   } else {
@@ -984,14 +1000,17 @@ export async function persistOrderSnapshot({
   const source = Array.isArray(items) ? items : [];
 
   // Canonicaliza y agrupa por identidad para evitar duplicados en insercion.
-  const aggregated = new Map<string, {
-    order_id: string;
-    product_id: string | null;
-    combo_id: string | null;
-    quantity: number;
-    price: number;
-    referenceItem: MesaOrderItem | null;
-  }>();
+  const aggregated = new Map<
+    string,
+    {
+      order_id: string;
+      product_id: string | null;
+      combo_id: string | null;
+      quantity: number;
+      price: number;
+      referenceItem: MesaOrderItem | null;
+    }
+  >();
 
   source.forEach((item) => {
     const quantity = Math.max(0, Math.floor(normalizeNumber(item?.quantity, 0)));
@@ -1032,42 +1051,63 @@ export async function persistOrderSnapshot({
     price: row.price,
   }));
   const totalFromSnapshot = targetRows.reduce(
-    (sum, row) => sum + (Math.max(0, normalizeNumber(row.quantity, 0)) * Math.max(0, normalizeNumber(row.price, 0))),
+    (sum, row) =>
+      sum +
+      Math.max(0, normalizeNumber(row.quantity, 0)) * Math.max(0, normalizeNumber(row.price, 0)),
     0,
   );
   const localSnapshotItems: MesaOrderItem[] = targetRows.map((row, index) => ({
-    id: normalizeText(row.referenceItem?.id) || `${row.product_id ? `p:${row.product_id}` : `c:${row.combo_id}`}-${index}`,
+    id:
+      normalizeText(row.referenceItem?.id) ||
+      `${row.product_id ? `p:${row.product_id}` : `c:${row.combo_id}`}-${index}`,
     order_id: orderId,
     product_id: row.product_id,
     combo_id: row.combo_id,
     quantity: Math.max(0, Math.floor(normalizeNumber(row.quantity, 0))),
     price: Math.max(0, normalizeNumber(row.price, 0)),
-    subtotal: Math.max(0, Math.floor(normalizeNumber(row.quantity, 0))) * Math.max(0, normalizeNumber(row.price, 0)),
+    subtotal:
+      Math.max(0, Math.floor(normalizeNumber(row.quantity, 0))) *
+      Math.max(0, normalizeNumber(row.price, 0)),
     products: row.referenceItem?.products || null,
     combos: row.referenceItem?.combos || null,
   }));
 
-  const rpcResult = await client.rpc('persist_order_snapshot', {
-    p_order_id: orderId,
-    p_items: rpcPayload,
-  });
+  // Intentar el RPC atómico primero, pero con un timeout defensivo porque en
+  // producción hemos visto que la llamada puede quedarse colgada indefinidamente
+  // y congelar la UI en "Guardando...". Si el RPC falla, vence o no existe,
+  // caemos al fallback manual de operaciones directas (mismo camino que la web).
+  try {
+    const rpcResult = await Promise.race([
+      client.rpc('persist_order_snapshot', {
+        p_order_id: orderId,
+        p_items: rpcPayload,
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('persist_order_snapshot timeout')), 8_000),
+      ),
+    ]);
 
-  if (!rpcResult.error) {
-    invalidateOrderItemsCache(orderId);
-    if (skipReload) {
-      return {
-        items: localSnapshotItems,
-        total: totalFromSnapshot,
-      };
+    if (!rpcResult.error) {
+      invalidateOrderItemsCache(orderId);
+      if (skipReload) {
+        return {
+          items: localSnapshotItems,
+          total: totalFromSnapshot,
+        };
+      }
+
+      const persistedItems = await listOrderItems(orderId, { forceRefresh: true });
+      const total = calculateOrderTotal(persistedItems);
+      return { items: persistedItems, total };
     }
 
-    const persistedItems = await listOrderItems(orderId, { forceRefresh: true });
-    const total = calculateOrderTotal(persistedItems);
-    return { items: persistedItems, total };
-  }
-
-  if (!isFunctionUnavailableError(rpcResult.error, 'persist_order_snapshot')) {
-    throw rpcResult.error;
+    if (__DEV__) {
+      console.warn('[persistOrderSnapshot] RPC error, using manual fallback:', rpcResult.error);
+    }
+  } catch (rpcError) {
+    if (__DEV__) {
+      console.warn('[persistOrderSnapshot] RPC failed, using manual fallback:', rpcError);
+    }
   }
 
   const { data: currentRows, error: currentRowsError } = await client
@@ -1078,16 +1118,19 @@ export async function persistOrderSnapshot({
 
   if (currentRowsError) throw currentRowsError;
 
-  const currentByKey = new Map<string, {
-    id: string;
-    product_id: string | null;
-    combo_id: string | null;
-    quantity: number;
-    price: number;
-  }>();
+  const currentByKey = new Map<
+    string,
+    {
+      id: string;
+      product_id: string | null;
+      combo_id: string | null;
+      quantity: number;
+      price: number;
+    }
+  >();
   const duplicateIdsToDelete: string[] = [];
 
-  (Array.isArray(currentRows) ? currentRows : []).forEach((row: any) => {
+  (Array.isArray(currentRows) ? currentRows : []).forEach((row) => {
     const rowId = normalizeText(row?.id);
     if (!rowId) return;
     const productId = row?.product_id ? String(row.product_id) : null;
@@ -1112,7 +1155,9 @@ export async function persistOrderSnapshot({
     });
   });
 
-  const targetKeys = new Set(targetRows.map((row) => (row.product_id ? `p:${row.product_id}` : `c:${row.combo_id}`)));
+  const targetKeys = new Set(
+    targetRows.map((row) => (row.product_id ? `p:${row.product_id}` : `c:${row.combo_id}`)),
+  );
   const staleIdsToDelete: string[] = [];
   currentByKey.forEach((row, key) => {
     if (!targetKeys.has(key)) {
@@ -1133,25 +1178,22 @@ export async function persistOrderSnapshot({
       continue;
     }
 
-    const insertResult = await client
-      .from('order_items')
-      .insert([{
+    const insertResult = await client.from('order_items').insert([
+      {
         order_id: row.order_id,
         product_id: row.product_id,
         combo_id: row.combo_id,
         quantity: row.quantity,
         price: row.price,
-      }]);
+      },
+    ]);
 
     if (insertResult.error) throw insertResult.error;
   }
 
   const idsToDelete = [...duplicateIdsToDelete, ...staleIdsToDelete];
   if (idsToDelete.length > 0) {
-    const deleteResult = await client
-      .from('order_items')
-      .delete()
-      .in('id', idsToDelete);
+    const deleteResult = await client.from('order_items').delete().in('id', idsToDelete);
 
     if (deleteResult.error) throw deleteResult.error;
   }
@@ -1179,10 +1221,7 @@ export async function removeOrderItemFromOrder({
   itemId: string;
 }): Promise<{ items: MesaOrderItem[]; total: number }> {
   const client = getSupabaseClient();
-  const { error } = await client
-    .from('order_items')
-    .delete()
-    .eq('id', itemId);
+  const { error } = await client.from('order_items').delete().eq('id', itemId);
 
   if (error) throw error;
 
