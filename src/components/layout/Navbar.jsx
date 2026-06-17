@@ -5,7 +5,8 @@ import {
   Bell,
   LogOut,
   Image as ImageIcon,
-  Check
+  Check,
+  X
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -37,6 +38,28 @@ const predefinedAvatars = [
   { id: 10, initials: 'KS', name: 'Kitchen', gradient: 'from-primary-600 to-primary-400' },
 ];
 
+const AVATAR_STORAGE_KEY = 'userAvatar';
+
+function getSavedAvatar() {
+  try {
+    const saved = localStorage.getItem(AVATAR_STORAGE_KEY);
+    if (!saved) return null;
+    const parsed = JSON.parse(saved);
+    const valid = predefinedAvatars.find((a) => a.id === parsed?.id);
+    return valid || null;
+  } catch {
+    return null;
+  }
+}
+
+function saveAvatar(avatar) {
+  try {
+    localStorage.setItem(AVATAR_STORAGE_KEY, JSON.stringify(avatar));
+  } catch {
+    // Silently ignore storage errors (e.g. private mode)
+  }
+}
+
 export const Navbar = React.memo(function Navbar({
   userName = "Admin",
   userEmail = "admin@stockypos.app",
@@ -45,19 +68,16 @@ export const Navbar = React.memo(function Navbar({
   onSignOut,
   warmupStatus = null
 }) {
-  const [selectedAvatar, setSelectedAvatar] = useState(() => {
-    const saved = localStorage.getItem('userAvatar');
-    return saved ? JSON.parse(saved) : predefinedAvatars[0];
-  });
+  const [selectedAvatar, setSelectedAvatar] = useState(() => getSavedAvatar() || predefinedAvatars[0]);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
-  
+
   // Usar el hook de notificaciones
   const { notifications, loading: notificationsLoading, markAsRead, markAllAsRead } = useNotifications(businessId);
 
   const unreadCount = notifications.filter(n => n.unread).length;
 
   useEffect(() => {
-    localStorage.setItem('userAvatar', JSON.stringify(selectedAvatar));
+    saveAvatar(selectedAvatar);
   }, [selectedAvatar]);
 
   const handleAvatarSelect = (avatar) => {
@@ -227,7 +247,7 @@ export const Navbar = React.memo(function Navbar({
                     onClick={() => setShowAvatarModal(false)}
                     className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
                   >
-                    <LogOut className="w-5 h-5 text-gray-500 rotate-180" />
+                    <X className="w-5 h-5 text-gray-500" />
                   </button>
                 </div>
               </div>
