@@ -13,7 +13,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.stocky.mobile",
+      "bundleIdentifier": "app.stockypos",
       "buildNumber": "1",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "Stocky necesita acceso al Bluetooth para conectarse a impresoras térmicas y permitir la impresión de comprobantes.",
@@ -21,7 +21,7 @@
       }
     },
     "android": {
-      "package": "com.stocky.mobile",
+      "package": "app.stockypos",
       "versionCode": 17,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
