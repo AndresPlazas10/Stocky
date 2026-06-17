@@ -88,6 +88,7 @@ export function OrderModal({ visible, orderState, actions, isKeyboardVisible }: 
       onClose={() => {
         void onDismiss();
       }}
+      hideCloseButton
       backdropVariant="blur"
       layout="centered"
       modalAnimationType="fade"
