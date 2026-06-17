@@ -546,7 +546,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
       } else {
         await loadProductos();
       }
-    } catch (error) {
+    } catch (_error) {
       setError('❌ Error al eliminar el producto');
       setShowDeleteModal(false);
       setProductToDelete(null);

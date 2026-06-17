@@ -152,7 +152,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
     } finally {
       setLoading(false);
     }
-  }, [loadFacturas, resolveBusinessContext]);
+  }, [loadFacturas, resolveBusinessContext, navigate]);
 
   useEffect(() => {
     loadData();

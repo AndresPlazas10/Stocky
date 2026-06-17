@@ -203,7 +203,7 @@ function Register() {
       }
     };
     checkSession();
-  }, []);
+  }, [navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
