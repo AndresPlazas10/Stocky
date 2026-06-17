@@ -9,6 +9,8 @@ export default defineConfig([
     'dist',
     'docs/**',
     'testing/**',
+    'coverage/**',
+    '**/coverage/**',
     'scripts/test-sale-creation.js',
     'src/utils/reactOptimizations.jsx',
     'src/hooks/optimized.js',
@@ -57,6 +59,7 @@ export default defineConfig([
       'apps/mobile/metro.config.js',
       'apps/mobile/app.config.js',
       'apps/mobile/plugins/withFirebaseAppInit.js',
+      'apps/mobile/scripts/optimize-assets.js',
       'src/config/localSync.js',
       'src/sync/shapeRegistry.js',
     ],
@@ -64,6 +67,9 @@ export default defineConfig([
       globals: {
         ...globals.node,
       },
+    },
+    rules: {
+      'no-console': 'off',
     },
   },
   {
