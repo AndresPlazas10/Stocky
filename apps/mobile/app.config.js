@@ -5,7 +5,7 @@ module.exports = {
     ...appJson.expo,
     android: {
       ...appJson.expo.android,
-      googleServicesFile: process.env.GOOGLE_SERVICES_JSON || './google-services.json',
+      googleServicesFile: process.env.GOOGLE_SERVICES_JSON_FILE || './google-services.json',
     },
   },
 };
