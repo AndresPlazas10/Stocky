@@ -384,7 +384,7 @@ function Home() {
                   transition={{ duration: 0.3, delay: index * 0.05 }}
                   className="rounded-2xl border border-primary-100 bg-white p-6 transition-shadow duration-200 hover:shadow-md sm:p-7"
                 >
-                  <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-full bg-[#171717] text-sm font-bold text-white">
+                  <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-full bg-primary-700 text-sm font-bold text-white">
                     {index + 1}
                   </div>
                   <p className="text-sm leading-relaxed text-muted-foreground">{line}</p>
@@ -449,7 +449,7 @@ function Home() {
                   transition={{ duration: 0.3, delay: index * 0.04 }}
                   className="group cursor-pointer rounded-2xl border border-primary-100 bg-white p-6 transition-all duration-200 hover:border-primary-200 hover:shadow-md sm:p-7"
                 >
-                  <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600 transition-colors duration-200 group-hover:bg-[#171717] group-hover:text-white">
+                  <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600 transition-colors duration-200 group-hover:bg-primary-700 group-hover:text-white">
                     <module.icon className="h-5 w-5" />
                   </div>
                   <h3 className="text-base font-semibold text-primary-900">{module.title}</h3>
@@ -461,12 +461,12 @@ function Home() {
         </section>
 
         <section id="start" className="px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
-          <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 rounded-3xl bg-[#171717] p-8 sm:p-10 lg:flex-row lg:items-center lg:p-12">
+          <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 rounded-3xl bg-gradient-to-br from-primary-700 to-primary-900 p-8 sm:p-10 lg:flex-row lg:items-center lg:p-12">
             <div className="max-w-xl">
               <h3 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
                 Empieza hoy y moderniza la operación de tu negocio
               </h3>
-              <p className="mt-3 text-sm leading-relaxed text-[#D4D4D4] sm:text-base">
+              <p className="mt-3 text-sm leading-relaxed text-primary-100 sm:text-base">
                 Crea tu cuenta en minutos y gestiona ventas, inventario y reportes desde una sola plataforma.
               </p>
             </div>
