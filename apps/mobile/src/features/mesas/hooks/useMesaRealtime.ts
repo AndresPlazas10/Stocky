@@ -37,7 +37,6 @@ export interface UseMesaRealtimeParams {
   setMesas: React.Dispatch<React.SetStateAction<MesaRecord[]>>;
   setMesaLocksByTableId: React.Dispatch<React.SetStateAction<Record<string, MesaEditLock>>>;
   setSelectedMesa: React.Dispatch<React.SetStateAction<MesaRecord | null>>;
-  setOrderUnitsByOrderId: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   setShowOrderModal?: React.Dispatch<React.SetStateAction<boolean>>;
   setShowCloseOrderChoiceModal?: React.Dispatch<React.SetStateAction<boolean>>;
   setShowPaymentModal?: React.Dispatch<React.SetStateAction<boolean>>;
@@ -71,7 +70,6 @@ export interface UseMesaRealtimeReturn {
   mesasSyncBroadcastChannelRef: React.MutableRefObject<any>;
   pendingUiTraceRef: React.MutableRefObject<RealtimeUiTrace | null>;
   realtimeClientInstanceIdRef: React.MutableRefObject<string>;
-  applyOrderUnitsSnapshot: (mesasRows: MesaRecord[]) => void;
   traceAsyncDuration: (label: string, startMs: number, extra?: Record<string, unknown>) => void;
 }
 
@@ -113,7 +111,6 @@ export function useMesaRealtime({
   setMesas,
   setMesaLocksByTableId,
   setSelectedMesa,
-  setOrderUnitsByOrderId,
   selectedMesaIdRef,
   heldMesaLockRef,
 }: UseMesaRealtimeParams): UseMesaRealtimeReturn {
@@ -166,57 +163,6 @@ export function useMesaRealtime({
       });
     },
     [],
-  );
-
-  // -------------------------------------------------------------------
-  // extractOrderUnitsSnapshot / applyOrderUnitsSnapshot
-  // -------------------------------------------------------------------
-
-  const extractOrderUnitsSnapshot = useCallback((mesasRows: MesaRecord[]) => {
-    const unitsByOrderId: Record<string, number> = {};
-    const missingOrderIdsSet = new Set<string>();
-    (Array.isArray(mesasRows) ? mesasRows : []).forEach((mesa) => {
-      const orderId = String(mesa?.current_order_id || '').trim();
-      if (!orderId) return;
-      const rawUnits = Number(mesa?.order_units);
-      if (Number.isFinite(rawUnits)) {
-        unitsByOrderId[orderId] = Math.max(0, Math.floor(rawUnits));
-      } else {
-        missingOrderIdsSet.add(orderId);
-      }
-    });
-    return { unitsByOrderId, missingOrderIds: Array.from(missingOrderIdsSet) };
-  }, []);
-
-  const applyOrderUnitsSnapshot = useCallback(
-    (mesasRows: MesaRecord[]) => {
-      const { unitsByOrderId, missingOrderIds } = extractOrderUnitsSnapshot(mesasRows);
-      const activeOrderIds = new Set(
-        (Array.isArray(mesasRows) ? mesasRows : [])
-          .map((mesa) => String(mesa?.current_order_id || '').trim())
-          .filter(Boolean),
-      );
-
-      setOrderUnitsByOrderId((prev) => {
-        const next: Record<string, number> = {};
-        let changed = false;
-
-        for (const [orderId, units] of Object.entries(unitsByOrderId)) {
-          next[orderId] = units;
-          if (prev[orderId] !== units) changed = true;
-        }
-
-        for (const orderId of missingOrderIds) {
-          if (activeOrderIds.has(orderId)) {
-            next[orderId] = prev[orderId] ?? 0;
-            if (prev[orderId] !== (next[orderId] ?? 0)) changed = true;
-          }
-        }
-
-        return changed ? next : prev;
-      });
-    },
-    [extractOrderUnitsSnapshot, setOrderUnitsByOrderId],
   );
 
   // -------------------------------------------------------------------
@@ -554,19 +500,10 @@ export function useMesaRealtime({
           return mesa;
         });
       });
-
-      applyOrderUnitsSnapshot(incoming);
     } catch {
       // no-op
     }
-  }, [
-    applyOrderUnitsSnapshot,
-    businessId,
-    isOrderFlowActive,
-    selectedMesaIdRef,
-    setMesas,
-    traceAsyncDuration,
-  ]);
+  }, [businessId, isOrderFlowActive, selectedMesaIdRef, setMesas, traceAsyncDuration]);
 
   // -------------------------------------------------------------------
   // scheduleMesasRealtimeRefresh
@@ -613,16 +550,6 @@ export function useMesaRealtime({
           orderId: normalizedOrderId,
         });
         const total = Math.max(0, Number(snapshot?.total || 0));
-        const units = Math.max(0, Math.floor(Number(snapshot?.units || 0)));
-
-        setOrderUnitsByOrderId((prev) => {
-          if (Math.max(0, Math.floor(Number(prev?.[normalizedOrderId] || 0))) === units)
-            return prev;
-          return {
-            ...prev,
-            [normalizedOrderId]: units,
-          };
-        });
 
         setMesas((prev) => {
           let changed = false;
@@ -632,7 +559,6 @@ export function useMesaRealtime({
             return {
               ...mesa,
               status: 'occupied',
-              order_units: units,
               orders: {
                 ...(mesa.orders || {}),
                 id: normalizedOrderId,
@@ -650,7 +576,6 @@ export function useMesaRealtime({
           return {
             ...prev,
             status: 'occupied',
-            order_units: units,
             orders: {
               ...(prev.orders || {}),
               id: normalizedOrderId,
@@ -663,7 +588,7 @@ export function useMesaRealtime({
         // no-op
       }
     },
-    [setMesas, setOrderUnitsByOrderId, setSelectedMesa, traceAsyncDuration],
+    [setMesas, setSelectedMesa, traceAsyncDuration],
   );
 
   const scheduleOrderRealtimeSummaryHydration = useCallback(
@@ -819,21 +744,6 @@ export function useMesaRealtime({
         };
       });
 
-      const previousOrderId = String(prevRow?.current_order_id || '').trim();
-      const updatedOrderId = hasNextCurrentOrderId ? String(nextCurrentOrderId || '').trim() : '';
-      if (previousOrderId || updatedOrderId || eventType === 'DELETE') {
-        setOrderUnitsByOrderId((prev) => {
-          const next = { ...prev };
-          if (previousOrderId && previousOrderId !== updatedOrderId) {
-            delete next[previousOrderId];
-          }
-          if (eventType === 'DELETE' || (!updatedOrderId && hasNextCurrentOrderId)) {
-            delete next[updatedOrderId];
-          }
-          return next;
-        });
-      }
-
       if (eventType !== 'DELETE' && hasNextStatus) {
         const normalizedStatus = String(nextStatus || '')
           .trim()
@@ -879,7 +789,6 @@ export function useMesaRealtime({
       selectedMesaIdRef,
       setMesas,
       setMesaLocksByTableId,
-      setOrderUnitsByOrderId,
       setSelectedMesa,
     ],
   );
@@ -1019,25 +928,6 @@ export function useMesaRealtime({
 
       if (deltasByOrderId.size === 0) return;
 
-      setOrderUnitsByOrderId((prev) => {
-        let changed = false;
-        const next = { ...prev };
-
-        deltasByOrderId.forEach((delta, orderId) => {
-          const currentUnits = Math.max(0, Math.floor(Number(next[orderId] || 0)));
-          const resolvedUnits = Math.max(0, currentUnits + Math.trunc(delta.deltaUnits));
-          if (resolvedUnits === currentUnits) return;
-          changed = true;
-          if (resolvedUnits === 0) {
-            delete next[orderId];
-          } else {
-            next[orderId] = resolvedUnits;
-          }
-        });
-
-        return changed ? next : prev;
-      });
-
       const normalizeTotal = (value: number) => Math.max(0, Math.round(value * 100) / 100);
 
       setMesas((prev) => {
@@ -1052,18 +942,11 @@ export function useMesaRealtime({
           const safeCurrentTotal = Number.isFinite(currentTotal) ? currentTotal : 0;
           const nextTotal = normalizeTotal(safeCurrentTotal + delta.deltaTotal);
 
-          const currentUnitsRaw = Number(mesa?.order_units);
-          const safeCurrentUnits = Number.isFinite(currentUnitsRaw)
-            ? Math.max(0, Math.floor(currentUnitsRaw))
-            : 0;
-          const nextUnits = Math.max(0, safeCurrentUnits + Math.trunc(delta.deltaUnits));
-
-          if (nextTotal === safeCurrentTotal && nextUnits === safeCurrentUnits) return mesa;
+          if (nextTotal === safeCurrentTotal) return mesa;
           changed = true;
           return {
             ...mesa,
             status: 'occupied',
-            order_units: nextUnits,
             orders: {
               ...(mesa.orders || {}),
               id: orderId,
@@ -1086,18 +969,11 @@ export function useMesaRealtime({
         const safeCurrentTotal = Number.isFinite(currentTotal) ? currentTotal : 0;
         const nextTotal = normalizeTotal(safeCurrentTotal + delta.deltaTotal);
 
-        const currentUnitsRaw = Number(prev?.order_units);
-        const safeCurrentUnits = Number.isFinite(currentUnitsRaw)
-          ? Math.max(0, Math.floor(currentUnitsRaw))
-          : 0;
-        const nextUnits = Math.max(0, safeCurrentUnits + Math.trunc(delta.deltaUnits));
-
-        if (nextTotal === safeCurrentTotal && nextUnits === safeCurrentUnits) return prev;
+        if (nextTotal === safeCurrentTotal) return prev;
 
         return {
           ...prev,
           status: 'occupied',
-          order_units: nextUnits,
           orders: {
             ...(prev.orders || {}),
             id: selectedOrderId,
@@ -1107,7 +983,7 @@ export function useMesaRealtime({
         };
       });
     },
-    [setMesas, setOrderUnitsByOrderId, setSelectedMesa],
+    [setMesas, setSelectedMesa],
   );
 
   // -------------------------------------------------------------------
@@ -1151,14 +1027,6 @@ export function useMesaRealtime({
       });
 
       if (payload?.current_order_id) {
-        const orderId = String(payload.current_order_id || '').trim();
-        const orderUnits = Number(payload?.order_units);
-        if (orderId && Number.isFinite(orderUnits)) {
-          setOrderUnitsByOrderId((prev) => ({
-            ...prev,
-            [orderId]: Math.max(0, Math.floor(orderUnits)),
-          }));
-        }
         applyRealtimeOrderEvent({
           eventType: 'UPDATE',
           new: {
@@ -1169,13 +1037,7 @@ export function useMesaRealtime({
         });
       }
     },
-    [
-      applyRealtimeMesaLockHint,
-      applyRealtimeOrderEvent,
-      applyRealtimeTableEvent,
-      businessId,
-      setOrderUnitsByOrderId,
-    ],
+    [applyRealtimeMesaLockHint, applyRealtimeOrderEvent, applyRealtimeTableEvent, businessId],
   );
 
   // -------------------------------------------------------------------
@@ -1383,7 +1245,6 @@ export function useMesaRealtime({
     mesasSyncBroadcastChannelRef,
     pendingUiTraceRef,
     realtimeClientInstanceIdRef,
-    applyOrderUnitsSnapshot,
     traceAsyncDuration,
   };
 }

@@ -118,7 +118,6 @@ export function MesasPanel({ session, businessContext }: Props) {
   const selectedMesaIdRef = useRef<string>('');
   const mesaActionVersionRef = useRef<Record<string, number>>({});
 
-  const [orderUnitsByOrderId, setOrderUnitsByOrderId] = useState<Record<string, number>>({});
   const [actorDisplayName, setActorDisplayName] = useState(() =>
     resolveSessionDisplayName(session),
   );
@@ -255,7 +254,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     setMesas,
     setMesaLocksByTableId,
     setSelectedMesa,
-    setOrderUnitsByOrderId,
     setShowOrderModal,
     setShowCloseOrderChoiceModal,
     setShowPaymentModal,
@@ -278,29 +276,8 @@ export function MesasPanel({ session, businessContext }: Props) {
     mesasSyncBroadcastChannelRef,
     pendingUiTraceRef,
     realtimeClientInstanceIdRef,
-    applyOrderUnitsSnapshot,
     traceAsyncDuration,
   } = realtime;
-
-  const patchMesaOrderUnits = useCallback((orderId: string, units: number) => {
-    const key = String(orderId || '').trim();
-    if (!key) return;
-    setOrderUnitsByOrderId((prev) => ({
-      ...prev,
-      [key]: Math.max(0, Math.floor(Number(units || 0))),
-    }));
-  }, []);
-
-  const clearMesaOrderUnits = useCallback((orderId: string | null | undefined) => {
-    const key = String(orderId || '').trim();
-    if (!key) return;
-    setOrderUnitsByOrderId((prev) => {
-      if (!(key in prev)) return prev;
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-  }, []);
 
   const bumpMesaActionVersion = useCallback((mesaId: string) => {
     const normalizedMesaId = String(mesaId || '').trim();
@@ -363,7 +340,6 @@ export function MesasPanel({ session, businessContext }: Props) {
       if (!nextContext?.businessId) {
         setContext(null);
         setMesas([]);
-        setOrderUnitsByOrderId({});
         setMesaLocksByTableId({});
         orderItemsCacheRef.current.clear();
         setError('No se encontro un negocio asociado a esta cuenta.');
@@ -418,8 +394,6 @@ export function MesasPanel({ session, businessContext }: Props) {
       const sortedMesas = nextMesas.sort(compareMesaTableIdentifiers);
       setMesas(sortedMesas);
       void refreshMesaLocks(nextContext.businessId);
-
-      applyOrderUnitsSnapshot(sortedMesas);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudieron cargar las mesas.');
     } finally {
@@ -429,7 +403,6 @@ export function MesasPanel({ session, businessContext }: Props) {
       }
     }
   }, [
-    applyOrderUnitsSnapshot,
     businessContext,
     catalogBusinessIdRef,
     catalogItemsRef,
@@ -805,7 +778,6 @@ export function MesasPanel({ session, businessContext }: Props) {
         );
       });
       if (orderIdToClear) {
-        clearMesaOrderUnits(orderIdToClear);
         orderItemsCacheRef.current.delete(orderIdToClear);
       }
 
@@ -824,7 +796,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         },
       );
     },
-    [clearMesaOrderUnits, context?.businessId, orderItemsCacheRef, publishMesaStateBroadcast],
+    [context?.businessId, orderItemsCacheRef, publishMesaStateBroadcast],
   );
 
   const mutations = useMesaOrderMutations({
@@ -846,12 +818,10 @@ export function MesasPanel({ session, businessContext }: Props) {
     persistOrderSnapshot,
     closeOrderSingle,
     closeOrderAsSplit,
-    patchMesaOrderUnits,
     patchMesaOrderTotal,
     publishRealtimeOrderSummary,
     setError,
     setMesas,
-    clearMesaOrderUnits,
     markMesaAsAvailableAfterSale,
     loadData,
     beginPrintFlow,
@@ -886,7 +856,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     if (selectedMesa?.id && selectedMesa.current_order_id) {
       patchMesaOrderTotal(selectedMesa.id, selectedMesa.current_order_id, orderTotal);
       const currentUnits = sumOrderItemsQuantity(orderItems);
-      patchMesaOrderUnits(selectedMesa.current_order_id, currentUnits);
       publishRealtimeOrderSummary(
         selectedMesa,
         selectedMesa.current_order_id,
@@ -903,7 +872,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     orderItems,
     orderTotal,
     patchMesaOrderTotal,
-    patchMesaOrderUnits,
     publishRealtimeOrderSummary,
     releaseEmptyOrderAndClose,
     releasingEmptyOrder,
@@ -1039,7 +1007,6 @@ export function MesasPanel({ session, businessContext }: Props) {
             const openedOrderId = String(mergedMesa.current_order_id || '').trim();
             if (openedOrderId) {
               orderItemsCacheRef.current.set(openedOrderId, []);
-              patchMesaOrderUnits(openedOrderId, 0);
             }
             if (orderModalOpenIntentRef.current) {
               void openOrderModal(mergedMesa, {
@@ -1077,7 +1044,6 @@ export function MesasPanel({ session, businessContext }: Props) {
       openOrderModal,
       orderItemsCacheRef,
       orderModalOpenIntentRef,
-      patchMesaOrderUnits,
       publishMesaStateBroadcast,
       selectedMesa,
       session.access_token,
@@ -1183,7 +1149,6 @@ export function MesasPanel({ session, businessContext }: Props) {
           heldMesaLock={heldMesaLock}
           contextBusinessId={context?.businessId}
           sessionUserId={session.user.id}
-          orderUnitsByOrderId={orderUnitsByOrderId}
           onMesaPress={handleMesaPress}
           onDeleteMesa={canDeleteMesas ? askDeleteMesa : undefined}
         />

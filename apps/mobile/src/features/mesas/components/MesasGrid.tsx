@@ -20,7 +20,6 @@ interface MesasGridProps {
   heldMesaLock: HeldMesaLock | null;
   contextBusinessId?: string | null;
   sessionUserId?: string;
-  orderUnitsByOrderId?: Record<string, number>;
   onMesaPress: (mesa: MesaRecord, meta: { occupied: boolean; lockedByOther: boolean }) => void;
   onDeleteMesa?: (mesa: MesaRecord) => void;
 }
@@ -34,7 +33,6 @@ export function MesasGrid({
   heldMesaLock,
   contextBusinessId,
   sessionUserId,
-  orderUnitsByOrderId,
   onMesaPress,
   onDeleteMesa,
 }: MesasGridProps) {
@@ -78,11 +76,6 @@ export function MesasGrid({
           mesaLock && (lockOwnerId ? !isOwnedByCurrentUser : lockToken ? !isSameClientLock : true),
         );
         const total = Number(mesa?.orders?.total || 0);
-        const orderId = String(mesa.current_order_id || '').trim();
-        const rowUnits = Number(mesa?.order_units);
-        const productsCount = orderId
-          ? Number(orderUnitsByOrderId?.[orderId] ?? (Number.isFinite(rowUnits) ? rowUnits : 0))
-          : 0;
 
         return (
           <MesaCard
@@ -91,7 +84,6 @@ export function MesasGrid({
             lockedByOther={lockedByOther}
             isBusy={isBusy}
             total={total}
-            productsCount={productsCount}
             onPress={(pressedMesa) => onMesaPress(pressedMesa, { occupied, lockedByOther })}
             onDeletePress={canDeleteMesas ? onDeleteMesa : undefined}
           />
