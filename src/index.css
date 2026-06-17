@@ -35,9 +35,9 @@
   --shadow-lg: 0 10px 15px -3px rgba(7, 87, 91, 0.1);
   --shadow-xl: 0 20px 25px -5px rgba(7, 87, 91, 0.15);
 
-  --gradient-primary: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+  --gradient-primary: linear-gradient(135deg, #07575B 0%, #66A5AD 100%);
   --gradient-accent: linear-gradient(135deg, #66A5AD 0%, #99D3DB 100%);
-  --gradient-hero: linear-gradient(135deg, #003B46 0%, #07575B 50%, #4F46E5 100%);
+  --gradient-hero: linear-gradient(135deg, #003B46 0%, #07575B 50%, #66A5AD 100%);
 }
 
 * {
@@ -753,11 +753,11 @@ body {
 .rotatingGradient {
   background: linear-gradient(
     var(--r),
-    #4F46E5,
-    #7C3AED,
-    #A78BFA,
-    #7C3AED,
-    #4F46E5
+    #003B46,
+    #07575B,
+    #66A5AD,
+    #07575B,
+    #003B46
   );
   animation: rotateGradient 3s linear infinite;
 }
