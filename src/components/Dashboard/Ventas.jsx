@@ -473,7 +473,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     } finally {
       setLoading(false);
     }
-  }, [loadVentas, loadProductos, loadCombos, checkIfEmployee]);
+  }, [loadVentas, loadProductos, loadCombos, checkIfEmployee, navigate]);
 
   useEffect(() => {
     if (businessId) {
@@ -991,7 +991,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear
     }
-  }, [cart, sessionChecked, comboStockShortages, simpleStockShortages, comboById, businessId, paymentMethod, loadVentas, isSubmitting, currentFilters, limit, page, saleIntentSignature]);
+  }, [cart, sessionChecked, comboStockShortages, simpleStockShortages, comboById, businessId, paymentMethod, loadVentas, isSubmitting, currentFilters, limit, page, saleIntentSignature, navigate]);
 
   // Funciones de eliminación de venta (solo admin)
   const handleDeleteSale = (saleId) => {

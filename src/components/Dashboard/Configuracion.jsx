@@ -126,7 +126,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
     } catch {
       setError('❌ No se pudo cerrar la sesión correctamente');
     }
-  }, []);
+  }, [navigate]);
 
   const handleDeleteAccount = useCallback(async () => {
     if (deletingAccount) return;
@@ -154,7 +154,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
     if (deleted) {
       setShowDeleteAccountModal(false);
     }
-  }, [deletingAccount]);
+  }, [deletingAccount, navigate]);
 
   const handlePrinterWidthChange = useCallback((e) => {
     const nextWidth = Number(e.target.value);

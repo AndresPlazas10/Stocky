@@ -329,7 +329,7 @@ export function ParticleTextEffect({ words = DEFAULT_WORDS, colors = TEAL_COLORS
       }
       window.removeEventListener("resize", handleResize)
     }
-  }, [words, colors, prefersReducedMotion])
+  }, [words, colors, prefersReducedMotion, drawAsPoints])
 
   if (prefersReducedMotion) {
     return (

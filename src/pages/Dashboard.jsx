@@ -212,7 +212,7 @@ function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [showWarning]);
+  }, [showWarning, navigate]);
 
   useEffect(() => {
     checkAuthAndLoadBusiness();

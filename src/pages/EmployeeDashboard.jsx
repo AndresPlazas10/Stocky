@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -44,9 +44,9 @@ function EmployeeDashboard() {
 
   useEffect(() => {
     checkEmployeeAuth();
-  }, []);
+  }, [checkEmployeeAuth]);
 
-  const checkEmployeeAuth = async () => {
+  const checkEmployeeAuth = useCallback(async () => {
     try {
       // Verificar autenticación
       let user = null;
@@ -185,7 +185,7 @@ function EmployeeDashboard() {
       setError('❌ Error al cargar información del empleado');
       setLoading(false);
     }
-  };
+  }, [navigate]);
 
   const handleSignOut = async () => {
     try {
