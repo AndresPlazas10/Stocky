@@ -125,7 +125,6 @@ export function useMesaRealtime({
   const realtimeClientInstanceIdRef = useRef(realtimeClientInstanceId);
   const pendingUiTraceRef = useRef<RealtimeUiTrace | null>(null);
   const mesaLockPlaceholderTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const recentlyReleasedLocksRef = useRef<Map<string, number>>(new Map());
 
   const businessId = String(_businessId || '').trim();
 
@@ -186,7 +185,7 @@ export function useMesaRealtime({
           const token = String(lock?.lock_token || '').trim();
           const expiresAtMs = Date.parse(String(lock?.lock_expires_at || '').trim());
           if (!Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs) return;
-          const isPending = token.startsWith('pending-') || token.startsWith('broadcast-');
+          const isPending = token.startsWith('broadcast-');
           const updatedAtMs = Date.parse(String(lock?.updated_at || '').trim());
           const isFresh = Number.isFinite(updatedAtMs) && nowMs - updatedAtMs <= 4000;
           if (isPending || isFresh) {
@@ -215,11 +214,6 @@ export function useMesaRealtime({
   const applyMesaLockPlaceholder = useCallback(
     (mesaId: string, lockBusinessId: string) => {
       if (!mesaId || !lockBusinessId) return;
-      const releasedAt = recentlyReleasedLocksRef.current.get(mesaId);
-      if (releasedAt && Date.now() - releasedAt < 2000) {
-        recentlyReleasedLocksRef.current.delete(mesaId);
-        return;
-      }
       const token = `pending-${mesaId}-${Date.now()}`;
       const expiresAt = new Date(Date.now() + 3500).toISOString();
       const updatedAt = new Date().toISOString();
@@ -430,7 +424,6 @@ export function useMesaRealtime({
           delete next[mesaId];
           return next;
         });
-        recentlyReleasedLocksRef.current.set(mesaId, Date.now());
         return;
       }
 
@@ -768,13 +761,17 @@ export function useMesaRealtime({
           });
         }
         if (normalizedStatus === 'occupied' && tableBusinessId) {
-          const selectedMesaId = String(selectedMesaIdRef.current || '').trim();
-          const held = heldMesaLockRef.current;
-          const hasHeldLock = Boolean(
-            held && held.tableId === mesaId && held.businessId === tableBusinessId,
-          );
-          if (!hasHeldLock && (!selectedMesaId || selectedMesaId !== mesaId)) {
-            applyMesaLockPlaceholder(mesaId, tableBusinessId);
+          const prevStatus = String(prevRow?.status || '').trim().toLowerCase();
+          const statusChangedToOccupied = eventType === 'INSERT' || prevStatus !== 'occupied';
+          if (statusChangedToOccupied) {
+            const selectedMesaId = String(selectedMesaIdRef.current || '').trim();
+            const held = heldMesaLockRef.current;
+            const hasHeldLock = Boolean(
+              held && held.tableId === mesaId && held.businessId === tableBusinessId,
+            );
+            if (!hasHeldLock && (!selectedMesaId || selectedMesaId !== mesaId)) {
+              applyMesaLockPlaceholder(mesaId, tableBusinessId);
+            }
           }
         }
       }
@@ -1212,7 +1209,6 @@ export function useMesaRealtime({
         clearTimeout(mesaLocksRealtimeRefreshTimerRef.current);
         mesaLocksRealtimeRefreshTimerRef.current = null;
       }
-      recentlyReleasedLocksRef.current.clear();
       void client.removeChannel(channel);
       if (mesasSyncBroadcastChannelRef.current) {
         void client.removeChannel(mesasSyncBroadcastChannelRef.current);
