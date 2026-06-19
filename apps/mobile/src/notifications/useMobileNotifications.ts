@@ -49,14 +49,15 @@ export function useMobileNotifications(session: Session | null) {
     void registerPushTokenForSession(session).then((result) => {
       if (cancelled) return;
       if (!result.ok) {
-        if (__DEV__)
-          console.warn(
-            '[notifications] push token registration skipped',
-            result.reason,
-            result.message,
-          );
+        console.warn(
+          '[notifications] push token registration skipped:',
+          result.reason,
+          result.message,
+        );
         return;
       }
+
+      console.warn('[notifications] push token registered:', result.token?.substring(0, 30) + '...');
 
       void (async () => {
         try {
@@ -64,7 +65,7 @@ export function useMobileNotifications(session: Session | null) {
           if (!businessContext || businessContext.source !== 'owner') return;
           await deactivateOtherPushTokensForUser(session.user.id, result.installationId);
         } catch (error) {
-          if (__DEV__) console.warn('[notifications] cleanup old tokens error', error);
+          console.warn('[notifications] cleanup old tokens error:', error);
         }
       })();
     });
@@ -92,15 +93,15 @@ export function useMobileNotifications(session: Session | null) {
 
           if (cancelled) return;
           if (!result.ok) {
-            if (__DEV__)
-              console.warn('[notifications] employee-login notify failed', result.message);
+            console.warn('[notifications] employee-login notify failed:', result.message);
             return;
           }
 
+          console.warn('[notifications] employee-login notify ok:', JSON.stringify(result.data));
           lastEmployeeLoginNotifyKeyRef.current = notifyKey;
         } catch (error) {
           if (cancelled) return;
-          if (__DEV__) console.warn('[notifications] employee-login notify error', error);
+          console.warn('[notifications] employee-login notify error:', error);
         }
       })();
     }

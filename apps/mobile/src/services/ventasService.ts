@@ -692,11 +692,17 @@ export async function createVenta({
   if (saleId) {
     const accessToken = await resolveAccessToken();
     if (accessToken && isEmployee) {
-      void notifyAdminSaleRegistered({
+      notifyAdminSaleRegistered({
         accessToken,
         businessId,
         saleTotal: resolvedTotal,
-      });
+      })
+        .then((r) => {
+          if (__DEV__) console.warn('[notif] sale_registered result:', JSON.stringify(r));
+        })
+        .catch((e) => {
+          console.warn('[notif] sale_registered error:', e);
+        });
     }
 
     const lowStockProductIds = Array.from(
@@ -708,11 +714,17 @@ export async function createVenta({
       ),
     );
     if (accessToken && lowStockProductIds.length > 0) {
-      void notifyAdminLowStock({
+      notifyAdminLowStock({
         accessToken,
         businessId,
         productIds: lowStockProductIds as string[],
-      });
+      })
+        .then((r) => {
+          if (__DEV__) console.warn('[notif] low_stock result:', JSON.stringify(r));
+        })
+        .catch((e) => {
+          console.warn('[notif] low_stock error:', e);
+        });
     }
   }
 
