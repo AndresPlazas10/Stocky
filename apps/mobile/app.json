@@ -2,7 +2,7 @@
   "expo": {
     "name": "Stocky Mobile",
     "slug": "stocky-mobile",
-    "version": "1.0.12",
+    "version": "1.0.15",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "app.stockypos",
-      "versionCode": 17,
+      "versionCode": 20,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -58,9 +58,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "4d8a80f4-cd3a-4750-8fc9-b8f7be0444d4"
+        "projectId": "4468fe70-de71-48b6-a56b-2fd26516e0b2"
       }
     },
-    "owner": "andresplazas"
+    "owner": "andres_plazas"
   }
 }
