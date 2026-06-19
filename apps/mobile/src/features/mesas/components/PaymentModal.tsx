@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { StockyModal } from '../../../ui/StockyModal';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { getPaymentMethodLabel, getPaymentMethodIcon } from '../../../utils/paymentMethods';
@@ -135,43 +135,45 @@ export function PaymentModal({
           <Ionicons name={showMenu ? 'chevron-up' : 'chevron-down'} size={20} color="#374151" />
         </Pressable>
         {showMenu ? (
-          <View style={styles.methodMenu}>
-            {PAYMENT_METHOD_OPTIONS.map((option) => {
-              const selected = option.value === paymentMethod;
-              return (
-                <Pressable
-                  key={option.value}
-                  style={[styles.menuItem, selected && styles.menuItemSelected]}
-                  onPress={() => {
-                    onPaymentMethodChange(option.value);
-                    if (option.value === 'cash' && String(amountReceived || '').trim() === '') {
-                      onAmountReceivedChange(String(Math.round(orderTotal || 0)));
-                    }
-                  }}
-                >
-                  <View style={styles.fieldLeft}>
-                    {isBankPaymentMethod(option.value) ? (
-                      <Image
-                        source={getBankLogoSource(option.value)!}
-                        style={styles.methodLogoSmall}
-                        resizeMode="contain"
-                      />
-                    ) : (
-                      <Ionicons
-                        name={getPaymentMethodIcon(option.value)}
-                        size={18}
-                        color={selected ? '#4F46E5' : '#111827'}
-                      />
-                    )}
-                    <Text style={[styles.menuText, selected && styles.menuTextSelected]}>
-                      {option.label}
-                    </Text>
-                  </View>
-                  {selected ? <Ionicons name="checkmark" size={18} color="#4F46E5" /> : null}
-                </Pressable>
-              );
-            })}
-          </View>
+          <ScrollView style={styles.methodMenuScroll} nestedScrollEnabled bounces={false}>
+            <View style={styles.methodMenu}>
+              {PAYMENT_METHOD_OPTIONS.map((option) => {
+                const selected = option.value === paymentMethod;
+                return (
+                  <Pressable
+                    key={option.value}
+                    style={[styles.menuItem, selected && styles.menuItemSelected]}
+                    onPress={() => {
+                      onPaymentMethodChange(option.value);
+                      if (option.value === 'cash' && String(amountReceived || '').trim() === '') {
+                        onAmountReceivedChange(String(Math.round(orderTotal || 0)));
+                      }
+                    }}
+                  >
+                    <View style={styles.fieldLeft}>
+                      {isBankPaymentMethod(option.value) ? (
+                        <Image
+                          source={getBankLogoSource(option.value)!}
+                          style={styles.methodLogoSmall}
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <Ionicons
+                          name={getPaymentMethodIcon(option.value)}
+                          size={18}
+                          color={selected ? '#4F46E5' : '#111827'}
+                        />
+                      )}
+                      <Text style={[styles.menuText, selected && styles.menuTextSelected]}>
+                        {option.label}
+                      </Text>
+                    </View>
+                    {selected ? <Ionicons name="checkmark" size={18} color="#4F46E5" /> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </ScrollView>
         ) : null}
 
         <Text style={styles.fieldLabel}>Cliente (opcional)</Text>
@@ -388,11 +390,14 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
   },
-  methodMenu: {
-    backgroundColor: '#FFFFFF',
+  methodMenuScroll: {
+    maxHeight: 240,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+  },
+  methodMenu: {
+    backgroundColor: '#FFFFFF',
     overflow: 'hidden',
   },
   menuItem: {
