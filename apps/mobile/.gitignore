@@ -36,7 +36,6 @@ yarn-error.*
 !.env.example
 
 # Firebase
-google-services.json
 !google-services.example.json
 
 # typescript

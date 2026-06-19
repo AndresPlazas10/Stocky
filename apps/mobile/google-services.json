@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "729492591569",
-    "project_id": "stocky-5370b",
-    "storage_bucket": "stocky-5370b.firebasestorage.app"
+    "project_number": "798589444284",
+    "project_id": "forward-aura-499703-i4",
+    "storage_bucket": "forward-aura-499703-i4.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:729492591569:android:d577a0de8d20062b2346f0",
+        "mobilesdk_app_id": "1:798589444284:android:3ffaafa22c58c9c296b0b9",
         "android_client_info": {
-          "package_name": "com.stocky.mobile"
+          "package_name": "app.stockypos"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDunGHQKth0Y7dizpKvGlTC2tcPYe-qWZQ"
+          "current_key": "AIzaSyD5VpY_QrY9eoA5JTTFfDWGYNHLiWYFPSA"
         }
       ],
       "services": {
