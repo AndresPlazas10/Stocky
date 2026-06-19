@@ -42,10 +42,6 @@ function EmployeeDashboard() {
   const [isBusinessDisabled, setIsBusinessDisabled] = useState(false);
   const warmupStatus = useWarmupStatus(business?.id);
 
-  useEffect(() => {
-    checkEmployeeAuth();
-  }, [checkEmployeeAuth]);
-
   const checkEmployeeAuth = useCallback(async () => {
     try {
       // Verificar autenticación
@@ -162,7 +158,7 @@ function EmployeeDashboard() {
         }
       }
       
-      // � VERIFICAR SI EL NEGOCIO ESTÁ DESHABILITADO (PRIORIDAD MÁXIMA)
+      // 🔒 VERIFICAR SI EL NEGOCIO ESTÁ DESHABILITADO (PRIORIDAD MÁXIMA)
       if (businessData.is_active === false) {
         try {
           await logSecurityEvent({
@@ -186,6 +182,10 @@ function EmployeeDashboard() {
       setLoading(false);
     }
   }, [navigate]);
+
+  useEffect(() => {
+    checkEmployeeAuth();
+  }, [checkEmployeeAuth]);
 
   const handleSignOut = async () => {
     try {

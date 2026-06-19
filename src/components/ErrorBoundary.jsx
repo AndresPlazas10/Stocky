@@ -17,7 +17,7 @@ class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
-      const showTechnicalDetails = true;
+      const showTechnicalDetails = import.meta.env.DEV;
       return (
         <div className="h-screen flex items-center justify-center p-6 bg-gray-50 overflow-hidden">
           <div className="max-w-xl text-center max-h-[calc(100vh-120px)] overflow-auto">
