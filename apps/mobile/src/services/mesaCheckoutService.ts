@@ -510,22 +510,34 @@ export async function closeOrderSingle({
   if (resolvedSaleId && saleTotal > 0) {
     const accessToken = await resolveAccessToken();
     if (accessToken && isEmployee) {
-      void notifyAdminSaleRegistered({
+      notifyAdminSaleRegistered({
         accessToken,
         businessId,
         saleTotal,
-      });
+      })
+        .then((r) => {
+          if (__DEV__) console.warn('[notif] sale_registered result:', JSON.stringify(r));
+        })
+        .catch((e) => {
+          console.warn('[notif] sale_registered error:', e);
+        });
     }
 
     const lowStockProductIds = Array.from(
       new Set(normalizedItems.map((item) => normalizeReference(item.product_id)).filter(Boolean)),
     );
     if (accessToken && lowStockProductIds.length > 0) {
-      void notifyAdminLowStock({
+      notifyAdminLowStock({
         accessToken,
         businessId,
         productIds: lowStockProductIds as string[],
-      });
+      })
+        .then((r) => {
+          if (__DEV__) console.warn('[notif] low_stock result:', JSON.stringify(r));
+        })
+        .catch((e) => {
+          console.warn('[notif] low_stock error:', e);
+        });
     }
   }
 
@@ -619,11 +631,17 @@ export async function closeOrderAsSplit({
       if (totalSold > 0) {
         const accessToken = await resolveAccessToken();
         if (accessToken && isEmployee) {
-          void notifyAdminSaleRegistered({
+          notifyAdminSaleRegistered({
             accessToken,
             businessId,
             saleTotal: totalSold,
-          });
+          })
+            .then((r) => {
+              if (__DEV__) console.warn('[notif] sale_registered (split atomic) result:', JSON.stringify(r));
+            })
+            .catch((e) => {
+              console.warn('[notif] sale_registered (split atomic) error:', e);
+            });
         }
         const lowStockProductIds = Array.from(
           new Set(
@@ -633,11 +651,17 @@ export async function closeOrderAsSplit({
           ),
         );
         if (accessToken && lowStockProductIds.length > 0) {
-          void notifyAdminLowStock({
+          notifyAdminLowStock({
             accessToken,
             businessId,
             productIds: lowStockProductIds as string[],
-          });
+          })
+            .then((r) => {
+              if (__DEV__) console.warn('[notif] low_stock (split atomic) result:', JSON.stringify(r));
+            })
+            .catch((e) => {
+              console.warn('[notif] low_stock (split atomic) error:', e);
+            });
         }
       }
 
@@ -734,11 +758,17 @@ export async function closeOrderAsSplit({
   if (totalSold > 0) {
     const accessToken = await resolveAccessToken();
     if (accessToken && isEmployee) {
-      void notifyAdminSaleRegistered({
+      notifyAdminSaleRegistered({
         accessToken,
         businessId,
         saleTotal: totalSold,
-      });
+      })
+        .then((r) => {
+          if (__DEV__) console.warn('[notif] sale_registered (split sequential) result:', JSON.stringify(r));
+        })
+        .catch((e) => {
+          console.warn('[notif] sale_registered (split sequential) error:', e);
+        });
     }
     const lowStockProductIds = Array.from(
       new Set(
@@ -748,11 +778,17 @@ export async function closeOrderAsSplit({
       ),
     );
     if (accessToken && lowStockProductIds.length > 0) {
-      void notifyAdminLowStock({
+      notifyAdminLowStock({
         accessToken,
         businessId,
         productIds: lowStockProductIds as string[],
-      });
+      })
+        .then((r) => {
+          if (__DEV__) console.warn('[notif] low_stock (split sequential) result:', JSON.stringify(r));
+        })
+        .catch((e) => {
+          console.warn('[notif] low_stock (split sequential) error:', e);
+        });
     }
   }
 
