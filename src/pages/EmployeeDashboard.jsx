@@ -325,7 +325,7 @@ function EmployeeDashboard() {
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
           flex flex-col shadow-2xl
         `}
-        style={{ background: 'linear-gradient(to bottom, #4f46e5, #7c3aed)' }}
+        style={{ background: 'linear-gradient(to bottom, #059669, #047857)' }}
       >
         {/* Header del Sidebar */}
         <div className="p-6 border-b border-white/10">
@@ -377,7 +377,7 @@ function EmployeeDashboard() {
                     : 'text-white/90 hover:bg-white/20 hover:text-white'
                   }
                 `}
-                style={isActive ? { color: '#4f46e5' } : {}}
+                style={isActive ? { color: '#059669' } : {}}
               >
                 <Icon className="w-5 h-5" />
                 <span>{item.label}</span>
