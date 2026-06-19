@@ -125,6 +125,7 @@ export function useMesaRealtime({
   const realtimeClientInstanceIdRef = useRef(realtimeClientInstanceId);
   const pendingUiTraceRef = useRef<RealtimeUiTrace | null>(null);
   const mesaLockPlaceholderTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const recentlyReleasedLocksRef = useRef<Map<string, number>>(new Map());
 
   const businessId = String(_businessId || '').trim();
 
@@ -214,6 +215,11 @@ export function useMesaRealtime({
   const applyMesaLockPlaceholder = useCallback(
     (mesaId: string, lockBusinessId: string) => {
       if (!mesaId || !lockBusinessId) return;
+      const releasedAt = recentlyReleasedLocksRef.current.get(mesaId);
+      if (releasedAt && Date.now() - releasedAt < 2000) {
+        recentlyReleasedLocksRef.current.delete(mesaId);
+        return;
+      }
       const token = `pending-${mesaId}-${Date.now()}`;
       const expiresAt = new Date(Date.now() + 3500).toISOString();
       const updatedAt = new Date().toISOString();
@@ -424,6 +430,7 @@ export function useMesaRealtime({
           delete next[mesaId];
           return next;
         });
+        recentlyReleasedLocksRef.current.set(mesaId, Date.now());
         return;
       }
 
@@ -1205,6 +1212,7 @@ export function useMesaRealtime({
         clearTimeout(mesaLocksRealtimeRefreshTimerRef.current);
         mesaLocksRealtimeRefreshTimerRef.current = null;
       }
+      recentlyReleasedLocksRef.current.clear();
       void client.removeChannel(channel);
       if (mesasSyncBroadcastChannelRef.current) {
         void client.removeChannel(mesasSyncBroadcastChannelRef.current);
