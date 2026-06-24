@@ -6,11 +6,8 @@
  * Ejemplo: 1200000 -> $1'200.000
  * Ejemplo: 2000 -> $2.000
  * Ejemplo: 1500.50 -> $1.500,50
- * @param {number} value - El valor numérico a formatear
- * @param {boolean} includeCurrency - Si incluir "$" al inicio (default: true)
- * @returns {string} - El precio formateado
  */
-export const formatPrice = (value, includeCurrency = true) => {
+export const formatPrice = (value: number | null | undefined, includeCurrency: boolean = true): string => {
   if (value === null || value === undefined || isNaN(value)) {
     return includeCurrency ? '$0' : '0';
   }
@@ -54,10 +51,8 @@ export const formatPrice = (value, includeCurrency = true) => {
  * Formatea un número sin símbolo de moneda
  * Ejemplo: 1200000 -> 1'200.000
  * Ejemplo: 2000 -> 2.000
- * @param {number} value - El valor numérico a formatear
- * @returns {string} - El número formateado
  */
-export const formatNumber = (value) => {
+export const formatNumber = (value: number | null | undefined): string => {
   return formatPrice(value, false);
 };
 
@@ -68,11 +63,8 @@ export const formatNumber = (value) => {
  * - Miles con coma: "5,000" -> 5000
  * - Formato es-CO: "1.500,50" -> 1500.5
  * - Formato en-US: "1500.50" -> 1500.5
- * @param {string|number|null|undefined} value
- * @param {number} fallback
- * @returns {number}
  */
-export const parsePriceInput = (value, fallback = 0) => {
+export const parsePriceInput = (value: string | number | null | undefined, fallback: number = 0): number => {
   if (value === null || value === undefined || value === '') return fallback;
   if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
 
@@ -117,21 +109,16 @@ export const parsePriceInput = (value, fallback = 0) => {
  * Convierte un string formateado a número
  * Ejemplo: "1'200.000" -> 1200000
  * Ejemplo: "2.000" -> 2000
- * @param {string} formattedValue - El valor formateado
- * @returns {number} - El valor numérico
  */
-export const parseFormattedNumber = (formattedValue) => {
+export const parseFormattedNumber = (formattedValue: string | null | undefined): number => {
   return parsePriceInput(formattedValue, 0);
 };
 
 /**
  * Formatea una fecha/timestamp de PostgreSQL timestamptz a formato local
  * Maneja correctamente las fechas con timezone de Supabase
- * @param {string|Date} timestamp - Timestamp de PostgreSQL o objeto Date
- * @param {Object} options - Opciones de formato (default: fecha y hora colombiana)
- * @returns {string} - Fecha formateada o "Fecha inválida"
  */
-export const formatDate = (timestamp, options = {}) => {
+export const formatDate = (timestamp: string | Date | number | null | undefined, options: Intl.DateTimeFormatOptions = {}): string => {
   // Validar entrada
   if (!timestamp || timestamp === null || timestamp === undefined) {
     
@@ -139,7 +126,7 @@ export const formatDate = (timestamp, options = {}) => {
   }
   
   try {
-    let date;
+    let date: Date;
     
     // Manejar diferentes formatos de entrada
     if (timestamp instanceof Date) {
@@ -162,7 +149,7 @@ export const formatDate = (timestamp, options = {}) => {
       return 'Fecha inválida';
     }
     
-    const defaultOptions = {
+    const defaultOptions: Intl.DateTimeFormatOptions = {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -182,17 +169,15 @@ export const formatDate = (timestamp, options = {}) => {
 
 /**
  * Formatea solo la fecha (sin hora)
- * @param {string|Date} timestamp - Timestamp de PostgreSQL o objeto Date
- * @returns {string} - Fecha formateada (ej: "15 dic 2025")
  */
-export const formatDateOnly = (timestamp) => {
+export const formatDateOnly = (timestamp: string | Date | number | null | undefined): string => {
   if (!timestamp) {
     
     return 'Fecha inválida';
   }
   
   try {
-    const date = new Date(timestamp);
+    const date = new Date(timestamp as string | number);
     
     if (isNaN(date.getTime())) {
       
@@ -213,17 +198,15 @@ export const formatDateOnly = (timestamp) => {
 
 /**
  * Formatea solo la hora en formato de 12 horas con AM/PM
- * @param {string|Date} timestamp - Timestamp de PostgreSQL o objeto Date
- * @returns {string} - Hora formateada (ej: "02:30 PM")
  */
-export const formatTimeOnly = (timestamp) => {
+export const formatTimeOnly = (timestamp: string | Date | number | null | undefined): string => {
   if (!timestamp) {
     
     return 'Hora inválida';
   }
   
   try {
-    const date = new Date(timestamp);
+    const date = new Date(timestamp as string | number);
     
     if (isNaN(date.getTime())) {
       
@@ -244,17 +227,15 @@ export const formatTimeOnly = (timestamp) => {
 
 /**
  * Formatea fecha en formato completo con hora de 12 horas
- * @param {string|Date} timestamp - Timestamp de PostgreSQL o objeto Date
- * @returns {string} - Fecha formateada (ej: "15 de diciembre de 2025, 02:30 PM")
  */
-export const formatDateLong = (timestamp) => {
+export const formatDateLong = (timestamp: string | Date | number | null | undefined): string => {
   if (!timestamp) {
     
     return 'Fecha inválida';
   }
   
   try {
-    const date = new Date(timestamp);
+    const date = new Date(timestamp as string | number);
     
     if (isNaN(date.getTime())) {
       
@@ -279,22 +260,20 @@ export const formatDateLong = (timestamp) => {
 /**
  * Formatea fecha y hora completa para tickets y recibos
  * Formato legible para impresiones POS
- * @param {string|Date} timestamp - Timestamp de PostgreSQL o objeto Date
- * @returns {string} - Fecha formateada (ej: "lunes, 15 de diciembre de 2025 - 02:30 PM")
  */
-export const formatDateTimeTicket = (timestamp) => {
+export const formatDateTimeTicket = (timestamp: string | Date | number | null | undefined): string => {
   if (!timestamp) {
     return 'Fecha inválida';
   }
   
   try {
-    const date = new Date(timestamp);
+    const date = new Date(timestamp as string | number);
     
     if (isNaN(date.getTime())) {
       return 'Fecha inválida';
     }
     
-    const dateOptions = {
+    const dateOptions: Intl.DateTimeFormatOptions = {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -302,7 +281,7 @@ export const formatDateTimeTicket = (timestamp) => {
       timeZone: 'America/Bogota'
     };
     
-    const timeOptions = {
+    const timeOptions: Intl.DateTimeFormatOptions = {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
@@ -320,16 +299,14 @@ export const formatDateTimeTicket = (timestamp) => {
 
 /**
  * Formatea solo la hora de forma compacta para UI
- * @param {string|Date} timestamp - Timestamp de PostgreSQL o objeto Date
- * @returns {string} - Hora formateada (ej: "2:30 PM")
  */
-export const formatTimeCompact = (timestamp) => {
+export const formatTimeCompact = (timestamp: string | Date | number | null | undefined): string => {
   if (!timestamp) {
     return 'Hora inválida';
   }
   
   try {
-    const date = new Date(timestamp);
+    const date = new Date(timestamp as string | number);
     
     if (isNaN(date.getTime())) {
       return 'Hora inválida';
@@ -348,16 +325,14 @@ export const formatTimeCompact = (timestamp) => {
 
 /**
  * Formatea fecha y hora de forma completa para reportes
- * @param {string|Date} timestamp - Timestamp de PostgreSQL o objeto Date
- * @returns {string} - Fecha formateada (ej: "15/12/2025 02:30 PM")
  */
-export const formatDateTimeReport = (timestamp) => {
+export const formatDateTimeReport = (timestamp: string | Date | number | null | undefined): string => {
   if (!timestamp) {
     return 'Fecha inválida';
   }
   
   try {
-    const date = new Date(timestamp);
+    const date = new Date(timestamp as string | number);
     
     if (isNaN(date.getTime())) {
       return 'Fecha inválida';

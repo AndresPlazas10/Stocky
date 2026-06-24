@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -12,7 +13,7 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error(errorMsg);
 }
 
-const resolveAuthStorage = () => {
+const resolveAuthStorage = (): Storage | undefined => {
   if (typeof window === 'undefined') return undefined;
   try {
     return window.sessionStorage || window.localStorage;
@@ -24,7 +25,7 @@ const resolveAuthStorage = () => {
 const authStorage = resolveAuthStorage();
 
 // Cliente optimizado con configuración de producción
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,

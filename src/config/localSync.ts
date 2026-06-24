@@ -1,14 +1,16 @@
-function resolveEnv() {
+import type { LocalSyncConfig, LocalWritesConfig, LocalReadsConfig } from '../types/config';
+
+function resolveEnv(): Record<string, string | undefined> {
   if (typeof import.meta !== 'undefined' && import.meta?.env) {
-    return import.meta.env;
+    return import.meta.env as Record<string, string | undefined>;
   }
   if (typeof process !== 'undefined' && process?.env) {
-    return process.env;
+    return process.env as Record<string, string | undefined>;
   }
   return {};
 }
 
-function envBoolean(value, fallback = false) {
+function envBoolean(value: string | undefined | null, fallback: boolean = false): boolean {
   if (value === undefined || value === null || value === '') return fallback;
   const normalized = String(value).trim().toLowerCase();
   if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
@@ -16,7 +18,7 @@ function envBoolean(value, fallback = false) {
   return fallback;
 }
 
-function envNumber(value, fallback) {
+function envNumber(value: string | undefined | null, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
@@ -25,7 +27,7 @@ const ENV = resolveEnv();
 
 // Modo seguro por defecto: online-only.
 // Se activa progresivamente por variables VITE_LOCAL_SYNC_*.
-export const LOCAL_SYNC_CONFIG = {
+export const LOCAL_SYNC_CONFIG: LocalSyncConfig = {
   enabled: envBoolean(ENV.VITE_LOCAL_SYNC_ENABLED, false),
   devtoolsEnabled: envBoolean(ENV.VITE_LOCAL_SYNC_DEVTOOLS_ENABLED, false),
   preferPGlite: envBoolean(ENV.VITE_LOCAL_SYNC_PREFER_PGLITE, false),
@@ -58,7 +60,7 @@ export const LOCAL_SYNC_CONFIG = {
     suppliersLocalFirst: envBoolean(ENV.VITE_LOCAL_SYNC_WRITE_SUPPLIERS_LOCAL_FIRST, false),
     invoices: envBoolean(ENV.VITE_LOCAL_SYNC_WRITE_INVOICES_ENABLED, false),
     invoicesLocalFirst: envBoolean(ENV.VITE_LOCAL_SYNC_WRITE_INVOICES_LOCAL_FIRST, false)
-  },
+  } as LocalWritesConfig,
   localReads: {
     products: envBoolean(ENV.VITE_LOCAL_SYNC_READ_PRODUCTS_ENABLED, false),
     sales: envBoolean(ENV.VITE_LOCAL_SYNC_READ_SALES_ENABLED, false),
@@ -66,7 +68,7 @@ export const LOCAL_SYNC_CONFIG = {
     orders: envBoolean(ENV.VITE_LOCAL_SYNC_READ_ORDERS_ENABLED, false),
     inventory: envBoolean(ENV.VITE_LOCAL_SYNC_READ_INVENTORY_ENABLED, false),
     invoices: envBoolean(ENV.VITE_LOCAL_SYNC_READ_INVOICES_ENABLED, false)
-  }
+  } as LocalReadsConfig
 };
 
 export default LOCAL_SYNC_CONFIG;

@@ -1,24 +1,26 @@
-function normalizeOrderStatus(status) {
+import type { Table, TableStatus } from '../types/order';
+
+function normalizeOrderStatus(status: string | null | undefined): string | null {
   const raw = String(status || '').trim().toLowerCase();
   if (!raw) return null;
   return raw;
 }
 
-function normalizeOrderReference(value) {
+function normalizeOrderReference(value: string | null | undefined): string | null {
   const raw = String(value ?? '').trim().toLowerCase();
   if (!raw || raw === 'null' || raw === 'undefined') return null;
   return String(value).trim();
 }
 
-export function normalizeTableStatus(status) {
+export function normalizeTableStatus(status: string | null | undefined): TableStatus {
   const raw = String(status || '').trim().toLowerCase();
   if (raw === 'open') return 'occupied';
   if (raw === 'closed') return 'available';
-  if (raw === 'occupied' || raw === 'available') return raw;
+  if (raw === 'occupied' || raw === 'available') return raw as TableStatus;
   return 'available';
 }
 
-export function normalizeTableRecord(table) {
+export function normalizeTableRecord(table: Table): Table {
   if (!table || typeof table !== 'object') return table;
 
   const normalizedCurrentOrderId = normalizeOrderReference(table.current_order_id);
@@ -43,10 +45,10 @@ export function normalizeTableRecord(table) {
   };
 }
 
-export function isTableOccupied(status) {
+export function isTableOccupied(status: string | null | undefined): boolean {
   return normalizeTableStatus(status) === 'occupied';
 }
 
-export function isTableAvailable(status) {
+export function isTableAvailable(status: string | null | undefined): boolean {
   return normalizeTableStatus(status) === 'available';
 }

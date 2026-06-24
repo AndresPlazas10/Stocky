@@ -2,11 +2,20 @@
  * Utilidades para detectar el dispositivo y entorno de ejecución
  */
 
+interface DeviceInfo {
+  isIOs: boolean;
+  isAndroid: boolean;
+  isStandalone: boolean;
+  isSafari: boolean;
+  isChrome: boolean;
+  userAgent: string;
+  platform: string;
+}
+
 /**
  * Detecta si el usuario está en iOS (iPhone, iPad, iPod)
- * @returns {boolean}
  */
-export function isIOs() {
+export function isIOs(): boolean {
   if (typeof window === 'undefined') return false;
 
   const userAgent = window.navigator.userAgent.toLowerCase();
@@ -15,9 +24,8 @@ export function isIOs() {
 
 /**
  * Detecta si el usuario está en Android
- * @returns {boolean}
  */
-export function isAndroid() {
+export function isAndroid(): boolean {
   if (typeof window === 'undefined') return false;
 
   const userAgent = window.navigator.userAgent.toLowerCase();
@@ -26,22 +34,20 @@ export function isAndroid() {
 
 /**
  * Detecta si la app está ejecutándose en modo standalone (PWA instalada)
- * @returns {boolean}
  */
-export function isStandalone() {
+export function isStandalone(): boolean {
   if (typeof window === 'undefined') return false;
 
   return (
     window.matchMedia('(display-mode: standalone)').matches ||
-    window.navigator.standalone === true
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
   );
 }
 
 /**
  * Detecta si el navegador es Safari
- * @returns {boolean}
  */
-export function isSafari() {
+export function isSafari(): boolean {
   if (typeof window === 'undefined') return false;
 
   const userAgent = window.navigator.userAgent.toLowerCase();
@@ -52,9 +58,8 @@ export function isSafari() {
 
 /**
  * Detecta si el navegador es Chrome
- * @returns {boolean}
  */
-export function isChrome() {
+export function isChrome(): boolean {
   if (typeof window === 'undefined') return false;
 
   const userAgent = window.navigator.userAgent.toLowerCase();
@@ -63,9 +68,8 @@ export function isChrome() {
 
 /**
  * Obtiene información completa del dispositivo/navegador
- * @returns {Object}
  */
-export function getDeviceInfo() {
+export function getDeviceInfo(): DeviceInfo {
   return {
     isIOs: isIOs(),
     isAndroid: isAndroid(),
@@ -79,9 +83,8 @@ export function getDeviceInfo() {
 
 /**
  * Detecta si el dispositivo soporta instalación PWA
- * @returns {boolean}
  */
-export function supportsPWA() {
+export function supportsPWA(): boolean {
   if (typeof window === 'undefined') return false;
 
   // iOS 16.4+ soporta PWA con notificaciones
