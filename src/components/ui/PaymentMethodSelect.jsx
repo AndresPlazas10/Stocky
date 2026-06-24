@@ -4,7 +4,7 @@ import {
   getPaymentMethodLabel,
   getPaymentMethodLogoCandidates,
   isBankPaymentMethod
-} from '../../utils/paymentMethodBranding.js';
+} from '../../utils/paymentMethodBranding';
 
 const BASE_OPTIONS = [
   { value: 'cash', emoji: '💵' },

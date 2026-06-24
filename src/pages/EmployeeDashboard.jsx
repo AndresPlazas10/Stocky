@@ -5,9 +5,9 @@ import {
   getAuthenticatedUser,
   getBusinessById,
   getEmployeeByUserId
-} from '../data/queries/authQueries.js';
+} from '../data/queries/authQueries';
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
-import { signOutGlobalSession } from '../data/commands/authCommands.js';
+import { signOutGlobalSession } from '../data/commands/authCommands';
 import BusinessDisabledModal from '../components/BusinessDisabledModal.jsx';
 import WhatsNewModal from '../components/Modals/WhatsNewModal.jsx';
 import Ventas from '../components/Dashboard/Ventas.jsx';

@@ -11,11 +11,11 @@ import {
   getBusinessById,
   getOwnedBusinessByUserId,
   getActiveEmployeeByUserId
-} from '../data/queries/authQueries.js';
+} from '../data/queries/authQueries';
 import {
   updateBusinessLogo
-} from '../data/commands/businessCommands.js';
-import { signOutGlobalSession } from '../data/commands/authCommands.js';
+} from '../data/commands/businessCommands';
+import { signOutGlobalSession } from '../data/commands/authCommands';
 import { useWarmupStatus } from '../hooks/useWarmupStatus.js';
 import PerformanceHud from '../components/perf/PerformanceHud.jsx';
 import { logSecurityEvent } from '../services/securityAuditService.js';

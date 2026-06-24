@@ -6,7 +6,7 @@ import {
   computeNextRetryAt,
   SALES_OUTBOX_BASE_RETRY_MS,
   SALES_OUTBOX_MAX_RETRY_MS
-} from '../src/data/commands/salesOutboxRetryPolicy.js';
+} from '../src/data/commands/salesOutboxRetryPolicy';
 
 test('isConnectivityError detecta errores de red comunes', () => {
   assert.equal(isConnectivityError('Failed to fetch'), true);

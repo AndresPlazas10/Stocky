@@ -6,9 +6,9 @@ import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import {
   updateBusinessProfile
-} from '../../data/commands/businessCommands.js';
-import { signOutSession } from '../../data/commands/authCommands.js';
-import { supabase } from '../../supabase/Client.jsx';
+} from '../../data/commands/businessCommands';
+import { signOutSession } from '../../data/commands/authCommands';
+import { supabase } from '../../supabase/Client';
 import {
   Settings,
   User,
@@ -193,7 +193,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
   }, [error, success]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#ffe498]/10 p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#C4DFE6]/10 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* Header */}
@@ -376,7 +376,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                       value={businessData.name}
                       onChange={handleBusinessChange}
                       required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
                       placeholder="Mi Negocio S.A.S"
                     />
                   </div>
@@ -392,7 +392,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                       name="nit"
                       value={businessData.nit}
                       onChange={handleBusinessChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
                       placeholder="900.123.456-7"
                     />
                   </div>
@@ -407,7 +407,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                       name="email"
                       value={businessData.email}
                       onChange={handleBusinessChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
                       placeholder="contacto@negocio.com"
                     />
                   </div>
@@ -422,7 +422,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                       name="phone"
                       value={businessData.phone}
                       onChange={handleBusinessChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
                       placeholder="+57 300 123 4567"
                     />
                   </div>
@@ -437,7 +437,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                       value={businessData.address}
                       onChange={handleBusinessChange}
                       rows="3"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all resize-none"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all resize-none"
                       placeholder="Calle 123 #45-67, Ciudad"
                     />
                   </div>
@@ -447,7 +447,7 @@ function Configuracion({ user, business, onBusinessUpdate }) {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex items-center gap-2 px-6 py-3 gradient-primary hover:from-[#f1c691] hover:to-[#edb886] text-black rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+                    className="flex items-center gap-2 px-6 py-3 gradient-primary hover:from-[#99D3DB] hover:to-[#66A5AD] text-black rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
                   >
                     {loading ? (
                       <>

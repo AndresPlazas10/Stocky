@@ -1,6 +1,6 @@
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
-import { buildUtcRangeFromLocalDates } from '../utils/dateRange.js';
-import { logger } from '../utils/logger.js';
+import { buildUtcRangeFromLocalDates } from '../utils/dateRange';
+import { logger } from '../utils/logger';
 
 const PURCHASE_LIST_COLUMNS = `
   id,

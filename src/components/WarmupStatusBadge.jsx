@@ -1,5 +1,5 @@
 import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import { DASHBOARD_WARMUP_PHASE } from '../services/dashboardWarmupService.js';
+import { DASHBOARD_WARMUP_PHASE } from '../services/dashboardWarmupService';
 import { useOnlineStatus } from '../hooks/useOnlineStatus.js';
 
 function resolveBadgePresentation(status, isOnline) {

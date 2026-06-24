@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { formatPrice, parsePriceInput } from '../../utils/formatters.js';
+import { formatPrice, parsePriceInput } from '../../utils/formatters';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
@@ -32,17 +32,17 @@ import {
   checkProductCanDelete,
   setProductActiveStatus,
   updateProductById
-} from '../../data/commands/inventoryCommands.js';
+} from '../../data/commands/inventoryCommands';
 import {
   getInventoryProductsPage,
   getSupplierById,
   getSuppliersByBusiness
-} from '../../data/queries/inventoryQueries.js';
+} from '../../data/queries/inventoryQueries';
 import {
   getAuthenticatedUser,
   isEmployeeInBusiness,
   getEmployeeRoleInBusiness
-} from '../../data/queries/authQueries.js';
+} from '../../data/queries/authQueries';
 import { isAdminRole } from '../../utils/roles.js';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
 import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
@@ -821,7 +821,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       value={formData.name}
                       onChange={handleChange}
                       required
-                      className="h-11 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
+                      className="h-11 rounded-xl border-gray-300 focus:border-[#66A5AD] focus:ring-[#66A5AD]"
                     />
                   </div>
 
@@ -835,7 +835,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       value={formData.category}
                       onChange={handleChange}
                       required
-                      className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#edb886] focus:ring-[#edb886] transition-all duration-300"
+                      className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#66A5AD] focus:ring-[#66A5AD] transition-all duration-300"
                     >
                       <option value="">Seleccionar categoría</option>
                       <option value="Platos">Platos</option>
@@ -876,7 +876,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       value={formData.purchase_price}
                       onChange={handleChange}
                       required
-                      className="h-11 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
+                      className="h-11 rounded-xl border-gray-300 focus:border-[#66A5AD] focus:ring-[#66A5AD]"
                     />
                   </div>
 
@@ -894,7 +894,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       value={formData.sale_price}
                       onChange={handleChange}
                       required
-                      className="h-11 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
+                      className="h-11 rounded-xl border-gray-300 focus:border-[#66A5AD] focus:ring-[#66A5AD]"
                     />
                   </div>
                 </div>
@@ -908,7 +908,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                         type="checkbox"
                         checked={formData.manage_stock !== false}
                         onChange={handleChange}
-                        className="h-4 w-4 rounded border-gray-300 text-[#edb886] focus:ring-[#edb886]"
+                        className="h-4 w-4 rounded border-gray-300 text-[#66A5AD] focus:ring-[#66A5AD]"
                       />
                     </label>
                   </div>
@@ -927,7 +927,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       onChange={handleChange}
                       required={formData.manage_stock !== false}
                       disabled={formData.manage_stock === false}
-                      className="h-11 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886] disabled:bg-gray-100 disabled:text-gray-400"
+                      className="h-11 rounded-xl border-gray-300 focus:border-[#66A5AD] focus:ring-[#66A5AD] disabled:bg-gray-100 disabled:text-gray-400"
                     />
                   </div>
 
@@ -944,7 +944,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       value={formData.min_stock}
                       onChange={handleChange}
                       disabled={formData.manage_stock === false}
-                      className="h-11 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886] disabled:bg-gray-100 disabled:text-gray-400"
+                      className="h-11 rounded-xl border-gray-300 focus:border-[#66A5AD] focus:ring-[#66A5AD] disabled:bg-gray-100 disabled:text-gray-400"
                     />
                     {formData.manage_stock !== false ? (
                       <p className="text-xs text-gray-500 mt-1">Alerta cuando el stock baje de este nivel</p>
@@ -961,7 +961,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                       name="unit"
                       value={formData.unit}
                       onChange={handleChange}
-                      className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#edb886] focus:ring-[#edb886] transition-all duration-300"
+                      className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#66A5AD] focus:ring-[#66A5AD] transition-all duration-300"
                     >
                       <option value="unit">Unidad</option>
                       <option value="kg">Kilogramo</option>
@@ -980,7 +980,7 @@ function Inventario({ businessId, userRole = 'admin' }) {
                     name="supplier_id"
                     value={formData.supplier_id}
                     onChange={handleChange}
-                    className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#edb886] focus:ring-[#edb886] transition-all duration-300"
+                    className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#66A5AD] focus:ring-[#66A5AD] transition-all duration-300"
                   >
                     <option value="">Sin proveedor</option>
                     {proveedores.map(prov => (

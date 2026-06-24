@@ -5,7 +5,7 @@ import { getFilteredPurchases } from '../../services/purchasesService';
 import {
   createPurchaseWithRpcFallback,
   deletePurchaseWithStockFallback
-} from '../../data/commands/purchasesCommands.js';
+} from '../../data/commands/purchasesCommands';
 import {
   getEmployeeRoleByBusinessAndUser,
   getEmployeesByBusiness,
@@ -13,12 +13,12 @@ import {
   getPurchaseDetailsWithProductByPurchaseId,
   getSupplierById,
   getSuppliersForBusiness
-} from '../../data/queries/purchasesQueries.js';
+} from '../../data/queries/purchasesQueries';
 import {
   getAuthenticatedUser,
   getBusinessOwnerById
-} from '../../data/queries/authQueries.js';
-import { formatPrice, formatDateOnly } from '../../utils/formatters.js';
+} from '../../data/queries/authQueries';
+import { formatPrice, formatDateOnly } from '../../utils/formatters';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
@@ -766,7 +766,7 @@ function Compras({ businessId }) {
             placeholder="Buscar por proveedor o monto..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-12 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
+            className="pl-10 h-12 rounded-xl border-gray-300 focus:border-[#66A5AD] focus:ring-[#66A5AD]"
           />
         </div>
       </Card>
@@ -953,7 +953,7 @@ function Compras({ businessId }) {
                     value={supplierId}
                     onChange={(e) => setSupplierId(e.target.value)}
                     required
-                    className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#edb886] focus:ring-1 focus:ring-[#edb886] outline-none"
+                    className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#66A5AD] focus:ring-1 focus:ring-[#66A5AD] outline-none"
                   >
                     <option value="">Seleccionar proveedor</option>
                     {proveedores.map(proveedor => (
@@ -973,7 +973,7 @@ function Compras({ businessId }) {
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#edb886] focus:ring-1 focus:ring-[#edb886] outline-none"
+                    className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#66A5AD] focus:ring-1 focus:ring-[#66A5AD] outline-none"
                   >
                     <option value="cash">Efectivo</option>
                     <option value="card">Tarjeta</option>
@@ -999,7 +999,7 @@ function Compras({ businessId }) {
                       }
                     }}
                     disabled={!supplierId}
-                    className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#edb886] focus:ring-1 focus:ring-[#edb886] outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#66A5AD] focus:ring-1 focus:ring-[#66A5AD] outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">
                       {!supplierId ? 'Primero selecciona un proveedor...' : 'Seleccionar producto...'}
@@ -1089,7 +1089,7 @@ function Compras({ businessId }) {
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     rows="3"
-                    className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:border-[#edb886] focus:ring-1 focus:ring-[#edb886] outline-none"
+                    className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:border-[#66A5AD] focus:ring-1 focus:ring-[#66A5AD] outline-none"
                     placeholder="Observaciones adicionales..."
                   />
                 </div>

@@ -1,0 +1,351 @@
+import { normalizeTableRecord } from '../../../utils/tableStatus';
+import { getOpenOrdersByBusiness } from '../../../data/queries/ordersQueries';
+
+export const MESAS_REMOTE_FALLBACK_POLL_MS = 5000;
+export const MESA_LOCK_TTL_SECONDS = 45;
+export const MESA_LOCK_HEARTBEAT_MS = 20000;
+export const MESA_IN_USE_MESSAGE = 'Alguien esta usando esta mesa.';
+
+export const ORDER_ITEMS_SELECT = `
+  id,
+  order_id,
+  product_id,
+  combo_id,
+  quantity,
+  price,
+  subtotal,
+  products (id, name, code, category),
+  combos (id, nombre, descripcion)
+`;
+
+export const ORDER_ITEM_TYPE = {
+  PRODUCT: 'product',
+  COMBO: 'combo'
+};
+
+export const getPaymentMethodLabel = (method) => {
+  if (method === 'cash') return 'Efectivo';
+  if (method === 'card') return 'Tarjeta';
+  if (method === 'transfer') return 'Transferencia';
+  if (method === 'mixed') return 'Mixto';
+  if (method === 'nequi') return 'Nequi';
+  if (method === 'bancolombia') return 'Bancolombia';
+  if (method === 'banco_bogota') return 'Banco de Bogota';
+  if (method === 'nu') return 'Nu';
+  if (method === 'davivienda') return 'Davivienda';
+  return method || '-';
+};
+
+export const toFiniteNumber = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+export const normalizeOrderItemNumericFields = (item) => {
+  if (!item || typeof item !== 'object') return item;
+
+  const quantity = toFiniteNumber(item.quantity, 0);
+  const price = toFiniteNumber(item.price, 0);
+  const subtotalFromRow = Number(item.subtotal);
+  const subtotal = Number.isFinite(subtotalFromRow) ? subtotalFromRow : (quantity * price);
+
+  return {
+    ...item,
+    quantity,
+    price,
+    subtotal
+  };
+};
+
+export const getTotalProductUnits = (items = []) =>
+  items.reduce((sum, item) => sum + toFiniteNumber(item?.quantity, 0), 0);
+
+export const calculateOrderItemsTotal = (items = []) =>
+  items.reduce((sum, item) => {
+    const subtotal = Number(item?.subtotal);
+    if (Number.isFinite(subtotal)) return sum + subtotal;
+
+    const quantity = toFiniteNumber(item?.quantity, 0);
+    const price = toFiniteNumber(item?.price, 0);
+    return sum + (quantity * price);
+  }, 0);
+
+export const isConnectivityError = (errorLike) => {
+  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+  return (
+    message.includes('failed to fetch')
+    || message.includes('networkerror')
+    || message.includes('network request failed')
+    || message.includes('fetch failed')
+    || message.includes('load failed')
+    || message.includes('network')
+  );
+};
+
+export const normalizeDisplayName = (value, fallback = 'Usuario') => {
+  const normalized = String(value || '').trim();
+  return normalized || fallback;
+};
+
+export const isMesaLockExpired = (lock) => {
+  const expiresAtMs = Date.parse(String(lock?.lock_expires_at || '').trim());
+  return Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now();
+};
+
+export const isDuplicateKeyError = (errorLike) => {
+  const code = String(errorLike?.code || '').trim();
+  if (code === '23505') return true;
+  const message = String(errorLike?.message || '').toLowerCase();
+  return message.includes('duplicate key');
+};
+
+export const isMissingTableEditLocksRelationError = (errorLike) => {
+  const message = String(errorLike?.message || '').toLowerCase();
+  return message.includes('table_edit_locks') && message.includes('does not exist');
+};
+
+export const isMissingTableEditLocksColumnError = (errorLike, columnName) => {
+  const message = String(errorLike?.message || '').toLowerCase();
+  return (
+    message.includes('column')
+    && message.includes(`"${String(columnName || '').toLowerCase()}"`)
+    && message.includes('table_edit_locks')
+  );
+};
+
+export const getMesaProductUnits = (mesa, { selectedMesa = null, orderItems = [] } = {}) => {
+  if (selectedMesa?.id && mesa?.id === selectedMesa.id && Array.isArray(orderItems) && orderItems.length > 0) {
+    return getTotalProductUnits(orderItems);
+  }
+
+  const mesaItems = Array.isArray(mesa?.orders?.order_items) ? mesa.orders.order_items : [];
+  if (mesaItems.length > 0) {
+    return getTotalProductUnits(mesaItems);
+  }
+
+  const localUnits = Number(
+    mesa?.orders?.local_units
+    ?? mesa?.orders?.items_units
+    ?? mesa?.orders?.items_count
+    ?? 0
+  );
+
+  return Number.isFinite(localUnits) ? localUnits : 0;
+};
+
+export const normalizeEntityId = (value) => {
+  const normalized = String(value ?? '').trim();
+  return normalized || null;
+};
+
+export const getOrderItemRenderKey = (item, index = 0) => {
+  const comboId = normalizeEntityId(item?.combo_id);
+  if (comboId) return `combo:${comboId}`;
+
+  const productId = normalizeEntityId(item?.product_id);
+  if (productId) return `product:${productId}`;
+
+  const itemId = normalizeEntityId(item?.id);
+  if (itemId) return `id:${itemId}`;
+
+  return `fallback:${index}`;
+};
+
+export const mergeOrderItemsPreservingPosition = (previousItems = [], incomingItems = []) => {
+  const normalizedIncoming = Array.isArray(incomingItems) ? incomingItems.filter(Boolean) : [];
+  if (!Array.isArray(previousItems) || previousItems.length === 0) {
+    return normalizedIncoming;
+  }
+
+  const incomingById = new Map(
+    normalizedIncoming
+      .filter((item) => item?.id)
+      .map((item) => [item.id, item])
+  );
+  const previousIds = new Set(previousItems.map((item) => item?.id).filter(Boolean));
+
+  const preserved = previousItems
+    .filter((item) => item?.id && incomingById.has(item.id))
+    .map((item) => incomingById.get(item.id));
+
+  const newItemsFirst = normalizedIncoming.filter((item) => !item?.id || !previousIds.has(item.id));
+
+  return [...newItemsFirst, ...preserved];
+};
+
+export const normalizeTableIdentifier = (value) => String(value ?? '').trim();
+
+export const compareTableIdentifiers = (left, right) => {
+  const a = normalizeTableIdentifier(left?.table_number);
+  const b = normalizeTableIdentifier(right?.table_number);
+
+  const aIsInteger = /^\d+$/.test(a);
+  const bIsInteger = /^\d+$/.test(b);
+
+  if (aIsInteger && bIsInteger) {
+    return Number(a) - Number(b);
+  }
+  if (aIsInteger && !bIsInteger) return -1;
+  if (!aIsInteger && bIsInteger) return 1;
+
+  return a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' });
+};
+
+export const applyPendingQuantities = (items = [], pendingUpdates = {}) => {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  if (!pendingUpdates || Object.keys(pendingUpdates).length === 0) {
+    return items.map((item) => normalizeOrderItemNumericFields(item));
+  }
+
+  return items.map((item) => {
+    const normalizedItem = normalizeOrderItemNumericFields(item);
+    const pendingQuantity = pendingUpdates[normalizedItem?.id];
+    if (pendingQuantity === undefined || pendingQuantity === null) return normalizedItem;
+
+    const normalizedQuantity = Number(pendingQuantity);
+    if (!Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0) return normalizedItem;
+
+    const normalizedPrice = toFiniteNumber(normalizedItem?.price, 0);
+    return {
+      ...normalizedItem,
+      quantity: normalizedQuantity,
+      subtotal: normalizedQuantity * normalizedPrice
+    };
+  });
+};
+
+export const getOrderItemName = (item) => item?.products?.name || item?.combos?.nombre || 'Item';
+
+export const buildDiagnosticAlertMessage = (errorLike, fallback = 'Error desconocido') => {
+  const message = String(errorLike?.message || errorLike || fallback).trim() || fallback;
+  const code = String(errorLike?.code || '').trim();
+  const status = String(errorLike?.status || errorLike?.statusCode || '').trim();
+  const hint = String(errorLike?.hint || '').trim();
+  const details = String(errorLike?.details || '').trim();
+
+  const diagnosticParts = [
+    code ? `code=${code}` : null,
+    status ? `status=${status}` : null,
+    hint ? `hint=${hint}` : null,
+    details ? `details=${details}` : null
+  ].filter(Boolean);
+
+  if (diagnosticParts.length === 0) return `${message}`;
+  return `${message} [diag: ${diagnosticParts.join(' | ')}]`;
+};
+
+export function sanitizeMesaOrderAssociation(mesa) {
+  if (!mesa || typeof mesa !== 'object') return mesa;
+
+  const mesaId = normalizeEntityId(mesa?.id);
+  const currentOrderId = normalizeEntityId(mesa?.current_order_id);
+  const order = mesa?.orders && typeof mesa.orders === 'object' ? mesa.orders : null;
+
+  if (!currentOrderId) {
+    return normalizeTableRecord({
+      ...mesa,
+      status: 'available',
+      current_order_id: null,
+      orders: null
+    });
+  }
+
+  if (!order) {
+    return normalizeTableRecord(mesa);
+  }
+
+  const orderId = normalizeEntityId(order?.id);
+  const orderTableId = normalizeEntityId(order?.table_id);
+  const orderStatus = String(order?.status || '').trim().toLowerCase();
+
+  const mismatchedOrderId = Boolean(orderId && orderId !== currentOrderId);
+  const mismatchedOrderTable = Boolean(orderTableId && mesaId && orderTableId !== mesaId);
+  const closedOrder = orderStatus === 'closed' || orderStatus === 'cancelled';
+
+  if (mismatchedOrderId || mismatchedOrderTable || closedOrder) {
+    return normalizeTableRecord({
+      ...mesa,
+      status: 'available',
+      current_order_id: null,
+      orders: null
+    });
+  }
+
+  return normalizeTableRecord(mesa);
+}
+
+export async function reconcileClosedOrdersFromOutbox(mesas = []) {
+  if (!Array.isArray(mesas) || mesas.length === 0) return mesas;
+  return mesas;
+}
+
+export function pickCanonicalOpenOrderForTable(openOrders = []) {
+  if (!Array.isArray(openOrders) || openOrders.length === 0) return null;
+  return openOrders
+    .filter((order) => normalizeEntityId(order?.id))
+    .sort((a, b) => {
+      const aTs = Date.parse(String(a?.opened_at || a?.updated_at || ''));
+      const bTs = Date.parse(String(b?.opened_at || b?.updated_at || ''));
+      const safeA = Number.isFinite(aTs) ? aTs : Number.MAX_SAFE_INTEGER;
+      const safeB = Number.isFinite(bTs) ? bTs : Number.MAX_SAFE_INTEGER;
+      if (safeA !== safeB) return safeA - safeB;
+      return String(a?.id || '').localeCompare(String(b?.id || ''));
+    })[0] || null;
+}
+
+export function orderHasProducts(order) {
+  const items = Array.isArray(order?.order_items) ? order.order_items : [];
+  if (items.length > 0) return true;
+  const total = Number(order?.total);
+  return Number.isFinite(total) && total > 0;
+}
+
+export async function reconcileTablesWithOpenOrders({ mesas = [], businessId }) {
+  if (!Array.isArray(mesas) || mesas.length === 0) return mesas;
+  if (!businessId) return mesas;
+
+  try {
+    const openOrders = await getOpenOrdersByBusiness(
+      businessId,
+      'id, business_id, table_id, status, total, opened_at, updated_at, order_items(id)'
+    );
+
+    const openOrdersByTableId = new Map();
+    (Array.isArray(openOrders) ? openOrders : []).forEach((order) => {
+      const tableId = normalizeEntityId(order?.table_id);
+      const orderId = normalizeEntityId(order?.id);
+      const status = String(order?.status || '').trim().toLowerCase();
+      if (!tableId || !orderId || status !== 'open') return;
+      if (!openOrdersByTableId.has(tableId)) openOrdersByTableId.set(tableId, []);
+      openOrdersByTableId.get(tableId).push(order);
+    });
+
+    return mesas.map((mesa) => {
+      const tableId = normalizeEntityId(mesa?.id);
+      if (!tableId) return mesa;
+
+      const currentOrderId = normalizeEntityId(mesa?.current_order_id);
+      if (currentOrderId) return mesa;
+
+      const candidates = openOrdersByTableId.get(tableId) || [];
+      const canonicalOrder = pickCanonicalOpenOrderForTable(candidates);
+      if (!canonicalOrder?.id) return mesa;
+      if (!orderHasProducts(canonicalOrder)) return mesa;
+
+      return normalizeTableRecord({
+        ...mesa,
+        status: 'occupied',
+        current_order_id: canonicalOrder.id,
+        orders: {
+          ...(mesa?.orders || {}),
+          id: canonicalOrder.id,
+          status: 'open',
+          total: Number(canonicalOrder?.total || mesa?.orders?.total || 0),
+          opened_at: canonicalOrder?.opened_at || mesa?.orders?.opened_at || null
+        }
+      });
+    });
+  } catch {
+    return mesas;
+  }
+}

@@ -1,4 +1,4 @@
-import { isConnectivityError } from '../data/commands/salesOutboxRetryPolicy.js';
+import { isConnectivityError } from '../data/commands/salesOutboxRetryPolicy';
 
 async function resolveSupabaseAdapter() {
   try {

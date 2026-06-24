@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { signOutSession } from '../data/commands/authCommands.js';
+import { signOutSession } from '../data/commands/authCommands';
 import WhatsNewModal from '../components/Modals/WhatsNewModal.jsx';
-import { isIOs, isStandalone, supportsPWA } from '../utils/deviceDetection.js';
+import { isIOs, isStandalone, supportsPWA } from '../utils/deviceDetection';
 import { SplineScene } from '../components/ui/splite.jsx';
 import GradientButton from '../components/ui/gradient-button.jsx';
 import { useViewport } from '../hooks/useViewport.js';

@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { formatPrice, parsePriceInput } from '../../utils/formatters.js';
+import { formatPrice, parsePriceInput } from '../../utils/formatters';
 import { useViewport } from '../../hooks/useViewport';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
 import {
@@ -20,11 +20,11 @@ import {
   deleteProductById,
   setProductActiveStatus,
   updateProductById
-} from '../../data/commands/inventoryCommands.js';
+} from '../../data/commands/inventoryCommands';
 import {
   getInventoryProductsByBusiness,
   getSuppliersByBusiness
-} from '../../data/queries/inventoryQueries.js';
+} from '../../data/queries/inventoryQueries';
 import {
   MobileTable,
   FloatingActionButton,

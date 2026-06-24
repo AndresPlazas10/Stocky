@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { readAdapter } from '../data/adapters/localAdapter.js';
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger';
 
 const RETRY_BASE_DELAY_MS = 800;
 const RETRY_MAX_DELAY_MS = 15000;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getWarmupStatus, subscribeWarmupStatus } from '../services/dashboardWarmupService.js';
+import { getWarmupStatus, subscribeWarmupStatus } from '../services/dashboardWarmupService';
 
 export function useWarmupStatus(businessId) {
   const [status, setStatus] = useState(() => getWarmupStatus(businessId));

@@ -1,4 +1,4 @@
-import { formatDateTimeTicket, formatPrice } from './formatters.js';
+import { formatDateTimeTicket, formatPrice } from './formatters';
 
 const getPaymentMethodLabel = (method) => {
   if (method === 'cash') return 'Efectivo';

@@ -1,4 +1,4 @@
-import { LOCAL_SYNC_CONFIG } from '../config/localSync.js';
+import { LOCAL_SYNC_CONFIG } from '../config/localSync';
 import { listLocalOutboxEvents, updateLocalOutboxEventStatus } from '../localdb/outboxEventsStore.js';
 import { dispatchOutboxMutation } from './outboxMutationHandlers.js';
 

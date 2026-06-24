@@ -1,4 +1,4 @@
-import { LOCAL_SYNC_CONFIG } from '../config/localSync.js';
+import { LOCAL_SYNC_CONFIG } from '../config/localSync';
 
 const TABLE_STORAGE_PREFIX = 'stocky.localdb.table.v1';
 

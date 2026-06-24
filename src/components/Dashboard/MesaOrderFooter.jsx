@@ -1,6 +1,6 @@
 import { Save, Printer, CheckCircle2 } from 'lucide-react';
 import { Button } from '../ui/button';
-import { formatPrice } from '../../utils/formatters.js';
+import { formatPrice } from '../../utils/formatters';
 
 export function MesaOrderFooter({
   orderTotal,

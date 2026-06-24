@@ -1,4 +1,4 @@
-import { supabase } from '../supabase/Client.jsx';
+import { supabase } from '../supabase/Client';
 
 export async function logSecurityEvent({ businessId, action, metadata = {} }) {
   const normalizedBusinessId = String(businessId || '').trim();

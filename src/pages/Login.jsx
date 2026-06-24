@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { getOwnedBusinessByUserId } from '../data/queries/authQueries.js';
-import { signInWithUsernamePassword } from '../data/commands/authCommands.js';
+import { getOwnedBusinessByUserId } from '../data/queries/authQueries';
+import { signInWithUsernamePassword } from '../data/commands/authCommands';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
