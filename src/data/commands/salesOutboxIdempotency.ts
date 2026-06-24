@@ -1,9 +1,14 @@
-function normalizeIdempotencyKey(value) {
+import type { OutboxEvent } from '../../types';
+
+function normalizeIdempotencyKey(value: unknown): string | null {
   const normalized = String(value || '').trim();
   return normalized || null;
 }
 
-export function findReusableSaleCreateOutboxEvent(queue = [], idempotencyKey) {
+export function findReusableSaleCreateOutboxEvent(
+  queue: OutboxEvent[] = [],
+  idempotencyKey: string
+): OutboxEvent | null {
   const normalizedKey = normalizeIdempotencyKey(idempotencyKey);
   if (!normalizedKey || !Array.isArray(queue)) return null;
 

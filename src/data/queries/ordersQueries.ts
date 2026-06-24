@@ -1,42 +1,75 @@
 import { readAdapter } from '../adapters/localAdapter';
+import type { Table, Order, ProductWithSupplier, SaleDetail, SaleListItem } from '../../types';
 
-export async function getTablesWithCurrentOrderByBusiness(businessId) {
+export async function getTablesWithCurrentOrderByBusiness(businessId: string): Promise<Table[]> {
   const { data, error } = await readAdapter.getTablesWithCurrentOrderByBusiness(businessId);
   if (error) throw error;
   return data || [];
 }
 
-export async function getOpenOrdersByBusiness(businessId, selectSql = 'id, business_id, table_id, status, opened_at, updated_at') {
+export async function getOpenOrdersByBusiness(
+  businessId: string,
+  selectSql: string = 'id, business_id, table_id, status, opened_at, updated_at'
+): Promise<Order[]> {
   const { data, error } = await readAdapter.getOpenOrdersByBusiness(businessId, selectSql);
   if (error) throw error;
   return data || [];
 }
 
-export async function getProductsForOrdersByBusiness(businessId) {
+export async function getProductsForOrdersByBusiness(businessId: string): Promise<ProductWithSupplier[]> {
   const { data, error } = await readAdapter.getProductsForOrdersByBusiness(businessId);
   if (error) throw error;
   return data || [];
 }
 
-export async function getOrderItemsByOrderId({ orderId, selectSql }) {
+export async function getOrderItemsByOrderId({
+  orderId,
+  selectSql
+}: {
+  orderId: string;
+  selectSql?: string;
+}): Promise<unknown[]> {
   const { data, error } = await readAdapter.getOrderItemsByOrderId(orderId, selectSql);
   if (error) throw error;
   return data || [];
 }
 
-export async function getOrderWithItemsById({ orderId, selectSql }) {
+export async function getOrderWithItemsById({
+  orderId,
+  selectSql
+}: {
+  orderId: string;
+  selectSql?: string;
+}): Promise<unknown | null> {
   const { data, error } = await readAdapter.getOrderWithItemsById(orderId, selectSql);
   if (error) throw error;
   return data || null;
 }
 
-export async function getOrderForRealtimeById({ orderId, selectSql }) {
+export async function getOrderForRealtimeById({
+  orderId,
+  selectSql
+}: {
+  orderId: string;
+  selectSql?: string;
+}): Promise<unknown | null> {
   const { data, error } = await readAdapter.getOrderForRealtimeById(orderId, selectSql);
   if (error) throw error;
   return data || null;
 }
 
-export async function getSalePrintBundle({ businessId, saleId }) {
+interface SalePrintBundle {
+  saleRow: SaleListItem | null;
+  saleDetails: SaleDetail[];
+}
+
+export async function getSalePrintBundle({
+  businessId,
+  saleId
+}: {
+  businessId: string;
+  saleId: string;
+}): Promise<SalePrintBundle> {
   const [{ data: saleRow, error: saleError }, { data: saleDetails, error: detailsError }] = await Promise.all([
     readAdapter.getSaleForPrintByBusinessAndId({ businessId, saleId }),
     readAdapter.getSaleDetailsForPrintBySaleId(saleId)

@@ -1,11 +1,26 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
-import { isMissingSupplierColumnError } from '../queries/suppliersQueries.js';
-import { invalidatePurchaseCache } from '../adapters/cacheInvalidation.js';
+import { isMissingSupplierColumnError } from '../queries/suppliersQueries';
+import { invalidatePurchaseCache } from '../adapters/cacheInvalidation';
+import type { Supplier } from '../../types';
+
+interface SupplierFormData {
+  business_name: string;
+  contact_name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  notes?: string;
+  nit?: string;
+  [key: string]: unknown;
+}
 
 function buildSupplierPayload({
-  formData = {},
+  formData = {} as SupplierFormData,
   taxColumn = 'nit'
-}) {
+}: {
+  formData: SupplierFormData;
+  taxColumn?: string;
+}): Record<string, unknown> {
   return {
     business_name: formData.business_name,
     contact_name: formData.contact_name || null,
@@ -22,7 +37,12 @@ export async function saveSupplierWithTaxFallback({
   formData,
   supplierId = null,
   preferredTaxColumn = 'nit'
-}) {
+}: {
+  businessId: string;
+  formData: SupplierFormData;
+  supplierId?: string | null;
+  preferredTaxColumn?: string;
+}): Promise<{ supplier: Partial<Supplier> | null; taxColumn: string }> {
   const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
   if (offlineMode) {
     throw new Error('Perdiste la conexión, intentando reconectar...');
@@ -34,8 +54,8 @@ export async function saveSupplierWithTaxFallback({
     taxColumn: preferredTaxColumn
   });
   const execute = supplierId
-    ? (payload) => supabaseAdapter.updateSupplierById(supplierId, payload)
-    : (payload) => supabaseAdapter.insertSupplier({
+    ? (payload: Record<string, unknown>) => supabaseAdapter.updateSupplierById(supplierId, payload)
+    : (payload: Record<string, unknown>) => supabaseAdapter.insertSupplier({
       business_id: businessId,
       ...payload,
       created_at: new Date().toISOString()
@@ -71,7 +91,9 @@ export async function saveSupplierWithTaxFallback({
   };
 }
 
-export async function deleteSupplierById(supplierIdOrOptions) {
+export async function deleteSupplierById(
+  supplierIdOrOptions: string | { supplierId: string; businessId?: string | null }
+): Promise<{ success: boolean }> {
   const supplierId = typeof supplierIdOrOptions === 'string'
     ? supplierIdOrOptions
     : supplierIdOrOptions?.supplierId;

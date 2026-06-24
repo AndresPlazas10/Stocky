@@ -5,7 +5,12 @@ export async function createInvoicingRequest({
   contactMethod,
   message = null,
   nitProvided = null
-}) {
+}: {
+  businessId: string;
+  contactMethod: string;
+  message?: string | null;
+  nitProvided?: string | null;
+}): Promise<boolean> {
   const { error } = await supabaseAdapter.insertInvoicingRequest({
     business_id: businessId,
     status: 'pending',

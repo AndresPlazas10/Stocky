@@ -1,7 +1,16 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
-import { invalidatePurchaseCache } from '../adapters/cacheInvalidation.js';
+import { invalidatePurchaseCache } from '../adapters/cacheInvalidation';
+import type { Purchase } from '../../types';
 
-function normalizePurchasePaymentMethod(paymentMethod) {
+interface CartItem {
+  product_id: string;
+  product_name?: string;
+  quantity: number;
+  unit_price: number;
+  manage_stock?: boolean;
+}
+
+function normalizePurchasePaymentMethod(paymentMethod: string): string {
   const normalized = String(paymentMethod || '').trim().toLowerCase();
   if (!normalized) return 'cash';
   if (normalized === 'efectivo') return 'cash';
@@ -10,8 +19,8 @@ function normalizePurchasePaymentMethod(paymentMethod) {
   return normalized;
 }
 
-function isConnectivityError(errorLike) {
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+function isConnectivityError(errorLike: unknown): boolean {
+  const message = String((errorLike as { message?: string })?.message || errorLike || '').toLowerCase();
   return (
     message.includes('failed to fetch')
     || message.includes('networkerror')
@@ -22,7 +31,13 @@ function isConnectivityError(errorLike) {
   );
 }
 
-async function assertPurchasableProductsManageStock({ businessId, cart = [] }) {
+async function assertPurchasableProductsManageStock({
+  businessId,
+  cart = []
+}: {
+  businessId: string;
+  cart: CartItem[];
+}): Promise<void> {
   const sourceItems = Array.isArray(cart) ? cart : [];
   if (sourceItems.length === 0) return;
 
@@ -49,7 +64,7 @@ async function assertPurchasableProductsManageStock({ businessId, cart = [] }) {
   if (error) throw error;
 
   const stockControlById = new Map(
-    (productRows || []).map((product) => [
+    (productRows || []).map((product: { id: string; manage_stock?: boolean }) => [
       String(product.id),
       product.manage_stock !== false
     ])
@@ -61,9 +76,9 @@ async function assertPurchasableProductsManageStock({ businessId, cart = [] }) {
   }
 }
 
-function isMissingCreatePurchaseRpcError(error) {
-  const code = String(error?.code || '');
-  const message = String(error?.message || '').toLowerCase();
+function isMissingCreatePurchaseRpcError(error: unknown): boolean {
+  const code = String((error as { code?: string })?.code || '');
+  const message = String((error as { message?: string })?.message || '').toLowerCase();
   return (
     code === 'PGRST202'
     || code === '42883'
@@ -79,7 +94,15 @@ async function createPurchaseLegacy({
   notes,
   total,
   cart
-}) {
+}: {
+  businessId: string;
+  userId: string;
+  supplierId: string | null;
+  paymentMethod: string;
+  notes: string | null;
+  total: number;
+  cart: CartItem[];
+}): Promise<{ purchaseId: string }> {
   const { data: purchase, error: purchaseError } = await supabaseAdapter.insertPurchase({
     business_id: businessId,
     user_id: userId,
@@ -113,7 +136,7 @@ async function createPurchaseLegacy({
   );
   if (productsFetchError) throw productsFetchError;
 
-  const stockMap = new Map((freshProducts || []).map((product) => [
+  const stockMap = new Map((freshProducts || []).map((product: { id: string; stock?: number; manage_stock?: boolean }) => [
     product.id,
     {
       stock: Number(product.stock || 0),
@@ -124,7 +147,7 @@ async function createPurchaseLegacy({
 
   const updateResults = await Promise.all(
     productIds.map((productId) => {
-      const item = purchaseItemMap.get(productId);
+      const item = purchaseItemMap.get(productId)!;
       const productState = stockMap.get(productId) || { stock: 0, manage_stock: true };
       const currentStock = Number(productState.stock || 0);
       const shouldManageStock = productState.manage_stock !== false;
@@ -149,6 +172,34 @@ async function createPurchaseLegacy({
   };
 }
 
+interface PurchaseRpcParams {
+  businessId: string;
+  userId: string;
+  supplierId: string | null;
+  paymentMethod: string;
+  notes: string | null;
+  total: number;
+  cart: CartItem[];
+  idempotencyKey?: string | null;
+}
+
+interface CreatePurchaseSuccessResult {
+  success: true;
+  data: {
+    id: string | null;
+    total: number;
+    items_count: number;
+    payment_method: string;
+  };
+}
+
+interface CreatePurchaseFailureResult {
+  success: false;
+  error: string;
+}
+
+type CreatePurchaseResult = CreatePurchaseSuccessResult | CreatePurchaseFailureResult;
+
 export async function createPurchaseWithRpcFallback({
   businessId,
   userId,
@@ -158,7 +209,7 @@ export async function createPurchaseWithRpcFallback({
   total,
   cart,
   idempotencyKey = null
-}) {
+}: PurchaseRpcParams): Promise<CreatePurchaseResult> {
   const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
   if (offlineMode) {
     return {
@@ -176,8 +227,8 @@ export async function createPurchaseWithRpcFallback({
   }));
   const normalizedPaymentMethod = normalizePurchasePaymentMethod(paymentMethod);
 
-  let rpcData = null;
-  let rpcError = null;
+  let rpcData: unknown = null;
+  let rpcError: unknown = null;
   ({ data: rpcData, error: rpcError } = await supabaseAdapter.createPurchaseCompleteRpc({
     p_business_id: businessId,
     p_user_id: userId,
@@ -187,7 +238,7 @@ export async function createPurchaseWithRpcFallback({
     p_items: purchaseItemsPayload
   }));
 
-  let purchaseId = null;
+  let purchaseId: string | null = null;
   if (rpcError) {
     if (isConnectivityError(rpcError)) {
       return {
@@ -213,7 +264,7 @@ export async function createPurchaseWithRpcFallback({
     purchaseId = legacyResult?.purchaseId || null;
   } else {
     const rpcRow = Array.isArray(rpcData) ? rpcData[0] : rpcData;
-    purchaseId = rpcRow?.purchase_id || null;
+    purchaseId = (rpcRow as { purchase_id?: string })?.purchase_id || null;
   }
 
   await invalidatePurchaseCache({
@@ -234,14 +285,24 @@ export async function createPurchaseWithRpcFallback({
   };
 }
 
-export async function deletePurchaseWithStockFallback({ purchaseId, businessId }) {
+interface DeletePurchaseResult {
+  appliedManualFallback: boolean;
+}
+
+export async function deletePurchaseWithStockFallback({
+  purchaseId,
+  businessId
+}: {
+  purchaseId: string;
+  businessId: string;
+}): Promise<DeletePurchaseResult> {
   const { data: purchaseDetails, error: detailsFetchError } = await supabaseAdapter.getPurchaseDetailsByPurchaseId(
     purchaseId
   );
   if (detailsFetchError) throw new Error(`Error al consultar detalles: ${detailsFetchError.message}`);
 
-  const groupedDetailsMap = new Map();
-  (purchaseDetails || []).forEach((detail) => {
+  const groupedDetailsMap = new Map<string, number>();
+  (purchaseDetails || []).forEach((detail: { product_id?: string; quantity?: number }) => {
     const productId = detail.product_id;
     const quantity = Number(detail.quantity || 0);
     if (!productId || quantity <= 0) return;
@@ -254,7 +315,7 @@ export async function deletePurchaseWithStockFallback({ purchaseId, businessId }
   }));
 
   const productIds = groupedDetails.map((item) => item.product_id);
-  let stockBeforeMap = new Map();
+  let stockBeforeMap = new Map<string, { stock: number; manage_stock: boolean }>();
 
   if (productIds.length > 0) {
     const { data: productsBefore, error: productsBeforeError } = await supabaseAdapter.getProductsByBusinessAndIds(
@@ -262,7 +323,7 @@ export async function deletePurchaseWithStockFallback({ purchaseId, businessId }
       productIds
     );
     if (productsBeforeError) throw new Error(`Error al consultar stock previo: ${productsBeforeError.message}`);
-    stockBeforeMap = new Map((productsBefore || []).map((p) => [
+    stockBeforeMap = new Map((productsBefore || []).map((p: { id: string; stock?: number; manage_stock?: boolean }) => [
       p.id,
       {
         stock: Number(p.stock || 0),
@@ -286,7 +347,7 @@ export async function deletePurchaseWithStockFallback({ purchaseId, businessId }
     );
     if (productsAfterError) throw new Error(`Error al consultar stock posterior: ${productsAfterError.message}`);
 
-    const stockAfterMap = new Map((productsAfter || []).map((p) => [
+    const stockAfterMap = new Map((productsAfter || []).map((p: { id: string; stock?: number; manage_stock?: boolean }) => [
       p.id,
       {
         stock: Number(p.stock || 0),
@@ -313,14 +374,14 @@ export async function deletePurchaseWithStockFallback({ purchaseId, businessId }
         return supabaseAdapter.updateProductStockAndPurchasePrice({
           businessId,
           productId: item.product_id,
-          stock: currentStock - item.quantity,
+          stock: currentStock! - item.quantity,
           purchasePrice: undefined
         });
       });
 
       const fallbackResults = await Promise.all(fallbackUpdates);
       const fallbackError = fallbackResults.find((result) => result.error)?.error;
-      if (fallbackError) throw new Error(`Error al ajustar stock manualmente: ${fallbackError.message}`);
+      if (fallbackError) throw new Error(`Error al ajustar stock manualmente: ${(fallbackError as Error).message}`);
 
       appliedManualFallback = true;
     }

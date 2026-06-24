@@ -1,8 +1,8 @@
 export const SALES_OUTBOX_BASE_RETRY_MS = 8_000;
 export const SALES_OUTBOX_MAX_RETRY_MS = 5 * 60_000;
 
-export function isConnectivityError(errorLike) {
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+export function isConnectivityError(errorLike: unknown): boolean {
+  const message = String((errorLike as { message?: string })?.message || errorLike || '').toLowerCase();
   return (
     message.includes('failed to fetch')
     || message.includes('networkerror')
@@ -13,7 +13,11 @@ export function isConnectivityError(errorLike) {
   );
 }
 
-export function computeNextRetryAt(attempts = 0, { nowMs = Date.now() } = {}) {
+interface RetryOptions {
+  nowMs?: number;
+}
+
+export function computeNextRetryAt(attempts: number = 0, { nowMs = Date.now() }: RetryOptions = {}): string {
   const safeAttempts = Math.max(0, Number(attempts || 0));
   const delay = Math.min(
     SALES_OUTBOX_MAX_RETRY_MS,
@@ -22,8 +26,8 @@ export function computeNextRetryAt(attempts = 0, { nowMs = Date.now() } = {}) {
   return new Date(nowMs + delay).toISOString();
 }
 
-export function isPermanentSyncError(errorLike) {
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+export function isPermanentSyncError(errorLike: unknown): boolean {
+  const message = String((errorLike as { message?: string })?.message || errorLike || '').toLowerCase();
   if (!message) return false;
 
   if (isConnectivityError(message)) return false;

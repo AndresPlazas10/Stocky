@@ -1,10 +1,49 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
-import { invalidateInventoryCache } from '../adapters/cacheInvalidation.js';
-import { enqueueOutboxMutation } from '../../sync/outboxShadow.js';
-import { parsePriceInput } from '../../utils/formatters.js';
+import { invalidateInventoryCache } from '../adapters/cacheInvalidation';
+import { enqueueOutboxMutation } from '../../sync/outboxShadow';
+import { parsePriceInput } from '../../utils/formatters';
+import type { Product } from '../../types';
 
-function isMissingAtomicCreateFunction(error) {
-  const message = String(error?.message || '').toLowerCase();
+interface ProductData {
+  business_id?: string;
+  name?: string;
+  category?: string;
+  purchase_price?: number;
+  sale_price?: number;
+  stock?: number;
+  min_stock?: number;
+  unit?: string;
+  supplier_id?: string | null;
+  is_active?: boolean;
+  manage_stock?: boolean;
+  created_at?: string;
+  code?: string;
+  id?: string;
+  [key: string]: unknown;
+}
+
+interface CreateProductResult {
+  usedFallback: boolean;
+  createdProduct: Partial<Product> | null;
+  localOnly: boolean;
+}
+
+interface ProductEventPayload {
+  product_id: string | null;
+  supplier_id: string | null;
+  manage_stock: boolean;
+  stock: number;
+  product: Partial<Product>;
+}
+
+type ProductCreateEventPayload = ProductEventPayload;
+
+interface TypedError extends Error {
+  code?: string;
+}
+
+function isMissingAtomicCreateFunction(error: unknown): boolean {
+  const message = String((error as { message?: string })?.message || '').toLowerCase();
   return (
     message.includes('create_product_with_generated_code')
     && (
@@ -15,32 +54,35 @@ function isMissingAtomicCreateFunction(error) {
   );
 }
 
-function buildMutationId(prefix, businessId = null) {
+function buildMutationId(prefix: string, businessId: string | null = null): string {
   const nonce = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
   return `${businessId || 'unknown'}:${prefix}:${nonce}`;
 }
 
-function buildLocalProductCode(productId) {
+function buildLocalProductCode(productId: string | null): string {
   const suffix = String(productId || '').replace(/-/g, '').slice(0, 8) || Date.now().toString().slice(-8);
   return `LCL-${suffix}`;
 }
 
-function normalizeNumber(value, fallback = 0) {
+function normalizeNumber(value: unknown, fallback: number = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function normalizePriceAmount(value, fallback = 0) {
-  return parsePriceInput(value, fallback);
+function normalizePriceAmount(value: unknown, fallback: number = 0): number {
+  return parsePriceInput(value as string | number, fallback);
 }
 
-function buildProductCreateEventPayload(productData = {}, { productId, code }) {
-  const row = {
-    id: productId,
+function buildProductCreateEventPayload(
+  productData: ProductData = {},
+  { productId, code }: { productId: string | null; code: string | null }
+): ProductCreateEventPayload {
+  const row: Partial<Product> = {
+    id: productId || undefined,
     business_id: productData.business_id,
     code: code || buildLocalProductCode(productId),
     name: productData.name,
-    category: productData.category || null,
+    category: productData.category || undefined,
     purchase_price: normalizePriceAmount(productData.purchase_price, 0),
     sale_price: normalizePriceAmount(productData.sale_price, 0),
     stock: normalizeNumber(productData.stock, 0),
@@ -53,23 +95,23 @@ function buildProductCreateEventPayload(productData = {}, { productId, code }) {
   };
 
   return {
-    product_id: row.id,
-    supplier_id: row.supplier_id,
-    manage_stock: row.manage_stock,
-    stock: row.stock,
+    product_id: row.id || null,
+    supplier_id: row.supplier_id || null,
+    manage_stock: row.manage_stock !== false,
+    stock: row.stock || 0,
     product: row
   };
 }
 
-export async function createProductWithFallback(productData) {
-  const normalizedProductData = {
+export async function createProductWithFallback(productData: ProductData): Promise<CreateProductResult> {
+  const normalizedProductData: ProductData = {
     ...productData,
     purchase_price: normalizePriceAmount(productData?.purchase_price, 0),
     sale_price: normalizePriceAmount(productData?.sale_price, 0)
   };
 
   let usedFallback = false;
-  let createdProduct = null;
+  let createdProduct: Partial<Product> | null = null;
 
   const { error: createError } = await supabaseAdapter.createProductWithGeneratedCodeRpc({
     p_business_id: normalizedProductData.business_id,
@@ -96,23 +138,23 @@ export async function createProductWithFallback(productData) {
       });
 
       if (retryError) {
-        const error = new Error(`Error al crear producto: ${retryError.message || 'Código duplicado'}`);
+        const error: TypedError = new Error(`Error al crear producto: ${retryError.message || 'Código duplicado'}`);
         error.code = retryError.code;
         throw error;
       }
 
       createdProduct = data || null;
-    } else if (createError.code === '42501') {
-      const error = new Error('No tienes permisos para crear productos. Contacta al administrador.');
-      error.code = createError.code;
+    } else if ((createError as { code?: string }).code === '42501') {
+      const error: TypedError = new Error('No tienes permisos para crear productos. Contacta al administrador.');
+      error.code = (createError as { code?: string }).code;
       throw error;
-    } else if (createError.code === '23503') {
-      const error = new Error('Proveedor no válido. Selecciona uno existente.');
-      error.code = createError.code;
+    } else if ((createError as { code?: string }).code === '23503') {
+      const error: TypedError = new Error('Proveedor no válido. Selecciona uno existente.');
+      error.code = (createError as { code?: string }).code;
       throw error;
     } else {
-      const error = new Error(`Error al crear producto: ${createError.message || 'Error desconocido'}`);
-      error.code = createError.code;
+      const error: TypedError = new Error(`Error al crear producto: ${(createError as { message?: string }).message || 'Error desconocido'}`);
+      error.code = (createError as { code?: string }).code;
       throw error;
     }
   }
@@ -124,7 +166,7 @@ export async function createProductWithFallback(productData) {
   });
 
   await enqueueOutboxMutation({
-    businessId: normalizedProductData.business_id,
+    businessId: normalizedProductData.business_id!,
     mutationType: 'product.create',
     payload: buildProductCreateEventPayload(normalizedProductData, {
       productId: createdProduct?.id || null,
@@ -140,7 +182,15 @@ export async function createProductWithFallback(productData) {
   };
 }
 
-export async function updateProductById({ productId, businessId = null, payload }) {
+export async function updateProductById({
+  productId,
+  businessId = null,
+  payload
+}: {
+  productId: string;
+  businessId?: string | null;
+  payload: Partial<Product>;
+}): Promise<Partial<Product> | null> {
   const normalizedPayload = { ...payload };
   if (Object.prototype.hasOwnProperty.call(payload || {}, 'purchase_price')) {
     normalizedPayload.purchase_price = normalizePriceAmount(payload?.purchase_price, 0);
@@ -151,7 +201,7 @@ export async function updateProductById({ productId, businessId = null, payload 
 
   const { data, error } = await supabaseAdapter.updateProductById(productId, normalizedPayload);
   if (error) {
-    const wrapped = new Error(`Error al actualizar producto: ${error.message || 'Error desconocido'}`);
+    const wrapped: TypedError = new Error(`Error al actualizar producto: ${error.message || 'Error desconocido'}`);
     wrapped.code = error.code;
     throw wrapped;
   }
@@ -178,15 +228,21 @@ export async function updateProductById({ productId, businessId = null, payload 
   return data || null;
 }
 
-export async function checkProductCanDelete(productId) {
+export async function checkProductCanDelete(productId: string): Promise<unknown> {
   const data = await supabaseAdapter.checkProductCanDelete(productId);
   return data;
 }
 
-export async function deleteProductById({ productId, businessId = null }) {
+export async function deleteProductById({
+  productId,
+  businessId = null
+}: {
+  productId: string;
+  businessId?: string | null;
+}): Promise<{ localOnly: boolean }> {
   const { error } = await supabaseAdapter.deleteProductById(productId);
   if (error) {
-    const wrapped = new Error(error.message || 'Error al eliminar producto');
+    const wrapped: TypedError = new Error(error.message || 'Error al eliminar producto');
     wrapped.code = error.code;
     throw wrapped;
   }
@@ -208,13 +264,21 @@ export async function deleteProductById({ productId, businessId = null }) {
   return { localOnly: false };
 }
 
-export async function setProductActiveStatus({ productId, isActive, businessId = null }) {
+export async function setProductActiveStatus({
+  productId,
+  isActive,
+  businessId = null
+}: {
+  productId: string;
+  isActive: boolean;
+  businessId?: string | null;
+}): Promise<Partial<Product> | null> {
   const { data, error } = await supabaseAdapter.updateProductById(productId, {
     is_active: Boolean(isActive)
   });
 
   if (error) {
-    const wrapped = new Error(error.message || 'Error al actualizar estado de producto');
+    const wrapped: TypedError = new Error(error.message || 'Error al actualizar estado de producto');
     wrapped.code = error.code;
     throw wrapped;
   }

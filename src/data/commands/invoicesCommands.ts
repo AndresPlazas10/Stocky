@@ -1,13 +1,22 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
-import { invalidateInvoiceCache } from '../adapters/cacheInvalidation.js';
-import { enqueueOutboxMutation } from '../../sync/outboxShadow.js';
+import { invalidateInvoiceCache } from '../adapters/cacheInvalidation';
+import { enqueueOutboxMutation } from '../../sync/outboxShadow';
+import type { Invoice, InvoiceItem } from '../../types';
 
-function buildMutationId(prefix, businessId = null) {
+interface InvoiceItemInput {
+  product_id?: string | null;
+  product_name?: string;
+  quantity?: number;
+  unit_price?: number;
+  total?: number;
+}
+
+function buildMutationId(prefix: string, businessId: string | null = null): string {
   const nonce = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
   return `${businessId || 'unknown'}:${prefix}:${nonce}`;
 }
 
-function normalizeInvoiceItems(items = []) {
+function normalizeInvoiceItems(items: InvoiceItemInput[] = []): InvoiceItemInput[] {
   const source = Array.isArray(items) ? items : [];
   return source.map((item) => ({
     product_id: item.product_id || null,
@@ -18,6 +27,13 @@ function normalizeInvoiceItems(items = []) {
   }));
 }
 
+interface CreateInvoiceResult {
+  invoice: Partial<Invoice> | null;
+  invoiceNumber: string;
+  invoiceItems: Array<Partial<InvoiceItem> & { created_at: string }>;
+  localOnly: boolean;
+}
+
 export async function createInvoiceWithItemsAndStock({
   businessId,
   employeeId = null,
@@ -25,7 +41,14 @@ export async function createInvoiceWithItemsAndStock({
   total = 0,
   notes = '',
   items = []
-}) {
+}: {
+  businessId: string;
+  employeeId?: string | null;
+  paymentMethod?: string;
+  total?: number;
+  notes?: string;
+  items?: InvoiceItemInput[];
+}): Promise<CreateInvoiceResult> {
   try {
     const { data: invoiceNumber, error: numberError } = await supabaseAdapter.generateInvoiceNumber(businessId);
     if (numberError) {
@@ -110,8 +133,8 @@ export async function createInvoiceWithItemsAndStock({
       invoiceItems,
       localOnly: false
     };
-  } catch (error) {
-    const message = String(error?.message || '');
+  } catch (error: unknown) {
+    const message = String((error as { message?: string })?.message || '');
     if (message.includes('generate_invoice_number')) {
       throw new Error(`Error al generar número de factura: ${message}`);
     }
@@ -122,7 +145,13 @@ export async function createInvoiceWithItemsAndStock({
   }
 }
 
-export async function markInvoiceAsSent({ invoiceId, businessId = null }) {
+export async function markInvoiceAsSent({
+  invoiceId,
+  businessId = null
+}: {
+  invoiceId: string;
+  businessId?: string | null;
+}): Promise<{ localOnly: boolean }> {
   const sentAt = new Date().toISOString();
   const { error } = await supabaseAdapter.updateInvoiceById(invoiceId, {
     status: 'sent',
@@ -151,11 +180,20 @@ export async function markInvoiceAsSent({ invoiceId, businessId = null }) {
   return { localOnly: false };
 }
 
+interface CancelInvoiceResult {
+  restoreError: unknown;
+  localOnly: boolean;
+}
+
 export async function cancelInvoiceAndRestoreStock({
   invoiceId,
   businessId = null,
   invoiceItems = []
-}) {
+}: {
+  invoiceId: string;
+  businessId?: string | null;
+  invoiceItems?: InvoiceItemInput[];
+}): Promise<CancelInvoiceResult> {
   const productUpdates = (invoiceItems || [])
     .map((item) => ({
       product_id: item.product_id,
@@ -173,13 +211,13 @@ export async function cancelInvoiceAndRestoreStock({
     throw new Error(`Error al cancelar factura: ${cancelError.message}`);
   }
 
-  let restoreError = null;
+  let restoreError: unknown = null;
 
   if (productUpdates.length > 0) {
     try {
       const { error } = await supabaseAdapter.restoreStockBatch(productUpdates);
       if (error) restoreError = error;
-    } catch (error) {
+    } catch (error: unknown) {
       restoreError = error;
     }
   }
@@ -208,7 +246,13 @@ export async function cancelInvoiceAndRestoreStock({
   };
 }
 
-export async function deleteInvoiceCascade({ invoiceId, businessId = null }) {
+export async function deleteInvoiceCascade({
+  invoiceId,
+  businessId = null
+}: {
+  invoiceId: string;
+  businessId?: string | null;
+}): Promise<{ localOnly: boolean }> {
   const { error: itemsError } = await supabaseAdapter.deleteInvoiceItemsByInvoiceId(invoiceId);
   if (itemsError) {
     throw new Error(`Error al eliminar items: ${itemsError.message}`);

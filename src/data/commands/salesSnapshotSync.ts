@@ -1,8 +1,24 @@
-export function applySaleSyncToSnapshot(snapshot = [], {
-  tempSaleId,
-  remoteSaleId,
-  syncedAt = null
-} = {}) {
+import type { Sale } from '../../types';
+
+interface SyncOptions {
+  tempSaleId: string;
+  remoteSaleId: string;
+  syncedAt?: string | null;
+}
+
+interface SyncResult {
+  nextSnapshot: Sale[];
+  updated: boolean;
+}
+
+export function applySaleSyncToSnapshot(
+  snapshot: Sale[] = [],
+  {
+    tempSaleId,
+    remoteSaleId,
+    syncedAt = null
+  }: SyncOptions
+): SyncResult {
   if (!Array.isArray(snapshot)) {
     return { nextSnapshot: [], updated: false };
   }

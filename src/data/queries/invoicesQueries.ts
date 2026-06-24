@@ -1,6 +1,12 @@
 import { readAdapter } from '../adapters/localAdapter';
+import type { Product, Invoice, InvoiceItem } from '../../types';
 
-export async function getBusinessContextByUserId(userId) {
+interface BusinessContext {
+  businessId: string | null;
+  employeeId: string | null;
+}
+
+export async function getBusinessContextByUserId(userId: string | null): Promise<BusinessContext> {
   if (!userId) return { businessId: null, employeeId: null };
 
   const { data: activeEmployee, error: activeError } = await readAdapter.getActiveEmployeeByUserId(
@@ -29,7 +35,11 @@ export async function getInvoicesWithItemsByBusiness({
   businessId,
   invoiceColumns,
   invoiceItemsColumns
-}) {
+}: {
+  businessId: string;
+  invoiceColumns: string;
+  invoiceItemsColumns: string;
+}): Promise<(Invoice & { items?: InvoiceItem[] })[]> {
   const { data, error } = await readAdapter.getInvoicesWithItemsByBusiness({
     businessId,
     invoiceColumns,
@@ -40,13 +50,16 @@ export async function getInvoicesWithItemsByBusiness({
   return data || [];
 }
 
-export async function getProductsForInvoicesByBusiness(businessId, selectSql) {
+export async function getProductsForInvoicesByBusiness(
+  businessId: string,
+  selectSql?: string
+): Promise<Product[]> {
   const { data, error } = await readAdapter.getProductsForInvoicesByBusiness(businessId, selectSql);
   if (error) throw error;
   return data || [];
 }
 
-export async function getProductsStockByIds(productIds) {
+export async function getProductsStockByIds(productIds: string[]): Promise<Product[]> {
   if (!Array.isArray(productIds) || productIds.length === 0) return [];
 
   const { data, error } = await readAdapter.getProductsStockByIds(productIds);
@@ -54,13 +67,16 @@ export async function getProductsStockByIds(productIds) {
   return data || [];
 }
 
-export async function getInvoiceWithItemsById(invoiceId, invoiceItemsColumns) {
+export async function getInvoiceWithItemsById(
+  invoiceId: string,
+  invoiceItemsColumns?: string
+): Promise<(Invoice & { items?: InvoiceItem[] }) | null> {
   const { data, error } = await readAdapter.getInvoiceWithItemsById(invoiceId, invoiceItemsColumns);
   if (error) throw error;
   return data || null;
 }
 
-export async function getInvoiceItemsByInvoiceId(invoiceId) {
+export async function getInvoiceItemsByInvoiceId(invoiceId: string): Promise<InvoiceItem[]> {
   const { data, error } = await readAdapter.getInvoiceItemsByInvoiceId(invoiceId);
   if (error) throw error;
   return data || [];
