@@ -1,5 +1,5 @@
 import { supabase } from '../../supabase/Client';
-import { logger } from '../../utils/logger.js';
+import { logger } from '../../utils/logger';
 
 const AUTH_STORAGE_KEY = 'supabase.auth.token';
 const INVENTORY_PRODUCT_COLUMNS = 'id, business_id, code, name, category, purchase_price, sale_price, stock, min_stock, unit, supplier_id, is_active, manage_stock, created_at';
