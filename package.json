@@ -6,7 +6,10 @@
   "license": "MIT",
   "private": true,
   "type": "module",
-  "main": "electron/main.cjs",
+  "workspaces": [
+    "packages/*",
+    "apps/mobile"
+  ],
   "keywords": [
     "pos",
     "punto-de-venta",
@@ -33,6 +36,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "test": "node --test testing/*.test.js",
     "test:offline": "node --test testing/closeOrderLocks.test.js testing/localOutboxEventsStore.test.js testing/offlineStockGuards.test.js testing/outboxMutationHandlers.test.js testing/outboxProcessorLocal.test.js testing/salesOutboxDedup.test.js testing/salesSnapshotSync.test.js testing/salesOutboxCandidates.test.js testing/salesOutboxRetryPolicy.test.js testing/salesOutboxTransitions.test.js",
     "test:unit": "vitest run",
@@ -59,16 +63,6 @@
     "check": "npm run lint && npm run build",
     "predeploy": "npm run lint && npm run test && npm run test:offline && npm run build",
     "check:production": "./check-production.sh",
-    "desktop:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
-    "desktop:precheck": "VITE_DESKTOP_BUILD=true npm run build && concurrently \"npm run preview -- --port 4173\" \"wait-on http://localhost:4173 && ELECTRON_START_URL=http://localhost:4173 electron .\"",
-    "desktop:pack:dir:x64": "VITE_DESKTOP_BUILD=true npm run build && electron-builder --win --x64 --dir",
-    "desktop:build": "VITE_DESKTOP_BUILD=true npm run build && electron-builder --win nsis portable",
-    "desktop:build:x64": "VITE_DESKTOP_BUILD=true npm run build && electron-builder --win nsis portable --x64",
-    "desktop:build:arm64": "VITE_DESKTOP_BUILD=true npm run build && electron-builder --win nsis portable --arm64",
-    "desktop:build:all": "VITE_DESKTOP_BUILD=true npm run build && electron-builder --win nsis portable --x64 --arm64",
-    "desktop:build:signed:x64": "VITE_DESKTOP_BUILD=true npm run build && electron-builder --win nsis portable --x64 -c.forceCodeSigning=true",
-    "desktop:build:signed:arm64": "VITE_DESKTOP_BUILD=true npm run build && electron-builder --win nsis portable --arm64 -c.forceCodeSigning=true",
-    "desktop:build:signed:all": "VITE_DESKTOP_BUILD=true npm run build && electron-builder --win nsis portable --x64 --arm64 -c.forceCodeSigning=true",
     "mobile:start": "npm --prefix apps/mobile run start",
     "mobile:android": "npm --prefix apps/mobile run android",
     "mobile:ios": "npm --prefix apps/mobile run ios",
@@ -82,18 +76,21 @@
     "@sentry/react": "^10.52.0",
     "@splinetool/react-spline": "^4.1.0",
     "@splinetool/runtime": "^1.12.97",
+    "@stocky/shared": "workspace:*",
     "@supabase/supabase-js": "^2.80.0",
     "@vercel/analytics": "^1.6.1",
     "@vercel/speed-insights": "^1.3.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.24",
+    "gsap": "^3.15.0",
     "lucide-react": "^0.553.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.5",
     "tailwind-merge": "^3.4.0",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
@@ -104,11 +101,10 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
+    "@typescript-eslint/eslint-plugin": "^8.62.0",
+    "@typescript-eslint/parser": "^8.62.0",
     "@vitejs/plugin-react": "^5.2.0",
     "autoprefixer": "^10.4.22",
-    "concurrently": "^9.2.1",
-    "electron": "^37.2.0",
-    "electron-builder": "^26.0.12",
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.22",
@@ -118,37 +114,11 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.17",
     "terser": "^5.44.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.62.0",
     "vercel": "^50.9.6",
     "vite": "^7.3.1",
     "vite-plugin-pwa": "^1.2.0",
-    "vitest": "^4.1.5",
-    "wait-on": "^8.0.5"
-  },
-  "build": {
-    "appId": "com.stocky.desktop",
-    "productName": "Stocky",
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "package.json"
-    ],
-    "directories": {
-      "output": "release"
-    },
-    "win": {
-      "signAndEditExecutable": true,
-      "target": [
-        "nsis",
-        "portable"
-      ]
-    },
-    "nsis": {
-      "artifactName": "${productName} Setup ${version} ${arch}.${ext}",
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    },
-    "portable": {
-      "artifactName": "${productName} ${version} ${arch} Portable.${ext}"
-    }
+    "vitest": "^4.1.5"
   }
 }

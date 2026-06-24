@@ -69,47 +69,36 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                      CLIENTES                                │
-├──────────────┬──────────────┬────────────────────────────────┤
-│   Web App    │  Mobile App  │      Desktop App               │
-│  React + Vite│  Expo + RN   │        Electron                │
-│              │              │                                │
-│  localhost   │  localhost   │      localhost                 │
-│    :5173     │    :8081     │        :5173                   │
-└──────┬───────┴──────┬───────┴──────────┬─────────────────────┘
-       │              │                  │
-       └──────────────┼──────────────────┘
-                      │
-                      ▼
-         ┌────────────────────────┐
-         │   Print Bridge Apps    │
-         │  (Android / Windows)   │
-         │   localhost:41780      │
-         └────────────┬───────────┘
-                      │
-                      ▼
-         ┌────────────────────────┐
-         │   Impresoras Térmicas  │
-         │      (Bluetooth)       │
+├──────────────────┬──────────────────────────────────────────┤
+│   Web App        │           Mobile App                     │
+│  React + Vite    │      Expo + React Native                 │
+│                  │                                          │
+│  localhost       │        localhost                         │
+│    :5173         │          :8081                           │
+└────────┬─────────┴──────────────┬───────────────────────────┘
+         │                        │
          └────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│                      BACKEND                                 │
-├─────────────────────────────────────────────────────────────┤
-│                    Supabase Platform                         │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────┐ │
-│  │PostgreSQL│  │   Auth   │  │ Realtime │  │   Storage  │ │
-│  │  + RLS   │  │  + JWT   │  │ Channels │  │  (assets)  │ │
-│  └──────────┘  └──────────┘  └──────────┘  └────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+                   ┌────────────────────────┐
+                   │   Print Bridge Apps    │
+                   │  (Android / Windows)   │
+                   │   localhost:41780      │
+                   └────────────┬───────────┘
+                                │
+                                ▼
+                   ┌────────────────────────┐
+                   │   Impresoras Térmicas  │
+                   │      (Bluetooth)       │
+                   └────────────────────────┘
 ```
 
 ### Stack Tecnológico
 
 | Capa | Tecnología |
 |------|-----------|
-| **Frontend Web** | React 19, Vite 7, TypeScript, Tailwind CSS |
-| **Frontend Mobile** | React Native 0.76, Expo 54, TypeScript |
-| **Desktop** | Electron 37 |
+| **Frontend Web** | React 19, Vite 7, Tailwind CSS |
+| **Frontend Mobile** | React Native, Expo 54, TypeScript |
 | **Backend** | Supabase (PostgreSQL, Auth, Realtime, Storage) |
 | **Estado** | React Hooks + Supabase Realtime |
 | **Testing** | Vitest, React Testing Library, Playwright |
@@ -151,23 +140,6 @@ npm start
 - ✅ Notificaciones push
 - ✅ Autenticación biométrica
 - ✅ Modo offline parcial
-
-### 🖥️ Desktop App
-
-Aplicación de escritorio para Windows y macOS.
-
-```bash
-# Desarrollo
-npm run desktop:dev
-# Build para producción
-npm run desktop:build
-```
-
-**Características:**
-- ✅ Integración nativa con SO
-- ✅ Impresión directa
-- ✅ Auto-actualizaciones
-- ✅ Modo offline completo
 
 ### 🖨️ Print Bridge
 
@@ -253,12 +225,6 @@ npm start
 # Escanea el QR con Expo Go (iOS/Android)
 ```
 
-#### Desktop App
-```bash
-npm run desktop:dev
-# Se abre la ventana de Electron
-```
-
 ---
 
 ## 🛠️ Scripts Disponibles
@@ -271,7 +237,6 @@ npm run desktop:dev
 | `npm run build` | Build de producción |
 | `npm run preview` | Sirve el build localmente |
 | `npm run lint` | Ejecuta ESLint |
-| `npm run lint:fix` | Corrige errores de lint automáticamente |
 
 ### Testing
 
@@ -300,24 +265,13 @@ npm run desktop:dev
 | `npm run mobile:start` | Inicia Expo dev server |
 | `npm run mobile:android` | Ejecuta en Android |
 | `npm run mobile:ios` | Ejecuta en iOS |
-| `npm run mobile:typecheck` | Typecheck de TypeScript |
-
-### Desktop
-
-| Script | Descripción |
-|--------|-------------|
-| `npm run desktop:dev` | Desarrollo con Electron |
-| `npm run desktop:build` | Build para producción |
-| `npm run desktop:build:win` | Build para Windows |
-| `npm run desktop:build:mac` | Build para macOS |
 
 ### Despliegue
 
 | Script | Descripción |
 |--------|-------------|
 | `npm run predeploy` | Lint + test + build |
-| `npm run deploy` | Despliega a Vercel |
-| `npm run deploy:prod` | Despliega a producción |
+| `npm run check:production` | Verifica estado de producción |
 
 ---
 
@@ -352,10 +306,6 @@ Stocky/
 │   │
 │   ├── print-bridge-android/    # Print Bridge para Android
 │   └── print-bridge-windows/    # Print Bridge para Windows
-│
-├── electron/                    # App de escritorio
-│   ├── main.cjs                # Proceso principal
-│   └── preload.cjs             # Script de preload
 │
 ├── docs/                        # Documentación
 │   ├── sql/                    # Scripts SQL
@@ -441,9 +391,9 @@ npm run test:e2e:ui
 
 | Tipo | Tests | Status |
 |------|-------|--------|
-| **Unitarios** | 98 | ✅ Pasando |
-| **E2E** | 5 | ⚠️ 3 fallando |
-| **Offline** | 10 | ✅ Pasando |
+| **Unitarios** | 134 | ✅ Pasando |
+| **E2E** | 8 | ✅ Pasando |
+| **Offline** | 119 | ✅ Pasando |
 
 ### Escribir Tests
 
@@ -489,21 +439,6 @@ eas build --platform all --profile production
 eas submit
 ```
 
-### Desktop App
-
-```bash
-# Windows
-npm run desktop:build:win
-
-# macOS
-npm run desktop:build:mac
-
-# Linux
-npm run desktop:build:linux
-```
-
-Los instaladores se generan en `release/`
-
 ---
 
 ## 🤝 Contribuir
@@ -518,7 +453,6 @@ Los instaladores se generan en `release/`
 
 ### Guías de Código
 
-- Usa **TypeScript** para código nuevo
 - Sigue el estilo de **ESLint** configurado
 - Escribe **tests** para nuevas funcionalidades
 - Documenta funciones complejas con **JSDoc**
@@ -542,8 +476,6 @@ Usa [GitHub Issues](https://github.com/AndresPlazas10/Stocky/issues) con:
 **Web App:** Sí, parcialmente. El modo offline permite crear ventas que se sincronizan cuando vuelve la conexión (outbox pattern).
 
 **Mobile App:** Parcialmente. Puedes ver datos cacheados, pero las operaciones de escritura requieren conexión.
-
-**Desktop App:** Sí, modo offline completo con sincronización automática.
 
 ### ¿Cómo configuro la impresión Bluetooth?
 
@@ -608,7 +540,6 @@ Este proyecto está bajo la licencia **MIT**. Ver [LICENSE](LICENSE) para más d
 - [Supabase](https://supabase.com/) - Backend as a Service
 - [Vercel](https://vercel.com/) - Hosting y CI/CD
 - [Expo](https://expo.dev/) - Framework para React Native
-- [Electron](https://www.electronjs.org/) - Framework para apps de escritorio
 
 ---
 

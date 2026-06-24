@@ -74,8 +74,8 @@ Nota: la cobertura actual es limitada frente al dominio. Priorizar tests de Mesa
 
 ## 8. Diagnosticos y reportes tecnicos
 
-La carpeta `docs/` incluye multiples analisis historicos (`ANALISIS_*`, `SOLUCION_*`, `RESUMEN_*`).
-Usarlos como contexto, no como fuente unica de verdad de arquitectura actual.
+La carpeta `docs/archive/` incluye analisis historicos (`ANALISIS_*`, `SOLUCION_*`, `RESUMEN_*`).
+Usarlos como contexto historico, no como fuente unica de verdad de arquitectura actual.
 
 ## Convenciones
 

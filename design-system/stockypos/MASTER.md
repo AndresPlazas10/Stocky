@@ -18,13 +18,15 @@
 
 | Role | Hex | CSS Variable |
 |------|-----|--------------|
-| Primary | `#0891B2` | `--color-primary` |
-| Secondary | `#22D3EE` | `--color-secondary` |
-| CTA/Accent | `#22C55E` | `--color-cta` |
-| Background | `#ECFEFF` | `--color-background` |
-| Text | `#164E63` | `--color-text` |
+| Primary | `#003B46` | `--color-primary` |
+| Secondary | `#07575B` | `--color-secondary` |
+| Accent | `#66A5AD` | `--color-accent` |
+| Background | `#E8F4F6` | `--color-background` |
+| Text | `#022225` | `--color-text` |
+| Success | `#22C55E` | `--color-success` |
+| Error | `#EF4444` | `--color-error` |
 
-**Color Notes:** Fresh cyan + clean green
+**Color Notes:** Dark teal palette with muted accent tones
 
 ### Typography
 
@@ -54,10 +56,10 @@
 
 | Level | Value | Usage |
 |-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle lift |
-| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Cards, buttons |
-| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, dropdowns |
-| `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | Hero images, featured cards |
+| `--shadow-sm` | `0 1px 2px 0 rgba(7,87,91,0.05)` | Subtle lift |
+| `--shadow-md` | `0 4px 6px -1px rgba(7,87,91,0.1)` | Cards, buttons |
+| `--shadow-lg` | `0 10px 15px -3px rgba(7,87,91,0.1)` | Modals, dropdowns |
+| `--shadow-xl` | `0 20px 25px -5px rgba(7,87,91,0.15)` | Hero images, featured cards |
 
 ---
 
@@ -68,30 +70,35 @@
 ```css
 /* Primary Button */
 .btn-primary {
-  background: #22C55E;
+  background: #003B46;
   color: white;
   padding: 12px 24px;
-  border-radius: 8px;
+  border-radius: 12px;
   font-weight: 600;
   transition: all 200ms ease;
   cursor: pointer;
 }
 
 .btn-primary:hover {
-  opacity: 0.9;
+  background: #07575B;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 59, 70, 0.3);
 }
 
 /* Secondary Button */
 .btn-secondary {
-  background: transparent;
-  color: #0891B2;
-  border: 2px solid #0891B2;
+  background: #07575B;
+  color: white;
   padding: 12px 24px;
-  border-radius: 8px;
+  border-radius: 12px;
   font-weight: 600;
   transition: all 200ms ease;
   cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: #003B46;
+  transform: translateY(-1px);
 }
 ```
 
@@ -99,16 +106,17 @@
 
 ```css
 .card {
-  background: #ECFEFF;
-  border-radius: 12px;
+  background: white;
+  border-radius: 16px;
   padding: 24px;
-  box-shadow: var(--shadow-md);
+  border: 1px solid rgba(102, 165, 173, 0.32);
+  box-shadow: 0 4px 6px -1px rgba(7, 87, 91, 0.1);
   transition: all 200ms ease;
   cursor: pointer;
 }
 
 .card:hover {
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 10px 15px -3px rgba(7, 87, 91, 0.1);
   transform: translateY(-2px);
 }
 ```
@@ -118,16 +126,16 @@
 ```css
 .input {
   padding: 12px 16px;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
+  border: 1px solid rgba(102, 165, 173, 0.32);
+  border-radius: 12px;
   font-size: 16px;
   transition: border-color 200ms ease;
 }
 
 .input:focus {
-  border-color: #0891B2;
+  border-color: #003B46;
   outline: none;
-  box-shadow: 0 0 0 3px #0891B220;
+  box-shadow: 0 0 0 3px rgba(0, 59, 70, 0.2);
 }
 ```
 

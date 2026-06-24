@@ -1,5 +1,8 @@
 /* eslint-env node */
 import webpush from 'web-push';
+import { normalizeText } from './apiUtils.js';
+
+export { normalizeText };
 
 const EXPO_PUSH_ENDPOINT = 'https://exp.host/--/api/v2/push/send';
 const EXPO_PUSH_CHUNK_SIZE = 100;
@@ -10,12 +13,7 @@ const WEB_PUSH_SUBJECT = String(process.env.WEB_PUSH_SUBJECT || 'mailto:soporte@
 
 let webPushConfigured = false;
 
-export function normalizeText(value, fallback = '') {
-  const normalized = String(value ?? '').trim();
-  return normalized || fallback;
-}
-
-function chunkArray(values, chunkSize) {
+export function chunkArray(values, chunkSize) {
   const size = Number(chunkSize) > 0 ? Number(chunkSize) : 100;
   const chunks = [];
   for (let index = 0; index < values.length; index += size) {

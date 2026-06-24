@@ -1,90 +1,21 @@
 /* eslint-env node */
-import { createClient } from '@supabase/supabase-js';
+import {
+  applyCors,
+  getBearerToken,
+  getUserFromToken,
+  createSupabaseAdmin,
+  userCanAccessBusiness,
+  normalizeOrigin,
+  isEnvConfigured,
+  sendError,
+  sendSuccess,
+} from './_lib/apiUtils.js';
+import { validateBody, SendEmailSchema } from './_lib/validation.js';
+import { emailLimiter } from './_lib/rateLimit.js';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const APP_ORIGIN = process.env.VITE_APP_URL;
 const SUPPORT_EMAIL = 'soporte@stockypos.app';
 const SUPPORT_FROM = `Stocky <${SUPPORT_EMAIL}>`;
 const DEFAULT_PUBLIC_ORIGIN = 'https://www.stockypos.app';
-
-function normalizeOrigin(value) {
-  try {
-    const parsed = new URL(String(value || '').trim());
-    return parsed.origin;
-  } catch {
-    return null;
-  }
-}
-
-function resolveAllowedOrigin(req) {
-  const configuredOrigin = normalizeOrigin(APP_ORIGIN);
-  const requestOrigin = normalizeOrigin(req?.headers?.origin);
-  if (!requestOrigin) return configuredOrigin;
-
-  const isLocalDevOrigin = (
-    requestOrigin === 'http://localhost:5173'
-    || requestOrigin === 'http://127.0.0.1:5173'
-  );
-
-  if (requestOrigin === configuredOrigin || isLocalDevOrigin) {
-    return requestOrigin;
-  }
-
-  return configuredOrigin;
-}
-
-function applyCors(req, res) {
-  const allowedOrigin = resolveAllowedOrigin(req);
-  if (allowedOrigin) {
-    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-    res.setHeader('Vary', 'Origin');
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'OPTIONS,POST');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
-
-function getBearerToken(req) {
-  const header = req.headers.authorization || req.headers.Authorization;
-  if (!header || typeof header !== 'string') return null;
-  if (!header.toLowerCase().startsWith('bearer ')) return null;
-  return header.slice(7).trim();
-}
-
-async function getUserFromToken(jwt) {
-  const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    fetch,
-    global: { headers: { Authorization: `Bearer ${jwt}` } }
-  });
-
-  const { data, error } = await authClient.auth.getUser();
-  if (error || !data?.user) {
-    throw new Error('Unauthorized');
-  }
-
-  return data.user;
-}
-
-async function userCanAccessBusiness(admin, userId, businessId) {
-  const [{ data: owner }, { data: employee }] = await Promise.all([
-    admin
-      .from('businesses')
-      .select('id')
-      .eq('id', businessId)
-      .eq('created_by', userId)
-      .limit(1),
-    admin
-      .from('employees')
-      .select('id')
-      .eq('business_id', businessId)
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .limit(1)
-  ]);
-
-  return (owner && owner.length > 0) || (employee && employee.length > 0);
-}
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -107,7 +38,6 @@ function resolveFromAddress() {
   const configured = process.env.RESEND_FROM_EMAIL;
   const configuredAddress = extractEmailAddress(configured);
 
-  // Seguridad: nunca usar correos personales por configuración accidental.
   if (configuredAddress === SUPPORT_EMAIL) {
     return String(configured).trim().includes('<')
       ? String(configured).trim()
@@ -126,28 +56,38 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    sendError(res, 405, 'Method not allowed');
+    return;
+  }
+
+  const rateLimitResult = emailLimiter(req, res);
+  if (rateLimitResult.blocked) {
+    sendError(res, 429, rateLimitResult.message);
+    return;
   }
 
   try {
     if (!process.env.RESEND_API_KEY) {
-      return res.status(500).json({
-        error: 'Resend no está configurado. Configura RESEND_API_KEY en Vercel.',
-        configured: false
-      });
+      sendError(res, 500, 'Resend no esta configurado. Configura RESEND_API_KEY en Vercel.');
+      return;
     }
 
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SERVICE_ROLE_KEY) {
-      return res.status(500).json({ error: 'Supabase environment not configured' });
+    if (!isEnvConfigured()) {
+      sendError(res, 500, 'Supabase environment not configured');
+      return;
     }
 
     const token = getBearerToken(req);
     if (!token) {
-      return res.status(401).json({ error: 'Missing bearer token' });
+      sendError(res, 401, 'Missing bearer token');
+      return;
     }
 
     const user = await getUserFromToken(token);
-    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { fetch });
+    const admin = createSupabaseAdmin();
+
+    const validation = validateBody(SendEmailSchema, req, res);
+    if (!validation.success) return;
 
     const {
       email,
@@ -158,28 +98,19 @@ export default async function handler(req, res) {
       businessName,
       businessId,
       issuedAt
-    } = req.body || {};
-
-    if (!email || !invoiceNumber || !customerName || total === null || total === undefined || !Array.isArray(items)) {
-      return res.status(400).json({
-        error: 'Faltan datos requeridos: email, invoiceNumber, customerName, total, items'
-      });
-    }
-
-    if (!businessId) {
-      return res.status(400).json({ error: 'Missing businessId' });
-    }
+    } = validation.data;
 
     const canAccess = await userCanAccessBusiness(admin, user.id, businessId);
     if (!canAccess) {
-      return res.status(403).json({ error: 'Forbidden for this business' });
+      sendError(res, 403, 'Forbidden for this business');
+      return;
     }
 
     const numericTotal = Number(total) || 0;
     const safeBusinessName = escapeHtml(businessName || 'Stocky');
     const safeCustomerName = escapeHtml(customerName);
     const safeInvoiceNumber = escapeHtml(invoiceNumber);
-    const publicOrigin = normalizeOrigin(APP_ORIGIN) || DEFAULT_PUBLIC_ORIGIN;
+    const publicOrigin = normalizeOrigin(process.env.VITE_APP_URL) || DEFAULT_PUBLIC_ORIGIN;
     const brandLogoUrl = `${publicOrigin}/branding/logoStocky.png`;
     const formattedIssuedAt = issuedAt
       ? new Date(issuedAt).toLocaleDateString('es-CO', {
@@ -244,7 +175,7 @@ export default async function handler(req, res) {
             <td style="background-color: #ffffff; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; padding: 28px;">
               <p style="margin: 0; font-size: 20px; font-weight: 700; color: #0f172a;">Hola ${safeCustomerName},</p>
               <p style="margin: 10px 0 22px 0; font-size: 15px; color: #4b5563; line-height: 1.6;">
-                Gracias por tu compra. Aquí tienes el detalle de tu comprobante.
+                Gracias por tu compra. Aqui tienes el detalle de tu comprobante.
               </p>
 
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 18px; background-color: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px;">
@@ -276,7 +207,7 @@ export default async function handler(req, res) {
           <tr>
             <td style="background-color: #f8fafc; border: 1px solid #e5e7eb; border-top: 0; border-radius: 0 0 14px 14px; padding: 20px 28px;">
               <p style="margin: 0 0 8px 0; color: #0f172a; font-size: 14px; font-weight: 600;">Gracias por confiar en ${safeBusinessName}</p>
-              <p style="margin: 0 0 10px 0; color: #64748b; font-size: 12px;">Este es un correo automático, por favor no responder.</p>
+              <p style="margin: 0 0 10px 0; color: #64748b; font-size: 12px;">Este es un correo automatico, por favor no responder.</p>
               <p style="margin: 0; color: #6b7280; font-size: 11px; line-height: 1.5;">
                 El presente comprobante es informativo. La responsabilidad tributaria recae exclusivamente en el establecimiento emisor.
               </p>
@@ -307,11 +238,9 @@ export default async function handler(req, res) {
       throw new Error(data?.message || 'Error al enviar email con Resend API');
     }
 
-    return res.status(200).json({ success: true, data });
+    sendSuccess(res, { data });
   } catch (error) {
     const status = error?.message === 'Unauthorized' ? 401 : 500;
-    return res.status(status).json({
-      error: error?.message || 'server error'
-    });
+    sendError(res, status, error?.message || 'server error');
   }
 }

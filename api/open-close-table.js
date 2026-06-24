@@ -1,66 +1,16 @@
 /* eslint-env node */
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const APP_ORIGIN = process.env.VITE_APP_URL;
-
-function normalizeOrigin(value) {
-  try {
-    const parsed = new URL(String(value || '').trim());
-    return parsed.origin;
-  } catch {
-    return null;
-  }
-}
-
-function resolveAllowedOrigin(req) {
-  const configuredOrigin = normalizeOrigin(APP_ORIGIN);
-  const requestOrigin = normalizeOrigin(req?.headers?.origin);
-  if (!requestOrigin) return configuredOrigin;
-
-  const isLocalDevOrigin = (
-    requestOrigin === 'http://localhost:5173'
-    || requestOrigin === 'http://127.0.0.1:5173'
-  );
-
-  if (requestOrigin === configuredOrigin || isLocalDevOrigin) {
-    return requestOrigin;
-  }
-
-  return configuredOrigin;
-}
-
-function applyCors(req, res) {
-  const allowedOrigin = resolveAllowedOrigin(req);
-  if (allowedOrigin) {
-    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-    res.setHeader('Vary', 'Origin');
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'OPTIONS,POST');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
-
-function getBearerToken(req) {
-  const header = req.headers.authorization || req.headers.Authorization;
-  if (!header || typeof header !== 'string') return null;
-  if (!header.toLowerCase().startsWith('bearer ')) return null;
-  return header.slice(7).trim();
-}
-
-async function getUserFromToken(jwt) {
-  const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    fetch,
-    global: { headers: { Authorization: `Bearer ${jwt}` } },
-  });
-
-  const { data, error } = await authClient.auth.getUser();
-  if (error || !data?.user) {
-    throw new Error('Unauthorized');
-  }
-  return data.user;
-}
+import {
+  applyCors,
+  getBearerToken,
+  getUserFromToken,
+  createSupabaseAdmin,
+  userCanAccessBusiness,
+  isEnvConfigured,
+  sendError,
+  sendSuccess,
+} from './_lib/apiUtils.js';
+import { validateBody, OpenCloseTableSchema } from './_lib/validation.js';
+import { tableLimiter } from './_lib/rateLimit.js';
 
 function mapRpcErrorToHttpStatus(errorLike) {
   const message = String(errorLike?.message || errorLike || '').toLowerCase();
@@ -103,26 +53,6 @@ function isMissingOpenedAtOnTablesError(errorLike) {
     && message.includes('"tables"')
     && message.includes('does not exist')
   );
-}
-
-async function userCanAccessBusiness(admin, userId, businessId) {
-  const [{ data: owner }, { data: employee }] = await Promise.all([
-    admin
-      .from('businesses')
-      .select('id')
-      .eq('id', businessId)
-      .eq('created_by', userId)
-      .limit(1),
-    admin
-      .from('employees')
-      .select('id')
-      .eq('business_id', businessId)
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .limit(1),
-  ]);
-
-  return (owner && owner.length > 0) || (employee && employee.length > 0);
 }
 
 async function runLegacyOpenCloseTable({
@@ -307,53 +237,51 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
+    sendError(res, 405, 'Method not allowed');
     return;
   }
 
-  if (!SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY || !SUPABASE_URL) {
-    res.status(500).json({ error: 'Supabase environment not configured' });
+  const rateLimitResult = tableLimiter(req, res);
+  if (rateLimitResult.blocked) {
+    sendError(res, 429, rateLimitResult.message);
+    return;
+  }
+
+  if (!isEnvConfigured()) {
+    sendError(res, 500, 'Supabase environment not configured');
     return;
   }
 
   try {
-    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { fetch });
+    const validation = validateBody(OpenCloseTableSchema, req, res);
+    if (!validation.success) return;
+
+    const admin = createSupabaseAdmin();
     const token = getBearerToken(req);
     if (!token) {
-      res.status(401).json({ error: 'Missing bearer token' });
+      sendError(res, 401, 'Missing bearer token');
       return;
     }
 
     const user = await getUserFromToken(token);
-
-    const { table_id, action } = req.body || {};
-    if (!table_id || !action) {
-      res.status(400).json({ error: 'Missing params: table_id/action' });
-      return;
-    }
-
-    const normalizedAction = action === 'open' ? 'open' : action === 'close' ? 'close' : null;
-    if (!normalizedAction) {
-      res.status(400).json({ error: 'Invalid action' });
-      return;
-    }
+    const { table_id, action } = validation.data;
 
     const { data, error } = await admin.rpc('open_close_table_transaction', {
       p_table_id: table_id,
-      p_action: normalizedAction,
+      p_action: action,
       p_user_id: user.id
     });
 
     let updated = null;
     if (error) {
-    if (!isMissingOpenCloseTableRpcError(error) && !isMissingOpenedAtOnTablesError(error)) {
+      if (!isMissingOpenCloseTableRpcError(error) && !isMissingOpenedAtOnTablesError(error)) {
         throw error;
       }
 
       updated = await runLegacyOpenCloseTable({
         admin,
         tableId: table_id,
-        action: normalizedAction,
+        action,
         userId: user.id
       });
     } else {
@@ -361,13 +289,13 @@ export default async function handler(req, res) {
     }
 
     if (!updated) {
-      res.status(404).json({ error: 'Table not found' });
+      sendError(res, 404, 'Table not found');
       return;
     }
 
-    res.status(200).json({ ok: true, data: updated });
+    sendSuccess(res, { data: updated });
   } catch (err) {
     const status = mapRpcErrorToHttpStatus(err);
-    res.status(status).json({ error: err?.message || 'server error' });
+    sendError(res, status, err?.message || 'server error');
   }
 }
