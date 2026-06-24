@@ -1,16 +1,64 @@
-import { getOpenOrdersByBusiness, getTablesWithCurrentOrderByBusiness } from '../data/queries/ordersQueries.js';
+import { getOpenOrdersByBusiness, getTablesWithCurrentOrderByBusiness } from '../data/queries/ordersQueries';
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger';
 import { detectTableOrderInconsistencies } from './tableConsistencyDetect.js';
 import { appendConflictLogRecord } from '../localdb/conflictLogStore.js';
+import type { Table, Order } from '../types';
 
-function normalizeText(value) {
+interface Finding {
+  severity: string;
+  [key: string]: unknown;
+}
+
+interface FixOperation {
+  type: 'update_table' | 'update_order';
+  target: {
+    tableId?: string;
+    businessId?: string;
+    orderId?: string;
+  };
+  payload?: Record<string, unknown>;
+}
+
+interface OperationResult {
+  ok: boolean;
+  reason?: string;
+}
+
+interface ReconcileResult {
+  ok: boolean;
+  reason: string;
+  findings: Finding[];
+  appliedFixes: number;
+}
+
+interface ReconcileRpcParams {
+  businessId: string;
+  maxFixes: number;
+  source: string;
+}
+
+interface ReconcileClientParams {
+  businessId: string;
+  dryRun: boolean;
+  maxFixes: number;
+  source: string;
+}
+
+export interface ReconcileOptions {
+  businessId?: string | null;
+  dryRun?: boolean;
+  maxFixes?: number;
+  source?: string;
+}
+
+function normalizeText(value: unknown): string | null {
   const normalized = String(value ?? '').trim();
   return normalized || null;
 }
 
-function isFunctionUnavailableError(errorLike, functionName) {
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+function isFunctionUnavailableError(errorLike: unknown, functionName: string): boolean {
+  const message = String((errorLike as Error)?.message || errorLike || '').toLowerCase();
   if (!message) return false;
 
   const normalizedFn = String(functionName || '').toLowerCase();
@@ -32,7 +80,13 @@ async function appendConflict({
   mutationId = null,
   reason,
   details = null
-}) {
+}: {
+  businessId?: string | null;
+  mutationType?: string;
+  mutationId?: string | null;
+  reason: string;
+  details?: unknown;
+}): Promise<unknown> {
   const normalizedBusinessId = normalizeText(businessId);
   const normalizedReason = normalizeText(reason);
   if (!normalizedBusinessId || !normalizedReason) return null;
@@ -47,7 +101,7 @@ async function appendConflict({
   });
 }
 
-async function applyFixOperation(operation) {
+async function applyFixOperation(operation: FixOperation): Promise<OperationResult> {
   if (!operation) return { ok: false, reason: 'missing_operation' };
 
   if (operation.type === 'update_table') {
@@ -91,7 +145,7 @@ async function applyFixOperation(operation) {
   return { ok: false, reason: 'unsupported_operation' };
 }
 
-async function reconcileWithRpc({ businessId, maxFixes, source }) {
+async function reconcileWithRpc({ businessId, maxFixes, source }: ReconcileRpcParams): Promise<ReconcileResult> {
   const { data, error } = await supabaseAdapter.reconcileTablesOrdersConsistencyRpc({
     p_business_id: businessId,
     p_max_fixes: maxFixes,
@@ -111,13 +165,21 @@ async function reconcileWithRpc({ businessId, maxFixes, source }) {
   };
 }
 
-async function reconcileWithClientFallback({ businessId, dryRun, maxFixes, source }) {
+async function reconcileWithClientFallback({
+  businessId,
+  dryRun,
+  maxFixes,
+  source
+}: ReconcileClientParams): Promise<ReconcileResult> {
   const [tables, openOrders] = await Promise.all([
     getTablesWithCurrentOrderByBusiness(businessId),
     getOpenOrdersByBusiness(businessId)
   ]);
 
-  const { findings, fixes } = detectTableOrderInconsistencies({ tables, openOrders });
+  const { findings, fixes } = detectTableOrderInconsistencies({
+    tables: tables as Table[],
+    openOrders: openOrders as Order[]
+  });
   if (findings.length === 0) {
     return {
       ok: true,
@@ -133,7 +195,7 @@ async function reconcileWithClientFallback({ businessId, dryRun, maxFixes, sourc
 
   if (!dryRun && limitedFixes.length > 0) {
     for (const fix of limitedFixes) {
-      const result = await applyFixOperation(fix);
+      const result = await applyFixOperation(fix as FixOperation);
       if (result.ok) {
         appliedFixes += 1;
       } else {
@@ -148,7 +210,7 @@ async function reconcileWithClientFallback({ businessId, dryRun, maxFixes, sourc
     }
   }
 
-  const highSeverityFindings = findings.filter((item) => item.severity === 'high');
+  const highSeverityFindings = findings.filter((item) => item.severity === 'high') as Finding[];
   if (highSeverityFindings.length > 0) {
     await appendConflict({
       businessId,
@@ -186,7 +248,7 @@ export async function reconcileTableOrderConsistency({
   dryRun = false,
   maxFixes = 25,
   source = 'manual'
-} = {}) {
+}: ReconcileOptions = {}): Promise<ReconcileResult> {
   const normalizedBusinessId = normalizeText(businessId);
   if (!normalizedBusinessId) {
     return {
@@ -213,14 +275,14 @@ export async function reconcileTableOrderConsistency({
         maxFixes: Math.max(1, Number(maxFixes || 25)),
         source
       });
-    } catch (error) {
+    } catch (error: unknown) {
       if (!isFunctionUnavailableError(error, 'reconcile_tables_orders_consistency')) {
         throw error;
       }
       logger.warn('[table-consistency] RPC no disponible, usando fallback cliente', {
         businessId: normalizedBusinessId,
         source,
-        error: error?.message || String(error)
+        error: (error as Error)?.message || String(error)
       });
     }
   }
