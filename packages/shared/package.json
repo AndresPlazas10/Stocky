@@ -1,0 +1,52 @@
+{
+  "name": "@stocky/shared",
+  "version": "1.0.0",
+  "description": "Shared utilities for Stocky POS",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./roles": {
+      "import": "./dist/roles.js",
+      "types": "./dist/roles.d.ts"
+    },
+    "./payment-methods": {
+      "import": "./dist/paymentMethods.js",
+      "types": "./dist/paymentMethods.d.ts"
+    },
+    "./formatters": {
+      "import": "./dist/formatters.js",
+      "types": "./dist/formatters.d.ts"
+    },
+    "./dates": {
+      "import": "./dist/dates.js",
+      "types": "./dist/dates.d.ts"
+    },
+    "./change": {
+      "import": "./dist/cambio.js",
+      "types": "./dist/cambio.d.ts"
+    },
+    "./connectivity": {
+      "import": "./dist/connectivity.js",
+      "types": "./dist/connectivity.d.ts"
+    },
+    "./normalization": {
+      "import": "./dist/normalization.js",
+      "types": "./dist/normalization.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  },
+  "files": [
+    "dist"
+  ]
+}

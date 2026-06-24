@@ -7,7 +7,6 @@ import path from 'path'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const apiBaseUrl = String(env.VITE_API_BASE_URL || '').trim().replace(/\/$/, '')
-  const isDesktopBuild = String(process.env.VITE_DESKTOP_BUILD || '').trim() === 'true'
   const apiProxy = apiBaseUrl
     ? {
         '/api': {
@@ -19,14 +18,14 @@ export default defineConfig(({ mode }) => {
     : undefined
 
   return {
-    base: isDesktopBuild ? './' : '/',
+    base: '/',
     plugins: [
       react({
         babel: {
           plugins: [],
         },
       }),
-      !isDesktopBuild && VitePWA({
+      VitePWA({
         registerType: 'autoUpdate',
         injectRegister: 'auto',
         includeAssets: [
@@ -110,6 +109,7 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
+        '@stocky/shared': path.resolve(__dirname, './packages/shared/src'),
       },
     },
     optimizeDeps: {
