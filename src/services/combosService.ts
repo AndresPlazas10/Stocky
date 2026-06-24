@@ -5,16 +5,63 @@ import { invalidateComboCache } from '../data/adapters/cacheInvalidation.js';
 export const COMBO_STATUS = {
   ACTIVE: 'active',
   INACTIVE: 'inactive'
-};
+} as const;
 
-export function normalizeComboStatus(status) {
+export type ComboStatusValue = typeof COMBO_STATUS[keyof typeof COMBO_STATUS];
+
+interface ComboItemPayload {
+  producto_id: string;
+  cantidad: number;
+}
+
+interface NormalizedComboPayload {
+  nombre: string;
+  precio_venta: number;
+  descripcion: string | null;
+  estado: ComboStatusValue;
+  items: ComboItemPayload[];
+}
+
+interface ComboCreateInput {
+  nombre?: string;
+  name?: string;
+  precio_venta?: number;
+  sale_price?: number;
+  descripcion?: string;
+  description?: string;
+  estado?: string;
+  status?: string;
+  items?: Array<{
+    producto_id?: string;
+    product_id?: string;
+    cantidad?: number;
+    quantity?: number;
+  }>;
+}
+
+interface ComboListItem {
+  id: string;
+  business_id: string;
+  nombre: string;
+  precio_venta: number;
+  descripcion: string | null;
+  estado: string;
+  combo_items?: Array<{
+    producto_id?: string;
+    products?: unknown;
+    [key: string]: unknown;
+  }>;
+  [key: string]: unknown;
+}
+
+export function normalizeComboStatus(status: string | undefined | null): ComboStatusValue {
   const normalized = String(status || '').trim().toLowerCase();
   return normalized === COMBO_STATUS.INACTIVE
     ? COMBO_STATUS.INACTIVE
     : COMBO_STATUS.ACTIVE;
 }
 
-function toPositiveNumber(value, fieldName) {
+function toPositiveNumber(value: unknown, fieldName: string): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     throw new Error(`${fieldName} debe ser mayor a 0`);
@@ -22,12 +69,12 @@ function toPositiveNumber(value, fieldName) {
   return parsed;
 }
 
-function normalizeComboItems(items = []) {
+function normalizeComboItems(items: ComboCreateInput['items'] = []): ComboItemPayload[] {
   if (!Array.isArray(items) || items.length === 0) {
     throw new Error('Debes agregar al menos un producto al combo');
   }
 
-  const uniqueProductIds = new Set();
+  const uniqueProductIds = new Set<string>();
 
   const normalized = items.map((item, index) => {
     const productoId = String(item?.producto_id || item?.product_id || '').trim();
@@ -51,7 +98,7 @@ function normalizeComboItems(items = []) {
   return normalized;
 }
 
-function normalizeComboPayload(payload = {}) {
+function normalizeComboPayload(payload: ComboCreateInput = {}): NormalizedComboPayload {
   const nombre = String(payload?.nombre || payload?.name || '').trim();
   if (!nombre) {
     throw new Error('El nombre del combo es obligatorio');
@@ -75,18 +122,21 @@ function normalizeComboPayload(payload = {}) {
   };
 }
 
-export async function fetchCombos(businessId, { onlyActive = false } = {}) {
+export async function fetchCombos(
+  businessId: string,
+  { onlyActive = false } = {}
+): Promise<ComboListItem[]> {
   if (!businessId) return [];
 
   const { data, error } = await readAdapter.getCombosByBusinessWithItems({
     businessId,
     onlyActive
-  });
+  } as Parameters<typeof readAdapter.getCombosByBusinessWithItems>[0]);
   if (error) {
     throw new Error(error.message || 'No se pudieron cargar los combos');
   }
 
-  return (data || []).map((combo) => ({
+  return ((data ?? []) as ComboListItem[]).map((combo) => ({
     ...combo,
     combo_items: (combo.combo_items || []).map((item) => ({
       ...item,
@@ -95,11 +145,11 @@ export async function fetchCombos(businessId, { onlyActive = false } = {}) {
   }));
 }
 
-export async function fetchComboCatalog(businessId) {
+export async function fetchComboCatalog(businessId: string): Promise<ComboListItem[]> {
   return fetchCombos(businessId, { onlyActive: true });
 }
 
-export async function createCombo(businessId, payload) {
+export async function createCombo(businessId: string, payload: ComboCreateInput): Promise<string> {
   if (!businessId) throw new Error('businessId es obligatorio');
 
   const normalized = normalizeComboPayload(payload);
@@ -125,7 +175,6 @@ export async function createCombo(businessId, payload) {
   const { error: itemsError } = await supabaseAdapter.insertComboItems(rows);
 
   if (itemsError) {
-    // Best effort rollback para evitar combos huérfanos.
     await supabaseAdapter.deleteComboByBusinessAndId({
       comboId: createdCombo.id,
       businessId
@@ -133,12 +182,16 @@ export async function createCombo(businessId, payload) {
     throw new Error(itemsError.message || 'No se pudieron guardar los productos del combo');
   }
 
-  await invalidateComboCache({ businessId, comboId: createdCombo.id });
+  await invalidateComboCache({ businessId, comboId: createdCombo.id } as Parameters<typeof invalidateComboCache>[0]);
 
   return createdCombo.id;
 }
 
-export async function updateCombo(comboId, businessId, payload) {
+export async function updateCombo(
+  comboId: string,
+  businessId: string,
+  payload: ComboCreateInput
+): Promise<void> {
   if (!comboId) throw new Error('comboId es obligatorio');
   if (!businessId) throw new Error('businessId es obligatorio');
 
@@ -177,10 +230,14 @@ export async function updateCombo(comboId, businessId, payload) {
     throw new Error(insertItemsError.message || 'No se pudieron guardar los productos del combo');
   }
 
-  await invalidateComboCache({ businessId, comboId });
+  await invalidateComboCache({ businessId, comboId } as Parameters<typeof invalidateComboCache>[0]);
 }
 
-export async function setComboStatus(comboId, businessId, status) {
+export async function setComboStatus(
+  comboId: string,
+  businessId: string,
+  status: string
+): Promise<void> {
   if (!comboId) throw new Error('comboId es obligatorio');
   if (!businessId) throw new Error('businessId es obligatorio');
 
@@ -199,10 +256,10 @@ export async function setComboStatus(comboId, businessId, status) {
     throw new Error(error.message || 'No se pudo actualizar el estado del combo');
   }
 
-  await invalidateComboCache({ businessId, comboId });
+  await invalidateComboCache({ businessId, comboId } as Parameters<typeof invalidateComboCache>[0]);
 }
 
-export async function deleteCombo(comboId, businessId) {
+export async function deleteCombo(comboId: string, businessId: string): Promise<void> {
   if (!comboId) throw new Error('comboId es obligatorio');
   if (!businessId) throw new Error('businessId es obligatorio');
 
@@ -219,9 +276,9 @@ export async function deleteCombo(comboId, businessId) {
     throw new Error(error.message || 'No se pudo eliminar el combo');
   }
 
-  if (!data?.id) {
+  if (!(data as unknown as { id?: string })?.id) {
     throw new Error('El combo no existe o no tienes permisos para eliminarlo');
   }
 
-  await invalidateComboCache({ businessId, comboId });
+  await invalidateComboCache({ businessId, comboId } as Parameters<typeof invalidateComboCache>[0]);
 }

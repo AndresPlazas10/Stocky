@@ -1,5 +1,5 @@
-const warmupStateByBusiness = new Map();
-const listenersByBusiness = new Map();
+const warmupStateByBusiness = new Map<string, WarmupStatus>();
+const listenersByBusiness = new Map<string, Set<(state: WarmupStatus) => void>>();
 const WARMUP_DISABLED_REASON = 'online_only_no_warmup';
 
 export const DASHBOARD_WARMUP_PHASE = {
@@ -7,9 +7,32 @@ export const DASHBOARD_WARMUP_PHASE = {
   RUNNING: 'running',
   READY: 'ready',
   ERROR: 'error'
-};
+} as const;
 
-function getDefaultWarmupState(businessId) {
+export type WarmupPhase = typeof DASHBOARD_WARMUP_PHASE[keyof typeof DASHBOARD_WARMUP_PHASE];
+
+export interface WarmupStatus {
+  businessId: string | null;
+  phase: WarmupPhase;
+  inProgress: boolean;
+  finishedAt: number;
+  updatedAt: number;
+  ok: number;
+  failed: number;
+  total: number;
+  reason: string;
+  error: unknown;
+}
+
+export interface WarmupResult {
+  warmed: boolean;
+  reason: string;
+  status: WarmupStatus;
+}
+
+type WarmupListener = (state: WarmupStatus) => void;
+
+function getDefaultWarmupState(businessId: string | null): WarmupStatus {
   return {
     businessId,
     phase: DASHBOARD_WARMUP_PHASE.READY,
@@ -24,7 +47,7 @@ function getDefaultWarmupState(businessId) {
   };
 }
 
-function notifyWarmupStatus(businessId) {
+function notifyWarmupStatus(businessId: string): void {
   const listeners = listenersByBusiness.get(businessId);
   if (!listeners || listeners.size === 0) return;
 
@@ -38,9 +61,9 @@ function notifyWarmupStatus(businessId) {
   });
 }
 
-function setWarmupStatus(businessId, patch = {}) {
+function setWarmupStatus(businessId: string, patch: Partial<WarmupStatus> = {}): WarmupStatus {
   const prev = warmupStateByBusiness.get(businessId) || getDefaultWarmupState(businessId);
-  const next = {
+  const next: WarmupStatus = {
     ...prev,
     ...patch,
     businessId,
@@ -51,19 +74,19 @@ function setWarmupStatus(businessId, patch = {}) {
   return next;
 }
 
-export function getWarmupStatus(businessId) {
+export function getWarmupStatus(businessId: string | null): WarmupStatus {
   if (!businessId) return getDefaultWarmupState(null);
   return warmupStateByBusiness.get(businessId) || getDefaultWarmupState(businessId);
 }
 
-export function subscribeWarmupStatus(businessId, listener) {
+export function subscribeWarmupStatus(businessId: string | null, listener: WarmupListener): () => void {
   if (!businessId || typeof listener !== 'function') return () => {};
 
   if (!listenersByBusiness.has(businessId)) {
     listenersByBusiness.set(businessId, new Set());
   }
 
-  const listeners = listenersByBusiness.get(businessId);
+  const listeners = listenersByBusiness.get(businessId)!;
   listeners.add(listener);
   listener(getWarmupStatus(businessId));
 
@@ -75,7 +98,7 @@ export function subscribeWarmupStatus(businessId, listener) {
   };
 }
 
-export async function warmupDashboardData(businessId) {
+export async function warmupDashboardData(businessId: string | null): Promise<WarmupResult> {
   if (!businessId) {
     return { warmed: false, reason: 'missing_business_id', status: getDefaultWarmupState(null) };
   }
