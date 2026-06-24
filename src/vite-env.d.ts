@@ -1,0 +1,60 @@
+/// <reference types="vite/client" />
+
+interface ImportMetaEnv {
+  readonly VITE_SUPABASE_URL: string;
+  readonly VITE_SUPABASE_ANON_KEY: string;
+  readonly VITE_APP_URL: string;
+  readonly VITE_APP_NAME: string;
+  readonly VITE_API_BASE_URL: string;
+  readonly VITE_EMAILJS_SERVICE_ID: string;
+  readonly VITE_EMAILJS_TEMPLATE_ID: string;
+  readonly VITE_EMAILJS_PUBLIC_KEY: string;
+  readonly VITE_RESEND_FROM_EMAIL: string;
+  readonly VITE_RESEND_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_DEVTOOLS_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_PREFER_PGLITE: string;
+  readonly VITE_LOCAL_SYNC_ELECTRIC_PULL_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_SHADOW_WRITES_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_OUTBOX_REMOTE_VERIFY_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_OUTBOX_POLL_MS: string;
+  readonly VITE_LOCAL_SYNC_OUTBOX_BATCH_SIZE: string;
+  readonly VITE_LOCAL_SYNC_OUTBOX_MAX_EVENTS_PER_TICK: string;
+  readonly VITE_LOCAL_SYNC_OUTBOX_MAX_RETRIES: string;
+  readonly VITE_LOCAL_SYNC_OUTBOX_RATE_WINDOW_SIZE: string;
+  readonly VITE_LOCAL_SYNC_OUTBOX_RATE_WINDOW_MINUTES: string;
+  readonly VITE_LOCAL_SYNC_CRITICAL_ALERT_CONSECUTIVE_THRESHOLD: string;
+  readonly VITE_LOCAL_SYNC_CRITICAL_ALERT_COOLDOWN_MINUTES: string;
+  readonly VITE_LOCAL_SYNC_CATALOG_CACHE_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_READ_CACHE_TTL_MS: string;
+  readonly VITE_LOCAL_SYNC_WRITE_ALL_LOCAL_FIRST: string;
+  readonly VITE_LOCAL_SYNC_WRITE_SALES_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_WRITE_SALES_LOCAL_FIRST: string;
+  readonly VITE_LOCAL_SYNC_WRITE_PURCHASES_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_WRITE_PURCHASES_LOCAL_FIRST: string;
+  readonly VITE_LOCAL_SYNC_WRITE_ORDERS_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_WRITE_ORDERS_LOCAL_FIRST: string;
+  readonly VITE_LOCAL_SYNC_WRITE_TABLES_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_WRITE_TABLES_LOCAL_FIRST: string;
+  readonly VITE_LOCAL_SYNC_WRITE_PRODUCTS_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_WRITE_PRODUCTS_LOCAL_FIRST: string;
+  readonly VITE_LOCAL_SYNC_WRITE_SUPPLIERS_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_WRITE_SUPPLIERS_LOCAL_FIRST: string;
+  readonly VITE_LOCAL_SYNC_WRITE_INVOICES_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_WRITE_INVOICES_LOCAL_FIRST: string;
+  readonly VITE_LOCAL_SYNC_READ_PRODUCTS_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_READ_SALES_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_READ_PURCHASES_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_READ_ORDERS_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_READ_INVENTORY_ENABLED: string;
+  readonly VITE_LOCAL_SYNC_READ_INVOICES_ENABLED: string;
+  readonly VITE_DISABLE_SALES_RPC: string;
+  readonly DEV: boolean;
+  readonly PROD: boolean;
+  readonly MODE: string;
+  readonly BASE_URL: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
