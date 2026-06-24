@@ -2,9 +2,20 @@ import {
   computeNextRetryAt,
   isConnectivityError,
   isPermanentSyncError
-} from './salesOutboxRetryPolicy.js';
+} from './salesOutboxRetryPolicy';
+import type { OutboxEvent } from '../../types';
 
-export function buildProcessingOutboxEventPatch(currentEvent, { nowIso = new Date().toISOString() } = {}) {
+interface ProcessingPatch extends Partial<OutboxEvent> {
+  status: 'processing';
+  attempts: number;
+  next_retry_at: null;
+  updated_at: string;
+}
+
+export function buildProcessingOutboxEventPatch(
+  currentEvent: OutboxEvent,
+  { nowIso = new Date().toISOString() }: { nowIso?: string } = {}
+): ProcessingPatch {
   return {
     ...currentEvent,
     status: 'processing',
@@ -14,12 +25,24 @@ export function buildProcessingOutboxEventPatch(currentEvent, { nowIso = new Dat
   };
 }
 
+interface FailedTransitionResult {
+  shouldBreak: boolean;
+  patch: Partial<OutboxEvent>;
+}
+
+interface FailedTransitionOptions {
+  event: OutboxEvent;
+  errorMessage: string;
+  nowMs?: number;
+  nowIso?: string;
+}
+
 export function resolveFailedOutboxSyncTransition({
   event,
   errorMessage,
   nowMs = Date.now(),
   nowIso = new Date(nowMs).toISOString()
-}) {
+}: FailedTransitionOptions): FailedTransitionResult {
   const attempts = Number(event?.attempts || 0) + 1;
   const message = String(errorMessage || 'Error al sincronizar venta pendiente');
 

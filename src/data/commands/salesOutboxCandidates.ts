@@ -1,7 +1,17 @@
-export function selectSalesOutboxCandidates(queue = [], {
-  nowMs = Date.now(),
-  maxEvents = 20
-} = {}) {
+import type { OutboxEvent } from '../../types';
+
+interface CandidateOptions {
+  nowMs?: number;
+  maxEvents?: number;
+}
+
+export function selectSalesOutboxCandidates(
+  queue: OutboxEvent[] = [],
+  {
+    nowMs = Date.now(),
+    maxEvents = 20
+  }: CandidateOptions = {}
+): OutboxEvent[] {
   const source = Array.isArray(queue) ? queue : [];
   const limit = Math.max(1, Number(maxEvents || 20));
 

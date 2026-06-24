@@ -13,13 +13,13 @@ const isolatedAuthClient = createClient(
   }
 );
 
-function isMissingDeleteEmployeeFunction(error) {
-  const message = String(error?.message || '').toLowerCase();
+function isMissingDeleteEmployeeFunction(error: unknown): boolean {
+  const message = String((error as { message?: string })?.message || '').toLowerCase();
   return message.includes('delete_employee') && message.includes('does not exist');
 }
 
-function mapAuthSignUpError(error) {
-  const errorMsg = String(error?.message || '');
+function mapAuthSignUpError(error: unknown): Error {
+  const errorMsg = String((error as { message?: string })?.message || '');
 
   if (errorMsg.includes('already registered') || errorMsg === 'User already registered') {
     return new Error('❌ Ya existe un empleado con este nombre de usuario');
@@ -34,8 +34,8 @@ function mapAuthSignUpError(error) {
   return new Error(`❌ Error al crear la cuenta: ${errorMsg || 'Error desconocido'}`);
 }
 
-function mapCreateEmployeeRpcError(error) {
-  const errorMsg = String(error?.message || '');
+function mapCreateEmployeeRpcError(error: unknown): Error {
+  const errorMsg = String((error as { message?: string })?.message || '');
 
   if (errorMsg.includes('23505') || errorMsg.includes('duplicate key')) {
     if (errorMsg.includes('username')) {
@@ -58,13 +58,26 @@ function mapCreateEmployeeRpcError(error) {
   return new Error(`❌ Error al crear el registro: ${errorMsg || 'Error desconocido'}`);
 }
 
+interface CreateEmployeeResult {
+  employeeId: string;
+  username: string;
+  password: string;
+  fullName: string;
+}
+
 export async function createEmployeeWithRpc({
   businessId,
   fullName,
   username,
   password,
   role = 'employee'
-}) {
+}: {
+  businessId: string;
+  fullName: string;
+  username: string;
+  password: string;
+  role?: string;
+}): Promise<CreateEmployeeResult> {
   const cleanUsername = String(username || '').trim().toLowerCase();
   const cleanPassword = String(password || '').trim();
   const cleanFullName = String(fullName || '').trim();
@@ -121,8 +134,11 @@ export async function createEmployeeWithRpc({
 export async function deleteEmployeeWithRpcFallback({
   employeeId,
   businessId
-}) {
-  let finalError = null;
+}: {
+  employeeId: string;
+  businessId: string;
+}): Promise<boolean> {
+  let finalError: unknown = null;
 
   const { error: deleteEmployeeError } = await supabaseAdapter.deleteEmployeeRpc(employeeId);
   if (deleteEmployeeError) {

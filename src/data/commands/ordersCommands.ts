@@ -1,17 +1,25 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
-import { enqueueOutboxMutation } from '../../sync/outboxShadow.js';
-import LOCAL_SYNC_CONFIG from '../../config/localSync.js';
-import { invalidateOrderCache } from '../adapters/cacheInvalidation.js';
+import { enqueueOutboxMutation } from '../../sync/outboxShadow';
+import LOCAL_SYNC_CONFIG from '../../config/localSync';
+import { invalidateOrderCache } from '../adapters/cacheInvalidation';
+import type { Order, OrderItem, Table } from '../../types';
 
-let openCloseRpcCompatibility = 'unknown';
+let openCloseRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
 
-function buildMutationId(prefix, businessId = null) {
+function buildMutationId(prefix: string, businessId: string | null = null): string {
   const nonce = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
   return `${businessId || 'unknown'}:${prefix}:${nonce}`;
 }
 
-function isMissingTablesUpdatedAtColumnError(errorLike) {
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+interface ErrorLike {
+  message?: string;
+  code?: string;
+  status?: number;
+  statusCode?: number;
+}
+
+function isMissingTablesUpdatedAtColumnError(errorLike: unknown): boolean {
+  const message = String((errorLike as ErrorLike)?.message || errorLike || '').toLowerCase();
   return (
     message.includes('column "updated_at"')
     && message.includes('relation "tables"')
@@ -19,8 +27,8 @@ function isMissingTablesUpdatedAtColumnError(errorLike) {
   );
 }
 
-function isMissingTablesOpenedAtColumnError(errorLike) {
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+function isMissingTablesOpenedAtColumnError(errorLike: unknown): boolean {
+  const message = String((errorLike as ErrorLike)?.message || errorLike || '').toLowerCase();
   return (
     message.includes('column "opened_at"')
     && message.includes('relation "tables"')
@@ -28,8 +36,8 @@ function isMissingTablesOpenedAtColumnError(errorLike) {
   );
 }
 
-function isOpenOrderAlreadyExistsForTableError(errorLike) {
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+function isOpenOrderAlreadyExistsForTableError(errorLike: unknown): boolean {
+  const message = String((errorLike as ErrorLike)?.message || errorLike || '').toLowerCase();
   return (
     message.includes('ya existe una orden abierta para la mesa')
     || (
@@ -40,10 +48,10 @@ function isOpenOrderAlreadyExistsForTableError(errorLike) {
   );
 }
 
-function isConflictError(errorLike) {
-  const code = String(errorLike?.code || '').toLowerCase();
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
-  const status = Number(errorLike?.status || errorLike?.statusCode || 0);
+function isConflictError(errorLike: unknown): boolean {
+  const code = String((errorLike as ErrorLike)?.code || '').toLowerCase();
+  const message = String((errorLike as ErrorLike)?.message || errorLike || '').toLowerCase();
+  const status = Number((errorLike as ErrorLike)?.status || (errorLike as ErrorLike)?.statusCode || 0);
   return (
     code === '23505'
     || status === 409
@@ -53,9 +61,9 @@ function isConflictError(errorLike) {
   );
 }
 
-function isOpenCloseRpcMissingError(errorLike) {
-  const code = String(errorLike?.code || '').toLowerCase();
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+function isOpenCloseRpcMissingError(errorLike: unknown): boolean {
+  const code = String((errorLike as ErrorLike)?.code || '').toLowerCase();
+  const message = String((errorLike as ErrorLike)?.message || errorLike || '').toLowerCase();
   return (
     code === '42883'
     || (
@@ -69,34 +77,47 @@ function isOpenCloseRpcMissingError(errorLike) {
   );
 }
 
-function normalizeNumber(value, fallback = 0) {
+function normalizeNumber(value: unknown, fallback: number = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-async function resolveActorUserId(userId = null) {
+async function resolveActorUserId(userId: string | null = null): Promise<string | null> {
   const normalizedUserId = String(userId || '').trim();
   if (normalizedUserId) return normalizedUserId;
   try {
     const { data } = await supabaseAdapter.getCurrentUser();
-    const resolved = String(data?.user?.id || '').trim();
+    const resolved = String((data as { user?: { id?: string } })?.user?.id || '').trim();
     return resolved || null;
   } catch {
     return null;
   }
 }
 
-async function getAssociatedOrderIdsForTable({ businessId, tableId }) {
+async function getAssociatedOrderIdsForTable({
+  businessId,
+  tableId
+}: {
+  businessId: string;
+  tableId: string;
+}): Promise<string[]> {
   if (!businessId || !tableId) return [];
   try {
     const { data, error } = await supabaseAdapter.getOrdersByTableId({ businessId, tableId });
     if (error) return [];
     return (Array.isArray(data) ? data : [])
-      .map((order) => String(order?.id || '').trim())
+      .map((order) => String((order as { id?: string })?.id || '').trim())
       .filter(Boolean);
   } catch {
     return [];
   }
+}
+
+interface PurgeOptions {
+  businessId: string;
+  tableId: string;
+  orderIds?: string[];
+  preserveMutationIds?: string[];
 }
 
 async function purgeLocalTableCascadeArtifacts({
@@ -104,7 +125,7 @@ async function purgeLocalTableCascadeArtifacts({
   tableId,
   orderIds = [],
   preserveMutationIds = []
-}) {
+}: PurgeOptions): Promise<void> {
   if (!businessId || !tableId) return;
   if (!LOCAL_SYNC_CONFIG.enabled) return;
   void preserveMutationIds;
@@ -115,7 +136,17 @@ async function purgeLocalTableCascadeArtifacts({
   }
 }
 
-export async function createTable({ businessId, tableNumber }) {
+interface TableCreateResult extends Partial<Table> {
+  __localOnly: boolean;
+}
+
+export async function createTable({
+  businessId,
+  tableNumber
+}: {
+  businessId: string;
+  tableNumber: string;
+}): Promise<TableCreateResult> {
   const { data, error } = await supabaseAdapter.insertTable({
     business_id: businessId,
     table_number: tableNumber,
@@ -139,7 +170,21 @@ export async function createTable({ businessId, tableNumber }) {
   };
 }
 
-export async function createOrderAndOccupyTable({ businessId, tableId, userId = null }) {
+interface OrderResult extends Partial<Order> {
+  __localOnly: boolean;
+  __rpc?: boolean;
+  __recoveredExistingOrder?: boolean;
+}
+
+export async function createOrderAndOccupyTable({
+  businessId,
+  tableId,
+  userId = null
+}: {
+  businessId: string;
+  tableId: string;
+  userId?: string | null;
+}): Promise<OrderResult> {
   const actorUserId = await resolveActorUserId(userId);
 
   if (openCloseRpcCompatibility !== 'unsupported' && actorUserId) {
@@ -152,7 +197,7 @@ export async function createOrderAndOccupyTable({ businessId, tableId, userId = 
     if (!rpcError) {
       openCloseRpcCompatibility = 'supported';
       const rpcRow = Array.isArray(rpcData) ? rpcData[0] : rpcData;
-      const orderId = String(rpcRow?.current_order_id || '').trim();
+      const orderId = String((rpcRow as { current_order_id?: string })?.current_order_id || '').trim();
       if (!orderId) {
         throw new Error('open_close_table_transaction no devolvió current_order_id');
       }
@@ -171,15 +216,14 @@ export async function createOrderAndOccupyTable({ businessId, tableId, userId = 
 
       return {
         id: orderId,
-        business_id: String(rpcRow?.business_id || businessId || '').trim() || businessId,
+        business_id: String((rpcRow as { business_id?: string })?.business_id || businessId || '').trim() || businessId,
         table_id: tableId,
-        user_id: actorUserId,
         status: 'open',
         total: 0,
-        opened_at: rpcRow?.opened_at || null,
+        opened_at: (rpcRow as { opened_at?: string })?.opened_at || null,
         __localOnly: false,
         __rpc: true
-      };
+      } as OrderResult;
     }
 
     if (
@@ -209,11 +253,11 @@ export async function createOrderAndOccupyTable({ businessId, tableId, userId = 
       );
       if (!openOrdersError) {
         const recoveredOrder = (openOrders || []).find(
-          (order) => String(order?.table_id || '') === String(tableId || '')
+          (order) => String((order as { table_id?: string })?.table_id || '') === String(tableId || '')
         );
-        if (recoveredOrder?.id) {
+        if ((recoveredOrder as { id?: string })?.id) {
           const { error: recoverTableError } = await supabaseAdapter.updateTableById(tableId, {
-            current_order_id: recoveredOrder.id,
+            current_order_id: (recoveredOrder as unknown as { id: string }).id,
             status: 'occupied'
           });
           if (
@@ -224,12 +268,12 @@ export async function createOrderAndOccupyTable({ businessId, tableId, userId = 
             throw recoverTableError;
           }
 
-          await invalidateOrderCache({ businessId, tableId, orderId: recoveredOrder.id });
+          await invalidateOrderCache({ businessId, tableId, orderId: (recoveredOrder as unknown as { id: string }).id });
           return {
-            ...recoveredOrder,
+            ...(recoveredOrder as unknown as Record<string, unknown>),
             __localOnly: false,
             __recoveredExistingOrder: true
-          };
+          } as OrderResult;
         }
       }
     }
@@ -265,7 +309,15 @@ export async function createOrderAndOccupyTable({ businessId, tableId, userId = 
   };
 }
 
-export async function updateOrderTotalById({ orderId, total, businessId = null }) {
+export async function updateOrderTotalById({
+  orderId,
+  total,
+  businessId = null
+}: {
+  orderId: string;
+  total: number;
+  businessId?: string | null;
+}): Promise<{ id: string; total: number; __localOnly: boolean }> {
   const { error } = await supabaseAdapter.updateOrderById(orderId, { total });
   if (error) throw error;
 
@@ -288,9 +340,9 @@ export async function updateOrderTotalById({ orderId, total, businessId = null }
 }
 
 export async function persistOrderItemQuantities(
-  pendingEntries = [],
-  { businessId = null, orderId = null } = {}
-) {
+  pendingEntries: Array<[string, number]> = [],
+  { businessId = null, orderId = null }: { businessId?: string | null; orderId?: string | null } = {}
+): Promise<{ __localOnly: boolean; updatedCount: number }> {
   if (!Array.isArray(pendingEntries) || pendingEntries.length === 0) {
     return {
       __localOnly: false,
@@ -324,7 +376,10 @@ export async function persistOrderItemQuantities(
   };
 }
 
-export async function deleteOrderItemById(itemId, { businessId = null, orderId = null } = {}) {
+export async function deleteOrderItemById(
+  itemId: string,
+  { businessId = null, orderId = null }: { businessId?: string | null; orderId?: string | null } = {}
+): Promise<{ id: string; __localOnly: boolean }> {
   const { error } = await supabaseAdapter.deleteOrderItemById(itemId);
   if (error) throw error;
 
@@ -351,7 +406,13 @@ export async function updateOrderItemQuantityById({
   businessId = null,
   orderId = null,
   preferLocal = false
-}) {
+}: {
+  itemId: string;
+  quantity: number;
+  businessId?: string | null;
+  orderId?: string | null;
+  preferLocal?: boolean;
+}): Promise<{ id: string; quantity: number; __localOnly: boolean }> {
   void preferLocal;
 
   const { error } = await supabaseAdapter.updateOrderItemById(itemId, { quantity });
@@ -376,17 +437,37 @@ export async function updateOrderItemQuantityById({
   };
 }
 
-export async function getOrderItemById({ itemId, selectSql }) {
+export async function getOrderItemById({
+  itemId,
+  selectSql
+}: {
+  itemId: string;
+  selectSql?: string;
+}): Promise<Partial<OrderItem> | null> {
   const { data, error } = await supabaseAdapter.getOrderItemById(itemId, selectSql);
   if (error) throw error;
-  return data || null;
+  return (data as Partial<OrderItem>) || null;
+}
+
+interface OrderItemRow {
+  order_id?: string;
+  product_id?: string | null;
+  combo_id?: string | null;
+  quantity?: number;
+  price?: number;
+  id?: string;
+  [key: string]: unknown;
 }
 
 async function mergeDuplicateOrderItemInsert({
   row,
   businessId = null,
   selectSql = 'id'
-}) {
+}: {
+  row: OrderItemRow;
+  businessId?: string | null;
+  selectSql?: string;
+}): Promise<Record<string, unknown> | null> {
   const orderId = row?.order_id || null;
   const productId = row?.product_id || null;
   const comboId = row?.combo_id || null;
@@ -399,14 +480,14 @@ async function mergeDuplicateOrderItemInsert({
     comboId,
     selectSql: 'id, quantity, price'
   });
-  if (findError || !existingItem?.id) return null;
+  if (findError || !(existingItem as { id?: string })?.id) return null;
 
-  const currentQty = normalizeNumber(existingItem.quantity, 0);
+  const currentQty = normalizeNumber((existingItem as { quantity?: number })?.quantity, 0);
   const incomingQty = normalizeNumber(row?.quantity, 0);
   const nextQuantity = currentQty + incomingQty;
 
   await updateOrderItemQuantityById({
-    itemId: existingItem.id,
+    itemId: (existingItem as { id: string }).id,
     quantity: nextQuantity,
     businessId,
     orderId
@@ -414,21 +495,21 @@ async function mergeDuplicateOrderItemInsert({
 
   if (selectSql && selectSql !== 'id') {
     const { data: refreshed, error: refreshedError } = await supabaseAdapter.getOrderItemById(
-      existingItem.id,
+      (existingItem as { id: string }).id,
       selectSql
     );
     if (!refreshedError && refreshed) {
       return {
-        ...refreshed,
+        ...(refreshed as unknown as Record<string, unknown>),
         __localOnly: false,
         __resolvedConflictAsUpdate: true
-      };
+      } as Record<string, unknown>;
     }
   }
 
-  const price = normalizeNumber(existingItem.price, normalizeNumber(row?.price, 0));
+  const price = normalizeNumber((existingItem as { price?: number })?.price, normalizeNumber(row?.price, 0));
   return {
-    id: existingItem.id,
+    id: (existingItem as { id: string }).id,
     order_id: orderId,
     product_id: productId,
     combo_id: comboId,
@@ -445,7 +526,12 @@ export async function insertOrderItem({
   selectSql = 'id',
   businessId = null,
   preferLocal = false
-}) {
+}: {
+  row: OrderItemRow;
+  selectSql?: string;
+  businessId?: string | null;
+  preferLocal?: boolean;
+}): Promise<Record<string, unknown>> {
   void preferLocal;
 
   const { data, error } = await supabaseAdapter.insertOrderItem(row, selectSql);
@@ -469,7 +555,7 @@ export async function insertOrderItem({
     mutationType: 'order.item.insert',
     payload: {
       order_id: row?.order_id || null,
-      item_id: data?.id || null,
+      item_id: (data as unknown as Record<string, unknown>)?.id || null,
       product_id: row?.product_id || null,
       combo_id: row?.combo_id || null,
       quantity: Number(row?.quantity || 0),
@@ -480,9 +566,9 @@ export async function insertOrderItem({
   await invalidateOrderCache({ businessId, orderId: row?.order_id || null });
 
   return {
-    ...(data || {}),
+    ...(data as unknown as Record<string, unknown> || {}),
     __localOnly: false
-  };
+  } as Record<string, unknown>;
 }
 
 export async function deleteOrderAndReleaseTable({
@@ -490,7 +576,12 @@ export async function deleteOrderAndReleaseTable({
   tableId,
   businessId = null,
   userId = null
-}) {
+}: {
+  orderId: string;
+  tableId: string;
+  businessId?: string | null;
+  userId?: string | null;
+}): Promise<{ order_id: string; table_id: string; __localOnly: boolean }> {
   let releasedViaRpc = false;
   const actorUserId = await resolveActorUserId(userId);
 
@@ -559,8 +650,11 @@ export async function deleteOrderAndReleaseTable({
   };
 }
 
-export async function deleteTableCascadeOrders(tableId, { businessId = null } = {}) {
-  const associatedOrderIds = await getAssociatedOrderIdsForTable({ businessId, tableId });
+export async function deleteTableCascadeOrders(
+  tableId: string,
+  { businessId = null }: { businessId?: string | null } = {}
+): Promise<{ table_id: string; __localOnly: boolean }> {
+  const associatedOrderIds = await getAssociatedOrderIdsForTable({ businessId: businessId!, tableId });
 
   const { error: releaseTableError } = businessId
     ? await supabaseAdapter.updateTableByBusinessAndId({
@@ -603,7 +697,7 @@ export async function deleteTableCascadeOrders(tableId, { businessId = null } = 
     mutationId
   });
   await purgeLocalTableCascadeArtifacts({
-    businessId,
+    businessId: businessId!,
     tableId,
     orderIds: associatedOrderIds,
     preserveMutationIds: [mutationId]

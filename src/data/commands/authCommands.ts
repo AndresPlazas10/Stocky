@@ -1,6 +1,24 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
+import type { Business } from '../../types';
 
-export function normalizeUsernameToEmail(username) {
+interface NormalizeUsernameResult {
+  cleanUsername: string;
+  email: string;
+}
+
+interface SignInResult {
+  user: Record<string, unknown> | null;
+  session: Record<string, unknown> | null;
+  username: string;
+}
+
+interface SignUpResult {
+  authData: Record<string, unknown> | null;
+  cleanUsername: string;
+  cleanEmail: string;
+}
+
+export function normalizeUsernameToEmail(username: string): NormalizeUsernameResult {
   const cleanUsername = String(username || '').trim().toLowerCase();
   return {
     cleanUsername,
@@ -11,7 +29,10 @@ export function normalizeUsernameToEmail(username) {
 export async function signInWithUsernamePassword({
   username,
   password
-}) {
+}: {
+  username: string;
+  password: string;
+}): Promise<SignInResult> {
   const { cleanUsername, email } = normalizeUsernameToEmail(username);
   const { data, error } = await supabaseAdapter.signInWithPassword({
     email,
@@ -21,8 +42,8 @@ export async function signInWithUsernamePassword({
     throw new Error('❌ Usuario o contraseña incorrectos');
   }
   return {
-    user: data?.user || null,
-    session: data?.session || null,
+    user: (data?.user as unknown as Record<string, unknown>) || null,
+    session: (data?.session as unknown as Record<string, unknown>) || null,
     username: cleanUsername
   };
 }
@@ -32,7 +53,12 @@ export async function signUpBusinessOwner({
   password,
   businessName,
   emailRedirectTo
-}) {
+}: {
+  username: string;
+  password: string;
+  businessName: string;
+  emailRedirectTo?: string;
+}): Promise<SignUpResult> {
   const { cleanUsername, email } = normalizeUsernameToEmail(username);
 
   const { data, error } = await supabaseAdapter.signUpWithPassword({
@@ -49,25 +75,36 @@ export async function signUpBusinessOwner({
 
   if (error) throw error;
   return {
-    authData: data || null,
+    authData: (data as Record<string, unknown>) || null,
     cleanUsername,
     cleanEmail: email
   };
 }
 
-export async function signOutSession() {
+export async function signOutSession(): Promise<boolean> {
   const { error } = await supabaseAdapter.signOut();
   if (error) throw error;
   return true;
 }
 
-export async function signOutGlobalSession() {
+export async function signOutGlobalSession(): Promise<boolean> {
   const { error } = await supabaseAdapter.signOutGlobal();
   if (error) throw error;
   return true;
 }
 
-export async function createBusinessRecord(payload) {
+interface BusinessPayload {
+  name?: string;
+  nit?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  username?: string;
+  created_at?: string;
+  [key: string]: unknown;
+}
+
+export async function createBusinessRecord(payload: BusinessPayload): Promise<Partial<Business> | null> {
   const createdAt = String(payload?.created_at || '').trim() || new Date().toISOString();
   const normalizedPayload = {
     ...payload,
@@ -106,7 +143,7 @@ export async function createBusinessRecord(payload) {
   return data || null;
 }
 
-export async function createEmployeeRecord(payload) {
+export async function createEmployeeRecord(payload: Record<string, unknown>): Promise<Record<string, unknown> | null> {
   const { data, error } = await supabaseAdapter.insertEmployee(payload);
   if (error) throw error;
   return data || null;

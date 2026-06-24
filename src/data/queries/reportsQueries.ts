@@ -1,10 +1,26 @@
 import { readAdapter } from '../adapters/localAdapter';
 
+interface ReportsSnapshot {
+  ventas: unknown[];
+  compras: unknown[];
+  productos: unknown[];
+  totalProveedores: number;
+  totalFacturas: number;
+  saleDetails: unknown[];
+  comboSaleDetails: unknown[];
+  combos: unknown[];
+  purchaseProducts: unknown[];
+}
+
 export async function getReportsSnapshot({
   businessId,
   start,
   end
-}) {
+}: {
+  businessId: string;
+  start: string;
+  end: string;
+}): Promise<ReportsSnapshot> {
   const [
     { data: ventas, error: ventasError },
     { data: compras, error: comprasError },
