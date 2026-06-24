@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getFilteredSales } from '../../services/salesService';
 import { recordSaleCreationTime } from '../../services/salesServiceOptimized';
-import { fetchComboCatalog } from '../../services/combosService.js';
+import { fetchComboCatalog } from '../../services/combosService';
 import {
   createSaleWithOutbox,
   deleteSaleWithDetails,
@@ -20,16 +20,16 @@ import {
   getSaleCashMetadataBySaleId,
   getSaleDetailsBySaleId,
   getSaleForPrintById
-} from '../../data/queries/salesQueries.js';
+} from '../../data/queries/salesQueries';
 import {
   getAuthenticatedUser,
   isEmployeeInBusiness,
   getEmployeeRoleInBusiness
-} from '../../data/queries/authQueries.js';
+} from '../../data/queries/authQueries';
 import { isAdminRole } from '../../utils/roles.js';
 import SalesFilters from '../Filters/SalesFilters';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
-import { formatPrice, formatDate, formatDateOnly } from '../../utils/formatters.js';
+import { formatPrice, formatDate, formatDateOnly } from '../../utils/formatters';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { isAutoPrintReceiptEnabled } from '../../utils/printer.js';
 import { printSaleReceipt } from '../../utils/saleReceiptPrint.js';
@@ -1506,7 +1506,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <Input
                           type="text"
-                          className="pl-9 h-11 rounded-xl border-gray-300 focus:border-[#edb886] focus:ring-[#edb886]"
+                          className="pl-9 h-11 rounded-xl border-gray-300 focus:border-[#66A5AD] focus:ring-[#66A5AD]"
                           placeholder="Buscar producto o combo..."
                           value={searchProduct}
                           onChange={(e) => setSearchProduct(e.target.value)}
@@ -1613,7 +1613,7 @@ function Ventas({ businessId, userRole = 'admin' }) {
                           <select
                             value={selectedCustomer}
                             onChange={(e) => setSelectedCustomer(e.target.value)}
-                            className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#edb886] focus:ring-[#edb886] transition-all duration-300"
+                            className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#66A5AD] focus:ring-[#66A5AD] transition-all duration-300"
                           >
                             <option value="">Venta general</option>
                             {clientes.map((cliente) => (

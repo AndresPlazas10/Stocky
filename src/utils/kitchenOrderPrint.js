@@ -1,5 +1,5 @@
 import { getThermalPaperWidthMm } from '../utils/printer.js';
-import { formatDateTimeTicket, formatPrice } from '../utils/formatters.js';
+import { formatDateTimeTicket, formatPrice } from '../utils/formatters';
 
 const buildKitchenOrderHtml = (itemsParaCocina, tableNumber, status, orderTotal) => {
   const printerWidthMm = getThermalPaperWidthMm();

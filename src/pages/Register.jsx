@@ -7,7 +7,7 @@ import {
   getOwnedBusinessByUserId,
   getCurrentSession,
   isBusinessUsernameTaken
-} from '../data/queries/authQueries.js';
+} from '../data/queries/authQueries';
 import {
   createBusinessRecord,
   createEmployeeRecord,
@@ -15,7 +15,7 @@ import {
   signInWithUsernamePassword,
   signOutSession,
   signUpBusinessOwner
-} from '../data/commands/authCommands.js';
+} from '../data/commands/authCommands';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';

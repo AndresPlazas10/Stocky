@@ -1,4 +1,4 @@
-import { LOCAL_SYNC_CONFIG } from '../config/localSync.js';
+import { LOCAL_SYNC_CONFIG } from '../config/localSync';
 import { initLocalDbClient, closeLocalDbClient, getLocalDbClientState } from '../localdb/client.js';
 import { processOutboxTick } from './outboxProcessor.js';
 import { listReconciliationConflicts, reconcileLocalState } from './reconciler.js';

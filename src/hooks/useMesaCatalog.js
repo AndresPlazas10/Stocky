@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../utils/offlineSnapshot.js';
-import { getProductsForOrdersByBusiness } from '../data/queries/ordersQueries.js';
-import { fetchComboCatalog } from '../services/combosService.js';
+import { getProductsForOrdersByBusiness } from '../data/queries/ordersQueries';
+import { fetchComboCatalog } from '../services/combosService';
 
 export function useMesaCatalog({ businessId, setProductos, setCombos, setError }) {
   const catalogWarmupPromiseRef = useRef(null);

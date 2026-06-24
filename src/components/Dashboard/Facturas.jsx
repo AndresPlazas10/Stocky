@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
-import { formatPrice, formatDate } from '../../utils/formatters.js';
+import { formatPrice, formatDate } from '../../utils/formatters';
 import { AnimatePresence } from 'framer-motion';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
@@ -12,7 +12,7 @@ import {
   createInvoiceWithItemsAndStock,
   deleteInvoiceCascade,
   markInvoiceAsSent
-} from '../../data/commands/invoicesCommands.js';
+} from '../../data/commands/invoicesCommands';
 import {
   getBusinessContextByUserId,
   getInvoiceItemsByInvoiceId,
@@ -20,8 +20,8 @@ import {
   getInvoicesWithItemsByBusiness,
   getProductsForInvoicesByBusiness,
   getProductsStockByIds
-} from '../../data/queries/invoicesQueries.js';
-import { getAuthenticatedUser } from '../../data/queries/authQueries.js';
+} from '../../data/queries/invoicesQueries';
+import { getAuthenticatedUser } from '../../data/queries/authQueries';
 
 const INVOICE_LIST_COLUMNS = `
   id,

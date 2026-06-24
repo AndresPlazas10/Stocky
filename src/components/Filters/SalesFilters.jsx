@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { getSalesSellersByBusiness } from '../../data/queries/authQueries.js';
+import { getSalesSellersByBusiness } from '../../data/queries/authQueries';
 import { Calendar, User, Filter, X, Receipt } from 'lucide-react';
 
 const SalesFilters = React.memo(function SalesFilters({ businessId, onApply, onClear }) {

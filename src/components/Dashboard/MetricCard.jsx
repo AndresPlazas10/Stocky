@@ -122,7 +122,7 @@ export function MetricCard({
         <motion.div
           className="absolute inset-0 border-2 border-transparent rounded-2xl"
           whileHover={{
-            borderColor: variant === 'default' ? '#ffe498' : undefined,
+            borderColor: variant === 'default' ? '#C4DFE6' : undefined,
             boxShadow: '0 0 20px rgba(102, 165, 173, 0.3)',
           }}
           transition={{ duration: 0.3 }}

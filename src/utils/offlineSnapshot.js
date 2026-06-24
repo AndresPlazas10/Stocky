@@ -9,9 +9,6 @@ function canUseStorage() {
 export function isOfflinePersistenceEnabled() {
   if (typeof window === 'undefined') return false;
 
-  const desktopRuntime = window?.stockyDesktop?.isDesktop === true;
-  if (desktopRuntime) return true;
-
   const flag = String(import.meta?.env?.VITE_ENABLE_OFFLINE_SNAPSHOT || '').trim().toLowerCase();
   return flag === '1' || flag === 'true' || flag === 'yes';
 }

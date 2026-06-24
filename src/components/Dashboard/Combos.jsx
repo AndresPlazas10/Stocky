@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Layers, Plus, X, Edit, Package, Save, Trash2, AlertCircle } from 'lucide-react';
-import { formatPrice } from '../../utils/formatters.js';
-import { getProductsForCombos } from '../../data/queries/combosQueries.js';
+import { formatPrice } from '../../utils/formatters';
+import { getProductsForCombos } from '../../data/queries/combosQueries';
 import {
   COMBO_STATUS,
   createCombo,
   deleteCombo,
   fetchCombos,
   updateCombo
-} from '../../services/combosService.js';
+} from '../../services/combosService';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';

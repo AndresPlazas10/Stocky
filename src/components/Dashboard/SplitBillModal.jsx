@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { X, Plus, Trash2, CheckCircle2, CreditCard, DollarSign } from 'lucide-react';
-import { formatPrice } from '../../utils/formatters.js';
+import { formatPrice } from '../../utils/formatters';
 import { calcularCambio } from '../../utils/cambio.js';
 
 const MAX_SUB_ACCOUNTS = 10;

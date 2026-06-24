@@ -3,11 +3,11 @@ import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
-import { getSuppliersForManagementPage } from '../../data/queries/suppliersQueries.js';
+import { getSuppliersForManagementPage } from '../../data/queries/suppliersQueries';
 import {
   deleteSupplierById,
   saveSupplierWithTaxFallback
-} from '../../data/commands/suppliersCommands.js';
+} from '../../data/commands/suppliersCommands';
 
 import { 
   Trash2, 
@@ -306,7 +306,7 @@ function Proveedores({ businessId }) {
   }, [success]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#ffe498]/10 p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#C4DFE6]/10 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         
         {/* Header */}
@@ -371,12 +371,12 @@ function Proveedores({ businessId }) {
                 placeholder="Buscar por empresa, contacto, email o NIT..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
+                className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
               />
             </div>
             
             <div className="flex gap-4">
-              <div className="px-6 py-3 bg-gradient-to-br from-accent-500/10 to-[#ffe498]/10 rounded-xl">
+              <div className="px-6 py-3 bg-gradient-to-br from-accent-500/10 to-[#C4DFE6]/10 rounded-xl">
                 <div className="text-2xl font-bold text-accent-600">{proveedores.length}</div>
                 <div className="text-sm text-gray-600">Total Proveedores</div>
               </div>
@@ -394,13 +394,13 @@ function Proveedores({ businessId }) {
           {loading && proveedores.length === 0 ? (
             <div className="flex items-center justify-center py-20">
               <div className="flex flex-col items-center gap-4">
-                <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#ffe498] border-t-transparent"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#C4DFE6] border-t-transparent"></div>
                 <p className="text-gray-600">Cargando proveedores...</p>
               </div>
             </div>
           ) : proveedores.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 px-6">
-              <div className="p-6 bg-gradient-to-br from-accent-500/10 to-[#ffe498]/10 rounded-full mb-6">
+              <div className="p-6 bg-gradient-to-br from-accent-500/10 to-[#C4DFE6]/10 rounded-full mb-6">
                 <Package className="w-16 h-16 text-accent-600" />
               </div>
               <h3 className="text-2xl font-bold text-gray-800 mb-2">No hay proveedores registrados</h3>
@@ -639,7 +639,7 @@ function Proveedores({ businessId }) {
                       onChange={handleChange}
                       placeholder="Ej: Distribuidora ABC S.A.S"
                       required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
                     />
                   </div>
 
@@ -656,7 +656,7 @@ function Proveedores({ businessId }) {
                         value={formData.contact_name}
                         onChange={handleChange}
                         placeholder="Ej: Juan Pérez"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
                       />
                     </div>
 
@@ -671,7 +671,7 @@ function Proveedores({ businessId }) {
                         value={formData.nit}
                         onChange={handleChange}
                         placeholder="123456789-0"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
                       />
                     </div>
                   </div>
@@ -689,7 +689,7 @@ function Proveedores({ businessId }) {
                         value={formData.email}
                         onChange={handleChange}
                         placeholder="contacto@empresa.com"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
                       />
                     </div>
 
@@ -704,7 +704,7 @@ function Proveedores({ businessId }) {
                         value={formData.phone}
                         onChange={handleChange}
                         placeholder="+57 300 123 4567"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
                       />
                     </div>
                   </div>
@@ -721,7 +721,7 @@ function Proveedores({ businessId }) {
                         value={formData.address}
                         onChange={handleChange}
                         placeholder="Calle 123 #45-67, Bogotá"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
                       />
                     </div>
 
@@ -736,7 +736,7 @@ function Proveedores({ businessId }) {
                         onChange={handleChange}
                         placeholder="Información adicional sobre el proveedor, términos de pago, etc..."
                         rows="3"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all resize-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all resize-none"
                       />
                     </div>
                   </div>
@@ -758,7 +758,7 @@ function Proveedores({ businessId }) {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="order-1 sm:order-2 w-full sm:flex-1 h-10 sm:h-10 px-4 gradient-primary hover:from-[#f1c691] hover:to-[#edb886] text-white rounded-lg font-medium text-sm transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                    className="order-1 sm:order-2 w-full sm:flex-1 h-10 sm:h-10 px-4 gradient-primary hover:from-[#99D3DB] hover:to-[#66A5AD] text-white rounded-lg font-medium text-sm transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                   >
                     {isSubmitting ? (
                       <>

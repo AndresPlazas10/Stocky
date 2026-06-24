@@ -3,7 +3,7 @@ import { Search } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { formatPrice } from '../../utils/formatters.js';
+import { formatPrice } from '../../utils/formatters';
 
 const ORDER_ITEM_TYPE = { PRODUCT: 'product', COMBO: 'combo' };
 

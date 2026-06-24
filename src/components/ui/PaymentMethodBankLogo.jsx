@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getPaymentMethodLogoCandidates, isBankPaymentMethod } from '../../utils/paymentMethodBranding.js';
+import { getPaymentMethodLogoCandidates, isBankPaymentMethod } from '../../utils/paymentMethodBranding';
 
 const getPaymentMethodLabel = (method) => {
   if (method === 'cash') return 'Efectivo';

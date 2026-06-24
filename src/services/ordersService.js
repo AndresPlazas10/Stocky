@@ -4,7 +4,7 @@
  */
 
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
-import { isAdminRole } from '../utils/roles.js';
+import { isAdminRole } from '../utils/roles';
 import { enqueueOutboxMutation } from '../sync/outboxShadow.js';
 import { notifyAdminLowStockWeb, notifyAdminSaleRegisteredWeb } from './webNotificationsService.js';
 import { createSaleWithOutbox } from '../data/commands/salesCommands.js';

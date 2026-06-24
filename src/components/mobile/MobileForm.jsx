@@ -40,7 +40,7 @@ export function MobileInput({
             transition-all duration-200
             ${error 
               ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-200' 
-              : 'border-gray-300 focus:border-[#edb886] focus:ring-2 focus:ring-[#edb886]/20'
+              : 'border-gray-300 focus:border-[#66A5AD] focus:ring-2 focus:ring-[#66A5AD]/20'
             }
             placeholder:text-gray-400
             disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
@@ -83,7 +83,7 @@ export function MobileTextarea({ label, error, helperText, rows = 4, ...props })
           resize-none
           ${error 
             ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-200' 
-            : 'border-gray-300 focus:border-[#edb886] focus:ring-2 focus:ring-[#edb886]/20'
+            : 'border-gray-300 focus:border-[#66A5AD] focus:ring-2 focus:ring-[#66A5AD]/20'
           }
           placeholder:text-gray-400
           disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
@@ -123,7 +123,7 @@ export function MobileSelect({ label, error, helperText, options = [], ...props 
           transition-all duration-200
           ${error 
             ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-200' 
-            : 'border-gray-300 focus:border-[#edb886] focus:ring-2 focus:ring-[#edb886]/20'
+            : 'border-gray-300 focus:border-[#66A5AD] focus:ring-2 focus:ring-[#66A5AD]/20'
           }
           disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
         `}

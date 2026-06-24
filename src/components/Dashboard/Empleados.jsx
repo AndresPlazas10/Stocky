@@ -8,11 +8,11 @@ import {
   getBusinessUsernameById,
   getEmployeesForManagementPage,
   isEmployeeUsernameTaken
-} from '../../data/queries/employeesQueries.js';
+} from '../../data/queries/employeesQueries';
 import {
   createEmployeeWithRpc,
   deleteEmployeeWithRpcFallback
-} from '../../data/commands/employeesCommands.js';
+} from '../../data/commands/employeesCommands';
 import { 
   Trash2, 
   Users, 
@@ -358,7 +358,7 @@ function Empleados({ businessId }) {
   }, [error, success]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#ffe498]/10 p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#C4DFE6]/10 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         
         {/* Header */}

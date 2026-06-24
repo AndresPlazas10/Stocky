@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
-import { formatPrice } from '../../utils/formatters.js';
-import { getReportsSnapshot } from '../../data/queries/reportsQueries.js';
+import { formatPrice } from '../../utils/formatters';
+import { getReportsSnapshot } from '../../data/queries/reportsQueries';
 import {
   TrendingUp,
   TrendingDown,
@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
-import { isBankPaymentMethod } from '../../utils/paymentMethodBranding.js';
+import { isBankPaymentMethod } from '../../utils/paymentMethodBranding';
 import { PaymentMethodBankLogo } from '../ui/PaymentMethodBankLogo';
 
 
@@ -322,7 +322,7 @@ function Reportes({ businessId }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#ffe498]/10 p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#C4DFE6]/10 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         
         {/* Header */}
@@ -347,7 +347,7 @@ function Reportes({ businessId }) {
               <select
                 value={selectedPeriod}
                 onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#ffe498] focus:border-transparent transition-all bg-white font-medium"
+                className="px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all bg-white font-medium"
               >
                 <option value="today">Hoy</option>
                 <option value="week">Última Semana</option>
@@ -488,7 +488,7 @@ function Reportes({ businessId }) {
               {/* Productos Activos */}
               <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-gradient-to-br from-accent-500/10 to-[#ffe498]/10 rounded-xl">
+                  <div className="p-3 bg-gradient-to-br from-accent-500/10 to-[#C4DFE6]/10 rounded-xl">
                     <Package className="w-8 h-8 text-accent-600" />
                   </div>
                   <div className="text-right">
@@ -497,7 +497,7 @@ function Reportes({ businessId }) {
                 </div>
                 <p className="text-gray-600 font-medium">Productos Activos</p>
                 <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-accent-500 to-[#ffe498]" style={{ width: '100%' }}></div>
+                  <div className="h-full bg-gradient-to-r from-accent-500 to-[#C4DFE6]" style={{ width: '100%' }}></div>
                 </div>
               </div>
 

@@ -4,9 +4,9 @@
  */
 
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
-import { isAdminRole } from '../utils/roles.js';
-import { buildUtcRangeFromLocalDates } from '../utils/dateRange.js';
-import { logger } from '../utils/logger.js';
+import { isAdminRole } from '../utils/roles';
+import { buildUtcRangeFromLocalDates } from '../utils/dateRange';
+import { logger } from '../utils/logger';
 
 const SALES_LIST_COLUMNS = `
   id,

@@ -1,4 +1,4 @@
-import baseLogger from './logger.js';
+import baseLogger from './logger';
 
 /**
  * Compat layer para código legado que importe productionLogger.

@@ -1,4 +1,4 @@
-import { LOCAL_SYNC_CONFIG } from '../config/localSync.js';
+import { LOCAL_SYNC_CONFIG } from '../config/localSync';
 import { enqueueLocalOutboxEvent } from '../localdb/outboxEventsStore.js';
 
 export async function enqueueOutboxMutation({

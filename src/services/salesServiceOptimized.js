@@ -4,7 +4,7 @@
  */
 
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
-import { isAdminRole } from '../utils/roles.js';
+import { isAdminRole } from '../utils/roles';
 import { notifyAdminLowStockWeb } from './webNotificationsService.js';
 
 function isFunctionUnavailableError(errorLike, functionName) {

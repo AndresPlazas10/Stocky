@@ -10,7 +10,7 @@ import {
   registerPwaPushSubscription,
   sendPwaPushTestNotification,
 } from '../services/pwaPushNotificationsService.js';
-import { isAndroid, isIOs, isStandalone } from '../utils/deviceDetection.js';
+import { isAndroid, isIOs, isStandalone } from '../utils/deviceDetection';
 
 
 // ── Animation variants (creados una sola vez) ──
