@@ -1,18 +1,36 @@
-/**
- * 📧 Email Validation & Configuration Utilities
- * 
- * Implementa validaciones robustas y configuración para prevenir
- * bounced emails y mantener buena reputación del dominio.
- * 
- * Recomendaciones de Supabase aplicadas:
- * ✅ Validación estricta de formato de email
- * ✅ Verificación de dominios descartables
- * ✅ Modo testing para desarrollo local
- * ✅ Logging de intentos de envío
- */
+interface EmailValidationResult {
+  valid: boolean;
+  error?: string;
+  normalized?: string;
+}
+
+interface ShouldSendEmailResult {
+  shouldSend: boolean;
+  reason?: string;
+  testEmail?: string;
+  email?: string;
+}
+
+interface EmailLogEntry {
+  timestamp: string;
+  environment: string;
+  type: string;
+  email: string;
+  success: boolean;
+  skipped: boolean;
+  error?: string | Error | null;
+}
+
+interface EmailStats {
+  total: number;
+  success: number;
+  failed: number;
+  skipped: number;
+  lastAttempt: EmailLogEntry | null;
+}
 
 // Lista de dominios descartables/temporales comunes
-const DISPOSABLE_EMAIL_DOMAINS = [
+const DISPOSABLE_EMAIL_DOMAINS: string[] = [
   'tempmail.com',
   'guerrillamail.com',
   'mailinator.com',
@@ -25,24 +43,10 @@ const DISPOSABLE_EMAIL_DOMAINS = [
   'sharklasers.com'
 ];
 
-// Lista de dominios válidos comunes (para referencia)
-const COMMON_EMAIL_PROVIDERS = [
-  'gmail.com',
-  'outlook.com',
-  'hotmail.com',
-  'yahoo.com',
-  'icloud.com',
-  'live.com',
-  'msn.com',
-  'protonmail.com'
-];
-
 /**
  * Valida el formato de un email con regex estricto
- * @param {string} email - Email a validar
- * @returns {boolean}
  */
-export const isValidEmailFormat = (email) => {
+export const isValidEmailFormat = (email: string | null | undefined): boolean => {
   if (!email || typeof email !== 'string') {
     return false;
   }
@@ -55,10 +59,8 @@ export const isValidEmailFormat = (email) => {
 
 /**
  * Verifica si el email es de un dominio descartable/temporal
- * @param {string} email - Email a verificar
- * @returns {boolean}
  */
-export const isDisposableEmail = (email) => {
+export const isDisposableEmail = (email: string | null | undefined): boolean => {
   if (!email || typeof email !== 'string') {
     return true;
   }
@@ -74,10 +76,8 @@ export const isDisposableEmail = (email) => {
 
 /**
  * Normaliza un email (lowercase, trim)
- * @param {string} email - Email a normalizar
- * @returns {string}
  */
-export const normalizeEmail = (email) => {
+export const normalizeEmail = (email: string | null | undefined): string => {
   if (!email || typeof email !== 'string') {
     return '';
   }
@@ -87,10 +87,8 @@ export const normalizeEmail = (email) => {
 
 /**
  * Validación completa de email
- * @param {string} email - Email a validar
- * @returns {Object} { valid: boolean, error?: string }
  */
-export const validateEmail = (email) => {
+export const validateEmail = (email: string | null | undefined): EmailValidationResult => {
   const normalized = normalizeEmail(email);
 
   // 1. Verificar que no esté vacío
@@ -159,9 +157,8 @@ export const validateEmail = (email) => {
 
 /**
  * Detecta si estamos en modo desarrollo
- * @returns {boolean}
  */
-export const isDevelopment = () => {
+export const isDevelopment = (): boolean => {
   // En producción, import.meta.env.DEV es false y MODE es 'production'
   return import.meta.env.DEV || 
          import.meta.env.MODE === 'development' ||
@@ -173,14 +170,13 @@ export const isDevelopment = () => {
 
 /**
  * Obtiene un email de testing válido para desarrollo
- * @returns {string}
  */
-export const getTestEmail = () => {
+export const getTestEmail = (): string => {
   // Fallback corporativo para evitar redirecciones accidentales a correos personales.
   return import.meta.env.VITE_TEST_EMAIL || 'soporte@stockypos.app';
 };
 
-const isEmailTestRedirectEnabled = () => {
+const isEmailTestRedirectEnabled = (): boolean => {
   const raw = String(
     import.meta.env.VITE_EMAIL_REDIRECT_TO_TEST
     ?? import.meta.env.VITE_FORCE_TEST_EMAIL
@@ -192,10 +188,8 @@ const isEmailTestRedirectEnabled = () => {
 
 /**
  * Decide si se debe enviar un email real o solo simularlo
- * @param {string} email - Email destinatario
- * @returns {Object} { shouldSend: boolean, reason?: string, testEmail?: string }
  */
-export const shouldSendEmail = (email) => {
+export const shouldSendEmail = (email: string | null | undefined): ShouldSendEmailResult => {
   const validation = validateEmail(email);
 
   // Si el email no es válido, no enviar
@@ -207,7 +201,6 @@ export const shouldSendEmail = (email) => {
   }
 
   // Solo redirigir a email de testing cuando se habilite explícitamente.
-  // Esto evita enviar siempre a soporte@stockypos.app por accidente.
   if (isEmailTestRedirectEnabled()) {
     const testEmail = getTestEmail();
     
@@ -227,7 +220,6 @@ export const shouldSendEmail = (email) => {
 
 /**
  * Logger de intentos de envío de email
- * @param {Object} params
  */
 export const logEmailAttempt = ({ 
   email, 
@@ -235,17 +227,23 @@ export const logEmailAttempt = ({
   success = false, 
   error = null,
   skipped = false 
-}) => {
+}: {
+  email: string | null | undefined;
+  type?: string;
+  success?: boolean;
+  error?: Error | string | null;
+  skipped?: boolean;
+}): void => {
   const isDev = isDevelopment();
   
-  const logData = {
+  const logData: EmailLogEntry = {
     timestamp: new Date().toISOString(),
     environment: isDev ? 'development' : 'production',
     type,
     email: email || 'unknown',
     success,
     skipped,
-    error: error?.message || error
+    error: error instanceof Error ? error.message : error
   };
 
   // En producción, enviar a servicio de logging si hay error
@@ -255,7 +253,7 @@ export const logEmailAttempt = ({
 
   // Opcional: guardar en localStorage para debugging
   try {
-    const logs = JSON.parse(localStorage.getItem('email_logs') || '[]');
+    const logs: EmailLogEntry[] = JSON.parse(localStorage.getItem('email_logs') || '[]');
     logs.push(logData);
     // Mantener solo los últimos 50 logs
     localStorage.setItem('email_logs', JSON.stringify(logs.slice(-50)));
@@ -266,11 +264,10 @@ export const logEmailAttempt = ({
 
 /**
  * Obtiene estadísticas de emails enviados (para debugging)
- * @returns {Object}
  */
-export const getEmailStats = () => {
+export const getEmailStats = (): EmailStats => {
   try {
-    const logs = JSON.parse(localStorage.getItem('email_logs') || '[]');
+    const logs: EmailLogEntry[] = JSON.parse(localStorage.getItem('email_logs') || '[]');
     
     return {
       total: logs.length,
@@ -293,7 +290,7 @@ export const getEmailStats = () => {
 /**
  * Limpia los logs de emails (útil para testing)
  */
-export const clearEmailLogs = () => {
+export const clearEmailLogs = (): void => {
   try {
     localStorage.removeItem('email_logs');
   } catch {

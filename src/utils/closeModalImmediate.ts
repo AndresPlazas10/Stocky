@@ -1,6 +1,8 @@
-// Helper para cerrar modal inmediatamente y ejecutar trabajo en background
-// Uso: closeModalImmediate(() => setIsOpen(false), () => doHeavyWork())
-export function closeModalImmediate(closeFn, backgroundFn) {
+/**
+ * Helper para cerrar modal inmediatamente y ejecutar trabajo en background
+ * Uso: closeModalImmediate(() => setIsOpen(false), () => doHeavyWork())
+ */
+export function closeModalImmediate(closeFn: () => void, backgroundFn?: () => void): void {
   // Cerrar UI inmediatamente
   try {
     closeFn();
@@ -8,7 +10,7 @@ export function closeModalImmediate(closeFn, backgroundFn) {
   }
 
   // Deferir trabajo que puede bloquear el cierre
-  const runBackground = () => {
+  const runBackground = (): void => {
     try {
       if (typeof backgroundFn === 'function') backgroundFn();
     } catch {

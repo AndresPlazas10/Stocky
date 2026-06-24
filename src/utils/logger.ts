@@ -7,6 +7,8 @@
 const isDev = import.meta.env.DEV;
 
 class Logger {
+  private isDev: boolean;
+
   constructor() {
     this.isDev = isDev;
   }
@@ -14,18 +16,18 @@ class Logger {
   /**
    * Logs informativos (solo en desarrollo)
    */
-  info(...args) {
+  info(...args: unknown[]): void {
     if (this.isDev) {
-      console.info(...args);
+      console.info(...args); // eslint-disable-line no-console
     }
   }
 
   /**
    * Warnings (solo en desarrollo)
    */
-  warn(...args) {
+  warn(...args: unknown[]): void {
     if (this.isDev) {
-      console.warn(...args);
+      console.warn(...args); // eslint-disable-line no-console
     }
   }
 
@@ -33,9 +35,9 @@ class Logger {
    * Errores (siempre se registran)
    * En producción podrían enviarse a Sentry, LogRocket, etc.
    */
-  error(...args) {
+  error(...args: unknown[]): void {
     if (this.isDev) {
-      console.error(...args);
+      console.error(...args); // eslint-disable-line no-console
     }
     // En producción: silencioso o enviar a servicio de monitoring
     // Para integrar: Sentry.captureException(args[0])
@@ -44,25 +46,25 @@ class Logger {
   /**
    * Debug (solo en desarrollo)
    */
-  debug(...args) {
+  debug(...args: unknown[]): void {
     if (this.isDev) {
-      console.debug(...args);
+      console.debug(...args); // eslint-disable-line no-console
     }
   }
 
   /**
    * Success messages (solo en desarrollo)
    */
-  success(...args) {
+  success(...args: unknown[]): void {
     if (this.isDev) {
-      console.log(...args);
+      console.log(...args); // eslint-disable-line no-console
     }
   }
 
   /**
    * Método para enviar a servicio de monitoring (placeholder)
    */
-  sendToMonitoring(level, data) {
+  sendToMonitoring(level: string, data: unknown): void {
     void level;
     void data;
     // Implementar integración con Sentry, LogRocket, etc.

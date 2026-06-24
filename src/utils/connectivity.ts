@@ -1,5 +1,5 @@
-export function isConnectivityError(errorLike) {
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+export function isConnectivityError(errorLike: unknown): boolean {
+  const message = String((errorLike as Error)?.message || errorLike || '').toLowerCase();
   return (
     message.includes('failed to fetch')
     || message.includes('networkerror')

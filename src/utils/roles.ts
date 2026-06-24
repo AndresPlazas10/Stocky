@@ -1,4 +1,4 @@
-export function isAdminRole(role) {
+export function isAdminRole(role: string | null | undefined): boolean {
   const normalizedRole = String(role || '').trim().toLowerCase();
   return normalizedRole === 'owner'
     || normalizedRole === 'admin'
