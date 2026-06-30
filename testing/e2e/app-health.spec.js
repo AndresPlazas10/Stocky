@@ -14,7 +14,7 @@ test.describe('Estado de la aplicación', () => {
 
   test('tiene meta tags PWA correctamente configuradas', async ({ page }) => {
     await page.goto('/');
-    const manifest = page.locator('link[rel="manifest"]');
+    const manifest = page.locator('link[rel="manifest"]').first();
     await expect(manifest).toBeAttached();
 
     const themeColor = page.locator('meta[name="theme-color"]');
