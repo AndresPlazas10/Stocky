@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {
   buildProcessingOutboxEventPatch,
   resolveFailedOutboxSyncTransition
-} from '../src/data/commands/salesOutboxTransitions';
-import { SALES_OUTBOX_BASE_RETRY_MS } from '../src/data/commands/salesOutboxRetryPolicy';
+} from '../src/data/commands/salesOutboxTransitions.ts';
+import { SALES_OUTBOX_BASE_RETRY_MS } from '../src/data/commands/salesOutboxRetryPolicy.ts';
 
 test('buildProcessingOutboxEventPatch mueve a processing y aumenta intentos', () => {
   const current = { id: 'evt-1', status: 'pending', attempts: 2, next_retry_at: 'x' };

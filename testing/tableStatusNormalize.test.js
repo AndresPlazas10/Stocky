@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeTableRecord } from '../src/utils/tableStatus.js';
+import { normalizeTableRecord } from '../src/utils/tableStatus.ts';
 
 test('mantiene mesa ocupada cuando hay orden abierta aunque order_items llegue vacío', () => {
   const normalized = normalizeTableRecord({

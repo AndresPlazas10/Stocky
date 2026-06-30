@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { findReusableSaleCreateOutboxEvent } from '../src/data/commands/salesOutboxIdempotency';
+import { findReusableSaleCreateOutboxEvent } from '../src/data/commands/salesOutboxIdempotency.ts';
 
 test('reutiliza evento sale.create pendiente con misma idempotencyKey', () => {
   const queue = [

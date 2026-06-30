@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/react';
 
-const isDev = import.meta.env.DEV;
+const isDev = typeof import.meta !== 'undefined' && import.meta.env?.DEV;
 
 class Logger {
   private isDev: boolean;
