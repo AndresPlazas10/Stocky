@@ -1,11 +1,11 @@
 import { readAdapter } from '../adapters/localAdapter';
 
 interface ReportsSnapshot {
-  ventas: unknown[];
-  compras: unknown[];
-  productos: unknown[];
-  totalProveedores: number;
-  totalFacturas: number;
+  sales: unknown[];
+  purchases: unknown[];
+  products: unknown[];
+  totalSuppliers: number;
+  totalInvoices: number;
   saleDetails: unknown[];
   comboSaleDetails: unknown[];
   combos: unknown[];
@@ -54,11 +54,11 @@ export async function getReportsSnapshot({
   if (purchaseProductsError) throw purchaseProductsError;
 
   return {
-    ventas: ventas || [],
-    compras: compras || [],
-    productos: productos || [],
-    totalProveedores: totalProveedores || 0,
-    totalFacturas: totalFacturas || 0,
+    sales: ventas || [],
+    purchases: compras || [],
+    products: productos || [],
+    totalSuppliers: totalProveedores || 0,
+    totalInvoices: totalFacturas || 0,
     saleDetails: saleDetails || [],
     comboSaleDetails: comboSaleDetails || [],
     combos: combos || [],

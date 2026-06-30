@@ -1,3 +1,4 @@
+import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -15,7 +16,7 @@ interface CreateMesaModalProps {
   onCancel: () => void;
 }
 
-export function CreateMesaModal({
+export const CreateMesaModal = React.memo(function CreateMesaModal({
   visible,
   isCreatingMesa,
   newTableNumber,
@@ -108,7 +109,7 @@ export function CreateMesaModal({
       </View>
     </StockyModal>
   );
-}
+});
 
 const styles = StyleSheet.create({
   footerRow: {

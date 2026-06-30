@@ -1,4 +1,5 @@
 import { startTransition, useCallback, useEffect, useRef } from 'react';
+import { logger } from '@/utils/logger';
 
 const MAX_QUEUE_BEFORE_SYNC_FLUSH = 120;
 
@@ -18,8 +19,8 @@ export function useRafBatchedQueue(options = {}) {
         if (typeof task !== 'function') return;
         try {
           task();
-        } catch {
-          // no-op: evita romper el resto del batch por un handler puntual.
+        } catch (err) {
+          logger.warn('hooks:rafBatch:task failed', err);
         }
       });
     };

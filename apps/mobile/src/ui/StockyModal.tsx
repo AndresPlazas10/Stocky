@@ -99,10 +99,10 @@ export function StockyModal({
   const effectiveBackdrop =
     backdropVariant === 'blur' && Platform.OS === 'android' ? 'dim' : backdropVariant;
   const openDuration = Math.max(
-    140,
-    Math.min(animationDurationMs + (modalAnimationType === 'slide' ? 30 : 0), 280),
+    120,
+    Math.min(animationDurationMs + (modalAnimationType === 'slide' ? 20 : 0) - 20, 240),
   );
-  const closeDuration = Math.max(120, Math.min(animationDurationMs - 20, 240));
+  const closeDuration = Math.max(100, Math.min(animationDurationMs - 40, 200));
   const openEasing = useMemo(
     () => (animationStyle === 'web' ? Easing.out(Easing.cubic) : Easing.out(Easing.exp)),
     [animationStyle],
@@ -275,7 +275,7 @@ export function StockyModal({
       contentOpacity.setValue(0);
       Animated.timing(contentOpacity, {
         toValue: 1,
-        duration: 180,
+        duration: 120,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }).start();

@@ -1100,6 +1100,139 @@ export function MesasPanel({ session, businessContext }: Props) {
     setShowSplitBillModal,
   ]);
 
+  const handleOpenAddMesa = useCallback(() => {
+    setShowCreateMesaModal(true);
+    setNewTableNumber('');
+  }, [setShowCreateMesaModal, setNewTableNumber]);
+
+  const handleCancelCreateMesa = useCallback(() => {
+    setShowCreateMesaModal(false);
+    setNewTableNumber('');
+  }, [setShowCreateMesaModal, setNewTableNumber]);
+
+  const handleCancelDeleteMesa = useCallback(() => {
+    if (!isDeletingMesa) {
+      setShowDeleteMesaModal(false);
+      setMesaToDelete(null);
+    }
+  }, [isDeletingMesa, setShowDeleteMesaModal, setMesaToDelete]);
+
+  const handleCloseCloseOrderChoice = useCallback(() => {
+    if (isClosingOrder || releasingEmptyOrder) return;
+    setShowCloseOrderChoiceModal(false);
+    setShowOrderModal(true);
+  }, [isClosingOrder, releasingEmptyOrder, setShowCloseOrderChoiceModal, setShowOrderModal]);
+
+  const handleClosePayment = useCallback(() => {
+    if (!isClosingOrder) {
+      setShowPaymentMethodMenu(false);
+      setShowPaymentModal(false);
+      setShowCloseOrderChoiceModal(true);
+    }
+  }, [isClosingOrder, setShowPaymentMethodMenu, setShowPaymentModal, setShowCloseOrderChoiceModal]);
+
+  const handleTogglePaymentMenu = useCallback(() => {
+    setShowPaymentMethodMenu((prev) => !prev);
+  }, [setShowPaymentMethodMenu]);
+
+  const handlePaymentMethodChange = useCallback(
+    (method: string) => {
+      setPaymentMethod(method as 'cash' | 'card' | 'transfer');
+      if (method === 'cash' && String(amountReceived || '').trim() === '') {
+        setAmountReceived(String(Math.round(orderTotal || 0)));
+      }
+    },
+    [amountReceived, orderTotal, setAmountReceived, setPaymentMethod],
+  );
+
+  const handleBackFromSplitBill = useCallback(() => {
+    setShowSplitBillModal(false);
+    setShowCloseOrderChoiceModal(true);
+  }, [setShowSplitBillModal, setShowCloseOrderChoiceModal]);
+
+  const handleCloseSplitBill = useCallback(() => {
+    if (isClosingOrder) return;
+    setShowSplitBillModal(false);
+    setShowCloseOrderChoiceModal(false);
+    setShowOrderModal(true);
+  }, [isClosingOrder, setShowSplitBillModal, setShowCloseOrderChoiceModal, setShowOrderModal]);
+
+  const handleCloseMesaCreatedToast = useCallback(() => {
+    toasts.setShowMesaCreatedToast(false);
+  }, [toasts]);
+
+  const handleCloseMesaDeletedToast = useCallback(() => {
+    toasts.setShowMesaDeletedToast(false);
+  }, [toasts]);
+
+  const handleCloseSaleToast = useCallback(() => {
+    toasts.setShowSaleToast(false);
+  }, [toasts]);
+
+  const handleCloseMesaSavedToast = useCallback(() => {
+    toasts.setShowMesaSavedToast(false);
+  }, [toasts]);
+
+  const memoizedOrderState = useMemo(
+    () => ({
+      selectedMesa,
+      orderModalTitle,
+      orderTotal,
+      orderItems,
+      filteredCatalog,
+      searchCatalog,
+      isCatalogLoading,
+      loadingOrder,
+      isSavingOrder,
+      isClosingOrder,
+      releasingEmptyOrder,
+      isPrintInProgress,
+      mutatingOrderItemId,
+      insufficientItems,
+      insufficientComboComponents,
+    }),
+    [
+      selectedMesa,
+      orderModalTitle,
+      orderTotal,
+      orderItems,
+      filteredCatalog,
+      searchCatalog,
+      isCatalogLoading,
+      loadingOrder,
+      isSavingOrder,
+      isClosingOrder,
+      releasingEmptyOrder,
+      isPrintInProgress,
+      mutatingOrderItemId,
+      insufficientItems,
+      insufficientComboComponents,
+    ],
+  );
+
+  const memoizedActions = useMemo(
+    () => ({
+      onDismiss: handleDismissOrderModal,
+      onSaveOrder: handleSaveOrder,
+      onPrintKitchen: handlePrintKitchen,
+      onCloseOrder: handleCloseOrder,
+      onCatalogItemPress: handleCatalogItemPress,
+      onUpdateOrderItemQuantity: handleUpdateOrderItemQuantity,
+      onSearchChange: setSearchCatalog,
+      resolveOrderItemDisplayName,
+    }),
+    [
+      handleDismissOrderModal,
+      handleSaveOrder,
+      handlePrintKitchen,
+      handleCloseOrder,
+      handleCatalogItemPress,
+      handleUpdateOrderItemQuantity,
+      setSearchCatalog,
+      resolveOrderItemDisplayName,
+    ],
+  );
+
   return (
     <>
       <View style={styles.mesasContainer}>
@@ -1120,10 +1253,7 @@ export function MesasPanel({ session, businessContext }: Props) {
 
           <Pressable
             style={styles.addMesaButtonWrap}
-            onPress={() => {
-              setShowCreateMesaModal(true);
-              setNewTableNumber('');
-            }}
+            onPress={handleOpenAddMesa}
             disabled={isCreatingMesa}
           >
             <LinearGradient
@@ -1162,22 +1292,14 @@ export function MesasPanel({ session, businessContext }: Props) {
         isKeyboardVisible={isKeyboardVisible}
         onChangeNumber={setNewTableNumber}
         onSubmit={handleCreateMesa}
-        onCancel={() => {
-          setShowCreateMesaModal(false);
-          setNewTableNumber('');
-        }}
+        onCancel={handleCancelCreateMesa}
       />
 
       <DeleteMesaModal
         visible={showDeleteMesaModal}
         mesaToDelete={mesaToDelete}
         isDeletingMesa={isDeletingMesa}
-        onCancel={() => {
-          if (!isDeletingMesa) {
-            setShowDeleteMesaModal(false);
-            setMesaToDelete(null);
-          }
-        }}
+        onCancel={handleCancelDeleteMesa}
         onConfirm={confirmDeleteMesa}
       />
 
@@ -1185,33 +1307,8 @@ export function MesasPanel({ session, businessContext }: Props) {
         visible={showOrderModal}
         session={session}
         context={context}
-        orderState={{
-          selectedMesa,
-          orderModalTitle,
-          orderTotal,
-          orderItems,
-          filteredCatalog,
-          searchCatalog,
-          isCatalogLoading,
-          loadingOrder,
-          isSavingOrder,
-          isClosingOrder,
-          releasingEmptyOrder,
-          isPrintInProgress,
-          mutatingOrderItemId,
-          insufficientItems,
-          insufficientComboComponents,
-        }}
-        actions={{
-          onDismiss: handleDismissOrderModal,
-          onSaveOrder: handleSaveOrder,
-          onPrintKitchen: handlePrintKitchen,
-          onCloseOrder: handleCloseOrder,
-          onCatalogItemPress: handleCatalogItemPress,
-          onUpdateOrderItemQuantity: handleUpdateOrderItemQuantity,
-          onSearchChange: setSearchCatalog,
-          resolveOrderItemDisplayName,
-        }}
+        orderState={memoizedOrderState}
+        actions={memoizedActions}
         isKeyboardVisible={isKeyboardVisible}
       />
 
@@ -1220,11 +1317,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         orderTotal={orderTotal}
         isClosingOrder={isClosingOrder}
         releasingEmptyOrder={releasingEmptyOrder}
-        onClose={() => {
-          if (isClosingOrder || releasingEmptyOrder) return;
-          setShowCloseOrderChoiceModal(false);
-          setShowOrderModal(true);
-        }}
+        onClose={handleCloseCloseOrderChoice}
         onPayAllTogether={handlePayAllTogether}
         onSplitBill={handleSplitBill}
       />
@@ -1237,20 +1330,9 @@ export function MesasPanel({ session, businessContext }: Props) {
         orderTotal={orderTotal}
         cashChangeData={cashChangeData}
         showMenu={showPaymentMethodMenu}
-        onClose={() => {
-          if (!isClosingOrder) {
-            setShowPaymentMethodMenu(false);
-            setShowPaymentModal(false);
-            setShowCloseOrderChoiceModal(true);
-          }
-        }}
-        onToggleMenu={() => setShowPaymentMethodMenu((prev) => !prev)}
-        onPaymentMethodChange={(method) => {
-          setPaymentMethod(method);
-          if (method === 'cash' && String(amountReceived || '').trim() === '') {
-            setAmountReceived(String(Math.round(orderTotal || 0)));
-          }
-        }}
+        onClose={handleClosePayment}
+        onToggleMenu={handleTogglePaymentMenu}
+        onPaymentMethodChange={handlePaymentMethodChange}
         onAmountReceivedChange={setAmountReceived}
         onConfirm={processPaymentAndClose}
       />
@@ -1259,16 +1341,8 @@ export function MesasPanel({ session, businessContext }: Props) {
         visible={showSplitBillModal}
         orderItems={orderItems}
         submitting={isClosingOrder}
-        onBack={() => {
-          setShowSplitBillModal(false);
-          setShowCloseOrderChoiceModal(true);
-        }}
-        onClose={() => {
-          if (isClosingOrder) return;
-          setShowSplitBillModal(false);
-          setShowCloseOrderChoiceModal(false);
-          setShowOrderModal(true);
-        }}
+        onBack={handleBackFromSplitBill}
+        onClose={handleCloseSplitBill}
         onConfirm={processSplitPaymentAndClose}
       />
       <StockyStatusToast
@@ -1279,7 +1353,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         secondaryLabel="Estado"
         secondaryValue="Disponible"
         durationMs={1000}
-        onClose={() => toasts.setShowMesaCreatedToast(false)}
+        onClose={handleCloseMesaCreatedToast}
       />
       <StockyStatusToast
         visible={toasts.showMesaDeletedToast}
@@ -1289,7 +1363,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         secondaryLabel="Estado"
         secondaryValue="Eliminada"
         durationMs={1000}
-        onClose={() => toasts.setShowMesaDeletedToast(false)}
+        onClose={handleCloseMesaDeletedToast}
       />
       <StockyStatusToast
         visible={toasts.showSaleToast}
@@ -1299,7 +1373,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         secondaryLabel="Total"
         secondaryValue={toasts.saleTotalLabel}
         durationMs={1000}
-        onClose={() => toasts.setShowSaleToast(false)}
+        onClose={handleCloseSaleToast}
       />
       <StockyStatusToast
         visible={toasts.showMesaSavedToast}
@@ -1309,7 +1383,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         secondaryLabel="Estado"
         secondaryValue="Actualizada"
         durationMs={1000}
-        onClose={() => toasts.setShowMesaSavedToast(false)}
+        onClose={handleCloseMesaSavedToast}
       />
       <PrintReceiptConfirmModal
         visible={showPrintModal}

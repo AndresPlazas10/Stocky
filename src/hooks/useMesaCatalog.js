@@ -3,7 +3,7 @@ import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../util
 import { getProductsForOrdersByBusiness } from '../data/queries/ordersQueries';
 import { fetchComboCatalog } from '../services/combosService';
 
-export function useMesaCatalog({ businessId, setProductos, setCombos, setError }) {
+export function useMesaCatalog({ businessId, setProducts, setCombos, setError }) {
   const catalogWarmupPromiseRef = useRef(null);
 
   const loadProductos = useCallback(async () => {
@@ -12,7 +12,7 @@ export function useMesaCatalog({ businessId, setProductos, setCombos, setError }
     const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
 
     if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
-      setProductos(offlineSnapshot);
+      setProducts(offlineSnapshot);
     }
 
     try {
@@ -21,28 +21,28 @@ export function useMesaCatalog({ businessId, setProductos, setCombos, setError }
       const hasLocalData = normalizedData.length > 0;
 
       if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
-        setProductos(offlineSnapshot);
+        setProducts(offlineSnapshot);
         return;
       }
 
-      setProductos(normalizedData);
+      setProducts(normalizedData);
       if (!offline || hasLocalData) {
         saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
       }
     } catch {
       const cached = readOfflineSnapshot(offlineSnapshotKey, []);
       if (Array.isArray(cached) && cached.length > 0) {
-        setProductos(cached);
+        setProducts(cached);
         return;
       }
 
       if (offline) {
-        setProductos([]);
+        setProducts([]);
       } else {
         setError('No se pudo cargar los productos. Revisa tu conexión e intenta de nuevo.');
       }
     }
-  }, [businessId, setProductos, setError]);
+  }, [businessId, setProducts, setError]);
 
   const loadCombos = useCallback(async () => {
     const offline = isOfflineMode();

@@ -326,6 +326,8 @@ export const formatTimeCompact = (timestamp: string | Date | number | null | und
 /**
  * Formatea fecha y hora de forma completa para reportes
  */
+export const toFiniteNumber = (value, fallback = 0) => { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : fallback; };
+
 export const formatDateTimeReport = (timestamp: string | Date | number | null | undefined): string => {
   if (!timestamp) {
     return 'Fecha inválida';

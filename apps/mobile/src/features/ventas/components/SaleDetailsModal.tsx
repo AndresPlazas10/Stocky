@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,7 +21,7 @@ type SaleDetailsModalProps = {
   onClose: () => void;
 };
 
-export function SaleDetailsModal({
+export const SaleDetailsModal = React.memo(function SaleDetailsModal({
   visible,
   selectedVenta,
   selectedVentaDetails,
@@ -28,9 +29,12 @@ export function SaleDetailsModal({
   ventaDetailsError,
   onClose,
 }: SaleDetailsModalProps) {
-  const selectedVentaItemsCount = selectedVentaDetails.reduce(
-    (sum, item) => sum + Math.max(0, Number(item.quantity || 0)),
-    0,
+  const selectedVentaItemsCount = useMemo(
+    () => selectedVentaDetails.reduce(
+      (sum, item) => sum + Math.max(0, Number(item.quantity || 0)),
+      0,
+    ),
+    [selectedVentaDetails],
   );
   const selectedVentaPaymentTheme = selectedVenta
     ? getPaymentMethodTheme(selectedVenta.payment_method)
@@ -228,4 +232,4 @@ export function SaleDetailsModal({
       ) : null}
     </StockyModal>
   );
-}
+});

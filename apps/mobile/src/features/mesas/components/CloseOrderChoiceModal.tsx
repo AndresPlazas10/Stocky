@@ -1,3 +1,4 @@
+import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -14,7 +15,7 @@ interface CloseOrderChoiceModalProps {
   onSplitBill: () => void;
 }
 
-export function CloseOrderChoiceModal({
+export const CloseOrderChoiceModal = React.memo(function CloseOrderChoiceModal({
   visible,
   orderTotal,
   isClosingOrder,
@@ -82,7 +83,7 @@ export function CloseOrderChoiceModal({
       </Pressable>
     </StockyModal>
   );
-}
+});
 
 const styles = StyleSheet.create({
   sheet: {

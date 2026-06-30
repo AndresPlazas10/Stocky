@@ -1,6 +1,8 @@
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { buildUtcRangeFromLocalDates } from '../utils/dateRange';
 import { logger } from '../utils/logger';
+import { isConnectivityError } from '../utils/connectivity';
+import { isRpcBadRequestError, isMissingRpcError, isMissingColumnError } from '../utils/rpcErrorUtils';
 
 const PURCHASE_LIST_COLUMNS = `
   id,
@@ -56,35 +58,6 @@ async function writeCachedPurchasesList(cacheKey, payload) {
   void payload;
 }
 
-function isMissingRpcError(error) {
-  const code = String(error?.code || '');
-  const message = String(error?.message || '').toLowerCase();
-  return code === 'PGRST202' || code === '42883' || message.includes('get_purchases_enriched');
-}
-
-function isRpcBadRequestError(errorLike) {
-  const status = Number(errorLike?.status || errorLike?.statusCode || 0);
-  const code = String(errorLike?.code || '').toUpperCase();
-  return status === 400 || code === 'PGRST100' || code === 'PGRST116' || code === 'PGRST301';
-}
-
-function isMissingColumnError(errorLike) {
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
-  return message.includes('column') && message.includes('does not exist');
-}
-
-function isConnectivityError(errorLike) {
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
-  return (
-    message.includes('failed to fetch')
-    || message.includes('networkerror')
-    || message.includes('network request failed')
-    || message.includes('fetch failed')
-    || message.includes('load failed')
-    || message.includes('network')
-  );
-}
-
 function mapRpcPurchaseRows(rows = []) {
   return rows.map((row) => {
     const employeeRole = row.employee_role || 'employee';
@@ -137,7 +110,7 @@ async function getFilteredPurchasesViaRpc(businessId, filters, pagination) {
   });
 
   if (error) {
-    if (isMissingRpcError(error)) {
+    if (isMissingRpcError(error, 'get_purchases_enriched')) {
       throw new Error(RPC_NOT_AVAILABLE);
     }
     throw error;
@@ -224,7 +197,7 @@ export async function getFilteredPurchases(businessId, filters = {}, pagination 
     await writeCachedPurchasesList(cacheKey, rpcResult);
     return { ...rpcResult, error: null };
   } catch (rpcError) {
-    if (isMissingRpcError(rpcError) || isRpcBadRequestError(rpcError)) {
+    if (isMissingRpcError(rpcError, 'get_purchases_enriched') || isRpcBadRequestError(rpcError)) {
       logger.warn('[purchases-service] falling back from get_purchases_enriched RPC', {
         code: rpcError?.code || null,
         status: rpcError?.status || rpcError?.statusCode || null,

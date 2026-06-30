@@ -13,7 +13,7 @@ export default defineConfig([
     'coverage/**',
     '**/coverage/**',
     'scripts/test-sale-creation.js',
-    'src/utils/reactOptimizations.jsx',
+
     'src/hooks/optimized.js',
     'public/pwa/sw-push.js',
     'scripts/perf/*.mjs',

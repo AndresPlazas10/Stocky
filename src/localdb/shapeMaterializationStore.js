@@ -4,6 +4,7 @@ import {
   runLocalDbTableTransaction,
   writeLocalDbTableRows
 } from './client.js';
+import { logger } from '@/utils/logger';
 
 const SHAPE_MATERIALIZATION_STORAGE_KEY = 'stocky.localdb.shape_materialization.v1';
 
@@ -30,8 +31,8 @@ function readFromLocalStorage() {
 function writeToLocalStorage(rows = []) {
   try {
     window.localStorage.setItem(SHAPE_MATERIALIZATION_STORAGE_KEY, JSON.stringify(Array.isArray(rows) ? rows : []));
-  } catch {
-    // no-op
+  } catch (err) {
+    logger.warn('localdb:shapeMaterialization:writeToLocalStorage failed', err);
   }
 }
 

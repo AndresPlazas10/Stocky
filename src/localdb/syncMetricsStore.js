@@ -1,4 +1,5 @@
 import { readLocalDbTableRows, writeLocalDbTableRows } from './client.js';
+import { logger } from '@/utils/logger';
 
 const SYNC_METRICS_STORAGE_KEY = 'stocky.localdb.sync_metrics.v1';
 
@@ -29,8 +30,8 @@ function readFromLocalStorage() {
 function writeToLocalStorage(rows = []) {
   try {
     window.localStorage.setItem(SYNC_METRICS_STORAGE_KEY, JSON.stringify(Array.isArray(rows) ? rows : []));
-  } catch {
-    // no-op
+  } catch (err) {
+    logger.warn('localdb:syncMetrics:writeToLocalStorage failed', err);
   }
 }
 

@@ -1,5 +1,6 @@
 import { getThermalPaperWidthMm } from './printer.js';
 import { buildSaleReceiptTemplate, validateSaleReceiptTemplate } from './receiptTemplate.js';
+import { logger } from '@/utils/logger';
 
 const escapeHtml = (value) => String(value ?? '')
   .replace(/&/g, '&amp;')
@@ -113,7 +114,7 @@ export async function printSaleReceipt({
     }, 500);
     setTimeout(() => {
       clearInterval(timer);
-      if (!win.closed) try { win.close(); } catch (_e) { /* ignore */ }
+      if (!win.closed) try { win.close(); } catch (_e) { logger.warn('utils:saleReceiptPrint:winClose failed', _e); }
       done();
     }, 120000);
   });

@@ -1,3 +1,4 @@
+import React from 'react';
 import { StockyDeleteConfirmModal } from '../../../ui/StockyDeleteConfirmModal';
 import { mesaDisplayName } from '../utils/mesaHelpers';
 import type { MesaRecord } from '../../../services/mesasService';
@@ -10,7 +11,7 @@ interface DeleteMesaModalProps {
   onConfirm: () => void;
 }
 
-export function DeleteMesaModal({
+export const DeleteMesaModal = React.memo(function DeleteMesaModal({
   visible,
   mesaToDelete,
   isDeletingMesa,
@@ -29,4 +30,4 @@ export function DeleteMesaModal({
       onConfirm={onConfirm}
     />
   );
-}
+});

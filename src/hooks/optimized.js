@@ -7,8 +7,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import * as Sentry from '@sentry/react';
 import { readAdapter } from '../data/adapters/localAdapter.js';
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
+import { logger } from '@/utils/logger';
 
 // =====================================================
 // useAuth - Gestión centralizada de autenticación
@@ -35,6 +37,7 @@ export function useAuth() {
         const currentSession = data?.session ?? null;
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
+        Sentry.setUser(currentSession?.user ? { id: currentSession.user.id, email: currentSession.user.email } : null);
         setLoading(false);
       })
       .catch(() => {
@@ -48,6 +51,7 @@ export function useAuth() {
     } = supabaseAdapter.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
+      Sentry.setUser(nextSession?.user ? { id: nextSession.user.id, email: nextSession.user.email } : null);
 
       if (_event === 'SIGNED_OUT') {
         localStorage.clear();
@@ -449,7 +453,7 @@ export function useLocalStorage(key, initialValue) {
         setStoredValue(valueToStore);
         window.localStorage.setItem(key, JSON.stringify(valueToStore));
       } catch (error) {
-        // Error writing to localStorage
+        logger.warn('hooks:localStorage:setValue failed', error);
       }
     },
     [key, storedValue]
@@ -460,7 +464,7 @@ export function useLocalStorage(key, initialValue) {
       window.localStorage.removeItem(key);
       setStoredValue(initialValue);
     } catch (error) {
-      // Error removing from localStorage
+      logger.warn('hooks:localStorage:removeValue failed', error);
     }
   }, [key, initialValue]);
 

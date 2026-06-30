@@ -1,0 +1,2403 @@
+import type { DashboardModuleProps } from '@/types/components';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { logger } from '@/utils/logger';
+import { motion, AnimatePresence } from 'framer-motion';
+import { getFilteredSales } from '../../services/salesService';
+import { recordSaleCreationTime } from '../../services/salesServiceOptimized';
+import { fetchComboCatalog } from '../../services/combosService';
+import {
+  createSaleWithOutbox,
+  deleteSaleWithDetails,
+  flushSalesOutbox,
+  getSalesOutboxSnapshot,
+  retryAllSalesOutboxErrorEvents,
+  retrySalesOutboxEventByTempSaleId,
+  subscribeSalesOutboxUpdates,
+  subscribeSalesSyncUpdates
+} from '../../data/commands/salesCommands.js';
+import {
+  getBusinessNameById,
+  getProductsForSale,
+  getSaleCashMetadataBySaleId,
+  getSaleDetailsBySaleId,
+  getSaleForPrintById
+} from '../../data/queries/salesQueries';
+import {
+  getAuthenticatedUser,
+  isEmployeeInBusiness,
+  getEmployeeRoleInBusiness
+} from '../../data/queries/authQueries';
+import { isAdminRole } from '../../utils/roles.js';
+import SalesFilters from '../Filters/SalesFilters';
+import { sendInvoiceEmail } from '../../utils/emailService.js';
+import { formatPrice, formatDate, formatDateOnly } from '../../utils/formatters';
+import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
+import { isAutoPrintReceiptEnabled } from '../../utils/printer.js';
+import { printSaleReceipt } from '../../utils/saleReceiptPrint.js';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Badge } from '../ui/badge';
+import PaymentMethodSelect from '../ui/PaymentMethodSelect.jsx';
+import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
+import { SaleErrorAlert } from '../ui/SaleErrorAlert';
+import { SaleUpdateAlert } from '../ui/SaleUpdateAlert';
+import { PrintReceiptConfirmModal } from '../ui/PrintReceiptConfirmModal';
+import Pagination from '../Pagination';
+import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
+import { useProgressiveList } from '../../hooks/useProgressiveList.js';
+import { useRafBatchedQueue } from '../../hooks/useRafBatchedQueue.js';
+import { useDebounce } from '../../hooks/optimized.js';
+import { 
+  ShoppingCart, 
+  Plus, 
+  Trash2, 
+  Receipt, 
+  Search,
+  DollarSign,
+  CheckCircle2,
+  AlertCircle,
+  User,
+  Mail,
+  FileText,
+  Calendar,
+  CreditCard,
+  X,
+  Printer,
+  Eye
+} from 'lucide-react';
+import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
+import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
+import { PaymentMethodBankLogo, getPaymentMethodLabel } from '../ui/PaymentMethodBankLogo';
+import {
+  applyOfflineStockConsumption,
+  buildCartConsumptionByProduct,
+  evaluateOfflineStockShortages
+} from '../../utils/offlineStockGuards.js';
+import { isConnectivityError, formatLoadError } from '../../utils/connectivity';
+
+
+// Función helper pura fuera del componente (no se recrea en renders)
+const getVendedorName = (sale) => {
+  // Prioridad 1: rol resuelto por joins (evita mostrar "Empleado" si el user es admin/owner)
+  if (sale?.employees?.role === 'owner' || sale?.employees?.role === 'admin') {
+    return 'Administrador';
+  }
+
+  // Prioridad 1: seller_name guardado en la venta (ventas nuevas)
+  if (sale?.seller_name && typeof sale.seller_name === 'string' && sale.seller_name.trim() !== '') {
+    return sale.seller_name;
+  }
+  
+  // Prioridad 2: Fallback a employees join (ventas antiguas)
+  if (!sale.employees) return 'Empleado';
+  if (sale.employees.role === 'owner' || sale.employees.role === 'admin') return 'Administrador';
+  return sale.employees.full_name || 'Empleado';
+};
+
+
+const buildDiagnosticAlertMessage = (errorLike, fallback = 'Error desconocido') => {
+  const message = String(errorLike?.message || errorLike || fallback).trim() || fallback;
+  const code = String(errorLike?.code || '').trim();
+  const status = String(errorLike?.status || errorLike?.statusCode || '').trim();
+  const hint = String(errorLike?.hint || '').trim();
+  const details = String(errorLike?.details || '').trim();
+
+  const diagnosticParts = [
+    code ? `code=${code}` : null,
+    status ? `status=${status}` : null,
+    hint ? `hint=${hint}` : null,
+    details ? `details=${details}` : null
+  ].filter(Boolean);
+
+  if (diagnosticParts.length === 0) return `❌ ${message}`;
+  return `❌ ${message} [diag: ${diagnosticParts.join(' | ')}]`;
+};
+
+const getActionableSyncErrorMessage = (errorLike) => {
+  const message = String(errorLike || '').trim();
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes('idx_sales_prevent_duplicates')) {
+    return 'Esta venta ya se había registrado previamente. Se recomienda recargar el historial para validar el estado final.';
+  }
+
+  if (normalized.includes('sesión no válida') || normalized.includes('sesion no valida') || normalized.includes('unauthorized')) {
+    return 'La sesión no es válida para sincronizar. Inicia sesión nuevamente y luego reintenta.';
+  }
+
+  if (normalized.includes('permission denied') || normalized.includes('row-level security') || normalized.includes('forbidden')) {
+    return 'No tienes permisos para sincronizar esta venta. Verifica el rol del usuario en este negocio.';
+  }
+
+  if (normalized.includes('datos de venta inválidos') || normalized.includes('datos de venta invalidos') || normalized.includes('item inválido') || normalized.includes('item invalido')) {
+    return 'La venta quedó con datos inválidos para sincronizar. Revísala y vuelve a crearla si es necesario.';
+  }
+
+  return message || 'No se pudo sincronizar esta venta.';
+};
+
+const toNumberOrNull = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const SALE_ITEM_TYPE = {
+  PRODUCT: 'product',
+  COMBO: 'combo'
+};
+
+const buildCartItemKey = (itemType, id) => `${itemType}:${id}`;
+
+const getSaleDetailDisplayName = (detail) => (
+  detail?.products?.name
+  || detail?.combos?.nombre
+  || detail?.combos?.name
+  || detail?.product_name
+  || 'Item'
+);
+
+function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
+  const navigate = useNavigate();
+  const [sales, setSales] = useState([]);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 768 ? 20 : 30));
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentFilters, setCurrentFilters] = useState({});
+  const [products, setProducts] = useState([]);
+  const [combos, setCombos] = useState([]);
+  const customers = [];
+  const [loading, setLoading] = useState(true);
+  const [showSaleModal, setShowSaleModal] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  const [successDetails, setSuccessDetails] = useState([]);
+  const [successTitle, setSuccessTitle] = useState('✨ Venta Registrada');
+  const [alertType, setAlertType] = useState('success'); // 'success' o 'error'
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const [isEmployee, setIsEmployee] = useState(false); // Verificar si es empleado
+  
+  // Estados para modal de eliminación de venta (solo admin)
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [saleToDelete, setSaleToDelete] = useState(null);
+
+  // Estado del carrito de venta
+  const [cart, setCart] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [searchProduct, setSearchProduct] = useState('');
+  const debouncedSearch = useDebounce(searchProduct, 200);
+  const [saleModalPanel, setSaleModalPanel] = useState('catalog');
+  const lowMotionMode = useLowMotionMode();
+  const enqueueRealtimeUpdate = useRafBatchedQueue();
+  
+  // Modal de facturación
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [selectedSale, setSelectedSale] = useState(null);
+  const [invoiceCustomerName, setInvoiceCustomerName] = useState('');
+  const [invoiceCustomerEmail, setInvoiceCustomerEmail] = useState('');
+  const [invoiceCustomerIdNumber, setInvoiceCustomerIdNumber] = useState('');
+  const [generatingInvoice, setGeneratingInvoice] = useState(false);
+  const [showSaleDetailsModal, setShowSaleDetailsModal] = useState(false);
+  const [saleDetailsLoading, setSaleDetailsLoading] = useState(false);
+  const [saleDetailsError, setSaleDetailsError] = useState('');
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [salesOutboxState, setSalesOutboxState] = useState(() => getSalesOutboxSnapshot());
+  const saleIntentKeyRef = useRef(null);
+  const saleIntentSignatureRef = useRef('');
+
+  // Estados para modal de impresión
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printSaleData, setPrintSaleData] = useState(null);
+  const [printSaleDetails, setPrintSaleDetails] = useState([]);
+  const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
+  const [printCustomerName, setPrintCustomerName] = useState('Venta general');
+
+  const closeSaleModal = useCallback(() => {
+    setShowSaleModal(false);
+    setCart([]);
+    setSelectedCustomer('');
+    setPaymentMethod('cash');
+    setSearchProduct('');
+    setSaleModalPanel('catalog');
+  }, []);
+
+  // Callbacks para modal de impresión
+  const handlePrintConfirm = useCallback(async () => {
+    if (!printSaleData) {
+      setError('⚠️ No hay datos de venta para imprimir.');
+      return;
+    }
+
+    setIsPrintingReceipt(true);
+    try {
+      const printResult = await printSaleReceipt({
+        sale: printSaleData,
+        saleDetails: printSaleDetails,
+        sellerName: printSaleData.seller_name || getVendedorName(printSaleData),
+        businessName: await getBusinessNameById(businessId),
+        customerName: printCustomerName,
+      });
+
+      if (!printResult.ok) {
+        setError('⚠️ No se pudo imprimir el recibo. Intenta nuevamente.');
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error al imprimir:', err);
+      setError('⚠️ No se pudo imprimir el recibo. Intenta nuevamente.');
+    } finally {
+      setIsPrintingReceipt(false);
+      setShowPrintModal(false);
+      setPrintSaleData(null);
+      setPrintSaleDetails([]);
+    }
+  }, [printSaleData, printSaleDetails, printCustomerName, businessId]);
+
+  const handlePrintCancel = useCallback(() => {
+    setShowPrintModal(false);
+    setPrintSaleData(null);
+    setPrintSaleDetails([]);
+    setPrintCustomerName('Venta general');
+  }, []);
+
+  // Funciones de carga memoizadas SIN cache para evitar problemas de actualización
+  const loadVentas = useCallback(async (filters = currentFilters, pagination: any = {}) => {
+    const offline = isOfflineMode();
+    const offlineSnapshotKey = `ventas.list:${businessId}`;
+    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
+
+    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+      setSales(offlineSnapshot);
+      setTotalCount(offlineSnapshot.length);
+    }
+
+    try {
+      const lim = Number(pagination.limit ?? limit);
+      const off = Number(pagination.offset ?? ((page - 1) * lim));
+      const includeCount = typeof pagination.includeCount === 'boolean'
+        ? pagination.includeCount
+        : off === 0;
+      const countMode = pagination.countMode || 'planned';
+      
+      // SIEMPRE cargar datos frescos - sin caché
+      const { data, count, error: salesError } = await getFilteredSales(businessId, filters, {
+        limit: lim,
+        offset: off,
+        includeCount,
+        countMode
+      }) as any;
+      if (salesError) {
+        throw new Error(salesError);
+      }
+      
+      const normalizedData = Array.isArray(data) ? data : [];
+      const hasLocalData = normalizedData.length > 0;
+
+      if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+        setSales(offlineSnapshot);
+        setTotalCount(offlineSnapshot.length);
+        return;
+      }
+
+      setSales(normalizedData);
+      if (!offline || hasLocalData) {
+        saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
+      }
+      if (typeof count === 'number') {
+        setTotalCount(count);
+      } else if (!includeCount) {
+        setTotalCount(off + normalizedData.length);
+      }
+    } catch (err) {
+      if (offline) {
+        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
+        const safe = Array.isArray(cached) ? cached : [];
+        setSales(safe);
+        setTotalCount(safe.length);
+      } else {
+        setSales([]);
+        setTotalCount(0);
+        setError(formatLoadError('las ventas', err));
+      }
+    }
+  }, [businessId, page, limit, currentFilters]);
+
+  const loadProductos = useCallback(async () => {
+    const offline = isOfflineMode();
+    const offlineSnapshotKey = `ventas.productos:${businessId}`;
+    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
+
+    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+      setProducts(offlineSnapshot);
+    }
+
+    try {
+      const data = await getProductsForSale(businessId);
+      const normalizedData = Array.isArray(data) ? data : [];
+      const hasLocalData = normalizedData.length > 0;
+      if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+        setProducts(offlineSnapshot);
+        return;
+      }
+
+      setProducts(normalizedData);
+      if (!offline || hasLocalData) {
+        saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
+      }
+    } catch {
+      if (offline) {
+        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
+        setProducts(Array.isArray(cached) ? cached : []);
+      } else {
+        throw new Error('No se pudo cargar productos para ventas');
+      }
+    }
+  }, [businessId]);
+
+  const loadCombos = useCallback(async () => {
+    const offline = isOfflineMode();
+    const offlineSnapshotKey = `ventas.combos:${businessId}`;
+    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
+
+    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+      setCombos(offlineSnapshot);
+    }
+
+    try {
+      const data = await fetchComboCatalog(businessId);
+      const normalizedData = Array.isArray(data) ? data : [];
+      const hasLocalData = normalizedData.length > 0;
+
+      if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
+        setCombos(offlineSnapshot);
+        return;
+      }
+
+      setCombos(normalizedData);
+      if (!offline || hasLocalData) {
+        saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
+      }
+    } catch {
+      if (offline) {
+        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
+        setCombos(Array.isArray(cached) ? cached : []);
+      } else {
+        throw new Error('No se pudo cargar combos para ventas');
+      }
+    }
+  }, [businessId]);
+
+  // Verificar si el usuario autenticado es empleado
+  const checkIfEmployee = useCallback(async () => {
+    try {
+      const user = await getAuthenticatedUser();
+      if (!user) {
+        setIsEmployee(false);
+        return;
+      }
+
+      const employeeRole = await getEmployeeRoleInBusiness({ userId: user.id, businessId });
+      if (employeeRole) {
+        // owner/admin/propietario/administrador deben conservar permisos de gestión.
+        setIsEmployee(!isAdminRole(employeeRole));
+        return;
+      }
+
+      // Fallback: si existe en employees pero sin rol resoluble, tratar como empleado restringido.
+      setIsEmployee(await isEmployeeInBusiness({ userId: user.id, businessId }));
+    } catch {
+      // Si hay error, asumimos que NO es empleado (es admin)
+      setIsEmployee(false);
+    }
+  }, [businessId]);
+
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const offlineMode = typeof navigator !== 'undefined' && navigator.onLine === false;
+      
+      // Verificar sesión ANTES de cargar datos
+      let user = null;
+      let authError = null;
+      try {
+        user = await getAuthenticatedUser();
+      } catch (error) {
+        authError = error;
+      }
+      
+      if (authError || !user?.id) {
+        if (offlineMode) {
+          setSessionChecked(true);
+          setError('⚠️ Sin internet (modo offline). Algunas acciones pueden requerir reconexión.');
+        } else {
+          setError('⚠️ Tu sesión ha expirado. Redirigiendo al login...');
+          setLoading(false);
+          setTimeout(() => {
+            navigate('/login');
+          }, 2000);
+          return;
+        }
+      } else {
+        setSessionChecked(true);
+      }
+      
+      await Promise.all([
+        loadVentas(),
+        loadProductos(),
+        loadCombos(),
+        checkIfEmployee()
+      ]);
+    } catch {
+      setError('⚠️ No se pudo cargar la información. Por favor, intenta recargar la página.');
+    } finally {
+      setLoading(false);
+    }
+  }, [loadVentas, loadProductos, loadCombos, checkIfEmployee, navigate]);
+
+  useEffect(() => {
+    if (businessId) {
+      loadData();
+    }
+  }, [businessId, loadData]);
+
+  useEffect(() => {
+    const syncState = () => setSalesOutboxState(getSalesOutboxSnapshot());
+    syncState();
+
+    const unsubscribe = subscribeSalesOutboxUpdates((snapshot) => {
+      setSalesOutboxState(snapshot);
+    });
+
+    const timer = setInterval(() => {
+      const snapshot = getSalesOutboxSnapshot();
+      setSalesOutboxState((prev) => {
+        if (JSON.stringify(prev) === JSON.stringify(snapshot)) return prev;
+        return snapshot;
+      });
+    }, 5000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeSalesSyncUpdates((payload) => {
+      const tempSaleId = String(payload?.tempSaleId || '').trim();
+      const remoteSaleId = String(payload?.remoteSaleId || '').trim();
+      const syncedAt = payload?.syncedAt || new Date().toISOString();
+      const payloadBusinessId = String(payload?.businessId || '').trim();
+
+      if (!tempSaleId || !remoteSaleId) return;
+      if (payloadBusinessId && String(businessId || '').trim() && payloadBusinessId !== String(businessId || '').trim()) {
+        return;
+      }
+
+      setSales((prevVentas) => {
+        const list = Array.isArray(prevVentas) ? [...prevVentas] : [];
+        const tempIndex = list.findIndex((sale) => String(sale?.id || '').trim() === tempSaleId);
+        if (tempIndex < 0) return prevVentas;
+
+        const remoteIndex = list.findIndex((sale) => String(sale?.id || '').trim() === remoteSaleId);
+        if (remoteIndex >= 0 && remoteIndex !== tempIndex) {
+          const tempSale = list[tempIndex] || {};
+          const remoteSale = list[remoteIndex] || {};
+          list[remoteIndex] = {
+            ...tempSale,
+            ...remoteSale,
+            id: remoteSaleId,
+            pending_sync: false,
+            synced_at: syncedAt
+          };
+          list.splice(tempIndex, 1);
+          return list;
+        }
+
+        list[tempIndex] = {
+          ...(list[tempIndex] || {}),
+          id: remoteSaleId,
+          pending_sync: false,
+          synced_at: syncedAt
+        };
+        return list;
+      });
+
+      setSelectedSale((prevSelected) => {
+        if (!prevSelected) return prevSelected;
+        const selectedId = String(prevSelected?.id || '').trim();
+        if (selectedId !== tempSaleId) return prevSelected;
+        return {
+          ...prevSelected,
+          id: remoteSaleId,
+          pending_sync: false,
+          synced_at: syncedAt
+        };
+      });
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [businessId]);
+
+  // 🔥 TIEMPO REAL: Suscripción a cambios en ventas
+  useRealtimeSubscription('sales', {
+    filter: { business_id: businessId },
+    enabled: !!businessId,
+    onInsert: (newSale) => {
+      enqueueRealtimeUpdate(() => {
+        const sellerName = typeof newSale?.seller_name === 'string' ? newSale.seller_name.trim() : '';
+        const isAdminSeller = sellerName.toLowerCase() === 'administrador';
+
+        const saleWithDetails = {
+          ...newSale,
+          employees: isAdminSeller
+            ? { full_name: 'Administrador', role: 'owner' }
+            : { full_name: sellerName || 'Vendedor desconocido', role: 'employee' }
+        };
+
+        // Verificar si la venta ya existe antes de agregarla
+        setSales(prev => {
+          const exists = prev.some(v => v.id === newSale.id);
+          if (exists) {
+            return prev;
+          }
+          return [saleWithDetails, ...prev];
+        });
+
+        // Incrementar el contador total
+        setTotalCount(prev => prev + 1);
+
+        setSuccess('✨ Nueva venta registrada');
+        setTimeout(() => setSuccess(null), 3000);
+      });
+    },
+    onUpdate: (updatedSale) => {
+      enqueueRealtimeUpdate(() => {
+        setSales(prev => prev.map(v => v.id === updatedSale.id ? { ...v, ...updatedSale } : v));
+      });
+    },
+    onDelete: (deletedSale) => {
+      enqueueRealtimeUpdate(() => {
+        setSales(prev => prev.filter(v => v.id !== deletedSale.id));
+        setTotalCount(prev => Math.max(0, prev - 1));
+      });
+    }
+  });
+
+  // 🔥 TIEMPO REAL: Suscripción a cambios en productos (para stock)
+  useRealtimeSubscription('products', {
+    filter: { business_id: businessId },
+    enabled: !!businessId,
+    onUpdate: (updatedProduct) => {
+      enqueueRealtimeUpdate(() => {
+        setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+        // Mantener stock disponible del carrito sincronizado con cambios en tiempo real
+        setCart(prevCart => prevCart.map(item =>
+          item.product_id === updatedProduct.id
+            ? {
+                ...item,
+                available_stock: updatedProduct.manage_stock === false ? null : updatedProduct.stock,
+                manage_stock: updatedProduct.manage_stock !== false
+              }
+            : item
+        ));
+      });
+    },
+    onDelete: (deletedProduct) => {
+      enqueueRealtimeUpdate(() => {
+        setProducts(prev => prev.filter(p => p.id !== deletedProduct.id));
+        setCart(prevCart => prevCart.map(item =>
+          item.product_id === deletedProduct.id
+            ? { ...item, available_stock: 0 }
+            : item
+        ));
+      });
+    },
+    onInsert: () => {}
+  });
+
+  useRealtimeSubscription('combos', {
+    filter: { business_id: businessId },
+    enabled: !!businessId,
+    onInsert: () => {
+      loadCombos().catch((err) => { logger.warn('ventas:combos_sync_insert failed', err); });
+    },
+    onUpdate: () => {
+      loadCombos().catch((err) => { logger.warn('ventas:combos_sync_update failed', err); });
+    },
+    onDelete: () => {
+      loadCombos().catch((err) => { logger.warn('ventas:combos_sync_delete failed', err); });
+    }
+  });
+
+  useEffect(() => {
+    if (!businessId || !Array.isArray(sales) || loading) return;
+
+    const snapshotKey = `ventas.list:${businessId}`;
+    if (sales.length === 0) {
+      const offline = isOfflineMode();
+      const existing = readOfflineSnapshot(snapshotKey, []);
+      if (offline && Array.isArray(existing) && existing.length > 0) {
+        return;
+      }
+    }
+
+    saveOfflineSnapshot(snapshotKey, sales);
+  }, [businessId, sales, loading]);
+
+  const comboById = useMemo(() => {
+    const map = new Map();
+    combos.forEach((combo) => map.set(combo.id, combo));
+    return map;
+  }, [combos]);
+
+  const catalogItems = useMemo(() => {
+      const productItems = products.map((product) => ({
+      item_type: SALE_ITEM_TYPE.PRODUCT,
+      item_id: product.id,
+      product_id: product.id,
+      combo_id: null,
+      name: product.name,
+      code: product.code || '',
+      sale_price: Number(product.sale_price || 0),
+      stock: Number(product.stock || 0),
+      manage_stock: product.manage_stock !== false,
+      combo_items: []
+    }));
+
+    const comboItems = combos.map((combo) => ({
+      item_type: SALE_ITEM_TYPE.COMBO,
+      item_id: combo.id,
+      product_id: null,
+      combo_id: combo.id,
+      name: combo.nombre,
+      code: `COMBO-${String(combo.id).slice(0, 4).toUpperCase()}`,
+      sale_price: Number(combo.precio_venta || 0),
+      stock: null,
+      combo_items: combo.combo_items || []
+    }));
+
+    return [...comboItems, ...productItems];
+  }, [products, combos]);
+
+  // Memoizar funciones del carrito
+  const addToCart = useCallback((catalogItem) => {
+    const itemType = catalogItem?.item_type || SALE_ITEM_TYPE.PRODUCT;
+    const itemId = catalogItem?.item_id || catalogItem?.id;
+    if (!itemId) return;
+
+    const itemKey = buildCartItemKey(itemType, itemId);
+
+    setCart((prevCart) => {
+      const existingItem = prevCart.find((item) => item.item_key === itemKey);
+
+      if (existingItem) {
+        return prevCart.map((item) => (
+          item.item_key === itemKey
+            ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.unit_price }
+            : item
+        ));
+      }
+
+      const unitPrice = Number(catalogItem.sale_price || 0);
+      const quantity = 1;
+      return [
+        ...prevCart,
+        {
+          item_key: itemKey,
+          item_type: itemType,
+          item_id: itemId,
+          product_id: itemType === SALE_ITEM_TYPE.PRODUCT ? itemId : null,
+          combo_id: itemType === SALE_ITEM_TYPE.COMBO ? itemId : null,
+          name: catalogItem.name,
+          code: catalogItem.code || '',
+          quantity,
+          unit_price: unitPrice,
+          subtotal: quantity * unitPrice,
+          available_stock: itemType === SALE_ITEM_TYPE.PRODUCT && catalogItem.manage_stock !== false
+            ? Number(catalogItem.stock || 0)
+            : null,
+          manage_stock: itemType === SALE_ITEM_TYPE.PRODUCT ? catalogItem.manage_stock !== false : true
+        }
+      ];
+    });
+    setSearchProduct('');
+  }, []);
+
+  const removeFromCart = useCallback((itemKey) => {
+    setCart((prevCart) => prevCart.filter((item) => item.item_key !== itemKey));
+  }, []);
+
+  const updateQuantity = useCallback((itemKey, newQuantity) => {
+    if (newQuantity <= 0) {
+      removeFromCart(itemKey);
+      return;
+    }
+
+    setCart((prevCart) => prevCart.map((item) => (
+      item.item_key === itemKey
+        ? { ...item, quantity: newQuantity, subtotal: newQuantity * item.unit_price }
+        : item
+    )));
+  }, [removeFromCart]);
+
+  const {
+    comboStockShortages,
+    simpleStockShortages
+  } = useMemo(() => evaluateOfflineStockShortages({
+    cart,
+    products: products,
+    comboById
+  }), [cart, products, comboById]);
+
+  const total = useMemo(() => {
+    return cart.reduce((sum, item) => sum + item.subtotal, 0);
+  }, [cart]);
+
+  const saleIntentSignature = useMemo(() => {
+    const normalizedItems = [...cart]
+      .map((item) => ({
+        item_type: item.item_type || SALE_ITEM_TYPE.PRODUCT,
+        product_id: item.product_id || null,
+        combo_id: item.combo_id || null,
+        quantity: Number(item.quantity || 0),
+        unit_price: Number(item.unit_price || 0)
+      }))
+      .sort((a, b) => String(a.product_id || a.combo_id || '').localeCompare(String(b.product_id || b.combo_id || '')));
+
+    return JSON.stringify({
+      businessId,
+      paymentMethod,
+      items: normalizedItems
+    });
+  }, [businessId, paymentMethod, cart]);
+
+  useEffect(() => {
+    if (cart.length === 0) {
+      saleIntentKeyRef.current = null;
+      saleIntentSignatureRef.current = '';
+    }
+  }, [cart.length]);
+
+  const processSale = useCallback(async () => {
+    if (isSubmitting) return; // Prevenir doble click
+    
+    setIsSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    
+    try {
+      if (cart.length === 0) {
+        throw new Error('⚠️ El carrito está vacío. Agrega productos antes de procesar la venta.');
+      }
+
+      // Verificar sesión antes de procesar
+      if (!sessionChecked) {
+        throw new Error('⚠️ Verificando sesión...');
+      }
+
+      if (comboStockShortages.length > 0) {
+        const firstShortage = comboStockShortages[0];
+        throw new Error(
+          `Stock insuficiente para "${firstShortage.product_name}". ` +
+          `Disponibles: ${firstShortage.available_stock}. Requeridos: ${firstShortage.required_quantity}.`
+        );
+      }
+
+      if (simpleStockShortages.length > 0) {
+        const firstShortage = simpleStockShortages[0];
+        throw new Error(
+          `Stock insuficiente para "${firstShortage.product_name}". ` +
+          `Disponibles: ${firstShortage.available_stock}. Requeridos: ${firstShortage.required_quantity}.`
+        );
+      }
+
+      // Calcular total del carrito
+      const saleTotal = cart.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+
+      // 🚀 USAR FUNCIÓN OPTIMIZADA: Una sola llamada RPC
+      const startTime = performance.now();
+      if (saleIntentSignatureRef.current !== saleIntentSignature) {
+        saleIntentSignatureRef.current = saleIntentSignature;
+        saleIntentKeyRef.current = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`);
+      }
+      
+      const result = await createSaleWithOutbox({
+        businessId,
+        cart,
+        paymentMethod,
+        total: saleTotal,
+        idempotencyKey: saleIntentKeyRef.current
+      });
+
+      const elapsedMs = performance.now() - startTime;
+      
+      if (!(result as any).success) {
+        throw new Error((result as any).error || 'Error al procesar la venta');
+      }
+
+      // Registrar latencia para debugging
+      recordSaleCreationTime(elapsedMs);
+
+      // Mostrar alerta con detalles de la venta
+      setSuccessTitle('✨ Venta Registrada');
+      setSuccessDetails([
+        { label: 'Total', value: formatPrice(saleTotal) },
+        { label: 'Método', value: getPaymentMethodLabel(paymentMethod) },
+        { label: 'Tiempo', value: `${elapsedMs.toFixed(0)}ms` },
+        { label: 'Artículos', value: cart.length },
+        ...(result?.data?.pending_sync ? [{ label: 'Estado', value: 'Pendiente de sincronización' }] : [])
+      ]);
+      setAlertType('success');
+      setSuccess(true);
+
+      if (result?.data?.pending_sync) {
+        const pendingSale = {
+          id: result?.data?.id,
+          business_id: businessId,
+          user_id: null,
+          seller_name: 'Venta offline',
+          payment_method: paymentMethod,
+          total: Number(saleTotal || 0),
+          created_at: result?.data?.created_at || new Date().toISOString(),
+          notes: 'Pendiente de sincronización',
+          pending_sync: true,
+          employees: { full_name: 'Pendiente sync', role: 'employee' }
+        };
+
+        setSales((prev) => {
+          const next = [pendingSale, ...prev];
+          saveOfflineSnapshot(`ventas.list:${businessId}`, next);
+          return next;
+        });
+        setTotalCount((prev) => prev + 1);
+
+        const consumptionByProduct = buildCartConsumptionByProduct({ cart, comboById });
+
+        setProducts((prevProducts) => {
+          const nextProducts = applyOfflineStockConsumption({
+            products: prevProducts,
+            consumptionByProduct
+          });
+
+          saveOfflineSnapshot(`ventas.productos:${businessId}`, nextProducts);
+          return nextProducts;
+        });
+      }
+
+      // Mostrar modal de impresión después de que la venta se registre
+      if (isAutoPrintReceiptEnabled()) {
+        // Preparar datos para impresión
+        const isPendingSync = !!result?.data?.pending_sync;
+
+        let saleForPrint = null;
+        let detailsForPrint = [];
+
+        if (isPendingSync) {
+          saleForPrint = {
+            id: result.data.id,
+            total: saleTotal,
+            payment_method: paymentMethod,
+            created_at: result?.data?.created_at || new Date().toISOString(),
+            seller_name: 'Venta offline'
+          };
+          detailsForPrint = cart.map((item) => ({
+            quantity: Number(item.quantity || 0),
+            unit_price: Number(item.unit_price || 0),
+            subtotal: Number(item.subtotal || (Number(item.quantity || 0) * Number(item.unit_price || 0))),
+            product_name: item.name || 'Item'
+          }));
+        } else {
+          try {
+            const [saleRow, saleDetails] = await Promise.all([
+              getSaleForPrintById(result.data.id),
+              getSaleDetailsBySaleId(result.data.id)
+            ]);
+
+            saleForPrint = saleRow || {
+              id: result.data.id,
+              total: saleTotal,
+              payment_method: paymentMethod,
+              created_at: new Date().toISOString(),
+              seller_name: 'Empleado'
+            };
+
+            detailsForPrint = Array.isArray(saleDetails) ? saleDetails : [];
+          } catch {
+            saleForPrint = {
+              id: result.data.id,
+              total: saleTotal,
+              payment_method: paymentMethod,
+              created_at: new Date().toISOString(),
+              seller_name: 'Empleado'
+            };
+            detailsForPrint = [];
+          }
+        }
+
+        // Guardar datos para el modal
+        setPrintSaleData(saleForPrint);
+        setPrintSaleDetails(detailsForPrint);
+
+        // Mostrar el modal después de un pequeño delay para que se vea el toast primero
+        setTimeout(() => {
+          setShowPrintModal(true);
+        }, 500);
+      }
+      
+      // Limpiar el carrito y cerrar POS
+      setCart([]);
+      setSelectedCustomer('');
+      setPaymentMethod('cash');
+      setShowSaleModal(false);
+      saleIntentKeyRef.current = null;
+      saleIntentSignatureRef.current = '';
+      setSaleModalPanel('catalog');
+
+      // Recargar ventas inmediatamente
+      await loadVentas(currentFilters, { limit, offset: (page - 1) * limit, includeCount: false });
+      
+    } catch (error) {
+      
+      // Si es error de sesión, redirigir a login
+      if (String(error?.message || '').includes('sesión ha expirado') && (typeof navigator === 'undefined' || navigator.onLine)) {
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
+      }
+      setError(buildDiagnosticAlertMessage(error, 'No se pudo procesar la venta. Por favor, intenta de nuevo.'));
+    } finally {
+      setIsSubmitting(false); // SIEMPRE desbloquear
+    }
+  }, [cart, sessionChecked, comboStockShortages, simpleStockShortages, comboById, businessId, paymentMethod, loadVentas, isSubmitting, currentFilters, limit, page, saleIntentSignature, navigate]);
+
+  // Funciones de eliminación de venta (solo admin)
+  const handleDeleteSale = (saleId) => {
+    setSaleToDelete(saleId);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteSale = async () => {
+    if (!saleToDelete) return;
+
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await deleteSaleWithDetails(saleToDelete, businessId);
+
+      setSuccessTitle('🗑️ Venta Eliminada');
+      setSuccessDetails([
+        { label: 'Acción', value: 'Venta eliminada correctamente' }
+      ]);
+      setAlertType('error');
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 4000);
+
+      // Recargar ventas
+      await loadVentas(currentFilters, { limit, offset: (page - 1) * limit, includeCount: false });
+
+      setShowDeleteModal(false);
+      setSaleToDelete(null);
+
+    } catch (error) {
+      setError('❌ ' + (error.message || 'Error al eliminar la venta'));
+      setTimeout(() => setError(null), 8000);
+      setShowDeleteModal(false);
+      setSaleToDelete(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSaleDetails = useCallback(async (saleId) => {
+    if (!saleId) return [];
+    return getSaleDetailsBySaleId(saleId);
+  }, []);
+
+  const openSaleDetailsModal = useCallback(async (sale) => {
+    setSelectedSale({ ...sale, sale_details: [] });
+    setShowSaleDetailsModal(true);
+    setSaleDetailsError('');
+
+    try {
+      setSaleDetailsLoading(true);
+      const details = await fetchSaleDetails(sale.id);
+      let saleInfo = {};
+      try {
+        const infoData = await getSaleCashMetadataBySaleId(sale.id);
+        if (infoData) {
+          saleInfo = infoData;
+        }
+      } catch (err) {
+        logger.warn('ventas:fetch_sale_cash_metadata failed', err);
+      }
+
+      setSelectedSale({
+        ...sale,
+        amount_received: (saleInfo as any).amount_received ?? sale.amount_received ?? null,
+        change_amount: (saleInfo as any).change_amount ?? sale.change_amount ?? null,
+        change_breakdown: (saleInfo as any).change_breakdown ?? sale.change_breakdown ?? [],
+        sale_details: details
+      });
+    } catch (err) {
+      setSaleDetailsError(err?.message || 'No se pudieron cargar los detalles de la venta');
+    } finally {
+      setSaleDetailsLoading(false);
+    }
+  }, [fetchSaleDetails]);
+
+  // Función para imprimir factura física
+  const handlePrintInvoice = useCallback(async (sale) => {
+    let saleDetails = [];
+    try {
+      saleDetails = await fetchSaleDetails(sale.id);
+    } catch {
+      setError('No se pudieron cargar los detalles de la venta');
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    if (!saleDetails || saleDetails.length === 0) {
+      setError('No se pudieron cargar los detalles de la venta');
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    const printResult = await printSaleReceipt({
+      sale: sale,
+      saleDetails,
+      sellerName: getVendedorName(sale),
+      businessName: await getBusinessNameById(businessId),
+    });
+
+    if (!printResult.ok) {
+      setError('No se pudo abrir la ventana de impresión. Verifica los permisos del navegador.');
+      setTimeout(() => setError(null), 3000);
+    }
+  }, [fetchSaleDetails, businessId]);
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setSaleToDelete(null);
+  };
+
+  // Memoizar catálogo filtrado (productos + combos)
+  const filteredCatalog = useMemo(() => {
+    if (!debouncedSearch.trim()) return catalogItems;
+
+    const search = debouncedSearch.toLowerCase();
+    return catalogItems.filter((item) =>
+      item.name.toLowerCase().includes(search) ||
+      item.code?.toLowerCase().includes(search)
+    );
+  }, [catalogItems, debouncedSearch]);
+
+  const {
+    visibleItems: visibleFilteredCatalog,
+    hasMore: hasMoreFilteredCatalog,
+    totalCount: totalFilteredCatalog,
+    sentinelRef: filteredCatalogSentinelRef,
+    loadMore: loadMoreFilteredCatalog
+  } = useProgressiveList(filteredCatalog, {
+    initialCount: lowMotionMode ? 12 : 20,
+    step: lowMotionMode ? 10 : 18,
+    rootMargin: '260px',
+    resetKey: `${searchProduct.trim().toLowerCase()}:${filteredCatalog.length}:${lowMotionMode ? 'low' : 'full'}`
+  });
+
+  const {
+    visibleItems: visibleCartItems,
+    hasMore: hasMoreCartItems,
+    totalCount: totalCartItems,
+    sentinelRef: cartSentinelRef,
+    loadMore: loadMoreCartItems
+  } = useProgressiveList(cart, {
+    initialCount: lowMotionMode ? 10 : 16,
+    step: lowMotionMode ? 8 : 14,
+    rootMargin: '220px',
+    resetKey: `${cart.length}:${lowMotionMode ? 'low' : 'full'}`
+  });
+  // Cleanup de timers de mensajes
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(null), 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
+
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  // Generar factura desde una venta existente (memoizado)
+  const generateInvoiceFromSale = useCallback(async () => {
+    if (!invoiceCustomerEmail || !invoiceCustomerEmail.includes('@')) {
+      setError('⚠️ Debes ingresar un email válido para enviar el comprobante');
+      return;
+    }
+    if (!invoiceCustomerName) {
+      setError('⚠️ Debes ingresar el nombre del cliente para enviar el comprobante');
+      return;
+    }
+
+    try {
+      setGeneratingInvoice(true);
+      setError(null);
+
+      // Obtener detalles de la venta
+      const saleDetails = await fetchSaleDetails(selectedSale.id);
+
+      const total = selectedSale.total;
+
+      // Generar número de comprobante (usando la venta existente)
+      const comprobanteNumber = `COMP-${selectedSale.id.substring(0, 8).toUpperCase()}`;
+
+      // Preparar items para el email
+      const emailItems = saleDetails.map(detail => ({
+        product_name: getSaleDetailDisplayName(detail),
+        quantity: detail.quantity,
+        unit_price: detail.unit_price
+      }));
+
+      // Obtener nombre del negocio
+      const businessName = await getBusinessNameById(businessId);
+
+      // Enviar comprobante por email
+      const emailResult = await sendInvoiceEmail({
+        email: invoiceCustomerEmail,
+        invoiceNumber: comprobanteNumber,
+        customerName: invoiceCustomerName,
+        total: total,
+        items: emailItems,
+        businessName: businessName || 'Stocky',
+        businessId,
+        issuedAt: selectedSale?.created_at || new Date().toISOString()
+      });
+
+      if (emailResult.success) {
+        setSuccess(`✅ Comprobante enviado exitosamente a ${invoiceCustomerEmail}`);
+      } else {
+        throw new Error(emailResult.error || 'Error al enviar el comprobante');
+      }
+
+      // Cerrar modal y limpiar
+      setShowInvoiceModal(false);
+      setInvoiceCustomerName('');
+      setInvoiceCustomerEmail('');
+      setInvoiceCustomerIdNumber('');
+      setSelectedSale(null);
+
+    } catch (error) {
+      setError('❌ ' + (error.message || 'No se pudo enviar el comprobante. Por favor, intenta de nuevo.'));
+    } finally {
+      setGeneratingInvoice(false);
+    }
+  }, [businessId, selectedSale, invoiceCustomerName, invoiceCustomerEmail, fetchSaleDetails]);
+
+  const selectedSaleAmountReceived = toNumberOrNull(selectedSale?.amount_received);
+  const selectedSaleChangeAmount = toNumberOrNull(selectedSale?.change_amount);
+  const hasAmountReceivedValue = selectedSale?.amount_received !== null
+    && selectedSale?.amount_received !== undefined;
+  const hasChangeAmountValue = selectedSale?.change_amount !== null
+    && selectedSale?.change_amount !== undefined;
+  const selectedSaleChangeBreakdown = Array.isArray(selectedSale?.change_breakdown)
+    ? selectedSale.change_breakdown
+    : [];
+  const selectedSaleTotal = toNumberOrNull(selectedSale?.total) ?? 0;
+  const changeFromBreakdown = selectedSaleChangeBreakdown.reduce((sum, entry) => {
+    const denomination = Number(entry?.denomination || 0);
+    const count = Number(entry?.count || 0);
+    if (!Number.isFinite(denomination) || !Number.isFinite(count) || count <= 0) return sum;
+    return sum + (denomination * count);
+  }, 0);
+  const changeFromDifference = selectedSaleAmountReceived !== null
+    ? Math.max(selectedSaleAmountReceived - selectedSaleTotal, 0)
+    : null;
+  const resolvedChangeAmount = selectedSaleChangeAmount !== null
+    ? selectedSaleChangeAmount
+    : (changeFromBreakdown > 0 ? changeFromBreakdown : changeFromDifference);
+  const hasChangeBreakdown = changeFromBreakdown > 0;
+  const showCashPaymentDetails = selectedSale?.payment_method === 'cash'
+    && (hasAmountReceivedValue || hasChangeAmountValue || hasChangeBreakdown);
+  const shouldBlockWithError = Boolean(sales.length === 0 && error && !isConnectivityError(error));
+  const lastSuccessfulSyncText = salesOutboxState?.lastSuccessfulSyncAt
+    ? formatDate(salesOutboxState.lastSuccessfulSyncAt)
+    : 'Sin sincronizaciones aún';
+
+  return (
+    <AsyncStateWrapper
+      loading={loading}
+      error={shouldBlockWithError ? error : null}
+      dataCount={sales.length}
+      onRetry={loadData}
+      skeletonType="ventas"
+      hasFilters={Boolean(currentFilters && Object.keys(currentFilters).length > 0)}
+      noResultsTitle="No hay ventas para esos filtros"
+      noResultsDescription="Ajusta los filtros o registra una nueva venta."
+      noResultsAction={
+        <div className="flex justify-center">
+          <Button
+            type="button"
+            onClick={() => {
+              setCurrentFilters({});
+              setPage(1);
+              loadVentas({}, { limit, offset: 0, includeCount: false });
+            }}
+            className="bg-white text-gray-700 border-2 border-gray-300 hover:bg-gray-100 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
+          >
+            Limpiar Filtros
+          </Button>
+        </div>
+      }
+      emptyTitle="Aun no hay ventas registradas"
+      emptyDescription="Las ventas apareceran aqui en tiempo real cuando registres la primera."
+      emptyAction={
+        <Button
+          type="button"
+          onClick={() => setShowSaleModal(true)}
+          className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
+        >
+          Crear Primera Venta
+        </Button>
+      }
+      bypassStateRendering={showSaleModal}
+      actionProcessing={isSubmitting || generatingInvoice}
+      className="min-h-screen bg-gradient-to-br from-light-bg-primary to-white p-6"
+    >
+    <div>
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <Card className="gradient-primary text-white shadow-xl rounded-2xl border-none mb-6">
+          <div className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="p-2 sm:p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                <ShoppingCart className="w-6 h-6 sm:w-8 sm:h-8" />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold">Ventas</h1>
+                <p className="text-white/80 mt-1 text-sm sm:text-base">Sistema de punto de venta</p>
+              </div>
+            </div>
+            <Button
+              onClick={() => setShowSaleModal(!showSaleModal)}
+              className="w-full sm:w-auto gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-xl flex items-center justify-center gap-2 text-sm sm:text-base"
+            >
+              {showSaleModal ? (
+                <>
+                  <Receipt className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="whitespace-nowrap">Ver Historial</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="whitespace-nowrap">Nueva Venta</span>
+                </>
+              )}
+            </Button>
+          </div>
+        </Card>
+      </motion.div>
+
+      {/* Mensajes */}
+      <AnimatePresence>
+        <SaleUpdateAlert
+          key="sale-submit-loading"
+          isVisible={isSubmitting}
+          onClose={() => {}}
+          title="Generando venta..."
+          details={[]}
+          duration={600000}
+        />
+        <SaleSuccessAlert 
+          key="sale-success"
+          isVisible={success && alertType === 'success'}
+          onClose={() => setSuccess(false)}
+          title={successTitle}
+          details={successDetails}
+          duration={6000}
+        />
+        <SaleErrorAlert 
+          key="sale-error"
+          isVisible={success && alertType === 'error'}
+          onClose={() => setSuccess(false)}
+          title={successTitle}
+          details={successDetails}
+          duration={7000}
+        />
+        <PrintReceiptConfirmModal
+          key="print-receipt-confirm"
+          isOpen={showPrintModal}
+          onConfirm={handlePrintConfirm}
+          onCancel={handlePrintCancel}
+          isLoading={isPrintingReceipt}
+          customerName={printCustomerName}
+          onCustomerNameChange={setPrintCustomerName}
+        />
+      </AnimatePresence>
+
+      {!showSaleModal && (
+        <SalesFilters
+          {...({ businessId } as any)}
+          onApply={(filters) => {
+            setCurrentFilters(filters || {});
+            setPage(1);
+            loadVentas(filters || {}, { limit, offset: 0, includeCount: false });
+          }}
+          onClear={() => {
+            setCurrentFilters({});
+            setPage(1);
+            loadVentas({}, { limit, offset: 0, includeCount: false });
+          }}
+        />
+      )}
+
+      {!showSaleModal && (
+        <Card className="mb-6 rounded-2xl border border-accent-200 bg-white shadow-sm">
+          <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-accent-700">Estado de sincronización de ventas</p>
+              <p className="text-xs text-gray-500 mt-0.5">Monitorea ventas pendientes o con error mientras trabajas offline.</p>
+              <p className="text-xs text-gray-500 mt-0.5">Último sync exitoso: {lastSuccessfulSyncText}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge className="bg-slate-100 text-slate-800 border border-slate-200">Cola: {salesOutboxState.total}</Badge>
+              <Badge className="bg-amber-100 text-amber-800 border border-amber-200">Pendientes: {salesOutboxState.pending}</Badge>
+              <Badge className="bg-gray-100 text-gray-800 border border-gray-200">Procesando: {salesOutboxState.processing}</Badge>
+              <Badge className="bg-red-100 text-red-800 border border-red-200">Errores: {salesOutboxState.error}</Badge>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={salesOutboxState.error <= 0}
+                className="h-8 border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                onClick={() => {
+                  const retried = retryAllSalesOutboxErrorEvents();
+                  if (retried <= 0) {
+                    setError('⚠️ No hay ventas con error para reintentar en este momento.');
+                    return;
+                  }
+                  setSuccessTitle('🔄 Reintento de sincronización iniciado');
+                  setSuccessDetails([
+                    { label: 'Ventas', value: retried },
+                    { label: 'Estado', value: 'Reintentando errores de sincronización' }
+                  ]);
+                  setAlertType('update');
+                  setSuccess(true);
+                }}
+              >
+                Reintentar errores
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Modal para Nueva Venta */}
+      <AnimatePresence>
+        {showSaleModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm p-2 sm:p-4 flex items-center justify-center"
+            onClick={closeSaleModal}
+          >
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0, y: 16 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0, y: 16 }}
+              transition={{ duration: 0.2 }}
+              className="w-full max-w-[1260px] max-h-[95vh] overflow-hidden rounded-3xl border border-accent-200 bg-white shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header del Modal */}
+              <div className="gradient-primary p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3 text-white">
+                  <div className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur-sm">
+                    <ShoppingCart className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-bold leading-tight">Nueva Venta</h2>
+                    <p className="text-xs sm:text-sm text-white/80">Catálogo y carrito en una sola vista</p>
+                  </div>
+                </div>
+                <button
+                  onClick={closeSaleModal}
+                  className="text-white/80 hover:text-white transition-colors p-2 hover:bg-white/15 rounded-lg"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="xl:hidden border-b border-accent-100 bg-white px-3 py-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSaleModalPanel('catalog')}
+                    className={`h-10 rounded-lg text-sm font-semibold transition ${
+                      saleModalPanel === 'catalog'
+                        ? 'gradient-primary text-white shadow-sm'
+                        : 'bg-accent-50 text-accent-600'
+                    }`}
+                  >
+                    Catálogo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSaleModalPanel('cart')}
+                    className={`h-10 rounded-lg text-sm font-semibold transition ${
+                      saleModalPanel === 'cart'
+                        ? 'gradient-primary text-white shadow-sm'
+                        : 'bg-accent-50 text-accent-600'
+                    }`}
+                  >
+                    Carrito ({cart.length})
+                  </button>
+                </div>
+              </div>
+
+              {/* Contenido del Modal */}
+              <div className="p-3 sm:p-5 xl:p-6 overflow-y-auto max-h-[calc(95vh-136px)] xl:max-h-[calc(95vh-88px)]">
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+                  {/* Panel izquierdo - Productos y combos */}
+                  <Card className={`rounded-2xl border border-accent-200 bg-white shadow-sm ${saleModalPanel === 'cart' ? 'hidden xl:block' : ''}`}>
+                    <CardHeader className="pb-4 border-b border-accent-100">
+                      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+                        <div>
+                          <CardTitle className="text-xl text-accent-600">Productos y Combos</CardTitle>
+                          <p className="text-sm text-gray-500 mt-1">Explora y agrega items al carrito</p>
+                        </div>
+                        <Badge className="w-fit bg-accent-100 text-accent-700 border border-accent-200">
+                          {totalFilteredCatalog} resultados
+                        </Badge>
+                      </div>
+                      <div className="relative mt-4">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          type="text"
+                          className="pl-9 h-11 rounded-xl border-gray-300 focus:border-[#66A5AD] focus:ring-[#66A5AD]"
+                          placeholder="Buscar producto o combo..."
+                          value={searchProduct}
+                          onChange={(e) => setSearchProduct(e.target.value)}
+                        />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 sm:p-5">
+                      {totalFilteredCatalog === 0 ? (
+                        <div className="text-center py-16 text-gray-500 border border-dashed border-gray-300 rounded-xl bg-gray-50">
+                          <AlertCircle className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+                          <p className="font-medium">No hay items disponibles</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3 xl:max-h-[56vh] xl:overflow-y-auto xl:pr-1 custom-scrollbar">
+                          {visibleFilteredCatalog.map((catalogItem) => (
+                            <motion.button
+                              key={`${catalogItem.item_type}:${catalogItem.item_id}`}
+                              type="button"
+                              whileHover={{ y: -2 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => addToCart(catalogItem)}
+                              className="text-left rounded-xl border border-gray-200 bg-gradient-to-b from-white to-gray-50 p-3.5 transition hover:border-primary-300 hover:shadow-md"
+                            >
+                              <div className="min-w-0">
+                                <p className="font-bold text-accent-600 text-base truncate" title={catalogItem.name}>
+                                  {catalogItem.name}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1 truncate" title={catalogItem.code}>
+                                  Código: {catalogItem.code || 'N/A'}
+                                </p>
+                                {catalogItem.item_type === SALE_ITEM_TYPE.COMBO ? (
+                                  <Badge className="mt-2 bg-gray-100 text-gray-800 border border-gray-200">
+                                    Combo ({catalogItem.combo_items?.length || 0} productos)
+                                  </Badge>
+                                ) : catalogItem.manage_stock === false ? (
+                                  <Badge className="mt-2 bg-slate-100 text-slate-700 border border-slate-200">
+                                    Sin control de stock
+                                  </Badge>
+                                ) : (
+                                  <Badge
+                                    className={`mt-2 border ${
+                                      catalogItem.stock > 10
+                                        ? 'bg-green-100 text-green-800 border-green-200'
+                                        : catalogItem.stock > 0
+                                        ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                                        : 'bg-red-100 text-red-800 border-red-200'
+                                    }`}
+                                  >
+                                    Stock: {catalogItem.stock}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="mt-4 flex items-center justify-between gap-2">
+                                <p className="text-lg font-bold text-secondary-600">
+                                  {formatPrice(catalogItem.sale_price)}
+                                </p>
+                                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-accent-100 text-accent-700">
+                                  <Plus className="w-4 h-4" />
+                                </span>
+                              </div>
+                            </motion.button>
+                          ))}
+                          {hasMoreFilteredCatalog && (
+                            <div className="sm:col-span-2 2xl:col-span-3 mt-1 flex flex-col items-center gap-2">
+                              <p className="text-xs text-gray-500">
+                                Mostrando {visibleFilteredCatalog.length} de {totalFilteredCatalog}
+                              </p>
+                              <div ref={filteredCatalogSentinelRef} className="h-2 w-full" aria-hidden="true" />
+                              <Button
+                                type="button"
+                                onClick={loadMoreFilteredCatalog}
+                                variant="outline"
+                                className="w-full sm:w-auto rounded-xl"
+                              >
+                                Cargar mas del catalogo
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Panel derecho - Carrito */}
+                  <Card className={`rounded-2xl border border-accent-200 bg-white shadow-sm ${saleModalPanel === 'catalog' ? 'hidden xl:block' : ''} xl:sticky xl:top-0 xl:h-fit`}>
+                    <CardHeader className="pb-4 border-b border-accent-100">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-xl text-accent-600">Carrito de Venta</CardTitle>
+                          <p className="text-sm text-gray-500 mt-1">{cart.length} items cargados</p>
+                        </div>
+                        <Badge className="bg-accent-50 text-accent-700 border border-accent-200">
+                          {formatPrice(total)}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 sm:p-5">
+                      <div className="space-y-4 mb-5">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                            <User className="w-4 h-4" />
+                            Cliente (opcional)
+                          </label>
+                          <select
+                            value={selectedCustomer}
+                            onChange={(e) => setSelectedCustomer(e.target.value)}
+                            className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#66A5AD] focus:ring-[#66A5AD] transition-all duration-300"
+                          >
+                            <option value="">Venta general</option>
+                             {customers.map((customer) => (
+                               <option key={customer.id} value={customer.id}>
+                                 {customer.full_name}
+                               </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                            <CreditCard className="w-4 h-4" />
+                            Método de pago
+                          </label>
+                          <PaymentMethodSelect
+                            value={paymentMethod}
+                            onChange={setPaymentMethod}
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="border-t border-gray-200 pt-4 mb-4">
+                        <p className="text-sm font-medium text-gray-700 mb-3">Items en el carrito:</p>
+                        <div className="space-y-2 xl:max-h-[30vh] xl:overflow-y-auto xl:pr-1 custom-scrollbar">
+                          {cart.length === 0 ? (
+                            <div className="text-center py-8 text-gray-400 border border-dashed border-gray-300 rounded-xl bg-gray-50">
+                              <ShoppingCart className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                              <p className="font-medium">El carrito está vacío</p>
+                              <p className="text-sm mt-1">Selecciona productos para agregar</p>
+                            </div>
+                          ) : (
+                            visibleCartItems.map((item) => (
+                              <motion.div
+                                key={item.item_key}
+                                initial={{ opacity: 0, x: -14 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: 14 }}
+                                transition={{ duration: 0.2 }}
+                              >
+                                <Card className="bg-gradient-to-br from-gray-50 to-white border-gray-200 rounded-xl shadow-none">
+                                  <div className="p-3">
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-bold text-accent-600 truncate">{item.name}</p>
+                                        <p className="text-xs text-gray-500 truncate">{item.code}</p>
+                                        {item.item_type === SALE_ITEM_TYPE.COMBO && (
+                                          <Badge className="mt-1 bg-gray-100 text-gray-700 border border-gray-200">Combo</Badge>
+                                        )}
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        onClick={() => removeFromCart(item.item_key)}
+                                        className="h-7 w-7 p-0 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg border-none"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                      <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1 w-fit">
+                                        <button
+                                          type="button"
+                                          onClick={() => updateQuantity(item.item_key, item.quantity - 1)}
+                                          className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold transition-colors"
+                                        >
+                                          -
+                                        </button>
+                                        <input
+                                          type="number"
+                                          value={item.quantity}
+                                          onChange={(e) => updateQuantity(item.item_key, parseInt(e.target.value, 10) || 0)}
+                                          min="1"
+                                          className="w-12 text-center border-none focus:outline-none focus:ring-0 font-bold text-accent-600 bg-transparent"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => updateQuantity(item.item_key, item.quantity + 1)}
+                                          className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-700 font-bold transition-colors"
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                      <p className="text-lg font-bold text-secondary-600">
+                                        {formatPrice(item.subtotal)}
+                                      </p>
+                                    </div>
+                                    {(() => {
+                                      if (item.item_type !== SALE_ITEM_TYPE.PRODUCT || !item.product_id) return false;
+                                      if (item.manage_stock === false) return false;
+                                      const available = Number.isFinite(item.available_stock) ? item.available_stock : 0;
+                                      return typeof available === 'number' && item.quantity > available;
+                                    })() && (
+                                      <div className="mt-3 p-2.5 bg-red-50 border border-red-200 rounded-md">
+                                        <div className="flex items-center gap-2">
+                                          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                                          <p className="text-xs text-red-700">
+                                            Disponibles: {item.available_stock} - Pedido: {item.quantity}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </Card>
+                              </motion.div>
+                            ))
+                          )}
+                          {hasMoreCartItems && (
+                            <div className="mt-2 flex flex-col items-center gap-2">
+                              <p className="text-xs text-gray-500">
+                                Mostrando {visibleCartItems.length} de {totalCartItems}
+                              </p>
+                              <div ref={cartSentinelRef} className="h-2 w-full" aria-hidden="true" />
+                              <Button
+                                type="button"
+                                onClick={loadMoreCartItems}
+                                variant="outline"
+                                className="w-full rounded-xl"
+                              >
+                                Cargar mas items del carrito
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {comboStockShortages.length > 0 && (
+                        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertCircle className="w-4 h-4 text-red-600" />
+                            <p className="text-sm font-semibold text-red-800">Stock insuficiente en combos</p>
+                          </div>
+                          <div className="space-y-1 text-xs text-red-700">
+                            {comboStockShortages.map((item) => (
+                              <p key={item.product_id}>
+                                {item.product_name}: disponibles {item.available_stock} / requeridos {item.required_quantity}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {simpleStockShortages.length > 0 && (
+                        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertCircle className="w-4 h-4 text-red-600" />
+                            <p className="text-sm font-semibold text-red-800">Stock insuficiente en productos</p>
+                          </div>
+                          <div className="space-y-1 text-xs text-red-700">
+                            {simpleStockShortages.map((item) => (
+                              <p key={`simple-shortage-${item.product_id}`}>
+                                {item.product_name}: disponibles {item.available_stock} / requeridos {item.required_quantity}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <Card className="gradient-primary text-white shadow-md rounded-xl border-none mb-3">
+                        <div className="p-4 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="w-5 h-5" />
+                            <span className="text-sm sm:text-base font-semibold">Total:</span>
+                          </div>
+                          <span className="text-2xl sm:text-3xl font-bold">{formatPrice(total)}</span>
+                        </div>
+                      </Card>
+
+                      <Button
+                        onClick={processSale}
+                        disabled={cart.length === 0 || isSubmitting || comboStockShortages.length > 0 || simpleStockShortages.length > 0}
+                        className="w-full h-11 sm:h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold text-sm sm:text-base rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                            Procesando venta...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-5 h-5" />
+                            Completar Venta
+                          </>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Historial de Ventas */}
+      {!showSaleModal && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          {sales.length === 0 ? (
+            <Card className="shadow-xl rounded-2xl bg-white border-none">
+              <div className="p-12 text-center">
+                <Receipt className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                <p className="text-gray-500 font-medium text-lg mb-2">No hay ventas registradas</p>
+                <p className="text-gray-400">Haz clic en "Nueva Venta" para comenzar</p>
+              </div>
+            </Card>
+              ) : (
+            <div className="space-y-4">
+                {/* Paginación superior */}
+                <Pagination
+                  currentPage={page}
+                  totalItems={totalCount}
+                  itemsPerPage={limit}
+                  onPageChange={async (newPage) => {
+                    setPage(newPage);
+                    await loadVentas(currentFilters, {
+                      limit,
+                      offset: (newPage - 1) * limit,
+                      includeCount: false
+                    });
+                  }}
+                  disabled={loading}
+                />
+
+                <div className="space-y-4">
+              {/* Vista de tarjetas en móvil y desktop */}
+              <div className="grid grid-cols-1 gap-4">
+                {sales.map((sale, index) => (
+                  <motion.div
+                    key={sale.id}
+                    initial={lowMotionMode ? false : { opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={lowMotionMode ? { duration: 0 } : { duration: 0.2, delay: index * 0.02 }}
+                  >
+                    {(() => {
+                      const outboxEntry = salesOutboxState.byTempSaleId?.[sale.id] || null;
+                      const saleSyncStatus = outboxEntry?.status || (sale?.pending_sync ? 'pending' : 'synced');
+                      const saleSyncError = outboxEntry?.last_error || null;
+
+                      return (
+                    <Card className="shadow-lg rounded-2xl bg-white border-2 border-accent-100 hover:border-primary-300 hover:shadow-xl transition-all duration-300">
+                      <CardContent className="p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          {/* Información principal */}
+                          <div className="flex-1 space-y-3">
+                            {/* Fecha y hora */}
+                            <div className="flex items-center gap-2 text-accent-600">
+                              <Calendar className="w-4 h-4 shrink-0" />
+                              <span className="text-sm font-medium">
+                                {sale.created_at ? formatDate(sale.created_at) : 'Fecha no disponible'}
+                              </span>
+                            </div>
+
+                            {/* Cliente y Vendedor */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div className="flex items-center gap-2">
+                                <User className="w-4 h-4 text-primary-600 shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-xs text-accent-500 uppercase tracking-wide">Cliente</p>
+                                  <p className="text-sm font-semibold text-primary-900 truncate">
+                                    Venta general
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <User className="w-4 h-4 text-accent-600 shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-xs text-accent-500 uppercase tracking-wide">Vendedor</p>
+                                  <p className="text-sm font-medium text-gray-700 truncate">
+                                    {getVendedorName(sale)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Método de pago */}
+                            <div className="flex items-center gap-2">
+                              <CreditCard className="w-4 h-4 text-accent-600 shrink-0" />
+                              <Badge 
+                                className={`${
+                                  sale.payment_method === 'cash' 
+                                    ? 'bg-green-100 text-green-800 border-green-200' 
+                                    : sale.payment_method === 'card'
+                                    ? 'bg-gray-100 text-gray-800 border-gray-200'
+                                    : sale.payment_method === 'transfer'
+                                    ? 'bg-gray-100 text-gray-800 border-gray-200'
+                                    : 'bg-orange-100 text-orange-800 border-orange-200'
+                                } border inline-flex items-center gap-1.5`}
+                              >
+                                {sale.payment_method === 'cash' && (
+                                  <>
+                                    <span>💵</span>
+                                    <span>Efectivo</span>
+                                  </>
+                                )}
+                                {sale.payment_method === 'card' && (
+                                  <>
+                                    <span>💳</span>
+                                    <span>Tarjeta</span>
+                                  </>
+                                )}
+                                {sale.payment_method === 'transfer' && (
+                                  <>
+                                    <span>🏦</span>
+                                    <span>Transferencia</span>
+                                  </>
+                                )}
+                                {sale.payment_method === 'mixed' && (
+                                  <>
+                                    <span>🔀</span>
+                                    <span>Mixto</span>
+                                  </>
+                                )}
+                                {![ 'cash', 'card', 'transfer', 'mixed' ].includes(sale.payment_method) && (
+                                  <>
+                                    <PaymentMethodBankLogo method={sale.payment_method} sizeClass="h-4" />
+                                    <span>{getPaymentMethodLabel(sale.payment_method)}</span>
+                                  </>
+                                )}
+                              </Badge>
+
+                              {saleSyncStatus === 'pending' && (
+                                <Badge className="bg-amber-100 text-amber-800 border border-amber-200">Pendiente sync</Badge>
+                              )}
+                              {saleSyncStatus === 'processing' && (
+                                <Badge className="bg-gray-100 text-gray-800 border border-gray-200">Sincronizando...</Badge>
+                              )}
+                              {saleSyncStatus === 'error' && (
+                                <Badge className="bg-red-100 text-red-800 border border-red-200">Error sync</Badge>
+                              )}
+                              {saleSyncStatus === 'synced' && (
+                                <Badge className="bg-emerald-100 text-emerald-800 border border-emerald-200">Sincronizada</Badge>
+                              )}
+                            </div>
+
+                            {saleSyncStatus === 'error' && saleSyncError && (
+                              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-2 py-1">
+                                {getActionableSyncErrorMessage(saleSyncError)}
+                              </p>
+                            )}
+
+                            {saleSyncStatus === 'error' && (
+                              <div className="pt-1">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs border-red-300 text-red-700 hover:bg-red-50"
+                                  onClick={() => {
+                                    const retried = retrySalesOutboxEventByTempSaleId(sale.id);
+                                    if (!retried) {
+                                      setError('⚠️ No se encontró la venta pendiente para reintentar sincronización.');
+                                      return;
+                                    }
+                                    void flushSalesOutbox();
+                                  }}
+                                >
+                                  Reintentar sync
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Total y Acciones */}
+                          <div className="flex flex-col sm:items-end gap-3 sm:border-l sm:border-accent-200 sm:pl-6">
+                            {/* Total */}
+                            <div className="text-left sm:text-right">
+                              <p className="text-xs text-accent-500 uppercase tracking-wide mb-1">Total</p>
+                              <p className="text-2xl sm:text-3xl font-bold text-primary-900">
+                                {formatPrice(sale.total)}
+                              </p>
+                            </div>
+
+                            {/* Botones de acción */}
+                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                              <Button
+                                onClick={async () => {
+                                  try {
+                                    const saleDetails = await fetchSaleDetails(sale.id);
+                                    setSelectedSale({ ...sale, sale_details: saleDetails });
+                                  } catch {
+                                    setSelectedSale({ ...sale, sale_details: [] });
+                                  }
+                                  setInvoiceCustomerName('');
+                                  setInvoiceCustomerEmail('');
+                                  setInvoiceCustomerIdNumber('');
+                                  setShowInvoiceModal(true);
+                                }}
+                                className="bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
+                              >
+                                <Mail className="w-4 h-4" />
+                                <span className="text-sm">Enviar por correo</span>
+                              </Button>
+                              <Button
+                                onClick={() => openSaleDetailsModal(sale)}
+                                disabled={saleDetailsLoading}
+                                className="bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto disabled:opacity-60"
+                              >
+                                <Eye className="w-4 h-4" />
+                                <span className="text-sm">Ver Detalles</span>
+                              </Button>
+                              <Button
+                                onClick={() => handlePrintInvoice(sale)}
+                                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
+                              >
+                                <Printer className="w-4 h-4" />
+                                <span className="text-sm">Imprimir</span>
+                              </Button>
+                              {userRole === 'admin' && !isEmployee && (
+                                <Button
+                                  onClick={() => handleDeleteSale(sale.id)}
+                                  className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
+                                  title="Eliminar venta"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                      );
+                    })()}
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* Modal para generar comprobante de pago desde venta */}
+      <AnimatePresence>
+        {showInvoiceModal && selectedSale && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowInvoiceModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            >
+              <Card className="bg-white shadow-2xl rounded-2xl border-none">
+                <div className="bg-gradient-to-r from-gray-600 to-gray-700 text-white p-6 rounded-t-2xl">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                      <FileText className="w-8 h-8" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold">Enviar Comprobante de Pago</h2>
+                      <p className="text-gray-100 mt-1">
+                        Venta del {selectedSale?.created_at ? formatDateOnly(selectedSale.created_at) : 'fecha no disponible'} por {formatPrice(selectedSale.total)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      Nombre del Cliente *
+                    </label>
+                    <Input
+                      type="text"
+                      value={invoiceCustomerName}
+                      onChange={(e) => setInvoiceCustomerName(e.target.value)}
+                      placeholder="Nombre completo del cliente"
+                      required
+                      className="h-11 rounded-xl border-gray-300 focus:border-gray-500 focus:ring-gray-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      <Mail className="w-4 h-4" />
+                      Email del Cliente *
+                    </label>
+                    <Input
+                      type="email"
+                      value={invoiceCustomerEmail}
+                      onChange={(e) => setInvoiceCustomerEmail(e.target.value)}
+                      placeholder="correo@ejemplo.com"
+                      required
+                      className="h-11 rounded-xl border-gray-300 focus:border-gray-500 focus:ring-gray-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      El comprobante de pago se enviará a este correo electrónico
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      NIT/Cédula (opcional)
+                    </label>
+                    <Input
+                      type="text"
+                      value={invoiceCustomerIdNumber}
+                      onChange={(e) => setInvoiceCustomerIdNumber(e.target.value)}
+                      placeholder="123456789-0"
+                      className="h-11 rounded-xl border-gray-300 focus:border-gray-500 focus:ring-gray-500"
+                    />
+                  </div>
+
+                  {selectedSale.sale_details && selectedSale.sale_details.length > 0 && (
+                    <div className="mt-6">
+                      <p className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                        <ShoppingCart className="w-5 h-5" />
+                        Productos:
+                      </p>
+                      <div className="overflow-x-auto rounded-xl border border-gray-200">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-200">
+                              <th className="px-4 py-3 text-left font-semibold text-gray-700">Producto</th>
+                              <th className="px-4 py-3 text-center font-semibold text-gray-700">Cant.</th>
+                              <th className="px-4 py-3 text-right font-semibold text-gray-700">Precio</th>
+                              <th className="px-4 py-3 text-right font-semibold text-gray-700">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedSale.sale_details.map((detail, index) => (
+                              <tr key={index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                <td className="px-4 py-3 text-gray-800">{getSaleDetailDisplayName(detail)}</td>
+                                <td className="px-4 py-3 text-center text-gray-700">{detail.quantity}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{formatPrice(detail.unit_price)}</td>
+                                <td className="px-4 py-3 text-right font-semibold text-gray-800">
+                                  {formatPrice(detail.quantity * detail.unit_price)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  <Card className="bg-gradient-to-r from-gray-50 to-gray-100 border-gray-200 shadow-md rounded-xl mt-6">
+                    <div className="p-4">
+                      <p className="text-sm font-medium text-gray-800 mb-2">Resumen:</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg font-semibold text-gray-900">Total:</span>
+                        <span className="text-2xl font-bold text-gray-900">{formatPrice(selectedSale.total)}</span>
+                      </div>
+                    </div>
+                  </Card>
+
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      onClick={() => setShowInvoiceModal(false)}
+                      disabled={generatingInvoice}
+                      className="flex-1 h-12 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-xl transition-all duration-300"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={generateInvoiceFromSale}
+                      disabled={generatingInvoice || !invoiceCustomerName || !invoiceCustomerEmail}
+                      className="flex-1 h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {generatingInvoice ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          Enviando...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-5 h-5" />
+                          Enviar Comprobante
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {/* Nota informativa */}
+                  <p className="text-gray-500 text-xs text-center mt-4 italic">
+                    El presente comprobante es informativo. La responsabilidad tributaria recae exclusivamente en el establecimiento emisor.
+                  </p>
+                </div>
+              </Card>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de detalle de venta */}
+      <AnimatePresence>
+        {showSaleDetailsModal && selectedSale && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => {
+              setShowSaleDetailsModal(false);
+              setSaleDetailsError('');
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+            >
+              <Card className="bg-white shadow-2xl rounded-2xl border-none">
+                <CardHeader className="bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-t-2xl">
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Eye className="w-5 h-5" />
+                    Detalle de Venta
+                  </CardTitle>
+                  <p className="text-sm text-slate-100">
+                    {selectedSale?.created_at ? formatDate(selectedSale.created_at) : 'Fecha no disponible'} • {getPaymentMethodLabel(selectedSale?.payment_method)}
+                  </p>
+                </CardHeader>
+
+                <CardContent className="p-6">
+                  <div className={`grid grid-cols-1 sm:grid-cols-3 ${showCashPaymentDetails ? 'lg:grid-cols-5' : ''} gap-3 mb-6`}>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs text-slate-500 uppercase">Vendedor</p>
+                      <p className="font-semibold text-slate-900">{getVendedorName(selectedSale)}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs text-slate-500 uppercase">Items</p>
+                      <p className="font-semibold text-slate-900">{selectedSale?.sale_details?.length || 0}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs text-slate-500 uppercase">Total</p>
+                      <p className="font-semibold text-slate-900">{formatPrice(selectedSale?.total || 0)}</p>
+                    </div>
+                    {showCashPaymentDetails && (
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                        <p className="text-xs text-emerald-700 uppercase">Recibido</p>
+                        <p className="font-semibold text-emerald-900">{formatPrice(selectedSaleAmountReceived)}</p>
+                      </div>
+                    )}
+                    {showCashPaymentDetails && (
+                      <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                        <p className="text-xs text-gray-700 uppercase">Cambio</p>
+                        <p className="font-semibold text-gray-900">
+                          {resolvedChangeAmount !== null ? formatPrice(resolvedChangeAmount) : 'No registrado'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {showCashPaymentDetails && selectedSaleChangeBreakdown.length > 0 && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 mb-6">
+                      <p className="text-xs text-slate-500 uppercase mb-2">Desglose del cambio</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {selectedSaleChangeBreakdown.map((entry, idx) => {
+                          const denomination = Number(entry?.denomination || 0);
+                          const count = Number(entry?.count || 0);
+                          if (!Number.isFinite(denomination) || !Number.isFinite(count) || count <= 0) return null;
+                          return (
+                            <p key={`change-${idx}`} className="text-sm text-slate-700">
+                              {count} x {formatPrice(denomination)}
+                            </p>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {saleDetailsLoading ? (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-700 text-sm">
+                      Cargando detalle de venta...
+                    </div>
+                  ) : saleDetailsError ? (
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800 text-sm">
+                      {saleDetailsError}
+                    </div>
+                  ) : !selectedSale.sale_details || selectedSale.sale_details.length === 0 ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 text-sm">
+                      Esta venta no tiene items de detalle disponibles.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border border-slate-200">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200">
+                            <th className="px-4 py-3 text-left font-semibold text-slate-700">Producto</th>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-700">Código</th>
+                            <th className="px-4 py-3 text-center font-semibold text-slate-700">Cantidad</th>
+                            <th className="px-4 py-3 text-right font-semibold text-slate-700">Unitario</th>
+                            <th className="px-4 py-3 text-right font-semibold text-slate-700">Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedSale.sale_details.map((item, idx) => (
+                            <tr key={`${selectedSale.id}-${idx}`} className="border-b border-slate-100 last:border-b-0">
+                              <td className="px-4 py-3 text-slate-800">{getSaleDetailDisplayName(item)}</td>
+                              <td className="px-4 py-3 text-slate-600">{item.products?.code || (item.combo_id ? 'COMBO' : '-')}</td>
+                              <td className="px-4 py-3 text-center text-slate-700">{item.quantity}</td>
+                              <td className="px-4 py-3 text-right text-slate-700">{formatPrice(item.unit_price)}</td>
+                              <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                                {formatPrice(item.subtotal ?? (Number(item.quantity || 0) * Number(item.unit_price || 0)))}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  <div className="pt-5 flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setShowSaleDetailsModal(false);
+                        setSaleDetailsError('');
+                      }}
+                      className="bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl px-5 py-2"
+                    >
+                      Cerrar
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de confirmación de eliminación de venta (solo admin) */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={cancelDelete}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md bg-white rounded-2xl shadow-2xl"
+            >
+              <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4 rounded-t-2xl">
+                <div className="flex items-center gap-3 text-white">
+                  <Trash2 className="w-6 h-6" />
+                  <h3 className="text-xl font-bold">Eliminar Venta</h3>
+                </div>
+              </div>
+              
+              <div className="p-6 space-y-4">
+                <p className="text-gray-700 font-semibold">
+                  ⚠️ ¿Estás seguro de eliminar esta venta permanentemente?
+                </p>
+                
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-800">
+                    <strong>Esta acción no se puede deshacer.</strong> La venta y todos sus detalles serán eliminados del sistema de forma permanente.
+                  </p>
+                </div>
+                
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={cancelDelete}
+                    className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={confirmDeleteSale}
+                    disabled={loading}
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {loading ? 'Eliminando...' : 'Eliminar Definitivamente'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+    </div>
+    </AsyncStateWrapper>
+  );
+}
+
+export default Ventas;

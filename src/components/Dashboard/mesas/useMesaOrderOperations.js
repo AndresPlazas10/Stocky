@@ -25,7 +25,6 @@ import {
   toFiniteNumber,
   getTotalProductUnits,
   calculateOrderItemsTotal,
-  isConnectivityError,
   normalizeEntityId,
   mergeOrderItemsPreservingPosition,
   normalizeTableIdentifier,
@@ -36,6 +35,7 @@ import {
   reconcileTablesWithOpenOrders,
   reconcileClosedOrdersFromOutbox
 } from './mesaHelpers.js';
+import { isConnectivityError } from '../../../utils/connectivity';
 import { normalizeTableRecord } from '../../../utils/tableStatus';
 import {
   isOfflineMode,
@@ -45,6 +45,7 @@ import {
 } from '../../../utils/offlineSnapshot.js';
 import { invalidateOrderCache } from '../../../data/adapters/cacheInvalidation.js';
 import { closeModalImmediate } from '../../../utils/closeModalImmediate';
+import { logger } from '@/utils/logger';
 
 export function useMesaOrderOperations({
   businessId,
@@ -58,7 +59,7 @@ export function useMesaOrderOperations({
   orderItems,
   setOrderItems,
   setPendingQuantityUpdatesSafe,
-  _productos,
+  _products,
   _combos,
   _catalogItems,
   _productCatalogByIdRef,
@@ -212,7 +213,7 @@ export function useMesaOrderOperations({
       saveOfflineSnapshot(snapshotKey, sanitized);
     }
 
-    invalidateOrderCache({ businessId, orderId }).catch(() => {});
+    invalidateOrderCache({ businessId, orderId }).catch((err) => { logger.warn('mesas:order_operations:invalidate_cache failed', err); });
   }, [businessId]);
 
   const handleCreateTable = useCallback(async (e) => {
@@ -436,8 +437,8 @@ export function useMesaOrderOperations({
           setShowOrderDetails(true);
           return;
         }
-      } catch {
-        // Si falla recuperación, caer a error visible para diagnóstico.
+      } catch (err) {
+        logger.warn('mesas:order_operations:recover_order_state failed', err);
       }
 
       if (isOfflinePersistenceEnabled()) {
@@ -689,7 +690,7 @@ export function useMesaOrderOperations({
     setSelectedMesa(normalizedMesa);
     setModalOpenIntent(true);
     setShowOrderDetails(true);
-    ensureCatalogWarmup().catch(() => {});
+    ensureCatalogWarmup().catch((err) => { logger.warn('mesas:order_operations:ensure_catalog_warmup failed', err); });
 
     if (normalizedMesa.status === 'occupied' && normalizedMesa.current_order_id) {
       setMesaOpenDebugStage('open:load-existing');
@@ -699,7 +700,7 @@ export function useMesaOrderOperations({
       );
       orderItemsRef.current = initialOrderItems;
       setOrderItems(initialOrderItems);
-      loadOrderDetails(normalizedMesa, { requestId }).catch(() => {});
+      loadOrderDetails(normalizedMesa, { requestId }).catch((err) => { logger.warn('mesas:order_operations:load_order_details failed', err); });
     } else {
       setMesaOpenDebugStage('open:create-new-order');
       orderItemsRef.current = [];
@@ -761,7 +762,7 @@ export function useMesaOrderOperations({
       const writeQueueByOrderId = orderTotalSyncQueueRef.current;
       const previousWrite = writeQueueByOrderId[normalizedOrderId] || Promise.resolve();
       const nextWrite = previousWrite
-        .catch(() => {})
+        .catch((err) => { logger.warn('mesas:order_operations:sync_order_total_prev_write failed', err); })
         .then(async () => {
           const updateResult = await updateOrderTotalById({ orderId: normalizedOrderId, total, businessId });
           if (updateResult?.__localOnly) {
@@ -778,8 +779,8 @@ export function useMesaOrderOperations({
       if (writeQueueByOrderId[normalizedOrderId] === nextWrite) {
         delete writeQueueByOrderId[normalizedOrderId];
       }
-    } catch {
-      // Error silencioso
+    } catch (err) {
+      logger.warn('mesas:order_operations:update_order_total failed', err);
     }
   }, [orderItems, businessId, setMesas, pendingRemoteOrderTotalsRef, lastSyncedOrderTotalsRef, orderTotalSyncQueueRef]);
 
@@ -802,7 +803,7 @@ export function useMesaOrderOperations({
         const writeQueueByOrderId = orderTotalSyncQueueRef.current;
         const previousWrite = writeQueueByOrderId[normalizedOrderId] || Promise.resolve();
         const nextWrite = previousWrite
-          .catch(() => {})
+          .catch((err) => { logger.warn('mesas:order_operations:flush_pending_totals_prev_write failed', err); })
           .then(async () => {
             const updateResult = await updateOrderTotalById({
               orderId: normalizedOrderId,
@@ -820,8 +821,8 @@ export function useMesaOrderOperations({
         if (writeQueueByOrderId[normalizedOrderId] === nextWrite) {
           delete writeQueueByOrderId[normalizedOrderId];
         }
-      } catch {
-        // Mantener pendiente para próximo intento.
+      } catch (err) {
+        logger.warn('mesas:order_operations:flush_pending_totals_sync failed', err);
       }
     }
   }, [businessId, pendingRemoteOrderTotalsRef, lastSyncedOrderTotalsRef, orderTotalSyncQueueRef]);
@@ -895,7 +896,7 @@ export function useMesaOrderOperations({
     clearClosedMesaCache({
       tableId: normalizedTableId || null,
       orderId: normalizedOrderId || null
-    }).catch(() => {});
+    }).catch((err) => { logger.warn('mesas:order_operations:clear_closed_mesa_cache failed', err); });
 
     closeModalImmediate(() => {
       orderItemsDirtyRef.current = false;
@@ -919,7 +920,7 @@ export function useMesaOrderOperations({
           await loadMesas();
         }
       } catch {
-        try { await loadMesas(); } catch { /* no-op */ }
+        try { await loadMesas(); } catch (err) { logger.warn('mesas:order_operations:load_mesas_recovery failed', err); }
       }
     });
   }, [businessId, clearClosedMesaCache, currentUser?.id, loadMesas, setPendingQuantityUpdatesSafe, setMesas, setShowOrderDetails, setModalOpenIntent, setSelectedMesa, setOrderItems, setSearchProduct, pendingRemoteOrderTotalsRef, lastSyncedOrderTotalsRef, orderItemsDirtyRef, orderItemsRef]);
@@ -949,7 +950,7 @@ export function useMesaOrderOperations({
         return next;
       });
       delete optimisticTempItemQuantitiesRef.current[itemId];
-      updateOrderTotal(selectedMesa?.current_order_id, nextOrderItems, { skipMesaState: true }).catch(() => {});
+      updateOrderTotal(selectedMesa?.current_order_id, nextOrderItems, { skipMesaState: true }).catch((err) => { logger.warn('mesas:order_operations:update_total_local_remove failed', err); });
       return;
     }
 
@@ -972,7 +973,7 @@ export function useMesaOrderOperations({
       });
       delete optimisticTempItemQuantitiesRef.current[itemId];
 
-      updateOrderTotal(selectedMesa.current_order_id, nextOrderItems, { skipMesaState: true }).catch(() => {});
+      updateOrderTotal(selectedMesa.current_order_id, nextOrderItems, { skipMesaState: true }).catch((err) => { logger.warn('mesas:order_operations:update_total_remote_remove failed', err); });
     } catch (_error) {
       setError('No se pudo eliminar el producto. Por favor, intenta de nuevo.');
       try {
@@ -988,8 +989,8 @@ export function useMesaOrderOperations({
             )
           );
         }
-      } catch {
-        // no-op
+      } catch (err) {
+        logger.warn('mesas:order_operations:remove_item_recover_items failed', err);
       }
     } finally {
       markOrderItemOpFinished();
@@ -1038,9 +1039,9 @@ export function useMesaOrderOperations({
           if (latestOrderItems.length > 0) {
             effectiveOrderItemsSnapshot = latestOrderItems;
           }
-        } catch {
-          // no-op
-        }
+      } catch (err) {
+        logger.warn('mesas:order_operations:remove_item_refresh failed', err);
+      }
       }
 
       const hasSavedItems = effectiveOrderItemsSnapshot.length > 0;
@@ -1112,10 +1113,10 @@ export function useMesaOrderOperations({
           await updateOrderTotal(mesaSnapshot.current_order_id, effectiveOrderItemsSnapshot, { skipMesaState: true });
 
           if (typeof navigator === 'undefined' || navigator.onLine) {
-            loadMesas().catch(() => {});
+            loadMesas().catch((err) => { logger.warn('mesas:order_operations:refresh_mesas_after_persist failed', err); });
           }
         } catch {
-          try { await loadMesas(); } catch { /* no-op */ }
+        try { await loadMesas(); } catch (err) { logger.warn('mesas:order_operations:load_mesas_recovery failed', err); }
         }
       })();
     } catch {
@@ -1255,8 +1256,8 @@ export function useMesaOrderOperations({
                   )
                 );
               }
-            } catch {
-              // no-op
+            } catch (err) {
+              logger.warn('mesas:order_operations:quantity_sync_refresh_items failed', err);
             }
           }).finally(() => {
             markOrderItemOpFinished();
@@ -1407,13 +1408,14 @@ export function useMesaOrderOperations({
                     )
                   );
                 }
-              } catch {
-                // no-op
-              }
+      } catch (err) {
+        logger.warn('mesas:order_operations:remove_item_refresh failed', err);
+      }
             }).finally(() => {
               markOrderItemOpFinished();
             });
-          }).catch(async () => {
+          }).catch(async (err) => {
+            logger.warn('mesas:order_operations:insert_item_catch failed', err);
             setError(`No se pudo agregar el item. Por favor, intenta de nuevo. [${itemDebugTag('insert-catch')}]`);
             delete optimisticTempItemQuantitiesRef.current[tempId];
             setOrderItems((prevItems) => prevItems.filter((item) => item.id !== tempId));
@@ -1435,8 +1437,8 @@ export function useMesaOrderOperations({
                   )
                 );
               }
-            } catch {
-              // no-op
+            } catch (recoverErr) {
+              logger.warn('mesas:order_operations:insert_item_recover_items failed', recoverErr);
             }
           }).finally(() => {
             markOrderItemOpFinished();
@@ -1445,7 +1447,7 @@ export function useMesaOrderOperations({
       }
 
       if (orderItemsChanged) {
-        updateOrderTotal(selectedMesa.current_order_id, nextOrderItems, { skipMesaState: true }).catch(() => {});
+        updateOrderTotal(selectedMesa.current_order_id, nextOrderItems, { skipMesaState: true }).catch((err) => { logger.warn('mesas:order_operations:update_total_after_item_change failed', err); });
       }
       setSearchProduct('');
       setQuantityToAdd(1);
@@ -1464,8 +1466,8 @@ export function useMesaOrderOperations({
             )
           );
         }
-      } catch {
-        // no-op
+      } catch (err) {
+        logger.warn('mesas:order_operations:add_catalog_item_refresh_items failed', err);
       }
     }
   }, [selectedMesa, quantityToAdd, updateOrderTotal, setPendingQuantityUpdatesSafe, businessId, isOfflineFirstRuntime, markOrderItemOpStarted, markOrderItemOpFinished, enqueueOrderItemWrite, setError, setOrderItems, setSearchProduct, setQuantityToAdd, pendingQuantityUpdatesRef, optimisticTempItemQuantitiesRef, pendingOrderItemOpsRef, orderItemsRef, orderItemsDirtyRef]);
@@ -1527,8 +1529,8 @@ export function useMesaOrderOperations({
             );
           }
         }
-      } catch {
-        // no-op
+      } catch (err) {
+        logger.warn('mesas:order_operations:update_item_quantity_recover_items failed', err);
       }
       setPendingQuantityUpdatesSafe({});
     }
@@ -1584,7 +1586,7 @@ export function useMesaOrderOperations({
 
         await updateOrderTotal(mesaSnapshot.current_order_id, effectiveItemsSnapshot, { skipMesaState: true });
       } catch {
-        try { await loadMesas(); } catch { /* no-op */ }
+        try { await loadMesas(); } catch (err) { logger.warn('mesas:order_operations:load_mesas_recovery failed', err); }
       }
     };
 

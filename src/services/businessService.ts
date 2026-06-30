@@ -1,4 +1,5 @@
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
+import { BUSINESS_COLUMNS } from '../utils/businessColumns';
 
 interface BusinessRow {
   id: string;
@@ -18,19 +19,6 @@ interface ServiceResult<T> {
   data: T | null;
   message: string;
 }
-
-const BUSINESS_COLUMNS = `
-  id,
-  name,
-  username,
-  email,
-  phone,
-  address,
-  created_by,
-  is_active,
-  created_at,
-  updated_at
-`;
 
 export async function getCurrentBusiness(): Promise<ServiceResult<BusinessRow>> {
   try {

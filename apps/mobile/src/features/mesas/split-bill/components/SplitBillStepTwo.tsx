@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { STOCKY_COLORS } from '../../../../theme/tokens';
@@ -29,7 +30,7 @@ interface SplitBillStepTwoProps {
   getItemExpectedQuantity: (_itemId: string) => number;
 }
 
-export function SplitBillStepTwo({
+export const SplitBillStepTwo = React.memo(function SplitBillStepTwo({
   currentAccountIndex,
   accountsCount,
   currentAccount,
@@ -42,6 +43,21 @@ export function SplitBillStepTwo({
   onAdjustQuantity,
   getItemExpectedQuantity: _getItemExpectedQuantity,
 }: SplitBillStepTwoProps) {
+  const itemMaxQuantities = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of orderItems) {
+      const expected = Math.max(0, Math.floor(Number(item.quantity || 0)));
+      const byAccount = itemAssignments[item.id] || {};
+      let assignedOthers = 0;
+      for (const [accountId, value] of Object.entries(byAccount)) {
+        if (Number(accountId) === currentAccount?.id) continue;
+        assignedOthers += Math.max(0, Math.floor(Number(value || 0)));
+      }
+      map.set(item.id, Math.max(0, expected - assignedOthers));
+    }
+    return map;
+  }, [orderItems, itemAssignments, currentAccount?.id]);
+
   return (
     <>
       <Text
@@ -134,11 +150,7 @@ export function SplitBillStepTwo({
           0,
           Math.floor(Number(byAccount[currentAccount?.id || 0] || 0)),
         );
-        const assignedOthers = Object.entries(byAccount).reduce((sum, [accountId, value]) => {
-          if (Number(accountId) === currentAccount?.id) return sum;
-          return sum + Math.max(0, Math.floor(Number(value || 0)));
-        }, 0);
-        const maxForSelected = Math.max(0, expected - assignedOthers);
+        const maxForSelected = itemMaxQuantities.get(item.id) ?? 0;
         return (
           <View key={item.id} style={styles.itemCard}>
             <View style={styles.assignmentRow}>
@@ -185,4 +197,4 @@ export function SplitBillStepTwo({
       </View>
     </>
   );
-}
+});

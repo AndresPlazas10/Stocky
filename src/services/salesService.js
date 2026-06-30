@@ -7,6 +7,8 @@ import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { isAdminRole } from '../utils/roles';
 import { buildUtcRangeFromLocalDates } from '../utils/dateRange';
 import { logger } from '../utils/logger';
+import { isConnectivityError } from '../utils/connectivity';
+import { isRpcBadRequestError, isMissingRpcError, isMissingColumnError } from '../utils/rpcErrorUtils';
 
 const SALES_LIST_COLUMNS = `
   id,
@@ -75,35 +77,6 @@ async function readCachedSalesList(cacheKey) {
 async function writeCachedSalesList(cacheKey, payload) {
   void cacheKey;
   void payload;
-}
-
-function isConnectivityError(errorLike) {
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
-  return (
-    message.includes('failed to fetch')
-    || message.includes('networkerror')
-    || message.includes('network request failed')
-    || message.includes('fetch failed')
-    || message.includes('load failed')
-    || message.includes('network')
-  );
-}
-
-function isMissingSalesRpcError(error) {
-  const code = String(error?.code || '');
-  const message = String(error?.message || '').toLowerCase();
-  return code === 'PGRST202' || code === '42883' || message.includes('get_sales_enriched');
-}
-
-function isRpcBadRequestError(errorLike) {
-  const status = Number(errorLike?.status || errorLike?.statusCode || 0);
-  const code = String(errorLike?.code || '').toUpperCase();
-  return status === 400 || code === 'PGRST100' || code === 'PGRST116' || code === 'PGRST301';
-}
-
-function isMissingColumnError(errorLike) {
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
-  return message.includes('column') && message.includes('does not exist');
 }
 
 function normalizeOptionalText(value) {
@@ -310,7 +283,7 @@ export async function getFilteredSales(businessId, filters = {}, pagination = {}
       });
 
       if (rpcError) {
-        if (isMissingSalesRpcError(rpcError) || isRpcBadRequestError(rpcError)) {
+        if (isMissingRpcError(rpcError, 'get_sales_enriched') || isRpcBadRequestError(rpcError)) {
           salesRpcDisabled = true;
           logger.warn('[sales-service] disabling get_sales_enriched RPC fallback after remote error', {
             code: rpcError?.code || null,

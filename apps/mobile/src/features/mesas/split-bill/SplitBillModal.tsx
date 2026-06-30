@@ -1,3 +1,4 @@
+import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,7 +22,7 @@ type Props = {
   onConfirm: (payload: { subAccounts: SplitSubAccount[] }) => void;
 };
 
-export function SplitBillModalRN({
+export const SplitBillModalRN = React.memo(function SplitBillModalRN({
   visible,
   orderItems,
   resolveItemName,
@@ -69,6 +70,8 @@ export function SplitBillModalRN({
       backdropVariant="blur"
       centeredOffsetY={14}
       modalAnimationType="fade"
+      deferContent
+      deferBehavior="hide"
       sheetStyle={styles.modalSheet}
       contentContainerStyle={styles.modalContent}
       contentStyle={styles.modalScroll}
@@ -152,4 +155,4 @@ export function SplitBillModalRN({
       ) : null}
     </StockyModal>
   );
-}
+});

@@ -1,3 +1,4 @@
+import React from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 import { MesaCard } from './MesaCard';
@@ -24,7 +25,7 @@ interface MesasGridProps {
   onDeleteMesa?: (mesa: MesaRecord) => void;
 }
 
-export function MesasGrid({
+export const MesasGrid = React.memo(function MesasGrid({
   mesas,
   loading = false,
   actingMesaId,
@@ -91,7 +92,7 @@ export function MesasGrid({
       }}
     />
   );
-}
+});
 
 const styles = StyleSheet.create({
   mesasPanelBody: {
