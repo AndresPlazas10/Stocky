@@ -35,7 +35,7 @@ interface NavbarProps {
   userRole?: string;
   businessId?: string;
   onSignOut?: () => void;
-  warmupStatus?: string | null;
+  warmupStatus?: { phase?: string; reason?: string } | null;
 }
 
 const predefinedAvatars: PredefinedAvatar[] = [
@@ -136,7 +136,7 @@ export const Navbar = React.memo(function Navbar({
                 )}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80">
+            <DropdownMenuContent className="w-80">
               <DropdownMenuLabel className="text-primary font-semibold">
                 Notificaciones
               </DropdownMenuLabel>
@@ -209,7 +209,7 @@ export const Navbar = React.memo(function Navbar({
                 </div>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent className="w-56">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-semibold text-gray-900">{userName}</p>

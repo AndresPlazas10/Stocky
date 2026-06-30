@@ -61,21 +61,25 @@ function App() {
   useEffect(() => {
     let cancelled = false;
 
-    const support = getWebPushSupportStatus();
-    if (!support.supported) return undefined;
+    const initPush = async () => {
+      const support = await getWebPushSupportStatus();
+      if (!support.supported || cancelled) return;
 
-    const tryRegister = async () => {
-      try {
-        const sessionResult = await supabaseAdapter.getCurrentSession();
-        const hasSession = Boolean(sessionResult?.data?.session?.access_token);
-        if (!hasSession || cancelled) return;
-        await registerPwaPushSubscription({ askPermission: false });
-      } catch (err) {
-        logger.warn('app:push_subscription_register failed', err);
-      }
+      const tryRegister = async () => {
+        try {
+          const sessionResult = await supabaseAdapter.getCurrentSession();
+          const hasSession = Boolean(sessionResult?.data?.session?.access_token);
+          if (!hasSession || cancelled) return;
+          await registerPwaPushSubscription({ askPermission: false });
+        } catch (err) {
+          logger.warn('app:push_subscription_register failed', err);
+        }
+      };
+
+      void tryRegister();
     };
 
-    void tryRegister();
+    void initPush();
 
     const {
       data: { subscription },
