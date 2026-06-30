@@ -6,11 +6,11 @@ test.describe('Modo Offline', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Simulate offline mode
-    await context.setOffline(true);
+    // Simulate offline by intercepting all requests
+    await context.route('**/*', (route) => route.abort('connectionrefused'));
 
-    // Reload to trigger offline state
-    await page.reload();
+    // Navigate to trigger offline state
+    await page.goto('/');
     await page.waitForTimeout(2000);
 
     // Check for offline indicator
@@ -21,19 +21,15 @@ test.describe('Modo Offline', () => {
     expect(typeof hasOfflineIndicator).toBe('boolean');
 
     // Re-enable online
-    await context.setOffline(false);
+    await context.unroute('**/*');
   });
 
   test('la app funciona sin errores en modo offline', async ({ page, context }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Go offline
-    await context.setOffline(true);
-
-    // Try to navigate
-    await page.reload();
-    await page.waitForTimeout(2000);
+    // Go offline by intercepting requests
+    await context.route('**/*', (route) => route.abort('connectionrefused'));
 
     // Check no fatal errors
     const errors = [];
@@ -43,10 +39,12 @@ test.describe('Modo Offline', () => {
       }
     });
 
-    await page.waitForTimeout(1000);
+    // Try to navigate while offline
+    await page.goto('/');
+    await page.waitForTimeout(2000);
 
     // Re-enable online
-    await context.setOffline(false);
+    await context.unroute('**/*');
 
     // Should not have critical errors
     expect(errors.length).toBe(0);
