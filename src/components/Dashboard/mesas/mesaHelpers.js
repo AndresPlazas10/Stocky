@@ -1,5 +1,9 @@
 import { normalizeTableRecord } from '../../../utils/tableStatus';
 import { getOpenOrdersByBusiness } from '../../../data/queries/ordersQueries';
+import { getPaymentMethodLabel } from '../../ui/PaymentMethodBankLogo';
+
+export { getPaymentMethodLabel };
+import { isConnectivityError } from '../../../utils/connectivity';
 
 export const MESAS_REMOTE_FALLBACK_POLL_MS = 5000;
 export const MESA_LOCK_TTL_SECONDS = 45;
@@ -21,19 +25,6 @@ export const ORDER_ITEMS_SELECT = `
 export const ORDER_ITEM_TYPE = {
   PRODUCT: 'product',
   COMBO: 'combo'
-};
-
-export const getPaymentMethodLabel = (method) => {
-  if (method === 'cash') return 'Efectivo';
-  if (method === 'card') return 'Tarjeta';
-  if (method === 'transfer') return 'Transferencia';
-  if (method === 'mixed') return 'Mixto';
-  if (method === 'nequi') return 'Nequi';
-  if (method === 'bancolombia') return 'Bancolombia';
-  if (method === 'banco_bogota') return 'Banco de Bogota';
-  if (method === 'nu') return 'Nu';
-  if (method === 'davivienda') return 'Davivienda';
-  return method || '-';
 };
 
 export const toFiniteNumber = (value, fallback = 0) => {
@@ -69,18 +60,6 @@ export const calculateOrderItemsTotal = (items = []) =>
     const price = toFiniteNumber(item?.price, 0);
     return sum + (quantity * price);
   }, 0);
-
-export const isConnectivityError = (errorLike) => {
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
-  return (
-    message.includes('failed to fetch')
-    || message.includes('networkerror')
-    || message.includes('network request failed')
-    || message.includes('fetch failed')
-    || message.includes('load failed')
-    || message.includes('network')
-  );
-};
 
 export const normalizeDisplayName = (value, fallback = 'Usuario') => {
   const normalized = String(value || '').trim();

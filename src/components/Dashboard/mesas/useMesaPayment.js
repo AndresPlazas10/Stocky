@@ -20,6 +20,7 @@ import {
 } from '../../../utils/offlineSnapshot.js';
 import { invalidateOrderCache } from '../../../data/adapters/cacheInvalidation.js';
 import { normalizeTableRecord } from '../../../utils/tableStatus';
+import { logger } from '@/utils/logger';
 
 const MODAL_REOPEN_GUARD_MS = 600;
 
@@ -46,7 +47,7 @@ function clearClosedMesaCache({ tableId, orderId = null, businessId }) {
     businessId,
     tableId: normalizedTableId,
     orderId: normalizeEntityId(orderId)
-  }).catch(() => {});
+  }).catch((err) => { logger.warn('mesas:payment:invalidate_order_cache failed', err); });
 }
 
 function buildStockConsumptionFromItems(items = [], comboCatalogByIdRef) {
@@ -85,11 +86,11 @@ function buildStockConsumptionFromItems(items = [], comboCatalogByIdRef) {
   return consumptionByProduct;
 }
 
-function applyLocalStockConsumption(consumptionByProduct, { mode = 'consume', businessId, setProductos }) {
+function applyLocalStockConsumption(consumptionByProduct, { mode = 'consume', businessId, setProducts }) {
   if (!(consumptionByProduct instanceof Map) || consumptionByProduct.size === 0) return;
   const shouldRestore = mode === 'restore';
 
-  setProductos((prevProducts) => {
+  setProducts((prevProducts) => {
     const source = Array.isArray(prevProducts) ? prevProducts : [];
     const nextProducts = source.map((product) => {
       if (product?.manage_stock === false) return product;
@@ -298,8 +299,8 @@ export function useMesaPayment({
   setAmountReceivedError,
   selectedCustomer,
   setSelectedCustomer,
-  clientes,
-  setClientes,
+  customers,
+  setCustomers,
   isClosingOrder,
   setIsClosingOrder,
   setIsGeneratingSplitSales,
@@ -353,7 +354,7 @@ export function useMesaPayment({
   insufficientComboComponents,
   orderTotal,
   setPendingQuantityUpdatesSafe,
-  setProductos,
+  setProducts,
 }) {
   const handleCloseOrder = () => {
     setShowCloseOrderChoiceModal(true);
@@ -418,8 +419,8 @@ export function useMesaPayment({
             appendCandidate({ saleId, saleRow, saleDetails });
             wasAdded = appendedSaleIds.has(String(saleId || '').trim());
           }
-        } catch {
-          // no-op
+        } catch (err) {
+          logger.warn('mesas:payment:get_sale_print_bundle failed', err);
         }
 
         if (!wasAdded) {
@@ -583,7 +584,7 @@ export function useMesaPayment({
     orderItemsRef.current = [];
     setOrderItems([]);
     setPendingQuantityUpdatesSafe({});
-    applyLocalStockConsumption(splitConsumptionByProduct, { businessId, setProductos });
+    applyLocalStockConsumption(splitConsumptionByProduct, { businessId, setProducts });
     setIsGeneratingSplitSales(false);
     setIsClosingOrder(false);
     setSuccessDetails([
@@ -626,17 +627,17 @@ export function useMesaPayment({
         // Usuario canceló la impresión o auto-print deshabilitado
       }
 
-      loadMesas().catch(() => {});
+      loadMesas().catch((err) => { logger.warn('mesas:payment:load_mesas_after_split failed', err); });
 
       setTimeout(() => {
         justCompletedSaleRef.current = false;
         setCanShowOrderModal(true);
       }, MODAL_REOPEN_GUARD_MS);
     } catch (error) {
-      applyLocalStockConsumption(splitConsumptionByProduct, { mode: 'restore', businessId, setProductos });
+      applyLocalStockConsumption(splitConsumptionByProduct, { mode: 'restore', businessId, setProducts });
       setError(buildDiagnosticAlertMessage(error, 'No se pudo cerrar la orden. Revirtiendo estado.'));
-      try { await loadMesas(); } catch { /* no-op */ }
-      try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch { /* no-op */ }
+      try { await loadMesas(); } catch (err) { logger.warn('mesas:payment:load_mesas_recovery_split failed', err); }
+      try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch (err) { logger.warn('mesas:payment:reset_modal_state_split failed', err); }
     } finally {
       releaseCloseOrderLock(splitCloseLockKey);
       setIsGeneratingSplitSales(false);
@@ -724,7 +725,7 @@ export function useMesaPayment({
     orderItemsRef.current = [];
     setOrderItems([]);
     setPendingQuantityUpdatesSafe({});
-    applyLocalStockConsumption(orderConsumptionByProduct, { businessId, setProductos });
+    applyLocalStockConsumption(orderConsumptionByProduct, { businessId, setProducts });
     setPaymentMethod('cash');
     setAmountReceived('');
     setAmountReceivedError('');
@@ -790,17 +791,17 @@ export function useMesaPayment({
           // Usuario canceló la impresión o auto-print deshabilitado
         }
 
-        loadMesas().catch(() => {});
+        loadMesas().catch((err) => { logger.warn('mesas:payment:load_mesas_after_single failed', err); });
 
         setTimeout(() => {
           justCompletedSaleRef.current = false;
           setCanShowOrderModal(true);
         }, MODAL_REOPEN_GUARD_MS);
       } catch (error) {
-        applyLocalStockConsumption(orderConsumptionByProduct, { mode: 'restore', businessId, setProductos });
+        applyLocalStockConsumption(orderConsumptionByProduct, { mode: 'restore', businessId, setProducts });
         setError(buildDiagnosticAlertMessage(error, 'No se pudo cerrar la orden. Revirtiendo estado.'));
-        try { await loadMesas(); } catch { /* no-op */ }
-        try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch { /* no-op */ }
+        try { await loadMesas(); } catch (err) { logger.warn('mesas:payment:load_mesas_recovery_single failed', err); }
+        try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch (err) { logger.warn('mesas:payment:reset_modal_state_single failed', err); }
       } finally {
         releaseCloseOrderLock(closeLockKey);
         setIsClosingOrder(false);

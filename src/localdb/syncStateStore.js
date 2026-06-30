@@ -4,6 +4,7 @@ import {
   runLocalDbTableTransaction,
   writeLocalDbTableRows
 } from './client.js';
+import { logger } from '@/utils/logger';
 
 const SYNC_STATE_STORAGE_KEY = 'stocky.localdb.sync_state.v1';
 
@@ -30,8 +31,8 @@ function readFromLocalStorage() {
 function writeToLocalStorage(rows = []) {
   try {
     window.localStorage.setItem(SYNC_STATE_STORAGE_KEY, JSON.stringify(Array.isArray(rows) ? rows : []));
-  } catch {
-    // no-op
+  } catch (err) {
+    logger.warn('localdb:syncState:writeToLocalStorage failed', err);
   }
 }
 

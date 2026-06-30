@@ -1,4 +1,5 @@
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
+import { logger } from '@/utils/logger';
 
 function isLocalhost() {
   if (typeof window === 'undefined') return false;
@@ -36,8 +37,8 @@ async function fetchWebPushPublicKey() {
         return data.publicKey;
       }
     }
-  } catch {
-    // Silenciar error
+  } catch (err) {
+    logger.warn('services:pwa_push:fetch_public_key_failed', err);
   }
 
   return '';

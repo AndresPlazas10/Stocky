@@ -6,6 +6,7 @@
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { isAdminRole } from '../utils/roles';
 import { notifyAdminLowStockWeb } from './webNotificationsService.js';
+import { logger } from '@/utils/logger';
 
 function isFunctionUnavailableError(errorLike, functionName) {
   const message = String(errorLike?.message || errorLike || '').toLowerCase();
@@ -92,8 +93,8 @@ async function maybeNotifyAdminLowStock({ businessId, productIds }) {
       businessId,
       productIds,
     });
-  } catch {
-    // Best-effort: no bloquear venta por notificaciones
+  } catch (err) {
+    logger.warn('services:sales:notify_admin_low_stock_failed', err);
   }
 }
 
@@ -264,8 +265,8 @@ export function recordSaleCreationTime(milliseconds) {
     
     localStorage.setItem(key, JSON.stringify(times));
     
-  } catch {
-    // Ignorar errores de localStorage
+  } catch (err) {
+    logger.warn('services:sales:record_creation_time_failed', err);
   }
 }
 

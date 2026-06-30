@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,7 +19,7 @@ type PurchaseDetailsModalProps = {
   onClose: () => void;
 };
 
-export function PurchaseDetailsModal({
+export const PurchaseDetailsModal = React.memo(function PurchaseDetailsModal({
   visible,
   selectedPurchase,
   selectedPurchaseDetails,
@@ -26,9 +27,12 @@ export function PurchaseDetailsModal({
   supplierLabel,
   onClose,
 }: PurchaseDetailsModalProps) {
-  const selectedPurchaseItemsCount = selectedPurchaseDetails.reduce(
-    (sum, detail) => sum + Math.max(0, Number(detail.quantity || 0)),
-    0,
+  const selectedPurchaseItemsCount = useMemo(
+    () => selectedPurchaseDetails.reduce(
+      (sum, detail) => sum + Math.max(0, Number(detail.quantity || 0)),
+      0,
+    ),
+    [selectedPurchaseDetails],
   );
   const selectedPurchasePaymentTheme = selectedPurchase
     ? getPaymentMethodTheme(selectedPurchase.payment_method)
@@ -190,4 +194,4 @@ export function PurchaseDetailsModal({
       ) : null}
     </StockyModal>
   );
-}
+});

@@ -1,4 +1,5 @@
 import { supabase } from '../supabase/Client';
+import { logger } from '@/utils/logger';
 
 export async function logSecurityEvent({ businessId, action, metadata = {} }) {
   const normalizedBusinessId = String(businessId || '').trim();
@@ -18,7 +19,7 @@ export async function logSecurityEvent({ businessId, action, metadata = {} }) {
         action: normalizedAction,
         metadata
       });
-  } catch {
-    // no-op
+  } catch (err) {
+    logger.error('services:security_audit:log_event_failed', err);
   }
 }

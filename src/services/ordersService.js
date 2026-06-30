@@ -8,6 +8,8 @@ import { isAdminRole } from '../utils/roles';
 import { enqueueOutboxMutation } from '../sync/outboxShadow.js';
 import { notifyAdminLowStockWeb, notifyAdminSaleRegisteredWeb } from './webNotificationsService.js';
 import { createSaleWithOutbox } from '../data/commands/salesCommands.js';
+import { logger } from '@/utils/logger';
+import { isConnectivityError } from '../utils/connectivity';
 
 function buildIdempotencyKey({ action, businessId, orderId, tableId }) {
   const normalizedAction = String(action || '').trim().toLowerCase();
@@ -29,18 +31,6 @@ async function enqueueOrderCloseOutbox({
     mutationId,
     payload
   });
-}
-
-function isConnectivityError(errorLike) {
-  const message = String(errorLike?.message || errorLike || '').toLowerCase();
-  return (
-    message.includes('failed to fetch')
-    || message.includes('networkerror')
-    || message.includes('network request failed')
-    || message.includes('fetch failed')
-    || message.includes('load failed')
-    || message.includes('network')
-  );
 }
 
 function buildOfflineCloseUnavailableMessage() {
@@ -265,8 +255,8 @@ async function maybeNotifyAdminSale({ businessId, saleTotal }) {
       businessId,
       saleTotal,
     });
-  } catch {
-    // no-op: no bloquear cierre de venta por notificaciones
+  } catch (err) {
+    logger.warn('services:orders:notify_admin_sale_failed', err);
   }
 }
 
@@ -280,8 +270,8 @@ async function maybeNotifyAdminLowStock({ businessId, productIds }) {
       businessId,
       productIds,
     });
-  } catch {
-    // no-op: no bloquear cierre de venta por notificaciones
+  } catch (err) {
+    logger.warn('services:orders:notify_admin_low_stock_failed', err);
   }
 }
 
@@ -564,8 +554,8 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
       });
 
       atomicSaleIds = (recentSales || []).map((sale) => sale.id).filter(Boolean);
-    } catch {
-      // no-op
+    } catch (err) {
+      logger.warn('services:orders:fetch_recent_sale_ids_failed', err);
     }
 
     await enqueueOrderCloseOutbox({

@@ -1,17 +1,7 @@
+import { isConnectivityError } from '../../utils/connectivity';
+
 export const SALES_OUTBOX_BASE_RETRY_MS = 8_000;
 export const SALES_OUTBOX_MAX_RETRY_MS = 5 * 60_000;
-
-export function isConnectivityError(errorLike: unknown): boolean {
-  const message = String((errorLike as { message?: string })?.message || errorLike || '').toLowerCase();
-  return (
-    message.includes('failed to fetch')
-    || message.includes('networkerror')
-    || message.includes('network request failed')
-    || message.includes('load failed')
-    || message.includes('fetch failed')
-    || message.includes('network')
-  );
-}
 
 interface RetryOptions {
   nowMs?: number;

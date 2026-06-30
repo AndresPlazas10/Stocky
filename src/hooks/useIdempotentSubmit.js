@@ -35,6 +35,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { logger } from '@/utils/logger';
 
 // Generar UUID v4 client-side (más rápido que crypto.randomUUID en algunos navegadores)
 const generateIdempotencyKey = () => {
@@ -108,8 +109,8 @@ class IdempotencyManager {
           key
         });
       }
-    } catch {
-      
+    } catch (err) {
+      logger.warn('hooks:idempotent:start failed', err);
     }
 
     return key;
@@ -138,8 +139,8 @@ class IdempotencyManager {
           result
         });
       }
-    } catch {
-      
+    } catch (err) {
+      logger.warn('hooks:idempotent:complete failed', err);
     }
   }
 
@@ -166,8 +167,8 @@ class IdempotencyManager {
           error: data.error
         });
       }
-    } catch {
-      
+    } catch (err) {
+      logger.warn('hooks:idempotent:fail failed', err);
     }
   }
 
@@ -177,8 +178,8 @@ class IdempotencyManager {
   clear() {
     try {
       sessionStorage.removeItem(this.storageKey);
-    } catch {
-      
+    } catch (err) {
+      logger.warn('hooks:idempotent:clear failed', err);
     }
   }
 

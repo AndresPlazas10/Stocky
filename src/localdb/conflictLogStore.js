@@ -1,4 +1,5 @@
 import { readLocalDbTableRows, writeLocalDbTableRows } from './client.js';
+import { logger } from '@/utils/logger';
 
 const CONFLICT_LOG_STORAGE_KEY = 'stocky.localdb.conflict_log.v1';
 
@@ -29,8 +30,8 @@ function readFromLocalStorage() {
 function writeToLocalStorage(items = []) {
   try {
     window.localStorage.setItem(CONFLICT_LOG_STORAGE_KEY, JSON.stringify(Array.isArray(items) ? items : []));
-  } catch {
-    // no-op
+  } catch (err) {
+    logger.warn('localdb:conflictLog:writeToLocalStorage failed', err);
   }
 }
 

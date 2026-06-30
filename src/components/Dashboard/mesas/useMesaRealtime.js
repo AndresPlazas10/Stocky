@@ -16,6 +16,7 @@ import {
   calculateOrderItemsTotal,
   compareTableIdentifiers
 } from './mesaHelpers.js';
+import { logger } from '@/utils/logger';
 
 export function useMesaRealtime({
   businessId,
@@ -237,8 +238,8 @@ export function useMesaRealtime({
             if (normalizedDirectItems.length > 0 || joinedOrderItems.length === 0) {
               incomingOrderItems = normalizedDirectItems;
             }
-          } catch {
-            // no-op
+          } catch (err) {
+            logger.warn('mesas:realtime:fetch_order_items_direct failed', err);
           }
         }
 
@@ -255,8 +256,8 @@ export function useMesaRealtime({
             if (normalizedRetryItems.length > 0) {
               incomingOrderItems = normalizedRetryItems;
             }
-          } catch {
-            // no-op
+          } catch (err) {
+            logger.warn('mesas:realtime:fetch_order_items_retry failed', err);
           }
         }
 
@@ -352,8 +353,8 @@ export function useMesaRealtime({
             };
           });
         });
-      } catch {
-        // no-op
+      } catch (err) {
+        logger.warn('mesas:realtime:refresh_order_after_realtime failed', err);
       }
     }, 100);
   }, [
@@ -588,9 +589,9 @@ export function useMesaRealtime({
   useRealtimeSubscription('combos', {
     filter: { business_id: businessId },
     enabled: !!businessId,
-    onInsert: () => { loadCombos().catch(() => {}); },
-    onUpdate: () => { loadCombos().catch(() => {}); },
-    onDelete: () => { loadCombos().catch(() => {}); }
+    onInsert: () => { loadCombos().catch((err) => { logger.warn('mesas:realtime:load_combos_on_insert failed', err); }); },
+    onUpdate: () => { loadCombos().catch((err) => { logger.warn('mesas:realtime:load_combos_on_update failed', err); }); },
+    onDelete: () => { loadCombos().catch((err) => { logger.warn('mesas:realtime:load_combos_on_delete failed', err); }); }
   });
 
   useEffect(() => () => {

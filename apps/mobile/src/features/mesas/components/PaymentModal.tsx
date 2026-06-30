@@ -1,3 +1,4 @@
+import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -23,7 +24,7 @@ interface PaymentModalProps {
   onConfirm: () => void;
 }
 
-export function PaymentModal({
+export const PaymentModal = React.memo(function PaymentModal({
   visible,
   isClosing,
   paymentMethod,
@@ -46,6 +47,8 @@ export function PaymentModal({
       backdropVariant="blur"
       centeredOffsetY={8}
       modalAnimationType="fade"
+      deferContent
+      deferBehavior="hide"
       sheetStyle={styles.sheet}
       headerSlot={
         <View style={styles.header}>
@@ -222,7 +225,7 @@ export function PaymentModal({
       </View>
     </StockyModal>
   );
-}
+});
 
 const styles = StyleSheet.create({
   sheet: {

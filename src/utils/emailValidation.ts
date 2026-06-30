@@ -1,3 +1,5 @@
+import { logger } from '@/utils/logger';
+
 interface EmailValidationResult {
   valid: boolean;
   error?: string;
@@ -257,8 +259,8 @@ export const logEmailAttempt = ({
     logs.push(logData);
     // Mantener solo los últimos 50 logs
     localStorage.setItem('email_logs', JSON.stringify(logs.slice(-50)));
-  } catch {
-    // Ignorar errores de localStorage
+  } catch (err) {
+    logger.warn('utils:emailValidation:logAttempt localStorage failed', err);
   }
 };
 
@@ -276,7 +278,8 @@ export const getEmailStats = (): EmailStats => {
       skipped: logs.filter(l => l.skipped).length,
       lastAttempt: logs[logs.length - 1] || null
     };
-  } catch {
+  } catch (err) {
+    logger.warn('utils:emailValidation:getEmailStats localStorage failed', err);
     return {
       total: 0,
       success: 0,
@@ -293,7 +296,7 @@ export const getEmailStats = (): EmailStats => {
 export const clearEmailLogs = (): void => {
   try {
     localStorage.removeItem('email_logs');
-  } catch {
-    // Silencioso en producción
+  } catch (err) {
+    logger.warn('utils:emailValidation:clearLogs localStorage failed', err);
   }
 };

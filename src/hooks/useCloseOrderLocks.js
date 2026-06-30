@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { logger } from '@/utils/logger';
 import {
   DEFAULT_CLOSE_ORDER_LOCK_TTL_MS,
   isCloseOrderLockActive,
@@ -28,8 +29,8 @@ export function useCloseOrderLocks() {
     if (typeof window === 'undefined' || !window.localStorage) return;
     try {
       window.localStorage.setItem(CLOSE_ORDER_LOCKS_STORAGE_KEY, JSON.stringify(next && typeof next === 'object' ? next : {}));
-    } catch {
-      // no-op
+    } catch (err) {
+      logger.warn('hooks:closeOrderLocks:write failed', err);
     }
   }, []);
 

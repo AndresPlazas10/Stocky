@@ -1,3 +1,5 @@
+import { logger } from '@/utils/logger';
+
 export function isOfflineMode() {
   return typeof navigator !== 'undefined' && navigator.onLine === false;
 }
@@ -21,8 +23,8 @@ export function saveOfflineSnapshot(key, payload) {
   if (!isOfflinePersistenceEnabled() || !canUseStorage() || !key) return;
   try {
     window.localStorage.setItem(resolveSnapshotKey(key), JSON.stringify(payload));
-  } catch {
-    // no-op
+  } catch (err) {
+    logger.warn('utils:offlineSnapshot:save failed', err);
   }
 }
 

@@ -4,6 +4,7 @@ import {
   runLocalDbTableTransaction,
   writeLocalDbTableRows
 } from './client.js';
+import { logger } from '@/utils/logger';
 
 const OUTBOX_EVENTS_STORAGE_KEY = 'stocky.localdb.outbox_events.v1';
 
@@ -30,8 +31,8 @@ function readFromLocalStorage() {
 function writeToLocalStorage(events = []) {
   try {
     window.localStorage.setItem(OUTBOX_EVENTS_STORAGE_KEY, JSON.stringify(Array.isArray(events) ? events : []));
-  } catch {
-    // no-op
+  } catch (err) {
+    logger.warn('localdb:outboxEvents:writeToLocalStorage failed', err);
   }
 }
 

@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 import { StockyModal } from '../../../ui/StockyModal';
@@ -16,7 +17,7 @@ type Props = {
   onClose: () => void;
 };
 
-export function ProductPickerModal({
+export const ProductPickerModal = React.memo(function ProductPickerModal({
   visible,
   productSearch,
   onProductSearchChange,
@@ -26,6 +27,15 @@ export function ProductPickerModal({
   onSelectProduct,
   onClose,
 }: Props) {
+  const takenByOtherSet = useMemo(() => {
+    const set = new Set<string>();
+    for (let i = 0; i < formItems.length; i++) {
+      if (i === productPickerRowIndex) continue;
+      const pid = formItems[i]?.productoId;
+      if (pid) set.add(pid);
+    }
+    return set;
+  }, [formItems, productPickerRowIndex]);
   return (
     <StockyModal
       visible={visible}
@@ -59,9 +69,7 @@ export function ProductPickerModal({
         const selected =
           productPickerRowIndex !== null &&
           formItems[productPickerRowIndex]?.productoId === product.id;
-        const takenByOther = formItems.some(
-          (item, index) => index !== productPickerRowIndex && item.productoId === product.id,
-        );
+        const takenByOther = takenByOtherSet.has(product.id);
         return (
           <Pressable
             key={product.id}
@@ -89,4 +97,4 @@ export function ProductPickerModal({
       })}
     </StockyModal>
   );
-}
+});

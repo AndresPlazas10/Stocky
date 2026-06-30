@@ -1,3 +1,5 @@
+import { logger } from '@/utils/logger';
+
 const warmupStateByBusiness = new Map<string, WarmupStatus>();
 const listenersByBusiness = new Map<string, Set<(state: WarmupStatus) => void>>();
 const WARMUP_DISABLED_REASON = 'online_only_no_warmup';
@@ -55,8 +57,8 @@ function notifyWarmupStatus(businessId: string): void {
   listeners.forEach((listener) => {
     try {
       listener(state);
-    } catch {
-      // no-op
+    } catch (err) {
+      logger.warn('services:dashboard_warmup:listener_failed', err);
     }
   });
 }

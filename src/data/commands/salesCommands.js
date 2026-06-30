@@ -3,13 +3,12 @@ import { createSaleOptimized } from '../../services/salesServiceOptimized.js';
 import { findReusableSaleCreateOutboxEvent } from './salesOutboxIdempotency.js';
 import { applySaleSyncToSnapshot } from './salesSnapshotSync.js';
 import { selectSalesOutboxCandidates } from './salesOutboxCandidates.js';
-import {
-  isConnectivityError
-} from './salesOutboxRetryPolicy.js';
+import { isConnectivityError } from '../../utils/connectivity';
 import {
   buildProcessingOutboxEventPatch,
   resolveFailedOutboxSyncTransition
 } from './salesOutboxTransitions.js';
+import { logger } from '@/utils/logger';
 
 const SALES_OUTBOX_KEY = 'stocky.sales.outbox.v1';
 const SALES_OUTBOX_EVENT = 'stocky:sales-outbox-updated';
@@ -30,8 +29,8 @@ function readSalesOutbox() {
     const raw = window.localStorage.getItem(SALES_OUTBOX_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+  } catch (err) {
+    logger.warn('data:sales:read_outbox_failed', err);
   }
 }
 
@@ -40,8 +39,8 @@ function writeSalesOutbox(next) {
   try {
     window.localStorage.setItem(SALES_OUTBOX_KEY, JSON.stringify(Array.isArray(next) ? next : []));
     window.dispatchEvent(new CustomEvent(SALES_OUTBOX_EVENT));
-  } catch {
-    // no-op
+  } catch (err) {
+    logger.warn('data:sales:write_outbox_failed', err);
   }
 }
 
@@ -61,8 +60,8 @@ function writeLastSuccessfulSyncAt(value) {
     const normalized = String(value || '').trim();
     if (!normalized) return;
     window.localStorage.setItem(SALES_LAST_SUCCESS_SYNC_AT_KEY, normalized);
-  } catch {
-    // no-op
+  } catch (err) {
+    logger.warn('data:sales:write_last_sync_at_failed', err);
   }
 }
 
@@ -159,8 +158,8 @@ function updateOfflineSalesSnapshotOnSync({ businessId, tempSaleId, remoteSaleId
       remoteSaleId,
       syncedAt: nowIso
     });
-  } catch {
-    // no-op
+  } catch (err) {
+    logger.warn('data:sales:update_snapshot_sync_failed', err);
   }
 }
 

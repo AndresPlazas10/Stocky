@@ -1,8 +1,8 @@
 import {
   computeNextRetryAt,
-  isConnectivityError,
   isPermanentSyncError
 } from './salesOutboxRetryPolicy';
+import { isConnectivityError } from '../../utils/connectivity';
 import type { OutboxEvent } from '../../types';
 
 interface ProcessingPatch extends Partial<OutboxEvent> {

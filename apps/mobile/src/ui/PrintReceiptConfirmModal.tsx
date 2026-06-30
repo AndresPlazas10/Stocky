@@ -1,3 +1,4 @@
+import React from 'react';
 import type { PropsWithChildren } from 'react';
 import { StyleSheet, Text, View, Pressable, ActivityIndicator, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,7 +14,7 @@ type Props = PropsWithChildren<{
   onCustomerNameChange?: (name: string) => void;
 }>;
 
-export function PrintReceiptConfirmModal({
+export const PrintReceiptConfirmModal = React.memo(function PrintReceiptConfirmModal({
   visible,
   onConfirm,
   onCancel,
@@ -87,7 +88,7 @@ export function PrintReceiptConfirmModal({
       />
     </StockyModal>
   );
-}
+});
 
 const styles = StyleSheet.create({
   headerIcon: {

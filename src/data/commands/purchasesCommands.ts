@@ -1,6 +1,7 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
 import { invalidatePurchaseCache } from '../adapters/cacheInvalidation';
 import type { Purchase } from '../../types';
+import { isConnectivityError } from '../../utils/connectivity';
 
 interface CartItem {
   product_id: string;
@@ -17,18 +18,6 @@ function normalizePurchasePaymentMethod(paymentMethod: string): string {
   if (normalized === 'tarjeta') return 'card';
   if (normalized === 'transferencia') return 'transfer';
   return normalized;
-}
-
-function isConnectivityError(errorLike: unknown): boolean {
-  const message = String((errorLike as { message?: string })?.message || errorLike || '').toLowerCase();
-  return (
-    message.includes('failed to fetch')
-    || message.includes('networkerror')
-    || message.includes('network request failed')
-    || message.includes('fetch failed')
-    || message.includes('load failed')
-    || message.includes('network')
-  );
 }
 
 async function assertPurchasableProductsManageStock({

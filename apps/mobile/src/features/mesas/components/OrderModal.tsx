@@ -1,3 +1,4 @@
+import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -53,7 +54,7 @@ export type OrderModalProps = {
   isKeyboardVisible: boolean;
 };
 
-export function OrderModal({ visible, orderState, actions, isKeyboardVisible }: OrderModalProps) {
+export const OrderModal = React.memo(function OrderModal({ visible, orderState, actions, isKeyboardVisible }: OrderModalProps) {
   const {
     orderModalTitle,
     orderTotal,
@@ -231,7 +232,7 @@ export function OrderModal({ visible, orderState, actions, isKeyboardVisible }: 
       />
     </StockyModal>
   );
-}
+});
 
 const styles = StyleSheet.create({
   orderModalSheet: {

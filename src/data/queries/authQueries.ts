@@ -1,8 +1,9 @@
 import { readAdapter } from '../adapters/localAdapter';
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
 import type { Business, Employee } from '../../types';
-
-const AUTH_STORAGE_KEY = 'supabase.auth.token';
+import { logger } from '@/utils/logger';
+import { isConnectivityError } from '../../utils/connectivity';
+import { parseJson, getStoredSessionFallback } from '../adapters/supabaseAdapter/shared';
 
 interface StoredSession {
   user?: { id: string; [key: string]: unknown };
@@ -11,99 +12,27 @@ interface StoredSession {
   [key: string]: unknown;
 }
 
-function parseJson<T>(value: string | null, fallback: T): T {
-  if (!value) return fallback;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function isConnectivityError(errorLike: unknown): boolean {
-  const message = String((errorLike as { message?: string })?.message || errorLike || '').toLowerCase();
-  return (
-    message.includes('failed to fetch')
-    || message.includes('networkerror')
-    || message.includes('network request failed')
-    || message.includes('fetch failed')
-    || message.includes('load failed')
-    || message.includes('network')
-  );
-}
-
-function getStoredSession(): StoredSession | null {
-  if (typeof window === 'undefined') return null;
-
-  const keys = new Set([AUTH_STORAGE_KEY]);
-  try {
-    for (let i = 0; i < (window.localStorage?.length || 0); i++) {
-      const key = window.localStorage.key(i);
-      if (typeof key === 'string' && key.includes('auth-token')) {
-        keys.add(key);
-      }
-    }
-    for (let i = 0; i < (window.sessionStorage?.length || 0); i++) {
-      const key = window.sessionStorage.key(i);
-      if (typeof key === 'string' && key.includes('auth-token')) {
-        keys.add(key);
-      }
-    }
-  } catch {
-    // best-effort
-  }
-
-  const pickSession = (parsed: StoredSession | null): StoredSession | null => {
-    if (!parsed) return null;
-    if (parsed?.user) return parsed;
-    if (parsed?.session?.user) return parsed.session as unknown as StoredSession;
-    if (parsed?.currentSession?.user) return parsed.currentSession as unknown as StoredSession;
-    if (Array.isArray(parsed as unknown)) {
-      for (const item of parsed as unknown as StoredSession[]) {
-        if (item?.user) return item;
-        if (item?.session?.user) return item.session as unknown as StoredSession;
-        if (item?.currentSession?.user) return item.currentSession as unknown as StoredSession;
-      }
-    }
-    return null;
-  };
-
-  for (const key of keys) {
-    const localRaw = window.localStorage?.getItem(key);
-    const localParsed = parseJson<StoredSession | null>(localRaw, null);
-    const localSession = pickSession(localParsed);
-    if (localSession) return localSession;
-
-    const sessionRaw = window.sessionStorage?.getItem(key);
-    const sessionParsed = parseJson<StoredSession | null>(sessionRaw, null);
-    const session = pickSession(sessionParsed);
-    if (session) return session;
-  }
-
-  return null;
-}
-
 export async function getAuthenticatedUser(): Promise<StoredSession['user'] | null> {
   const { data, error } = await readAdapter.getCurrentUser();
   if (error) {
     if (!isConnectivityError(error)) throw error;
     const session = await getCurrentSession();
-    return session?.user || getStoredSession()?.user || null;
+    return session?.user || getStoredSessionFallback()?.user || null;
   }
 
   if (data?.user) return data.user;
 
   const session = await getCurrentSession();
-  return session?.user || getStoredSession()?.user || null;
+  return session?.user || getStoredSessionFallback()?.user || null;
 }
 
 export async function getCurrentSession(): Promise<StoredSession | null> {
   const { data, error } = await supabaseAdapter.getCurrentSession();
   if (error) {
     if (!isConnectivityError(error)) throw error;
-    return getStoredSession();
+    return getStoredSessionFallback();
   }
-  return data?.session || getStoredSession() || null;
+  return data?.session || getStoredSessionFallback() || null;
 }
 
 export async function getOwnedBusinessByUserId(userId: string, selectSql: string = '*'): Promise<Business | null> {

@@ -1,4 +1,5 @@
 import { LOCAL_SYNC_CONFIG } from '../config/localSync';
+import { logger } from '@/utils/logger';
 
 const TABLE_STORAGE_PREFIX = 'stocky.localdb.table.v1';
 
@@ -42,8 +43,8 @@ function writeTableToLocalStorage(mode, tableName, rows = []) {
       getTableStorageKey(mode, tableName),
       JSON.stringify(Array.isArray(rows) ? rows : [])
     );
-  } catch {
-    // no-op
+  } catch (err) {
+    logger.warn('localdb:client:writeTableToLocalStorage failed', err);
   }
 }
 
