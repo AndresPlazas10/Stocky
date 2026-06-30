@@ -127,7 +127,7 @@ const MesasGrid = memo(function MesasGrid({
                   {isOccupied && mesa.orders && !lockedByOther && (
                     <div className="mt-4 pt-4 border-t border-accent-200">
                       <p className="text-lg font-bold text-primary-900">
-                        {formatPrice(parseFloat(mesa.orders.total || 0))}
+                        {formatPrice(parseFloat(String(mesa.orders.total || '0')))}
                       </p>
                       <p className="text-sm text-primary-600">
                         {units} productos

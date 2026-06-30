@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Layers, Plus } from 'lucide-react';
 import { deleteTableCascadeOrders } from '../../data/commands/ordersCommands';
+import type { SplitBillOrderItem, OrderItem } from '../../types/components';
+import { calcularCambio } from '../../utils/cambio';
 import { Button } from '../ui/button';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { getTotalProductUnits } from './mesas/mesaHelpers.js';
@@ -66,33 +68,13 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
   const catalog = useMesasCatalog({
     products: state.products,
     combos: state.combos,
-    setError: state.setError,
-    setSuccess: state.setSuccess,
-    setSuccessTitle: state.setSuccessTitle,
-    setSuccessDetails: state.setSuccessDetails,
-    setAlertType: state.setAlertType,
-    isCreatingTable: state.isCreatingTable,
-    setIsCreatingTable: state.setIsCreatingTable,
-    newTableNumber: state.newTableNumber,
-    setNewTableNumber: state.setNewTableNumber,
-    showAddForm: state.showAddForm,
-    setShowAddForm: state.setShowAddForm,
-    modalOpenIntent: state.modalOpenIntent,
-    setModalOpenIntent: state.setModalOpenIntent,
-    canShowOrderModal: state.canShowOrderModal,
-    setCanShowOrderModal: state.setCanShowOrderModal,
-    quantityToAdd: state.quantityToAdd,
-    setQuantityToAdd: state.setQuantityToAdd,
+    orderItems: state.orderItems,
+    selectedMesa: state.selectedMesa,
     searchProduct: state.searchProduct,
-    setSearchProduct: state.setSearchProduct,
-    canManageTables: state.canManageTables,
-    isEmployee: state.isEmployee,
-    currentUser: state.currentUser,
-    getCurrentUser: state.getCurrentUser,
-    activeMesaBroadcastRef: refs.activeMesaBroadcastRef,
-    heldMesaLockRef: refs.heldMesaLockRef,
-    mesaSyncClientIdRef: refs.mesaSyncClientIdRef,
-    getMesaLockState,
+    debouncedSearch: state.debouncedSearch,
+    lowMotionMode: state.lowMotionMode,
+    paymentMethod: state.paymentMethod,
+    amountReceived: state.amountReceived,
   });
 
   const {
@@ -224,8 +206,8 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     setAmountReceivedError: state.setAmountReceivedError,
     selectedCustomer: state.selectedCustomer,
     setSelectedCustomer: state.setSelectedCustomer,
-    clientes: state.customers,
-    setClientes: state.setCustomers,
+    customers: state.customers,
+    setCustomers: state.setCustomers,
     isClosingOrder: state.isClosingOrder,
     setIsClosingOrder: state.setIsClosingOrder,
     setIsGeneratingSplitSales: state.setIsGeneratingSplitSales,
@@ -315,10 +297,10 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
   useMesasEffects({
     businessId,
     mesas: state.mesas,
-    selectedMesa: state.selectedMesa,
+    _selectedMesa: state.selectedMesa,
     showOrderDetails: state.showOrderDetails,
     loadMesas,
-    loadClientes: state.loadClientes,
+    loadClientes: state.loadCustomers,
     getCurrentUser: state.getCurrentUser,
     checkIfEmployee: state.checkIfEmployee,
     refreshMesaLocks,
@@ -326,9 +308,9 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     refreshMesaEditLockHeartbeatWeb,
     releaseMesaEditLockWeb,
     flushPendingRemoteOrderTotals,
-    setMesas: state.setMesas,
-    setShowOrderDetails: state.setShowOrderDetails,
-    setCanShowOrderModal: state.setCanShowOrderModal,
+    _setMesas: state.setMesas,
+    _setShowOrderDetails: state.setShowOrderDetails,
+    _setCanShowOrderModal: state.setCanShowOrderModal,
     heldMesaLockRef: refs.heldMesaLockRef,
     activeMesaBroadcastRef: refs.activeMesaBroadcastRef,
     mesaSyncBroadcastChannelRef: refs.mesaSyncBroadcastChannelRef,
@@ -340,7 +322,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
 
   const handleRetry = async () => {
     try {
-      await Promise.all([loadMesas(), state.loadClientes()]);
+      await Promise.all([loadMesas(), state.loadCustomers()]);
     } catch {
       state.setError('No se pudo cargar la informacion de las mesas. Por favor, intenta recargar la pagina.');
     }
@@ -376,7 +358,6 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
       >
         <MesasHeader
           canManageTables={state.canManageTables}
-          showAddForm={state.showAddForm}
           onToggleAddForm={() => state.setShowAddForm(!state.showAddForm)}
         />
 
@@ -421,7 +402,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
             isEmployee={state.isEmployee}
             onOpenTable={handleOpenTable}
             onDeleteTable={(mesaId) => {
-              state.setMesaToDelete(mesaId);
+              state.setMesaToDelete(state.mesas.find((m) => m.id === mesaId) ?? null);
               state.setShowDeleteModal(true);
             }}
             selectedMesaId={state.modalOpenIntent && state.showOrderDetails ? null : state.selectedMesa?.id || null}
@@ -457,7 +438,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
           isOpen={state.modalOpenIntent && state.showOrderDetails && state.canShowOrderModal}
           selectedMesa={state.selectedMesa}
           searchProduct={state.searchProduct}
-          onSearchChange={state.setSearchProduct}
+          onSearchChange={(value) => state.setSearchProduct(value)}
           filteredCatalog={catalog.filteredCatalog}
           visibleFilteredCatalog={catalog.visibleFilteredCatalog}
           hasMoreFilteredCatalog={catalog.hasMoreFilteredCatalog}
@@ -466,8 +447,8 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
           lowMotionMode={state.lowMotionMode}
           onAddItem={addCatalogItemToOrder}
           onLoadMoreFilteredCatalog={catalog.loadMoreFilteredCatalog}
-          orderItems={state.orderItems}
-          visibleOrderItems={catalog.visibleOrderItems}
+          orderItems={state.orderItems as OrderItem[]}
+          visibleOrderItems={catalog.visibleOrderItems as OrderItem[]}
           hasMoreOrderItems={catalog.hasMoreOrderItems}
           totalOrderItems={catalog.totalOrderItems}
           orderItemsSentinelRef={catalog.orderItemsSentinelRef}
@@ -494,7 +475,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
         <AnimatePresence>
           {state.showSplitBillModal && (
             <SplitBillModal
-              orderItems={state.orderItems}
+              orderItems={state.orderItems as SplitBillOrderItem[]}
               onConfirm={processSplitPaymentAndClose}
               onCancel={() => {
                 state.setShowSplitBillModal(false);
@@ -530,6 +511,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
             state.setSelectedCustomer('');
           }}
           onConfirm={processPaymentAndClose}
+          calcularCambio={calcularCambio}
         />
 
         <MesaDeleteModal
@@ -540,7 +522,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
           }}
           onConfirm={async () => {
             if (!state.mesaToDelete) return;
-            const mesaId = state.mesaToDelete;
+            const mesaId = state.mesaToDelete.id;
             const snapshotMesas = state.mesas.slice();
             const deletedTable = snapshotMesas.find((m) => m.id === mesaId) || null;
             const deletedTableLabel = deletedTable?.table_number ? `#${deletedTable.table_number}` : '-';

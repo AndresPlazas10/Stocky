@@ -18,7 +18,7 @@ interface DashboardLayoutProps {
   onSignOut?: () => void;
   activeSection: string;
   onSectionChange: (section: string) => void;
-  warmupStatus?: string | null;
+  warmupStatus?: { phase?: string; reason?: string } | null;
 }
 
 export function DashboardLayout({ 

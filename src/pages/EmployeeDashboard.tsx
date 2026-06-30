@@ -275,7 +275,6 @@ function EmployeeDashboard() {
   }
 
   if (isBusinessDisabled) {
-    // @ts-expect-error BusinessDisabledModal is a .jsx component with untyped props
     return <BusinessDisabledModal businessName={business?.name} onSignOut={handleSignOut} />;
   }
 

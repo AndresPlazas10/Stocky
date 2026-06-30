@@ -115,8 +115,8 @@ export function ProductFormModal({
                     >
                       <option value="">Seleccionar categoría</option>
                       {PRODUCT_CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
+                        <option key={cat.value} value={cat.value}>
+                          {cat.label}
                         </option>
                       ))}
                     </select>

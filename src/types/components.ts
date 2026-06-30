@@ -222,7 +222,7 @@ export interface ProductFormModalProps {
   on_cancel: () => void;
   isSubmitting: boolean;
   generatedCode: string;
-  proveedores: Supplier[];
+  suppliers: Supplier[];
 }
 
 // ── Mesa Props ──
@@ -317,27 +317,42 @@ export interface MesasAlertsProps {
   onErrorClose: () => void;
 }
 
+export interface CatalogItem {
+  item_type: string;
+  id: string;
+  name: string;
+  sale_price?: number;
+}
+
+export interface OrderItem {
+  id: string;
+  combo_id?: string | null;
+  price: string;
+  subtotal: string;
+  quantity: number;
+}
+
 export interface OrderDetailsModalProps {
   isOpen: boolean;
   selectedMesa: MesaRecord | null;
   searchProduct: string;
-  onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  filteredCatalog: unknown[];
-  visibleFilteredCatalog: unknown[];
+  onSearchChange: (value: string) => void;
+  filteredCatalog: CatalogItem[];
+  visibleFilteredCatalog: CatalogItem[];
   hasMoreFilteredCatalog: boolean;
   totalFilteredCatalog: number;
   filteredCatalogSentinelRef: React.RefObject<HTMLDivElement>;
   lowMotionMode: boolean;
-  onAddItem: (item: unknown) => void;
+  onAddItem: (item: CatalogItem) => void;
   onLoadMoreFilteredCatalog: () => void;
-  orderItems: unknown[];
-  visibleOrderItems: unknown[];
+  orderItems: OrderItem[];
+  visibleOrderItems: OrderItem[];
   hasMoreOrderItems: boolean;
   totalOrderItems: number;
   orderItemsSentinelRef: React.RefObject<HTMLDivElement>;
   isOrderItemsSyncing: boolean;
-  getOrderItemRenderKey: (item: unknown) => string;
-  getOrderItemName: (item: unknown) => string;
+  getOrderItemRenderKey: (item: OrderItem) => string;
+  getOrderItemName: (item: OrderItem) => string;
   onUpdateQuantity: (itemId: string, quantity: number) => void;
   onLoadMoreOrderItems: () => void;
   orderTotal: number;
@@ -372,7 +387,7 @@ export interface ChangeInfo {
   reason?: string;
   change: number;
   breakdown: ChangeBreakdown[];
-  paid: number | null;
+  paid?: number | null;
 }
 
 export interface MesaPaymentModalProps {
