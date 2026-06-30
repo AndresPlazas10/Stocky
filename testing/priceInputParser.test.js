@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePriceInput } from '../src/utils/formatters.js';
+import { parsePriceInput } from '../src/utils/formatters.ts';
 
 test('convierte miles con punto a numero entero', () => {
   assert.equal(parsePriceInput('5.000'), 5000);

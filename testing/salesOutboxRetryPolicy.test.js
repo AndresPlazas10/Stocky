@@ -2,11 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   isConnectivityError,
+} from '../src/utils/connectivity.ts';
+import {
   isPermanentSyncError,
   computeNextRetryAt,
   SALES_OUTBOX_BASE_RETRY_MS,
   SALES_OUTBOX_MAX_RETRY_MS
-} from '../src/data/commands/salesOutboxRetryPolicy';
+} from '../src/data/commands/salesOutboxRetryPolicy.ts';
 
 test('isConnectivityError detecta errores de red comunes', () => {
   assert.equal(isConnectivityError('Failed to fetch'), true);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applySaleSyncToSnapshot } from '../src/data/commands/salesSnapshotSync';
+import { applySaleSyncToSnapshot } from '../src/data/commands/salesSnapshotSync.ts';
 
 test('reemplaza tempSaleId por remoteSaleId y marca sincronizada', () => {
   const snapshot = [

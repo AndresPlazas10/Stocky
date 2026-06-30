@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { selectSalesOutboxCandidates } from '../src/data/commands/salesOutboxCandidates';
+import { selectSalesOutboxCandidates } from '../src/data/commands/salesOutboxCandidates.ts';
 
 test('incluye pendientes sin next_retry_at y excluye tipos distintos', () => {
   const queue = [
