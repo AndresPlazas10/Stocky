@@ -34,10 +34,15 @@ export default defineConfig({
       use: { ...devices['Pixel 5'] },
     },
   ],
-  webServer: process.env.CI ? undefined : {
+  webServer: process.env.CI ? {
+    command: 'npx vite preview --port 4173',
+    url: 'http://localhost:4173',
+    reuseExistingServer: true,
+    timeout: 60000,
+  } : {
     command: 'npm run dev',
     url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-    timeout: 30000,
+    reuseExistingServer: true,
+    timeout: 60000,
   },
 });
