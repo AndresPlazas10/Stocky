@@ -11,7 +11,7 @@ export type MesaRecord = {
   id: string;
   business_id: string;
   table_number?: number | string | null;
-  name?: string | null;
+  table_name?: string | null;
   status: MesaStatus;
   current_order_id?: string | null;
   order_units?: number;
@@ -120,7 +120,7 @@ function normalizeMesaRow(row: Record<string, unknown>): MesaRecord {
       : Number(rawOrderUnits);
   const rawSyncVersion = Number(row?.sync_version);
   const rawTableNumber = row?.table_number;
-  const rawName = row?.name;
+  const rawTableName = row?.table_name;
   const ordersRecord =
     row.orders && typeof row.orders === 'object' && row.orders !== null
       ? (row.orders as Record<string, unknown>)
@@ -133,7 +133,7 @@ function normalizeMesaRow(row: Record<string, unknown>): MesaRecord {
       typeof rawTableNumber === 'string' || typeof rawTableNumber === 'number'
         ? rawTableNumber
         : null,
-    name: typeof rawName === 'string' ? rawName : null,
+    table_name: typeof rawTableName === 'string' ? rawTableName : null,
     status: normalizeMesaStatus(row?.status),
     current_order_id: row?.current_order_id ? String(row.current_order_id) : null,
     order_units:
@@ -370,28 +370,14 @@ async function enrichMesasWithSyncVersion(mesas: MesaRecord[]): Promise<MesaReco
   });
 }
 
-async function fetchMesasWithSelect(businessId: string, includeNameColumn: boolean) {
+async function fetchMesasWithSelect(businessId: string, _includeNameColumn: boolean) {
   const client = getSupabaseClient();
 
-  const selectSql = includeNameColumn
-    ? `
+  const selectSql = `
       id,
       business_id,
       table_number,
-      name,
-      status,
-      current_order_id,
-      sync_version,
-      orders:orders!current_order_id (
-        id,
-        status,
-        total
-      )
-    `
-    : `
-      id,
-      business_id,
-      table_number,
+      table_name,
       status,
       current_order_id,
       sync_version,
@@ -535,19 +521,9 @@ async function runLegacyOpenCloseWithSupabaseClient({
   const client = getSupabaseClient();
   let { data: tableRow, error: tableError } = await client
     .from('tables')
-    .select('id,business_id,table_number,name,current_order_id,status')
+    .select('id,business_id,table_number,table_name,current_order_id,status')
     .eq('id', tableId)
     .maybeSingle();
-
-  if (tableError && isMissingNameColumnError(tableError)) {
-    const fallback = await client
-      .from('tables')
-      .select('id,business_id,table_number,current_order_id,status')
-      .eq('id', tableId)
-      .maybeSingle();
-    tableRow = fallback.data ? { ...fallback.data, name: null } : null;
-    tableError = fallback.error;
-  }
 
   if (tableError) throw tableError;
   if (!tableRow?.id || !tableRow?.business_id) {
@@ -619,7 +595,7 @@ async function runLegacyOpenCloseWithSupabaseClient({
     status: action === 'open' ? 'occupied' : 'available',
     current_order_id: action === 'open' ? nextOrderId : null,
     table_number: tableRow.table_number ?? null,
-    name: tableRow.name ?? null,
+    table_name: tableRow.table_name ?? null,
     sync_version: undefined,
     orders: null,
   };
@@ -1492,17 +1468,6 @@ function isMissingUpdatedAtOnTablesError(errorLike: SupabaseErrorLike) {
   );
 }
 
-function isMissingOpenedAtOnTablesError(errorLike: SupabaseErrorLike) {
-  const message = String(errorLike?.message || '').toLowerCase();
-  return (
-    message.includes('column') &&
-    message.includes('"opened_at"') &&
-    message.includes('relation') &&
-    message.includes('"tables"') &&
-    message.includes('does not exist')
-  );
-}
-
 function formatErrorMessage(errorLike: unknown, fallback = 'Operacion fallida'): string {
   if (errorLike instanceof Error) {
     const message = String(errorLike.message || '').trim();
@@ -1558,8 +1523,8 @@ export function isMesaOccupied(status: string | null | undefined) {
 }
 
 export function compareMesaTableIdentifiers(left: MesaRecord, right: MesaRecord) {
-  const leftId = normalizeTableIdentifier(left?.table_number ?? left?.name ?? left?.id);
-  const rightId = normalizeTableIdentifier(right?.table_number ?? right?.name ?? right?.id);
+  const leftId = normalizeTableIdentifier(left?.table_number ?? left?.table_name ?? left?.id);
+  const rightId = normalizeTableIdentifier(right?.table_number ?? right?.table_name ?? right?.id);
 
   return leftId.localeCompare(rightId, 'es', {
     numeric: true,
@@ -1574,7 +1539,7 @@ export function resolveMesaSyncVersion(mesa: Partial<MesaRecord> | null | undefi
 }
 
 export function mesaDisplayName(mesa: MesaRecord): string {
-  if (mesa.name && String(mesa.name).trim()) return String(mesa.name).trim();
+  if (mesa.table_name && String(mesa.table_name).trim()) return String(mesa.table_name).trim();
   if (
     mesa.table_number !== null &&
     mesa.table_number !== undefined &&
@@ -1608,7 +1573,7 @@ async function insertMesaWithFallbackSelect({
 }): Promise<MesaRecord> {
   const client = getSupabaseClient();
 
-  const withName = await client
+  const result = await client
     .from('tables')
     .insert([
       {
@@ -1617,31 +1582,11 @@ async function insertMesaWithFallbackSelect({
         status: 'available',
       },
     ])
-    .select('id,business_id,table_number,name,status,current_order_id')
+    .select('id,business_id,table_number,table_name,status,current_order_id')
     .single();
 
-  if (!withName.error) {
-    return normalizeMesaRow(withName.data);
-  }
-
-  if (isMissingNameColumnError(withName.error)) {
-    const withoutName = await client
-      .from('tables')
-      .insert([
-        {
-          business_id: businessId,
-          table_number: tableNumber,
-          status: 'available',
-        },
-      ])
-      .select('id,business_id,table_number,status,current_order_id')
-      .single();
-
-    if (withoutName.error) throw withoutName.error;
-    return normalizeMesaRow(withoutName.data);
-  }
-
-  throw withName.error;
+  if (result.error) throw result.error;
+  return normalizeMesaRow(result.data);
 }
 
 export async function createMesa({
@@ -1785,7 +1730,6 @@ export async function openCloseMesa({
       }
 
       if (
-        isMissingOpenedAtOnTablesError(error) ||
         isMissingUpdatedAtOnTablesError(error) ||
         isMissingNameColumnError(error)
       ) {

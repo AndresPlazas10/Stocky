@@ -1323,7 +1323,7 @@ export function useMesaOrderMutations({
     }
 
     try {
-      const mesaLabel = selectedMesa.table_number ?? selectedMesa.name ?? '-';
+      const mesaLabel = selectedMesa.table_number ?? selectedMesa.table_name ?? '-';
 
       const savedPrinter = await getSavedPrinter();
       if (savedPrinter) {

@@ -459,7 +459,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         editing_lock_expires_at: lockExpiresAt,
         editing_lock_ttl_ms: isMesaOccupiedNow ? lockTtlMs : null,
         table_number: mesa.table_number ?? null,
-        name: mesa.name ?? null,
+        table_name: mesa.table_name ?? null,
         order_status: mesa.orders?.status ?? null,
         order_total: Number(mesa.orders?.total || 0),
         order_units: Number.isFinite(Number(options?.orderUnits))
@@ -725,7 +725,7 @@ export function MesasPanel({ session, businessContext }: Props) {
           status: 'occupied',
           current_order_id: normalizedOrderId,
           table_number: mesa?.table_number ?? null,
-          name: mesa?.name ?? null,
+          table_name: mesa?.table_name ?? null,
           orders: {
             id: normalizedOrderId,
             status: 'open',
@@ -759,13 +759,13 @@ export function MesasPanel({ session, businessContext }: Props) {
       let orderIdToClear = '';
       let mesaBusinessId = String(context?.businessId || '').trim();
       let mesaTableNumber: string | number | null | undefined = null;
-      let mesaName: string | null | undefined = null;
+      let mesaTableName: string | null | undefined = null;
       setMesas((prev) => {
         const target = prev.find((mesa) => mesa.id === mesaId) || null;
         orderIdToClear = String(target?.current_order_id || '').trim();
         mesaBusinessId = String(target?.business_id || mesaBusinessId || '').trim();
         mesaTableNumber = target?.table_number;
-        mesaName = target?.name;
+        mesaTableName = target?.table_name;
         return prev.map((mesa) =>
           mesa.id === mesaId
             ? {
@@ -788,7 +788,7 @@ export function MesasPanel({ session, businessContext }: Props) {
           status: 'available',
           current_order_id: null,
           table_number: mesaTableNumber ?? null,
-          name: mesaName ?? null,
+          table_name: mesaTableName ?? null,
           orders: null,
         },
         {
