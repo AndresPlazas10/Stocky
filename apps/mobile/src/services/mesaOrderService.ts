@@ -808,18 +808,12 @@ async function updateOrderItemSubtotal({
   price: number;
 }) {
   const client = getSupabaseClient();
-  const withSubtotal = await client
+  const { error } = await client
     .from('order_items')
-    .update({ quantity, subtotal: quantity * price })
+    .update({ quantity })
     .eq('id', itemId);
 
-  if (!withSubtotal.error) return;
-
-  const fallback = await client.from('order_items').update({ quantity }).eq('id', itemId);
-
-  if (!fallback.error) return;
-
-  throw fallback.error;
+  if (error) throw error;
 }
 
 export async function addCatalogItemToOrder({
