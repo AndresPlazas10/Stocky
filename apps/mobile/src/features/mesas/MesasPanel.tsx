@@ -986,6 +986,8 @@ export function MesasPanel({ session, businessContext }: Props) {
         const mergedMesa: MesaRecord = {
           ...mesa,
           ...updatedMesa,
+          table_number: updatedMesa.table_number ?? mesa.table_number,
+          table_name: updatedMesa.table_name ?? mesa.table_name,
           orders: {
             ...(mesa.orders || {}),
             ...(updatedMesa.orders || {}),

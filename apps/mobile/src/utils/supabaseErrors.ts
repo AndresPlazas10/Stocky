@@ -10,12 +10,16 @@ export function isFunctionUnavailableError(
   functionName: string,
 ): boolean {
   if (!errorLike) return false;
-  const message = errorLike.message || '';
+  const code = String(errorLike.code || '').toLowerCase();
+  const message = String(errorLike.message || '').toLowerCase();
   return (
-    errorLike.code === '42883' ||
+    code === '42883' ||
+    code === 'pgrst202' ||
     message.includes(`function "${functionName}"`) ||
     message.includes(`function ${functionName}`) ||
-    message.includes('does not exist')
+    message.includes('does not exist') ||
+    message.includes('schema cache') ||
+    message.includes('could not find the function')
   );
 }
 
