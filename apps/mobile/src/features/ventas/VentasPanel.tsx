@@ -296,6 +296,11 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
 
         {loading ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
         {loadingSales ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
+        {_error ? (
+          <View style={{ backgroundColor: '#FEE2E2', borderRadius: 8, padding: 12, marginHorizontal: 16, marginTop: 8 }}>
+            <Text style={{ color: '#991B1B', fontSize: 13 }}>{_error}</Text>
+          </View>
+        ) : null}
 
         <RecordFilterCard
           title="Filtros de Ventas"

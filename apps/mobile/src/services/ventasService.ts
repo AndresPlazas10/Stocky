@@ -629,8 +629,6 @@ export async function createVenta({
     p_items: itemsForRpc,
     p_order_id: null,
     p_table_id: null,
-    p_amount_received: normalizedAmountReceived,
-    p_change_breakdown: normalizedChangeBreakdown,
   };
   const idempotentPayload = {
     ...basePayload,
