@@ -34,8 +34,8 @@ export function normalizeTableIdentifier(value: string | number | null | undefin
 }
 
 export function compareMesaTableIdentifiers(left: MesaRecord, right: MesaRecord) {
-  const leftId = normalizeTableIdentifier(left?.table_number ?? left?.name ?? left?.id);
-  const rightId = normalizeTableIdentifier(right?.table_number ?? right?.name ?? right?.id);
+  const leftId = normalizeTableIdentifier(left?.table_number ?? left?.table_name ?? left?.id);
+  const rightId = normalizeTableIdentifier(right?.table_number ?? right?.table_name ?? right?.id);
 
   return leftId.localeCompare(rightId, 'es', {
     numeric: true,
@@ -50,7 +50,7 @@ export function resolveMesaSyncVersion(mesa: Partial<MesaRecord> | null | undefi
 }
 
 export function mesaDisplayName(mesa: MesaRecord): string {
-  if (mesa.name && String(mesa.name).trim()) return String(mesa.name).trim();
+  if (mesa.table_name && String(mesa.table_name).trim()) return String(mesa.table_name).trim();
   if (
     mesa.table_number !== null &&
     mesa.table_number !== undefined &&

@@ -642,7 +642,7 @@ export function useMesaRealtime({
       const hasNextTableNumber = Boolean(
         nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'table_number'),
       );
-      const hasNextName = Boolean(nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'name'));
+      const hasNextTableName = Boolean(nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'table_name'));
       const hasNextSyncVersion = Boolean(
         nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'sync_version'),
       );
@@ -665,7 +665,7 @@ export function useMesaRealtime({
             id: mesaId,
             business_id: String(nextRow?.business_id || '').trim(),
             table_number: hasNextTableNumber ? (nextRow?.table_number ?? null) : null,
-            name: hasNextName ? (nextRow?.name ?? null) : null,
+            table_name: hasNextTableName ? (nextRow?.table_name ?? null) : null,
             status: String(nextStatus || 'available'),
             current_order_id: hasNextCurrentOrderId ? nextCurrentOrderId : null,
             sync_version: hasNextSyncVersion ? nextSyncVersion : undefined,
@@ -697,7 +697,7 @@ export function useMesaRealtime({
           status: resolvedStatus,
           current_order_id: resolvedCurrentOrderId,
           table_number: hasNextTableNumber ? (nextRow?.table_number ?? null) : current.table_number,
-          name: hasNextName ? (nextRow?.name ?? null) : current.name,
+          table_name: hasNextTableName ? (nextRow?.table_name ?? null) : current.table_name,
           sync_version: hasNextSyncVersion ? nextSyncVersion : current.sync_version,
           orders: (() => {
             if (!resolvedCurrentOrderId || resolvedStatus === 'available') return null;
@@ -738,7 +738,7 @@ export function useMesaRealtime({
           status: resolvedStatus,
           current_order_id: resolvedCurrentOrderId,
           table_number: hasNextTableNumber ? (nextRow?.table_number ?? null) : prev.table_number,
-          name: hasNextName ? (nextRow?.name ?? null) : prev.name,
+          table_name: hasNextTableName ? (nextRow?.table_name ?? null) : prev.table_name,
           sync_version: hasNextSyncVersion ? nextSyncVersion : prev.sync_version,
           orders: !resolvedCurrentOrderId || resolvedStatus === 'available' ? null : prev.orders,
         };
@@ -1025,7 +1025,7 @@ export function useMesaRealtime({
           status: payload?.status ?? null,
           current_order_id: payload?.current_order_id ?? null,
           table_number: payload?.table_number ?? null,
-          name: payload?.name ?? null,
+          table_name: payload?.table_name ?? null,
           sync_version: payload?.sync_version ?? null,
         },
       });
