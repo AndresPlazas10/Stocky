@@ -50,7 +50,8 @@ export const productsAdapter = {
       .from('products')
       .select('id, name, purchase_price, supplier_id, stock, manage_stock, is_active')
       .eq('business_id', businessId)
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .gt('stock', 0);
   },
 
   async getProductPurchasePricesByBusiness(businessId) {

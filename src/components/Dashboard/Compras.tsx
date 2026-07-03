@@ -974,7 +974,7 @@ function Compras({ businessId }: DashboardModuleProps) {
                       {!supplierId ? 'Primero selecciona un proveedor...' : 'Seleccionar producto...'}
                     </option>
                     {products
-                      .filter(product => (!supplierId || product.supplier_id === supplierId))
+                      .filter(product => (!supplierId || product.supplier_id === supplierId) && product.stock > 0)
                       .map(product => (
                         <option
                           key={product.id}
