@@ -66,6 +66,7 @@ export interface UseMesaRealtimeReturn {
   scheduleMesaLocksRefresh: (businessId: string) => void;
   scheduleOrderRealtimeSummaryHydration: (orderId: string) => void;
   refreshMesasRealtime: () => Promise<void>;
+  setActiveOrderId: (orderId: string | null) => void;
   mesasSyncBroadcastReadyRef: React.MutableRefObject<boolean>;
   mesasSyncBroadcastChannelRef: React.MutableRefObject<any>;
   pendingUiTraceRef: React.MutableRefObject<RealtimeUiTrace | null>;
@@ -125,8 +126,16 @@ export function useMesaRealtime({
   const realtimeClientInstanceIdRef = useRef(realtimeClientInstanceId);
   const pendingUiTraceRef = useRef<RealtimeUiTrace | null>(null);
   const mesaLockPlaceholderTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const activeOrderIdRef = useRef<string | null>(null);
+  const [activeOrderId, setActiveOrderIdState] = useState<string | null>(null);
 
   const businessId = String(_businessId || '').trim();
+
+  const setActiveOrderId = useCallback((orderId: string | null) => {
+    const normalized = String(orderId || '').trim() || null;
+    activeOrderIdRef.current = normalized;
+    setActiveOrderIdState(normalized);
+  }, []);
 
   // -------------------------------------------------------------------
   // markRealtimeIngress
@@ -1111,35 +1120,6 @@ export function useMesaRealtime({
         {
           event: '*',
           schema: 'public',
-          table: 'order_items',
-        },
-        (payload: any) => {
-          if (cancelled) return;
-          markRealtimeIngress('order_items', payload);
-          const newRow = payload?.new as Record<string, unknown> | undefined;
-          const oldRow = payload?.old as Record<string, unknown> | undefined;
-          const nextOrderId = normalizeOrderReference(newRow?.order_id);
-          const previousOrderId = normalizeOrderReference(oldRow?.order_id);
-
-          applyRealtimeOrderItemDelta(payload);
-
-          if (nextOrderId) {
-            scheduleOrderRealtimeSummaryHydration(nextOrderId);
-          }
-          if (previousOrderId && previousOrderId !== nextOrderId) {
-            scheduleOrderRealtimeSummaryHydration(previousOrderId);
-          }
-
-          if (!nextOrderId && !previousOrderId) {
-            scheduleRefresh();
-          }
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
           table: 'table_edit_locks',
           filter: `business_id=eq.${businessId}`,
         },
@@ -1237,6 +1217,68 @@ export function useMesaRealtime({
   ]);
 
   // -------------------------------------------------------------------
+  // Filtered order_items subscription (scoped to active order)
+  // -------------------------------------------------------------------
+
+  useEffect(() => {
+    const orderId = activeOrderIdRef.current;
+    if (!businessId || !orderId) return undefined;
+
+    let cancelled = false;
+    let client;
+    try {
+      client = getSupabaseClient();
+    } catch {
+      return undefined;
+    }
+
+    traceMesaSync('order_items_subscribe', { orderId });
+
+    const orderChannel = client
+      .channel(`mobile-order-items:${businessId}:${orderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'order_items',
+          filter: `order_id=eq.${orderId}`,
+        },
+        (payload: any) => {
+          if (cancelled) return;
+          markRealtimeIngress('order_items', payload);
+          applyRealtimeOrderItemDelta(payload);
+
+          const newRow = payload?.new as Record<string, unknown> | undefined;
+          const oldRow = payload?.old as Record<string, unknown> | undefined;
+          const nextOrderId = normalizeOrderReference(newRow?.order_id);
+          const previousOrderId = normalizeOrderReference(oldRow?.order_id);
+
+          if (nextOrderId) {
+            scheduleOrderRealtimeSummaryHydration(nextOrderId);
+          }
+          if (previousOrderId && previousOrderId !== nextOrderId) {
+            scheduleOrderRealtimeSummaryHydration(previousOrderId);
+          }
+        },
+      );
+
+    orderChannel.subscribe();
+
+    return () => {
+      cancelled = true;
+      traceMesaSync('order_items_unsubscribe', { orderId });
+      void client.removeChannel(orderChannel);
+    };
+  }, [
+    activeOrderId,
+    businessId,
+    applyRealtimeOrderItemDelta,
+    markRealtimeIngress,
+    scheduleOrderRealtimeSummaryHydration,
+  ]);
+
+  // -------------------------------------------------------------------
   // Return
   // -------------------------------------------------------------------
 
@@ -1245,6 +1287,7 @@ export function useMesaRealtime({
     scheduleMesaLocksRefresh,
     scheduleOrderRealtimeSummaryHydration,
     refreshMesasRealtime,
+    setActiveOrderId,
     mesasSyncBroadcastReadyRef,
     mesasSyncBroadcastChannelRef,
     pendingUiTraceRef,
