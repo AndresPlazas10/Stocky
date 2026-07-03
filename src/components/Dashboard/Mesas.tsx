@@ -6,7 +6,7 @@ import type { SplitBillOrderItem, OrderItem } from '../../types/components';
 import { calcularCambio } from '../../utils/cambio';
 import { Button } from '../ui/button';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
-import { getTotalProductUnits } from './mesas/mesaHelpers.js';
+import { getTotalProductUnits, getOrderItemRenderKey, getOrderItemName } from './mesas/mesaHelpers.js';
 import MesasGrid from './mesas/MesasGrid';
 import { useMesaEditLocks } from './mesas/useMesaEditLocks.js';
 import { useMesaRealtime } from './mesas/useMesaRealtime.js';
@@ -453,8 +453,8 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
           totalOrderItems={catalog.totalOrderItems}
           orderItemsSentinelRef={catalog.orderItemsSentinelRef}
           isOrderItemsSyncing={state.isOrderItemsSyncing}
-          getOrderItemRenderKey={null}
-          getOrderItemName={null}
+          getOrderItemRenderKey={getOrderItemRenderKey}
+          getOrderItemName={getOrderItemName}
           onUpdateQuantity={updateItemQuantity}
           onLoadMoreOrderItems={catalog.loadMoreOrderItems}
           orderTotal={catalog.orderTotal}
