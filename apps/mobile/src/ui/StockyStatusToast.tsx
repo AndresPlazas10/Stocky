@@ -43,7 +43,7 @@ export function StockyStatusToast({
     const anim = Animated.timing(progress, {
       toValue: 1,
       duration: durationMs,
-      useNativeDriver: false,
+      useNativeDriver: true,
     });
     let cancelled = false;
     anim.start(({ finished }) => {
@@ -55,9 +55,9 @@ export function StockyStatusToast({
     };
   }, [durationMs, progress, visible]);
 
-  const lineWidth = progress.interpolate({
+  const scaleX = progress.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
+    outputRange: [0, 1],
   });
 
   return (
@@ -113,7 +113,7 @@ export function StockyStatusToast({
               ) : null}
             </View>
             <View style={styles.progressTrack}>
-              <Animated.View style={[styles.progressFill, { width: lineWidth }]} />
+              <Animated.View style={[styles.progressFill, { transform: [{ scaleX }] }]} />
             </View>
           </View>
         </View>
@@ -204,7 +204,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: {
+    width: '100%',
     height: '100%',
     backgroundColor: '#E2E8F0',
+    transformOrigin: 'left',
   },
 });
