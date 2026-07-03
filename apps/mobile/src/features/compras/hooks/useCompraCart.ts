@@ -27,6 +27,10 @@ export function useCompraCart() {
         setError('Este producto no maneja stock y no puede registrarse en compras.');
         return;
       }
+      if (product.stock <= 0) {
+        setError('Este producto no tiene stock disponible.');
+        return;
+      }
 
       setCart((prev) => {
         const existing = prev.find((item) => item.product_id === product.id);
