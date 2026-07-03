@@ -43,6 +43,8 @@ import { useMesaPrint } from './hooks/useMesaPrint';
 import { useMesaCreate } from './hooks/useMesaCreate';
 import { useMesaRefSync } from './hooks/useMesaRefSync';
 import { useMesaKeyboard } from './hooks/useMesaKeyboard';
+import { useMesaDeleteModal } from './hooks/useMesaDeleteModal';
+import { usePaymentFlow } from './hooks/usePaymentFlow';
 import { MesasGrid } from './components/MesasGrid';
 import { MesasPanelHeader } from './components/MesasPanelHeader';
 import { MesasToasts } from './components/MesasToasts';
@@ -114,10 +116,6 @@ export function MesasPanel({ session, businessContext }: Props) {
   const [actingMesaId, setActingMesaId] = useState<string | null>(null);
 
   const { isKeyboardVisible } = useMesaKeyboard();
-
-  const [showDeleteMesaModal, setShowDeleteMesaModal] = useState(false);
-  const [mesaToDelete, setMesaToDelete] = useState<MesaRecord | null>(null);
-  const [isDeletingMesa, setIsDeletingMesa] = useState(false);
 
   const selectedMesaIdRef = useRef<string>('');
   const mesaActionVersionRef = useRef<Record<string, number>>({});
@@ -710,18 +708,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     [context?.businessId, publishMesaStateBroadcast],
   );
 
-  const askDeleteMesa = useCallback(
-    (mesa: MesaRecord) => {
-      if (context?.source === 'employee') {
-        setError('No tienes permisos para eliminar mesas.');
-        return;
-      }
-      setMesaToDelete(mesa);
-      setShowDeleteMesaModal(true);
-    },
-    [context?.source],
-  );
-
   const markMesaAsAvailableAfterSale = useCallback(
     (mesaId: string) => {
       let orderIdToClear = '';
@@ -813,6 +799,44 @@ export function MesasPanel({ session, businessContext }: Props) {
     handlePrintKitchen,
   } = mutations;
 
+  const {
+    showDeleteMesaModal,
+    mesaToDelete,
+    isDeletingMesa,
+    askDeleteMesa,
+    confirmDeleteMesa,
+    handleCancelDeleteMesa,
+  } = useMesaDeleteModal({
+    context,
+    selectedMesa,
+    setMesas,
+    closeOrderModal,
+    setError,
+    showDeletedToast: toasts.showDeletedToast,
+  });
+
+  const {
+    handleSplitBill,
+    handleCloseCloseOrderChoice,
+    handleClosePayment,
+    handleTogglePaymentMenu,
+    handlePaymentMethodChange,
+    handleBackFromSplitBill,
+    handleCloseSplitBill,
+  } = usePaymentFlow({
+    isClosingOrder,
+    releasingEmptyOrder,
+    orderTotal,
+    amountReceived,
+    setShowCloseOrderChoiceModal,
+    setShowPaymentModal,
+    setShowPaymentMethodMenu,
+    setShowSplitBillModal,
+    setShowOrderModal,
+    setPaymentMethod,
+    setAmountReceived,
+  });
+
   const handleDismissOrderModal = useCallback(() => {
     if (isClosingOrder || releasingEmptyOrder || isSavingOrder) return;
 
@@ -845,38 +869,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     releasingEmptyOrder,
     selectedMesa,
   ]);
-
-  const confirmDeleteMesa = useCallback(async () => {
-    if (context?.source === 'employee') {
-      setError('No tienes permisos para eliminar mesas.');
-      return;
-    }
-    if (!context?.businessId || !mesaToDelete) return;
-
-    setIsDeletingMesa(true);
-    setError(null);
-
-    try {
-      const deletedLabel = mesaDisplayName(mesaToDelete);
-      await deleteMesaCascade({
-        businessId: context.businessId,
-        tableId: mesaToDelete.id,
-      });
-
-      setMesas((prev) => prev.filter((mesa) => mesa.id !== mesaToDelete.id));
-      if (selectedMesa?.id === mesaToDelete.id) {
-        closeOrderModal();
-      }
-
-      setShowDeleteMesaModal(false);
-      setMesaToDelete(null);
-      toasts.showDeletedToast(deletedLabel);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo eliminar la mesa.');
-    } finally {
-      setIsDeletingMesa(false);
-    }
-  }, [closeOrderModal, context, mesaToDelete, selectedMesa, toasts]);
 
   const handleOpenClose = useCallback(
     async (mesa: MesaRecord, action: 'open' | 'close') => {
@@ -1058,18 +1050,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     [handleAddCatalogItem, isKeyboardVisible],
   );
 
-  const handleSplitBill = useCallback(() => {
-    setShowCloseOrderChoiceModal(false);
-    setShowPaymentModal(false);
-    setShowPaymentMethodMenu(false);
-    setShowSplitBillModal(true);
-  }, [
-    setShowCloseOrderChoiceModal,
-    setShowPaymentMethodMenu,
-    setShowPaymentModal,
-    setShowSplitBillModal,
-  ]);
-
   const handleOpenAddMesa = useCallback(() => {
     setShowCreateMesaModal(true);
     setNewTableNumber('');
@@ -1079,53 +1059,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     setShowCreateMesaModal(false);
     setNewTableNumber('');
   }, [setShowCreateMesaModal, setNewTableNumber]);
-
-  const handleCancelDeleteMesa = useCallback(() => {
-    if (!isDeletingMesa) {
-      setShowDeleteMesaModal(false);
-      setMesaToDelete(null);
-    }
-  }, [isDeletingMesa, setShowDeleteMesaModal, setMesaToDelete]);
-
-  const handleCloseCloseOrderChoice = useCallback(() => {
-    if (isClosingOrder || releasingEmptyOrder) return;
-    setShowCloseOrderChoiceModal(false);
-    setShowOrderModal(true);
-  }, [isClosingOrder, releasingEmptyOrder, setShowCloseOrderChoiceModal, setShowOrderModal]);
-
-  const handleClosePayment = useCallback(() => {
-    if (!isClosingOrder) {
-      setShowPaymentMethodMenu(false);
-      setShowPaymentModal(false);
-      setShowCloseOrderChoiceModal(true);
-    }
-  }, [isClosingOrder, setShowPaymentMethodMenu, setShowPaymentModal, setShowCloseOrderChoiceModal]);
-
-  const handleTogglePaymentMenu = useCallback(() => {
-    setShowPaymentMethodMenu((prev) => !prev);
-  }, [setShowPaymentMethodMenu]);
-
-  const handlePaymentMethodChange = useCallback(
-    (method: string) => {
-      setPaymentMethod(method as 'cash' | 'card' | 'transfer');
-      if (method === 'cash' && String(amountReceived || '').trim() === '') {
-        setAmountReceived(String(Math.round(orderTotal || 0)));
-      }
-    },
-    [amountReceived, orderTotal, setAmountReceived, setPaymentMethod],
-  );
-
-  const handleBackFromSplitBill = useCallback(() => {
-    setShowSplitBillModal(false);
-    setShowCloseOrderChoiceModal(true);
-  }, [setShowSplitBillModal, setShowCloseOrderChoiceModal]);
-
-  const handleCloseSplitBill = useCallback(() => {
-    if (isClosingOrder) return;
-    setShowSplitBillModal(false);
-    setShowCloseOrderChoiceModal(false);
-    setShowOrderModal(true);
-  }, [isClosingOrder, setShowSplitBillModal, setShowCloseOrderChoiceModal, setShowOrderModal]);
 
   const memoizedOrderState = useMemo(
     () => ({
