@@ -128,6 +128,7 @@ export function StockyModal({
   const modalOpenStartedAtRef = useRef(0);
   const openPaintLoggedRef = useRef(false);
   const contentReadyLoggedRef = useRef(false);
+  const animationStartedRef = useRef(false);
   const [contentReady, setContentReady] = useState(!deferContent);
   const [contentOpacity] = useState(() => new Animated.Value(deferContent ? 0 : 1));
   const shouldHideContent = deferContent && deferBehavior === 'hide';
@@ -195,6 +196,7 @@ export function StockyModal({
     if (visible) {
       if (instantOpen) {
         appear.setValue(1);
+        animationStartedRef.current = true;
         if (!openPaintLoggedRef.current) {
           openPaintLoggedRef.current = true;
           perfMark('modal_open_painted', {
@@ -204,7 +206,10 @@ export function StockyModal({
           });
         }
       } else {
-        appear.setValue(0);
+        if (!animationStartedRef.current) {
+          appear.setValue(0);
+        }
+        animationStartedRef.current = true;
         Animated.timing(appear, {
           toValue: 1,
           duration: openDuration,
@@ -231,6 +236,7 @@ export function StockyModal({
     }).start(({ finished }) => {
       if (!finished) return;
       if (visibilityAnimationIdRef.current !== animationId) return;
+      animationStartedRef.current = false;
       perfMark('modal_close_complete', {
         modal: perfTag || title || 'untagged',
         closeMs: closeDuration,

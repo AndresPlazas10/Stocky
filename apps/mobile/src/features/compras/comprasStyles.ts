@@ -4,6 +4,9 @@ import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
 export const comprasStyles = StyleSheet.create({
   container: {
     gap: 16,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 26,
   },
   heroCard: {
     borderRadius: 22,

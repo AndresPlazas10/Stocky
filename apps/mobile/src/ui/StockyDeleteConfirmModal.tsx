@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,7 +21,7 @@ type Props = {
   onCancel: () => void;
 };
 
-export function StockyDeleteConfirmModal({
+export const StockyDeleteConfirmModal = memo(function StockyDeleteConfirmModal({
   visible,
   title,
   itemLabel,
@@ -121,7 +122,7 @@ export function StockyDeleteConfirmModal({
       ) : null}
     </StockyModal>
   );
-}
+});
 
 const styles = StyleSheet.create({
   sheet: {
