@@ -279,6 +279,7 @@ export function MesasPanel({ session, businessContext }: Props) {
     pendingUiTraceRef,
     realtimeClientInstanceIdRef,
     traceAsyncDuration,
+    setActiveOrderId,
   } = realtime;
 
   useMesaRefSync({
@@ -786,7 +787,7 @@ export function MesasPanel({ session, businessContext }: Props) {
   });
 
   const {
-    closeOrderModal,
+    closeOrderModal: closeOrderModalBase,
     releaseEmptyOrderAndClose,
     handleAddCatalogItem,
     handleUpdateOrderItemQuantity,
@@ -798,6 +799,11 @@ export function MesasPanel({ session, businessContext }: Props) {
     processSplitPaymentAndClose,
     handlePrintKitchen,
   } = mutations;
+
+  const closeOrderModal = useCallback(() => {
+    setActiveOrderId(null);
+    closeOrderModalBase();
+  }, [setActiveOrderId, closeOrderModalBase]);
 
   const {
     showDeleteMesaModal,
@@ -968,6 +974,7 @@ export function MesasPanel({ session, businessContext }: Props) {
             const openedOrderId = String(mergedMesa.current_order_id || '').trim();
             if (openedOrderId) {
               orderItemsCacheRef.current.set(openedOrderId, []);
+              setActiveOrderId(openedOrderId);
             }
             if (orderModalOpenIntentRef.current) {
               void openOrderModal(mergedMesa, {
@@ -1013,6 +1020,7 @@ export function MesasPanel({ session, businessContext }: Props) {
       setOrderItems,
       setOrderModalError,
       setSelectedMesa,
+      setActiveOrderId,
     ],
   );
 
@@ -1027,6 +1035,8 @@ export function MesasPanel({ session, businessContext }: Props) {
       }
       if (occupied) {
         setActingMesaId(mesa.id);
+        const orderId = String(mesa.current_order_id || '').trim() || null;
+        if (orderId) setActiveOrderId(orderId);
         void openOrderModal(mesa).finally(() => {
           setActingMesaId((current) => (current === mesa.id ? null : current));
         });
@@ -1034,7 +1044,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         void handleOpenClose(mesa, 'open');
       }
     },
-    [handleOpenClose, openOrderModal],
+    [handleOpenClose, openOrderModal, setActiveOrderId],
   );
 
   const handleCatalogItemPress = useCallback(
