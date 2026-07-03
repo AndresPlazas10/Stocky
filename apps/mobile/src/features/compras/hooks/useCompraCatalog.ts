@@ -82,6 +82,8 @@ export function useCompraCatalog(businessId: string) {
       return products
         .filter((product) => {
           if (cartProductIds.has(product.id)) return false;
+          if (product.manage_stock === false) return false;
+          if (product.stock <= 0) return false;
           if (supplierId && product.supplier_id !== supplierId) return false;
           if (!search) return true;
           return String(product.name || '')
