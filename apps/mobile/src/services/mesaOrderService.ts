@@ -1156,30 +1156,42 @@ export async function persistOrderSnapshot({
     }
   });
 
-  for (const row of targetRows) {
-    const key = row.product_id ? `p:${row.product_id}` : `c:${row.combo_id}`;
-    const existing = currentByKey.get(key);
+  const upsertResults = await Promise.allSettled(
+    targetRows.map((row) => {
+      const key = row.product_id ? `p:${row.product_id}` : `c:${row.combo_id}`;
+      const existing = currentByKey.get(key);
 
-    if (existing?.id) {
-      await updateOrderItemSubtotal({
-        itemId: existing.id,
-        quantity: row.quantity,
-        price: row.price,
-      });
-      continue;
-    }
+      if (existing?.id) {
+        return updateOrderItemSubtotal({
+          itemId: existing.id,
+          quantity: row.quantity,
+          price: row.price,
+        });
+      }
 
-    const insertResult = await client.from('order_items').insert([
-      {
-        order_id: row.order_id,
-        product_id: row.product_id,
-        combo_id: row.combo_id,
-        quantity: row.quantity,
-        price: row.price,
-      },
-    ]);
+      return client
+        .from('order_items')
+        .insert([
+          {
+            order_id: row.order_id,
+            product_id: row.product_id,
+            combo_id: row.combo_id,
+            quantity: row.quantity,
+            price: row.price,
+          },
+        ])
+        .then((result) => {
+          if (result.error) throw result.error;
+        });
+    }),
+  );
 
-    if (insertResult.error) throw insertResult.error;
+  const failedUpserts = upsertResults.filter((r) => r.status === 'rejected');
+  if (failedUpserts.length > 0 && __DEV__) {
+    console.warn(
+      '[persistOrderSnapshot] fallback upsert errors:',
+      failedUpserts.map((r) => (r as PromiseRejectedResult).reason?.message || r),
+    );
   }
 
   const idsToDelete = [...duplicateIdsToDelete, ...staleIdsToDelete];
