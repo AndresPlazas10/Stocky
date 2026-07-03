@@ -19,7 +19,7 @@ export function DashboardSectionScreen({ sectionId: propSectionId }: Props = {})
   if (!sectionId) return null;
 
   const useNativeSectionScroll =
-    sectionId === 'inventario' || sectionId === 'combos' || sectionId === 'proveedores';
+    sectionId === 'inventario' || sectionId === 'combos' || sectionId === 'proveedores' || sectionId === 'ventas' || sectionId === 'compras';
 
   return (
     <StockyBackground>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -271,113 +271,121 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
 
   return (
     <>
-      <View style={s.container}>
-        <LinearGradient
-          colors={['#4F46E5', '#7C3AED']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={s.heroCard}
-        >
-          <View style={s.heroTop}>
-            <View style={s.heroIconBox}>
-              <Ionicons name="cart-outline" size={28} color={STOCKY_COLORS.white} />
-            </View>
-            <View style={s.heroTitleWrap}>
-              <Text style={s.heroTitle}>Ventas</Text>
-              <Text style={s.heroSubtitle}>Sistema de punto de venta</Text>
-            </View>
-          </View>
-
-          <Pressable style={s.heroCreateButton} onPress={openCreateSaleModal}>
-            <Ionicons name="add" size={20} color="rgba(255,255,255,0.9)" />
-            <Text style={s.heroCreateButtonText}>Nueva Venta</Text>
-          </Pressable>
-        </LinearGradient>
-
-        {loading ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
-        {loadingSales ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
-        {_error ? (
-          <View style={{ backgroundColor: '#FEE2E2', borderRadius: 8, padding: 12, marginHorizontal: 16, marginTop: 8 }}>
-            <Text style={{ color: '#991B1B', fontSize: 13 }}>{_error}</Text>
-          </View>
-        ) : null}
-
-        <RecordFilterCard
-          title="Filtros de Ventas"
-          subtitle="Filtra por un día específico."
-          expanded={showFiltersExpanded}
-          onToggle={() => setShowFiltersExpanded((prev) => !prev)}
-          dayField={{
-            icon: 'calendar-clear-outline',
-            label: 'Día',
-            selectedLabel: selectedDayLabel,
-            isActive: dayFilter !== 'all',
-            onOpen: openDayFilterCalendar,
-          }}
-          secondField={{
-            icon: 'person-outline',
-            label: 'Vendedor',
-            selectedLabel: selectedSellerLabel,
-            isActive: sellerFilter !== 'all',
-            onOpen: () => setShowSellerFilterModal(true),
-          }}
-          onClearFilters={clearFilters}
-        />
-
-        <View style={s.paginationCard}>
-          <Text style={s.paginationText}>
-            Mostrando {pageRange.from} a {pageRange.to} de {filteredVentas.length} registros
-          </Text>
-          <View style={s.paginationControls}>
-            <Pressable
-              style={[
-                s.paginationArrowButton,
-                canPrevPage && s.paginationArrowButtonActive,
-                !canPrevPage && s.buttonDisabled,
-              ]}
-              onPress={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-              disabled={!canPrevPage}
-            >
-              <Ionicons name="chevron-back" size={19} color={canPrevPage ? '#4F46E5' : '#9CA3AF'} />
-            </Pressable>
-            <View style={s.paginationPageBadge}>
-              <Text style={s.paginationPageText}>
-                Página {currentPage} de {totalPages}
-              </Text>
-            </View>
-            <Pressable
-              style={[
-                s.paginationArrowButton,
-                canNextPage && s.paginationArrowButtonActive,
-                !canNextPage && s.buttonDisabled,
-              ]}
-              onPress={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={!canNextPage}
-            >
-              <Ionicons
-                name="chevron-forward"
-                size={19}
-                color={canNextPage ? '#4F46E5' : '#9CA3AF'}
-              />
-            </Pressable>
-          </View>
-        </View>
-
-        {!loading && paginatedVentas.length === 0 ? (
-          <Text style={s.emptyText}>No hay ventas para esos filtros.</Text>
-        ) : null}
-
-        {paginatedVentas.map((venta) => (
+      <FlatList
+        data={paginatedVentas}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
           <SaleCard
-            key={venta.id}
-            venta={venta}
+            venta={item}
             canDelete={canDeleteSales}
             onViewDetails={openVentaDetails}
             onPrint={handlePrintSale}
             onDelete={askDeleteVenta}
           />
-        ))}
-      </View>
+        )}
+        ListHeaderComponent={
+          <>
+            <LinearGradient
+              colors={['#4F46E5', '#7C3AED']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.heroCard}
+            >
+              <View style={s.heroTop}>
+                <View style={s.heroIconBox}>
+                  <Ionicons name="cart-outline" size={28} color={STOCKY_COLORS.white} />
+                </View>
+                <View style={s.heroTitleWrap}>
+                  <Text style={s.heroTitle}>Ventas</Text>
+                  <Text style={s.heroSubtitle}>Sistema de punto de venta</Text>
+                </View>
+              </View>
+
+              <Pressable style={s.heroCreateButton} onPress={openCreateSaleModal}>
+                <Ionicons name="add" size={20} color="rgba(255,255,255,0.9)" />
+                <Text style={s.heroCreateButtonText}>Nueva Venta</Text>
+              </Pressable>
+            </LinearGradient>
+
+            {loading ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
+            {loadingSales ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
+            {_error ? (
+              <View style={{ backgroundColor: '#FEE2E2', borderRadius: 8, padding: 12, marginHorizontal: 16, marginTop: 8 }}>
+                <Text style={{ color: '#991B1B', fontSize: 13 }}>{_error}</Text>
+              </View>
+            ) : null}
+
+            <RecordFilterCard
+              title="Filtros de Ventas"
+              subtitle="Filtra por un día específico."
+              expanded={showFiltersExpanded}
+              onToggle={() => setShowFiltersExpanded((prev) => !prev)}
+              dayField={{
+                icon: 'calendar-clear-outline',
+                label: 'Día',
+                selectedLabel: selectedDayLabel,
+                isActive: dayFilter !== 'all',
+                onOpen: openDayFilterCalendar,
+              }}
+              secondField={{
+                icon: 'person-outline',
+                label: 'Vendedor',
+                selectedLabel: selectedSellerLabel,
+                isActive: sellerFilter !== 'all',
+                onOpen: () => setShowSellerFilterModal(true),
+              }}
+              onClearFilters={clearFilters}
+            />
+
+            <View style={s.paginationCard}>
+              <Text style={s.paginationText}>
+                Mostrando {pageRange.from} a {pageRange.to} de {filteredVentas.length} registros
+              </Text>
+              <View style={s.paginationControls}>
+                <Pressable
+                  style={[
+                    s.paginationArrowButton,
+                    canPrevPage && s.paginationArrowButtonActive,
+                    !canPrevPage && s.buttonDisabled,
+                  ]}
+                  onPress={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={!canPrevPage}
+                >
+                  <Ionicons name="chevron-back" size={19} color={canPrevPage ? '#4F46E5' : '#9CA3AF'} />
+                </Pressable>
+                <View style={s.paginationPageBadge}>
+                  <Text style={s.paginationPageText}>
+                    Página {currentPage} de {totalPages}
+                  </Text>
+                </View>
+                <Pressable
+                  style={[
+                    s.paginationArrowButton,
+                    canNextPage && s.paginationArrowButtonActive,
+                    !canNextPage && s.buttonDisabled,
+                  ]}
+                  onPress={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={!canNextPage}
+                >
+                  <Ionicons
+                    name="chevron-forward"
+                    size={19}
+                    color={canNextPage ? '#4F46E5' : '#9CA3AF'}
+                  />
+                </Pressable>
+              </View>
+            </View>
+
+            {!loading && paginatedVentas.length === 0 ? (
+              <Text style={s.emptyText}>No hay ventas para esos filtros.</Text>
+            ) : null}
+          </>
+        }
+        contentContainerStyle={s.container}
+        removeClippedSubviews
+        maxToRenderPerBatch={10}
+        windowSize={5}
+      />
 
       <CreateSaleModal
         visible={showCreateSaleModal}
