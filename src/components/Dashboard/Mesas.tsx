@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Layers, Plus } from 'lucide-react';
 import { deleteTableCascadeOrders } from '../../data/commands/ordersCommands';
@@ -76,6 +76,8 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     paymentMethod: state.paymentMethod,
     amountReceived: state.amountReceived,
   });
+
+  const isOpeningTableRef = useRef(false);
 
   const {
     handleCreateTable,
@@ -156,6 +158,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     getMesaLockState,
     showAddForm: state.showAddForm,
     setShowAddForm: state.setShowAddForm,
+    isOpeningTableRef,
   });
 
   useMesaRealtime({
@@ -177,6 +180,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     pendingRemoteOrderTotalsRef: refs.pendingRemoteOrderTotalsRef,
     loadCombos,
     comboCatalogByIdRef: refs.comboCatalogByIdRef,
+    isOpeningTableRef,
   });
 
   const {
