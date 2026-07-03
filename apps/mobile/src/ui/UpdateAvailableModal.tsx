@@ -1,4 +1,4 @@
-import { Linking, Modal, StyleSheet, Text, View } from 'react-native';
+import { Linking, Modal, Platform, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -18,12 +18,16 @@ export function UpdateAvailableModal({ notice }: UpdateAvailableModalProps) {
   return (
     <Modal transparent visible statusBarTranslucent>
       <View style={styles.backdrop}>
-        <BlurView
-          style={StyleSheet.absoluteFillObject}
-          tint="dark"
-          intensity={24}
-          experimentalBlurMethod="dimezisBlurView"
-        />
+        {Platform.OS === 'android' ? (
+          <View style={styles.scrimDim} />
+        ) : (
+          <BlurView
+            style={StyleSheet.absoluteFillObject}
+            tint="dark"
+            intensity={24}
+            experimentalBlurMethod="dimezisBlurView"
+          />
+        )}
         <View style={styles.scrim} />
         <View style={styles.card}>
           <LinearGradient colors={['#1D4ED8', '#0F172A']} style={styles.header}>
@@ -52,6 +56,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 18,
+  },
+  scrimDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.44)',
   },
   scrim: {
     ...StyleSheet.absoluteFillObject,

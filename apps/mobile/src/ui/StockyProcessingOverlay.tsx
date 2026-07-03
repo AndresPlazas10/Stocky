@@ -49,13 +49,19 @@ export function StockyProcessingOverlay({ visible, label = 'Procesando...', deta
     >
       <View style={styles.overlay}>
         <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: scrimOpacity }]}>
-          <BlurView
-            style={StyleSheet.absoluteFillObject}
-            tint="dark"
-            intensity={24}
-            experimentalBlurMethod="dimezisBlurView"
-          />
-          <View style={styles.scrim} />
+          {Platform.OS === 'android' ? (
+            <View style={styles.scrimDim} />
+          ) : (
+            <>
+              <BlurView
+                style={StyleSheet.absoluteFillObject}
+                tint="dark"
+                intensity={24}
+                experimentalBlurMethod="dimezisBlurView"
+              />
+              <View style={styles.scrim} />
+            </>
+          )}
         </Animated.View>
         <Animated.View
           style={[
@@ -86,6 +92,10 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(2, 34, 37, 0.22)',
   },
+  scrimDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(2, 34, 37, 0.45)',
+  },
   card: {
     minWidth: 218,
     borderRadius: STOCKY_RADIUS.lg,
@@ -97,10 +107,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 7,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.16,
-    shadowRadius: 18,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 5,
   },
   label: {
     color: '#111827',
