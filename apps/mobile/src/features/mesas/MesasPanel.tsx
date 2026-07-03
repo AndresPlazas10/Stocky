@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../theme/tokens';
+import { formatCop } from '../../utils/money';
 
-import { StockyStatusToast } from '../../ui/StockyStatusToast';
+import { useToast } from '../../hooks/useToast';
+import { StockyToast } from '../../ui/StockyToast';
+import { TOAST_MESSAGES } from '../../constants/toastMessages';
 import { PrintReceiptConfirmModal } from '../../ui/PrintReceiptConfirmModal';
 import {
   addCatalogItemToOrder,
@@ -14,6 +17,7 @@ import {
   listCatalogItems,
   loadOpenOrderSnapshot,
   persistOrderSnapshot,
+  preloadRpcCompatibility,
   removeOrderItemFromOrder,
   syncOrderItemQuantity,
   type MesaOrderCatalogItem,
@@ -34,7 +38,6 @@ import {
 import { type VentaDetailRecord, type VentaRecord } from '../../services/ventasService';
 import { SplitBillModalRN } from './SplitBillModalRN';
 
-import { useMesaToasts } from './hooks/useMesaToasts';
 import { useMesaOrderState } from './hooks/useMesaOrderState';
 import { useMesaEditLock } from './hooks/useMesaEditLock';
 import { useMesaRealtime } from './hooks/useMesaRealtime';
@@ -47,7 +50,7 @@ import { useMesaDeleteModal } from './hooks/useMesaDeleteModal';
 import { usePaymentFlow } from './hooks/usePaymentFlow';
 import { MesasGrid } from './components/MesasGrid';
 import { MesasPanelHeader } from './components/MesasPanelHeader';
-import { MesasToasts } from './components/MesasToasts';
+import { MesasModals } from './components/MesasModals';
 import { OrderModal } from './components/OrderModal';
 import { CreateMesaModal } from './components/CreateMesaModal';
 import { DeleteMesaModal } from './components/DeleteMesaModal';
@@ -81,7 +84,7 @@ function traceMesaSync(label: string, data: Record<string, unknown>) {
     },
     {},
   );
-  console.warn(`[mesa-sync] ${label}`, safeData);
+  if (__DEV__) console.warn(`[mesa-sync] ${label}`, safeData);
 }
 
 type StoredCatalogSnapshot = {
@@ -126,7 +129,7 @@ export function MesasPanel({ session, businessContext }: Props) {
   const sessionDisplayName = useMemo(() => resolveSessionDisplayName(session), [session]);
   const canDeleteMesas = context?.source !== 'employee';
 
-  const toasts = useMesaToasts();
+  const toast = useToast();
   const orderState = useMesaOrderState({ listCatalogItems });
   const {
     showOrderModal,
@@ -235,7 +238,7 @@ export function MesasPanel({ session, businessContext }: Props) {
     context,
     onCreated: (createdMesa) => {
       setMesas((prev) => [...prev, createdMesa].sort(compareMesaTableIdentifiers));
-      toasts.showCreatedToast(mesaDisplayName(createdMesa));
+      toast.showSuccess(TOAST_MESSAGES.mesas.created(mesaDisplayName(createdMesa)));
     },
     onError: (msg) => setError(msg),
   });
@@ -411,6 +414,14 @@ export function MesasPanel({ session, businessContext }: Props) {
       const sortedMesas = nextMesas.sort(compareMesaTableIdentifiers);
       setMesas(sortedMesas);
       void refreshMesaLocks(nextContext.businessId);
+
+      // Pre-fetch order items for occupied tables in background
+      const occupiedMesas = sortedMesas.filter(
+        (m) => m.status === 'occupied' && m.current_order_id,
+      );
+      for (const mesa of occupiedMesas) {
+        void loadOpenOrderSnapshot(mesa.current_order_id!, { forceRefresh: false });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudieron cargar las mesas.');
     } finally {
@@ -500,6 +511,7 @@ export function MesasPanel({ session, businessContext }: Props) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial de datos
     void loadData();
+    void preloadRpcCompatibility();
   }, [loadData]);
 
   useEffect(() => {
@@ -784,6 +796,15 @@ export function MesasPanel({ session, businessContext }: Props) {
     buildCashBreakdown,
     setPrintSalesData,
     setShowPrintModal,
+    onOrderSaved: () => {
+      toast.showSuccess(TOAST_MESSAGES.mesas.updated());
+    },
+    onOrderClosed: (mesaLabel, total) => {
+      toast.showSuccess(TOAST_MESSAGES.ventas.confirmed(mesaLabel, formatCop(total)));
+    },
+    onKitchenPrinted: () => {
+      toast.showSuccess(TOAST_MESSAGES.mesas.orderSent());
+    },
   });
 
   const {
@@ -818,7 +839,7 @@ export function MesasPanel({ session, businessContext }: Props) {
     setMesas,
     closeOrderModal,
     setError,
-    showDeletedToast: toasts.showDeletedToast,
+    showDeletedToast: (label: string) => toast.showSuccess(TOAST_MESSAGES.mesas.deleted(label)),
   });
 
   const {
@@ -1152,75 +1173,56 @@ export function MesasPanel({ session, businessContext }: Props) {
         />
       </View>
 
-      <CreateMesaModal
-        visible={showCreateMesaModal}
+      <MesasModals
+        session={session}
+        context={context}
+        isKeyboardVisible={isKeyboardVisible}
+        showCreateMesaModal={showCreateMesaModal}
         isCreatingMesa={isCreatingMesa}
         newTableNumber={newTableNumber}
         mesaPreviewName={mesaPreviewName}
-        isKeyboardVisible={isKeyboardVisible}
         onChangeNumber={setNewTableNumber}
-        onSubmit={handleCreateMesa}
-        onCancel={handleCancelCreateMesa}
-      />
-
-      <DeleteMesaModal
-        visible={showDeleteMesaModal}
+        onSubmitCreateMesa={handleCreateMesa}
+        onCancelCreateMesa={handleCancelCreateMesa}
+        showDeleteMesaModal={showDeleteMesaModal}
         mesaToDelete={mesaToDelete}
         isDeletingMesa={isDeletingMesa}
-        onCancel={handleCancelDeleteMesa}
-        onConfirm={confirmDeleteMesa}
-      />
-
-      <OrderModal
-        visible={showOrderModal}
-        session={session}
-        context={context}
+        onCancelDeleteMesa={handleCancelDeleteMesa}
+        onConfirmDeleteMesa={confirmDeleteMesa}
+        showOrderModal={showOrderModal}
         orderState={memoizedOrderState}
         actions={memoizedActions}
-        isKeyboardVisible={isKeyboardVisible}
-      />
-
-      <CloseOrderChoiceModal
-        visible={showCloseOrderChoiceModal}
+        showCloseOrderChoiceModal={showCloseOrderChoiceModal}
         orderTotal={orderTotal}
         isClosingOrder={isClosingOrder}
         releasingEmptyOrder={releasingEmptyOrder}
-        onClose={handleCloseCloseOrderChoice}
+        onCloseCloseOrderChoice={handleCloseCloseOrderChoice}
         onPayAllTogether={handlePayAllTogether}
         onSplitBill={handleSplitBill}
-      />
-
-      <PaymentModal
-        visible={showPaymentModal}
-        isClosing={isClosingOrder}
+        showPaymentModal={showPaymentModal}
         paymentMethod={paymentMethod}
         amountReceived={amountReceived}
-        orderTotal={orderTotal}
         cashChangeData={cashChangeData}
-        showMenu={showPaymentMethodMenu}
-        onClose={handleClosePayment}
-        onToggleMenu={handleTogglePaymentMenu}
+        showPaymentMethodMenu={showPaymentMethodMenu}
+        onClosePayment={handleClosePayment}
+        onTogglePaymentMenu={handleTogglePaymentMenu}
         onPaymentMethodChange={handlePaymentMethodChange}
         onAmountReceivedChange={setAmountReceived}
-        onConfirm={processPaymentAndClose}
-      />
-
-      <SplitBillModalRN
-        visible={showSplitBillModal}
+        onConfirmPayment={processPaymentAndClose}
+        showSplitBillModal={showSplitBillModal}
         orderItems={orderItems}
-        submitting={isClosingOrder}
-        onBack={handleBackFromSplitBill}
-        onClose={handleCloseSplitBill}
-        onConfirm={processSplitPaymentAndClose}
-      />
-      <MesasToasts toasts={toasts} />
-      <PrintReceiptConfirmModal
-        visible={showPrintModal}
-        onConfirm={handlePrintConfirm}
-        onCancel={handlePrintCancel}
-        isLoading={isPrintingReceipt}
-        customerName={printCustomerName}
+        isClosingSplitBill={isClosingOrder}
+        onBackSplitBill={handleBackFromSplitBill}
+        onCloseSplitBill={handleCloseSplitBill}
+        onConfirmSplitBill={processSplitPaymentAndClose}
+        toast={toast.toast}
+        onHideToast={toast.hideToast}
+        showPrintModal={showPrintModal}
+        isPrintingReceipt={isPrintingReceipt}
+        printCustomerName={printCustomerName}
         onCustomerNameChange={setPrintCustomerName}
+        onPrintConfirm={handlePrintConfirm}
+        onPrintCancel={handlePrintCancel}
       />
     </>
   );

@@ -18,8 +18,6 @@ export function UnitPickerModal({ visible, selectedUnit, onSelect, onClose }: Pr
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={26}
-      modalAnimationType="fade"
-      animationDurationMs={150}
       bodyFlex
       perfTag="inventario.picker_unidad"
       onClose={onClose}

@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
+import React, { useCallback, useState } from 'react';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlatList, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useState } from 'react';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import type { MesaOrderCatalogItem } from '../../../services/mesaOrderService';
@@ -15,7 +15,11 @@ interface CatalogResultsListProps {
   isKeyboardVisible?: boolean;
 }
 
-export function CatalogResultsList({
+const CatalogItemSeparator = () => <View style={styles.catalogResultRowDivider} />;
+
+const catalogKeyExtractor = (item: MesaOrderCatalogItem) => `${item.item_type}:${item.id}`;
+
+export const CatalogResultsList = React.memo(function CatalogResultsList({
   catalog,
   searchQuery,
   onSearchChange,
@@ -26,6 +30,36 @@ export function CatalogResultsList({
 }: CatalogResultsListProps) {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const hasCatalogQuery = searchQuery.trim().length > 0;
+
+  const renderItem = useCallback(
+    ({ item }: { item: MesaOrderCatalogItem }) => (
+      <Pressable
+        style={[styles.catalogResultRow, disabled && styles.disabled]}
+        disabled={disabled}
+        onPress={() => {
+          if (isKeyboardVisible) {
+            Keyboard.dismiss();
+            return;
+          }
+          onItemPress(item);
+        }}
+      >
+        <View style={styles.catalogResultLeft}>
+          <Text style={styles.catalogResultName}>{item.name}</Text>
+          {item.item_type === 'combo' ? (
+            <View style={styles.comboPill}>
+              <Text style={styles.comboPillText}>Combo</Text>
+            </View>
+          ) : null}
+        </View>
+        <StockyMoneyText
+          value={Number(item.sale_price || 0)}
+          style={styles.catalogResultPrice}
+        />
+      </Pressable>
+    ),
+    [disabled, isKeyboardVisible, onItemPress],
+  );
 
   return (
     <>
@@ -54,44 +88,23 @@ export function CatalogResultsList({
         <View style={styles.catalogResultsCard}>
           <FlatList
             data={catalog}
-            keyExtractor={(item) => `${item.item_type}:${item.id}`}
+            keyExtractor={catalogKeyExtractor}
             nestedScrollEnabled
             keyboardShouldPersistTaps="never"
             showsVerticalScrollIndicator
             style={styles.catalogResultsScroll}
-            ItemSeparatorComponent={() => <View style={styles.catalogResultRowDivider} />}
-            renderItem={({ item }) => (
-              <Pressable
-                style={[styles.catalogResultRow, disabled && styles.disabled]}
-                disabled={disabled}
-                onPress={() => {
-                  if (isKeyboardVisible) {
-                    Keyboard.dismiss();
-                    return;
-                  }
-                  onItemPress(item);
-                }}
-              >
-                <View style={styles.catalogResultLeft}>
-                  <Text style={styles.catalogResultName}>{item.name}</Text>
-                  {item.item_type === 'combo' ? (
-                    <View style={styles.comboPill}>
-                      <Text style={styles.comboPillText}>Combo</Text>
-                    </View>
-                  ) : null}
-                </View>
-                <StockyMoneyText
-                  value={Number(item.sale_price || 0)}
-                  style={styles.catalogResultPrice}
-                />
-              </Pressable>
-            )}
+            ItemSeparatorComponent={CatalogItemSeparator}
+            removeClippedSubviews
+            initialNumToRender={8}
+            maxToRenderPerBatch={6}
+            windowSize={5}
+            renderItem={renderItem}
           />
         </View>
       ) : null}
     </>
   );
-}
+});
 
 const styles = StyleSheet.create({
   catalogSearchHeader: {

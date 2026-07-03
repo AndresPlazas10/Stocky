@@ -146,8 +146,8 @@ function resolveUserDisplayName(user: unknown): string | null {
   return null;
 }
 
-function buildIdempotencyKey({ businessId, seed }: { businessId: string; seed: string }) {
-  return `stocky:mobile:sale:${businessId}:${seed}`;
+function buildIdempotencyKey({ businessId, userId, seed }: { businessId: string; userId: string; seed: string }) {
+  return `stocky:mobile:sale:${businessId}:${userId}:${seed}`;
 }
 
 function buildSalesHistoryCacheKey(businessId: string, limit: number) {
@@ -612,6 +612,7 @@ export async function createVenta({
   const { userId, sellerName, isEmployee } = await resolveSellerContext(businessId);
   const idempotencyKey = buildIdempotencyKey({
     businessId,
+    userId,
     seed: idempotencySeed || `${Date.now()}`,
   });
 
@@ -699,7 +700,7 @@ export async function createVenta({
           if (__DEV__) console.warn('[notif] sale_registered result:', JSON.stringify(r));
         })
         .catch((e) => {
-          console.warn('[notif] sale_registered error:', e);
+          if (__DEV__) console.warn('[notif] sale_registered error:', e);
         });
     }
 
@@ -721,7 +722,7 @@ export async function createVenta({
           if (__DEV__) console.warn('[notif] low_stock result:', JSON.stringify(r));
         })
         .catch((e) => {
-          console.warn('[notif] low_stock error:', e);
+          if (__DEV__) console.warn('[notif] low_stock error:', e);
         });
     }
   }

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useCallback } from 'react';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
@@ -54,6 +54,10 @@ export type OrderModalProps = {
   isKeyboardVisible: boolean;
 };
 
+const OrderItemSeparator = () => <View style={styles.orderItemSeparator} />;
+
+const orderItemKeyExtractor = (item: MesaOrderItem) => item.id;
+
 export const OrderModal = React.memo(function OrderModal({ visible, orderState, actions, isKeyboardVisible }: OrderModalProps) {
   const {
     orderModalTitle,
@@ -83,6 +87,22 @@ export const OrderModal = React.memo(function OrderModal({ visible, orderState, 
     resolveOrderItemDisplayName,
   } = actions;
 
+  const renderOrderItem = useCallback(
+    ({ item }: { item: MesaOrderItem }) => {
+      const busy = mutatingOrderItemId === item.id;
+      return (
+        <OrderItemRow
+          item={item}
+          itemName={resolveOrderItemDisplayName(item)}
+          busy={busy}
+          disabled={isClosingOrder || releasingEmptyOrder}
+          onChangeQuantity={onUpdateOrderItemQuantity}
+        />
+      );
+    },
+    [mutatingOrderItemId, resolveOrderItemDisplayName, isClosingOrder, releasingEmptyOrder, onUpdateOrderItemQuantity],
+  );
+
   return (
     <StockyModal
       visible={visible}
@@ -92,10 +112,6 @@ export const OrderModal = React.memo(function OrderModal({ visible, orderState, 
       hideCloseButton
       backdropVariant="blur"
       layout="centered"
-      modalAnimationType="fade"
-      animationStyle="web"
-      animationDurationMs={420}
-      animationScaleFrom={1}
       bodyFlex
       deferContent
       deferBehavior="hide"
@@ -207,22 +223,15 @@ export const OrderModal = React.memo(function OrderModal({ visible, orderState, 
       {orderItems.length > 0 ? (
         <FlatList
           data={orderItems}
-          keyExtractor={(item) => item.id}
+          keyExtractor={orderItemKeyExtractor}
           scrollEnabled={false}
-          style={{ flexGrow: 0 }}
-          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-          renderItem={({ item }) => {
-            const busy = mutatingOrderItemId === item.id;
-            return (
-              <OrderItemRow
-                item={item}
-                itemName={resolveOrderItemDisplayName(item)}
-                busy={busy}
-                disabled={isClosingOrder || releasingEmptyOrder}
-                onChangeQuantity={onUpdateOrderItemQuantity}
-              />
-            );
-          }}
+          style={styles.orderItemsFlatList}
+          ItemSeparatorComponent={OrderItemSeparator}
+          removeClippedSubviews
+          initialNumToRender={8}
+          maxToRenderPerBatch={6}
+          windowSize={5}
+          renderItem={renderOrderItem}
         />
       ) : null}
 
@@ -235,6 +244,12 @@ export const OrderModal = React.memo(function OrderModal({ visible, orderState, 
 });
 
 const styles = StyleSheet.create({
+  orderItemsFlatList: {
+    flexGrow: 0,
+  },
+  orderItemSeparator: {
+    height: 10,
+  },
   orderModalSheet: {
     maxHeight: '88%',
     height: '88%',

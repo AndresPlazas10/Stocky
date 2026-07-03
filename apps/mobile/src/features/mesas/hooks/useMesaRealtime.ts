@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
 import { getSupabaseClient } from '../../../lib/supabase';
 import type { MesaRecord, MesaEditLock } from '../../../services/mesasService';
 import {
@@ -102,7 +103,7 @@ function traceMesaSync(label: string, data: Record<string, unknown>) {
     },
     {},
   );
-  console.warn(`[mesa-sync] ${label}`, safeData);
+  if (__DEV__) console.warn(`[mesa-sync] ${label}`, safeData);
 }
 
 export function useMesaRealtime({
@@ -128,6 +129,7 @@ export function useMesaRealtime({
   const mesaLockPlaceholderTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const activeOrderIdRef = useRef<string | null>(null);
   const [activeOrderId, setActiveOrderIdState] = useState<string | null>(null);
+  const isFocused = useIsFocused();
 
   const businessId = String(_businessId || '').trim();
 
@@ -487,27 +489,57 @@ export function useMesaRealtime({
         : '';
 
       setMesas((prev) => {
+        const incomingById = new Map(incoming.map((mesa) => [String(mesa.id || ''), mesa]));
         const previousById = new Map(prev.map((mesa) => [String(mesa.id || ''), mesa]));
-        return incoming.map((mesa) => {
+
+        const missingFromIncoming = prev.filter(
+          (mesa) => !incomingById.has(String(mesa.id || '').trim()),
+        );
+        if (missingFromIncoming.length > 0) {
+          traceMesaSync('refresh_rpc_missing_mesa', {
+            businessId,
+            prevCount: prev.length,
+            incomingCount: incoming.length,
+            missingIds: missingFromIncoming
+              .map((m) => String(m?.id || '').trim())
+              .filter(Boolean),
+          });
+        }
+
+        const merged: MesaRecord[] = prev.map((mesa) => {
           const mesaId = String(mesa.id || '').trim();
-          const previousMesa = previousById.get(mesaId);
-          if (selectedMesaId && String(mesa.id || '') === selectedMesaId) {
-            return previousById.get(selectedMesaId) || mesa;
+          const incomingMesa = incomingById.get(mesaId);
+
+          if (selectedMesaId && mesaId === selectedMesaId) {
+            return incomingMesa || previousById.get(selectedMesaId) || mesa;
           }
-          if (previousMesa) {
-            const previousSyncVersion = resolveMesaSyncVersion(previousMesa);
-            const incomingSyncVersion = resolveMesaSyncVersion(mesa);
-            if (previousSyncVersion > incomingSyncVersion) {
-              traceMesaSync('refresh_drop_stale_row', {
-                mesaId,
-                previousSyncVersion,
-                incomingSyncVersion,
-              });
-              return previousMesa;
-            }
+
+          if (!incomingMesa) {
+            return mesa;
           }
-          return mesa;
+
+          const previousSyncVersion = resolveMesaSyncVersion(mesa);
+          const incomingSyncVersion = resolveMesaSyncVersion(incomingMesa);
+          if (previousSyncVersion > incomingSyncVersion) {
+            traceMesaSync('refresh_drop_stale_row', {
+              mesaId,
+              previousSyncVersion,
+              incomingSyncVersion,
+            });
+            return mesa;
+          }
+
+          return incomingMesa;
         });
+
+        for (const incomingMesa of incoming) {
+          const incomingId = String(incomingMesa.id || '').trim();
+          if (incomingId && !previousById.has(incomingId)) {
+            merged.push(incomingMesa);
+          }
+        }
+
+        return merged.sort(compareMesaTableIdentifiers);
       });
     } catch {
       // no-op
@@ -664,6 +696,11 @@ export function useMesaRealtime({
 
         if (eventType === 'DELETE') {
           if (index === -1) return prev;
+          traceMesaSync('realtime_delete_mesa_from_state', {
+            mesaId,
+            prevCount: prev.length,
+            nextCount: prev.length - 1,
+          });
           const next = prev.filter((mesa) => String(mesa?.id || '').trim() !== mesaId);
           return next;
         }
@@ -1173,10 +1210,12 @@ export function useMesaRealtime({
     });
     mesasSyncBroadcastChannelRef.current = syncChannel;
 
-    fallbackTimer = setInterval(() => {
-      scheduleRefresh();
-      scheduleLocks();
-    }, 15000);
+    if (isFocused) {
+      fallbackTimer = setInterval(() => {
+        scheduleRefresh();
+        scheduleLocks();
+      }, 15000);
+    }
 
     return () => {
       cancelled = true;
@@ -1204,10 +1243,10 @@ export function useMesaRealtime({
     applyRealtimeMesaLockBroadcast,
     applyRealtimeMesaBroadcast,
     applyRealtimeMesaLockEvent,
-    applyRealtimeOrderItemDelta,
     applyRealtimeOrderEvent,
     applyRealtimeTableEvent,
     businessId,
+    isFocused,
     markRealtimeIngress,
     scheduleOrderRealtimeSummaryHydration,
     scheduleMesaLocksRefresh,

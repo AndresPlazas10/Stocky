@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../theme/tokens';
 import { StockyModal } from './StockyModal';
@@ -45,7 +45,6 @@ export const StockyDeleteConfirmModal = memo(function StockyDeleteConfirmModal({
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={70}
-      modalAnimationType="fade"
       onClose={() => {
         if (disableCancel) return;
         onCancel();

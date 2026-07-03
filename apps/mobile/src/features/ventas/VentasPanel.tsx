@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../theme/tokens';
 import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
@@ -20,6 +20,9 @@ import { useVentaDetails } from './hooks/useVentaDetails';
 import { useVentaPrint } from './hooks/useVentaPrint';
 import { useVentaMutations } from './hooks/useVentaMutations';
 import { useVentaPayment } from './hooks/useVentaPayment';
+import { useToast } from '../../hooks/useToast';
+import { StockyToast } from '../../ui/StockyToast';
+import { TOAST_MESSAGES } from '../../constants/toastMessages';
 import { SaleCard } from './components/SaleCard';
 import { SaleDetailsModal } from './components/SaleDetailsModal';
 import { CreateSaleModal } from './components/CreateSaleModal';
@@ -31,6 +34,155 @@ type Props = {
   businessName: string | null;
   source: 'owner' | 'employee';
 };
+
+const ventakeyExtractor = (item: VentaRecord) => item.id;
+
+type VentasListHeaderProps = {
+  loading: boolean;
+  loadingSales: boolean;
+  error: string | null;
+  openCreateSaleModal: () => void;
+  showFiltersExpanded: boolean;
+  setShowFiltersExpanded: React.Dispatch<React.SetStateAction<boolean>>;
+  selectedDayLabel: string;
+  dayFilter: string;
+  openDayFilterCalendar: () => void;
+  selectedSellerLabel: string;
+  sellerFilter: string;
+  setShowSellerFilterModal: React.Dispatch<React.SetStateAction<boolean>>;
+  clearFilters: () => void;
+  pageRange: { from: number; to: number };
+  filteredVentas: VentaRecord[];
+  currentPage: number;
+  totalPages: number;
+  canPrevPage: boolean;
+  canNextPage: boolean;
+  setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
+  paginatedVentas: VentaRecord[];
+};
+
+const VentasListHeader = memo(function VentasListHeader({
+  loading,
+  loadingSales,
+  error,
+  openCreateSaleModal,
+  showFiltersExpanded,
+  setShowFiltersExpanded,
+  selectedDayLabel,
+  dayFilter,
+  openDayFilterCalendar,
+  selectedSellerLabel,
+  sellerFilter,
+  setShowSellerFilterModal,
+  clearFilters,
+  pageRange,
+  filteredVentas,
+  currentPage,
+  totalPages,
+  canPrevPage,
+  canNextPage,
+  setCurrentPage,
+  paginatedVentas,
+}: VentasListHeaderProps) {
+  return (
+    <>
+      <LinearGradient
+        colors={['#4F46E5', '#7C3AED']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={s.heroCard}
+      >
+        <View style={s.heroTop}>
+          <View style={s.heroIconBox}>
+            <Ionicons name="cart-outline" size={28} color={STOCKY_COLORS.white} />
+          </View>
+          <View style={s.heroTitleWrap}>
+            <Text style={s.heroTitle}>Ventas</Text>
+            <Text style={s.heroSubtitle}>Sistema de punto de venta</Text>
+          </View>
+        </View>
+
+        <Pressable style={s.heroCreateButton} onPress={openCreateSaleModal}>
+          <Ionicons name="add" size={20} color="rgba(255,255,255,0.9)" />
+          <Text style={s.heroCreateButtonText}>Nueva Venta</Text>
+        </Pressable>
+      </LinearGradient>
+
+      {loading ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
+      {loadingSales ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
+      {error ? (
+        <View style={{ backgroundColor: '#FEE2E2', borderRadius: 8, padding: 12, marginHorizontal: 16, marginTop: 8 }}>
+          <Text style={{ color: '#991B1B', fontSize: 13 }}>{error}</Text>
+        </View>
+      ) : null}
+
+      <RecordFilterCard
+        title="Filtros de Ventas"
+        subtitle="Filtra por un día específico."
+        expanded={showFiltersExpanded}
+        onToggle={() => setShowFiltersExpanded((prev) => !prev)}
+        dayField={{
+          icon: 'calendar-clear-outline',
+          label: 'Día',
+          selectedLabel: selectedDayLabel,
+          isActive: dayFilter !== 'all',
+          onOpen: openDayFilterCalendar,
+        }}
+        secondField={{
+          icon: 'person-outline',
+          label: 'Vendedor',
+          selectedLabel: selectedSellerLabel,
+          isActive: sellerFilter !== 'all',
+          onOpen: () => setShowSellerFilterModal(true),
+        }}
+        onClearFilters={clearFilters}
+      />
+
+      <View style={s.paginationCard}>
+        <Text style={s.paginationText}>
+          Mostrando {pageRange.from} a {pageRange.to} de {filteredVentas.length} registros
+        </Text>
+        <View style={s.paginationControls}>
+          <Pressable
+            style={[
+              s.paginationArrowButton,
+              canPrevPage && s.paginationArrowButtonActive,
+              !canPrevPage && s.buttonDisabled,
+            ]}
+            onPress={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+            disabled={!canPrevPage}
+          >
+            <Ionicons name="chevron-back" size={19} color={canPrevPage ? '#4F46E5' : '#9CA3AF'} />
+          </Pressable>
+          <View style={s.paginationPageBadge}>
+            <Text style={s.paginationPageText}>
+              Página {currentPage} de {totalPages}
+            </Text>
+          </View>
+          <Pressable
+            style={[
+              s.paginationArrowButton,
+              canNextPage && s.paginationArrowButtonActive,
+              !canNextPage && s.buttonDisabled,
+            ]}
+            onPress={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+            disabled={!canNextPage}
+          >
+            <Ionicons
+              name="chevron-forward"
+              size={19}
+              color={canNextPage ? '#4F46E5' : '#9CA3AF'}
+            />
+          </Pressable>
+        </View>
+      </View>
+
+      {!loading && paginatedVentas.length === 0 ? (
+        <Text style={s.emptyText}>No hay ventas para esos filtros.</Text>
+      ) : null}
+    </>
+  );
+});
 
 export function VentasPanel({ businessId, businessName, source }: Props) {
   const [loading, setLoading] = useState(true);
@@ -124,6 +276,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
     handlePrintSale,
   } = useVentaPrint(businessName, setError);
 
+  const toast = useToast();
   const canDeleteSales = source === 'owner';
 
   const {
@@ -168,6 +321,12 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
     setSelectedVentaDetails: () => {},
     setVentas,
     setError,
+    onSaleCreated: (total) => {
+      toast.showSuccess(TOAST_MESSAGES.ventas.registered(formatCop(total)));
+    },
+    onSaleDeleted: () => {
+      toast.showSuccess(TOAST_MESSAGES.ventas.deleted());
+    },
   });
 
   const loadInitialData = useCallback(async () => {
@@ -198,7 +357,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
       const recentSales = await listRecentVentas(businessId, 50, { forceRefresh: true });
       setVentas(recentSales);
     } catch (err) {
-      console.error('[Ventas] error al refrescar ventas silenciosamente:', getErrorMessage(err));
+      if (__DEV__) console.error('[Ventas] error al refrescar ventas silenciosamente:', getErrorMessage(err));
     }
   }, [businessId]);
 
@@ -269,118 +428,52 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
     }
   }, [catalogItems.length, loadCatalogData]);
 
+  const renderVentaItem = useCallback(
+    ({ item }: { item: VentaRecord }) => (
+      <SaleCard
+        venta={item}
+        canDelete={canDeleteSales}
+        onViewDetails={openVentaDetails}
+        onPrint={handlePrintSale}
+        onDelete={askDeleteVenta}
+      />
+    ),
+    [canDeleteSales, openVentaDetails, handlePrintSale, askDeleteVenta],
+  );
+
   return (
     <>
       <FlatList
         data={paginatedVentas}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <SaleCard
-            venta={item}
-            canDelete={canDeleteSales}
-            onViewDetails={openVentaDetails}
-            onPrint={handlePrintSale}
-            onDelete={askDeleteVenta}
-          />
-        )}
+        keyExtractor={ventakeyExtractor}
+        renderItem={renderVentaItem}
         ListHeaderComponent={
-          <>
-            <LinearGradient
-              colors={['#4F46E5', '#7C3AED']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={s.heroCard}
-            >
-              <View style={s.heroTop}>
-                <View style={s.heroIconBox}>
-                  <Ionicons name="cart-outline" size={28} color={STOCKY_COLORS.white} />
-                </View>
-                <View style={s.heroTitleWrap}>
-                  <Text style={s.heroTitle}>Ventas</Text>
-                  <Text style={s.heroSubtitle}>Sistema de punto de venta</Text>
-                </View>
-              </View>
-
-              <Pressable style={s.heroCreateButton} onPress={openCreateSaleModal}>
-                <Ionicons name="add" size={20} color="rgba(255,255,255,0.9)" />
-                <Text style={s.heroCreateButtonText}>Nueva Venta</Text>
-              </Pressable>
-            </LinearGradient>
-
-            {loading ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
-            {loadingSales ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
-            {_error ? (
-              <View style={{ backgroundColor: '#FEE2E2', borderRadius: 8, padding: 12, marginHorizontal: 16, marginTop: 8 }}>
-                <Text style={{ color: '#991B1B', fontSize: 13 }}>{_error}</Text>
-              </View>
-            ) : null}
-
-            <RecordFilterCard
-              title="Filtros de Ventas"
-              subtitle="Filtra por un día específico."
-              expanded={showFiltersExpanded}
-              onToggle={() => setShowFiltersExpanded((prev) => !prev)}
-              dayField={{
-                icon: 'calendar-clear-outline',
-                label: 'Día',
-                selectedLabel: selectedDayLabel,
-                isActive: dayFilter !== 'all',
-                onOpen: openDayFilterCalendar,
-              }}
-              secondField={{
-                icon: 'person-outline',
-                label: 'Vendedor',
-                selectedLabel: selectedSellerLabel,
-                isActive: sellerFilter !== 'all',
-                onOpen: () => setShowSellerFilterModal(true),
-              }}
-              onClearFilters={clearFilters}
-            />
-
-            <View style={s.paginationCard}>
-              <Text style={s.paginationText}>
-                Mostrando {pageRange.from} a {pageRange.to} de {filteredVentas.length} registros
-              </Text>
-              <View style={s.paginationControls}>
-                <Pressable
-                  style={[
-                    s.paginationArrowButton,
-                    canPrevPage && s.paginationArrowButtonActive,
-                    !canPrevPage && s.buttonDisabled,
-                  ]}
-                  onPress={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                  disabled={!canPrevPage}
-                >
-                  <Ionicons name="chevron-back" size={19} color={canPrevPage ? '#4F46E5' : '#9CA3AF'} />
-                </Pressable>
-                <View style={s.paginationPageBadge}>
-                  <Text style={s.paginationPageText}>
-                    Página {currentPage} de {totalPages}
-                  </Text>
-                </View>
-                <Pressable
-                  style={[
-                    s.paginationArrowButton,
-                    canNextPage && s.paginationArrowButtonActive,
-                    !canNextPage && s.buttonDisabled,
-                  ]}
-                  onPress={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                  disabled={!canNextPage}
-                >
-                  <Ionicons
-                    name="chevron-forward"
-                    size={19}
-                    color={canNextPage ? '#4F46E5' : '#9CA3AF'}
-                  />
-                </Pressable>
-              </View>
-            </View>
-
-            {!loading && paginatedVentas.length === 0 ? (
-              <Text style={s.emptyText}>No hay ventas para esos filtros.</Text>
-            ) : null}
-          </>
+          <VentasListHeader
+            loading={loading}
+            loadingSales={loadingSales}
+            error={_error}
+            openCreateSaleModal={openCreateSaleModal}
+            showFiltersExpanded={showFiltersExpanded}
+            setShowFiltersExpanded={setShowFiltersExpanded}
+            selectedDayLabel={selectedDayLabel}
+            dayFilter={dayFilter}
+            openDayFilterCalendar={openDayFilterCalendar}
+            selectedSellerLabel={selectedSellerLabel}
+            sellerFilter={sellerFilter}
+            setShowSellerFilterModal={setShowSellerFilterModal}
+            clearFilters={clearFilters}
+            pageRange={pageRange}
+            filteredVentas={filteredVentas}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            canPrevPage={canPrevPage}
+            canNextPage={canNextPage}
+            setCurrentPage={setCurrentPage}
+            paginatedVentas={paginatedVentas}
+          />
         }
+        style={s.screenList}
+        ListHeaderComponentStyle={{ paddingBottom: 16 }}
         contentContainerStyle={s.container}
         removeClippedSubviews
         maxToRenderPerBatch={10}
@@ -472,6 +565,15 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         isLoading={isPrinting}
         customerName={printCustomerName}
         onCustomerNameChange={setPrintCustomerName}
+      />
+      <StockyToast
+        visible={toast.toast.visible}
+        type={toast.toast.type}
+        title={toast.toast.title}
+        message={toast.toast.message}
+        ctaText={toast.toast.ctaText}
+        durationMs={toast.toast.durationMs}
+        onClose={toast.hideToast}
       />
     </>
   );

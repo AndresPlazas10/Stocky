@@ -13,9 +13,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getSupabaseClient } from '../lib/supabase';
+import { useToast } from '../hooks/useToast';
+import { StockyToast } from '../ui/StockyToast';
+import { TOAST_MESSAGES } from '../constants/toastMessages';
 import { getErrorMessage } from '../utils/error';
 
 type AuthMode = 'signin' | 'signup';
@@ -234,7 +237,7 @@ export function AuthScreen() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const toast = useToast();
 
   const isSignIn = mode === 'signin';
 
@@ -372,7 +375,7 @@ export function AuthScreen() {
 
       const userId = authResult.data.user.id;
 
-      setMessage('Cuenta creada correctamente.');
+      toast.showSuccess(TOAST_MESSAGES.auth.accountCreated());
 
       createBusinessWithFallback({
         userId,
@@ -394,7 +397,7 @@ export function AuthScreen() {
           ]),
         )
         .catch((err) => {
-          console.error('[Auth] Background setup failed', err);
+          if (__DEV__) console.error('[Auth] Background setup failed', err);
         });
     } catch (err) {
       try {
@@ -413,7 +416,6 @@ export function AuthScreen() {
 
     setLoading(true);
     setError(null);
-    setMessage(null);
 
     try {
       if (isSignIn) {
@@ -432,7 +434,6 @@ export function AuthScreen() {
     if (!allowSignUp) return;
     setMode((prev) => (prev === 'signin' ? 'signup' : 'signin'));
     setError(null);
-    setMessage(null);
   };
 
   const contentContainerStyle = [
@@ -498,7 +499,15 @@ export function AuthScreen() {
               ) : null}
 
               {error ? <Text style={styles.error}>{error}</Text> : null}
-              {message ? <Text style={styles.message}>{message}</Text> : null}
+              <StockyToast
+                visible={toast.toast.visible}
+                type={toast.toast.type}
+                title={toast.toast.title}
+                message={toast.toast.message}
+                ctaText={toast.toast.ctaText}
+                durationMs={toast.toast.durationMs}
+                onClose={toast.hideToast}
+              />
 
               {isSignIn ? (
                 <>
@@ -813,18 +822,6 @@ const styles = StyleSheet.create({
     color: '#B91C1C',
     backgroundColor: '#FEE2E2',
     borderColor: '#FECACA',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    marginBottom: 4,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  message: {
-    color: '#065F46',
-    backgroundColor: '#D1FAE5',
-    borderColor: '#6EE7B7',
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 12,

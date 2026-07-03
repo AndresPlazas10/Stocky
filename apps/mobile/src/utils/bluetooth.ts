@@ -9,7 +9,7 @@ export async function isBluetoothEnabled(): Promise<boolean> {
     if (!BluetoothClassic) return false;
     return await BluetoothClassic.isBluetoothEnabled();
   } catch (error) {
-    console.error('[BT] isBluetoothEnabled failed:', error);
+    if (__DEV__) console.error('[BT] isBluetoothEnabled failed:', error);
     return false;
   }
 }

@@ -1,4 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { StatusPill } from './StatusPill';
@@ -15,7 +16,7 @@ interface MesaCardProps {
   onDeletePress?: (mesa: MesaRecord) => void;
 }
 
-export function MesaCard({
+export const MesaCard = React.memo(function MesaCard({
   mesa,
   occupied,
   lockedByOther,
@@ -68,7 +69,7 @@ export function MesaCard({
       ) : null}
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

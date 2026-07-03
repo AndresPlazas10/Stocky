@@ -14,10 +14,12 @@ type UseEmpleadoMutationsParams = {
   userId: string;
   canManageEmployees: boolean;
   onRefresh: () => Promise<void>;
+  onEmployeeCreated?: (name: string) => void;
+  onEmployeeDeleted?: () => void;
 };
 
 export function useEmpleadoMutations(params: UseEmpleadoMutationsParams) {
-  const { form, businessId, userId, canManageEmployees, onRefresh } = params;
+  const { form, businessId, userId, canManageEmployees, onRefresh, onEmployeeCreated, onEmployeeDeleted } = params;
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +77,7 @@ export function useEmpleadoMutations(params: UseEmpleadoMutationsParams) {
         role: 'employee',
       });
 
+      onEmployeeCreated?.(cleanFullName);
       form.setGeneratedCredentials({
         fullName: created.fullName,
         username: created.username,
@@ -88,7 +91,7 @@ export function useEmpleadoMutations(params: UseEmpleadoMutationsParams) {
     } finally {
       setCreating(false);
     }
-  }, [businessId, canManageEmployees, creating, form, onRefresh]);
+  }, [businessId, canManageEmployees, creating, form, onRefresh, onEmployeeCreated]);
 
   const askDeleteEmployee = useCallback(
     (employee: EmpleadoRecord) => {
@@ -113,6 +116,7 @@ export function useEmpleadoMutations(params: UseEmpleadoMutationsParams) {
         employeeId: form.employeeToDelete.id,
         businessId,
       });
+      onEmployeeDeleted?.();
       form.setShowDeleteModal(false);
       form.setEmployeeToDelete(null);
       await onRefresh();
@@ -121,7 +125,7 @@ export function useEmpleadoMutations(params: UseEmpleadoMutationsParams) {
     } finally {
       setDeleting(false);
     }
-  }, [businessId, canManageEmployees, deleting, form, onRefresh, userId]);
+  }, [businessId, canManageEmployees, deleting, form, onRefresh, userId, onEmployeeDeleted]);
 
   return {
     creating,

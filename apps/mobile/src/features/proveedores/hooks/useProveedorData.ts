@@ -94,7 +94,7 @@ export function useProveedorData({ businessId, source, userId }: UseProveedorDat
       setHasMoreSuppliers(result.suppliers.length === SUPPLIERS_PAGE_SIZE);
       setPage(1);
     } catch (err) {
-      console.error(
+      if (__DEV__) console.error(
         '[Proveedores] error al refrescar proveedores silenciosamente:',
         getErrorMessage(err),
       );
@@ -119,7 +119,7 @@ export function useProveedorData({ businessId, source, userId }: UseProveedorDat
       setHasMoreSuppliers(result.suppliers.length === SUPPLIERS_PAGE_SIZE);
       setPage(nextPage);
     } catch (err) {
-      console.error('[Proveedores] error al cargar más proveedores:', getErrorMessage(err));
+      if (__DEV__) console.error('[Proveedores] error al cargar más proveedores:', getErrorMessage(err));
     } finally {
       setLoadingMore(false);
     }

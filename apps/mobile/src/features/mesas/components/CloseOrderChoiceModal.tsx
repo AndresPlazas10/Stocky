@@ -1,5 +1,5 @@
 import React from 'react';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { StockyModal } from '../../../ui/StockyModal';
@@ -30,7 +30,6 @@ export const CloseOrderChoiceModal = React.memo(function CloseOrderChoiceModal({
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={8}
-      modalAnimationType="fade"
       sheetStyle={styles.sheet}
       headerSlot={
         <View style={styles.header}>

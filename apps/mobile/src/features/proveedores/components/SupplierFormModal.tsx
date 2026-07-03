@@ -1,7 +1,7 @@
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 import { useEffect } from 'react';
 import { InteractionManager } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 import { StockyModal } from '../../../ui/StockyModal';
@@ -59,8 +59,6 @@ export function SupplierFormModal({
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={16}
-      modalAnimationType="fade"
-      animationDurationMs={180}
       deferContent
       deferFallback={
         <View style={styles.formDeferredFallback}>

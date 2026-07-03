@@ -12,7 +12,7 @@ interface TopSellersChartProps {
   chartConfig: Record<string, unknown>;
 }
 
-export function TopSellersChart({ data, width, height, chartConfig }: TopSellersChartProps) {
+export default function TopSellersChart({ data, width, height, chartConfig }: TopSellersChartProps) {
   return (
     <View style={s.blockCard}>
       <Text style={s.sectionTitle}>Top vendedores (gráfico)</Text>

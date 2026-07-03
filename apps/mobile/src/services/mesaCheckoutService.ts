@@ -519,7 +519,7 @@ export async function closeOrderSingle({
           if (__DEV__) console.warn('[notif] sale_registered result:', JSON.stringify(r));
         })
         .catch((e) => {
-          console.warn('[notif] sale_registered error:', e);
+          if (__DEV__) console.warn('[notif] sale_registered error:', e);
         });
     }
 
@@ -536,7 +536,7 @@ export async function closeOrderSingle({
           if (__DEV__) console.warn('[notif] low_stock result:', JSON.stringify(r));
         })
         .catch((e) => {
-          console.warn('[notif] low_stock error:', e);
+          if (__DEV__) console.warn('[notif] low_stock error:', e);
         });
     }
   }
@@ -640,7 +640,7 @@ export async function closeOrderAsSplit({
               if (__DEV__) console.warn('[notif] sale_registered (split atomic) result:', JSON.stringify(r));
             })
             .catch((e) => {
-              console.warn('[notif] sale_registered (split atomic) error:', e);
+              if (__DEV__) console.warn('[notif] sale_registered (split atomic) error:', e);
             });
         }
         const lowStockProductIds = Array.from(
@@ -660,7 +660,7 @@ export async function closeOrderAsSplit({
               if (__DEV__) console.warn('[notif] low_stock (split atomic) result:', JSON.stringify(r));
             })
             .catch((e) => {
-              console.warn('[notif] low_stock (split atomic) error:', e);
+              if (__DEV__) console.warn('[notif] low_stock (split atomic) error:', e);
             });
         }
       }
@@ -767,7 +767,7 @@ export async function closeOrderAsSplit({
           if (__DEV__) console.warn('[notif] sale_registered (split sequential) result:', JSON.stringify(r));
         })
         .catch((e) => {
-          console.warn('[notif] sale_registered (split sequential) error:', e);
+          if (__DEV__) console.warn('[notif] sale_registered (split sequential) error:', e);
         });
     }
     const lowStockProductIds = Array.from(
@@ -787,7 +787,7 @@ export async function closeOrderAsSplit({
           if (__DEV__) console.warn('[notif] low_stock (split sequential) result:', JSON.stringify(r));
         })
         .catch((e) => {
-          console.warn('[notif] low_stock (split sequential) error:', e);
+          if (__DEV__) console.warn('[notif] low_stock (split sequential) error:', e);
         });
     }
   }

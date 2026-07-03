@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useIsFocused } from '@react-navigation/native';
 import { getSupabaseClient } from '../lib/supabase';
 
 type TableSubscription = {
@@ -24,6 +25,7 @@ type Options = {
   onCleanup?: () => void;
   event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*';
   schema?: string;
+  pausePollingWhenHidden?: boolean;
 };
 
 export function useSupabaseRealtime({
@@ -38,10 +40,12 @@ export function useSupabaseRealtime({
   onCleanup,
   event = '*',
   schema = 'public',
+  pausePollingWhenHidden = true,
 }: Options) {
   const onSubscribedRef = useRef(onSubscribed);
   const onPollTickRef = useRef(onPollTick);
   const onCleanupRef = useRef(onCleanup);
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     onSubscribedRef.current = onSubscribed;
@@ -109,7 +113,10 @@ export function useSupabaseRealtime({
       broadcastChannel.subscribe();
     }
 
-    if (pollIntervalMs > 0 && onPollTickRef.current) {
+    const shouldPoll =
+      pollIntervalMs > 0 && onPollTickRef.current && (!pausePollingWhenHidden || isFocused);
+
+    if (shouldPoll) {
       fallbackTimer = setInterval(() => {
         onPollTickRef.current?.();
       }, pollIntervalMs);
@@ -122,5 +129,16 @@ export function useSupabaseRealtime({
       if (broadcastChannel) void client.removeChannel(broadcastChannel);
       onCleanupRef.current?.();
     };
-  }, [broadcastEvents, businessId, channelKey, event, pollIntervalMs, schema, tables, userId]);
+  }, [
+    broadcastEvents,
+    businessId,
+    channelKey,
+    event,
+    isFocused,
+    pausePollingWhenHidden,
+    pollIntervalMs,
+    schema,
+    tables,
+    userId,
+  ]);
 }

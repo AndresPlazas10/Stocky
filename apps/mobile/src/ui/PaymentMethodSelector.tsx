@@ -1,5 +1,5 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { getPaymentMethodTheme, isBankPaymentMethod } from '../utils/paymentMethods';
 import { getBankLogoSource } from '../utils/paymentMethodBranding';
 

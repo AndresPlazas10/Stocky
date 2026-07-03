@@ -2,6 +2,9 @@ import { StyleSheet } from 'react-native';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
 
 export const ventasStyles = StyleSheet.create({
+  screenList: {
+    flex: 1,
+  },
   container: {
     gap: 16,
     paddingHorizontal: 16,

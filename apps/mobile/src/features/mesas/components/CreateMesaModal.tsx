@@ -1,5 +1,5 @@
 import React from 'react';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { StockyModal } from '../../../ui/StockyModal';
@@ -33,7 +33,6 @@ export const CreateMesaModal = React.memo(function CreateMesaModal({
       backdropVariant="blur"
       layout="centered"
       centeredOffsetY={106}
-      modalAnimationType="fade"
       onClose={() => {
         if (!isCreatingMesa) onCancel();
       }}

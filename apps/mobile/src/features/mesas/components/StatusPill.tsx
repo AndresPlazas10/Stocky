@@ -1,3 +1,4 @@
+import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 interface StatusPillProps {
@@ -5,7 +6,7 @@ interface StatusPillProps {
   lockedByOther: boolean;
 }
 
-export function StatusPill({ occupied, lockedByOther }: StatusPillProps) {
+export const StatusPill = React.memo(function StatusPill({ occupied, lockedByOther }: StatusPillProps) {
   const locked = lockedByOther;
   return (
     <View
@@ -27,7 +28,7 @@ export function StatusPill({ occupied, lockedByOther }: StatusPillProps) {
       </Text>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   pill: {

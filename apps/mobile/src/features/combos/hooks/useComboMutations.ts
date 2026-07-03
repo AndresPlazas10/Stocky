@@ -20,6 +20,8 @@ interface UseComboMutationsParams {
   refreshCombos: () => Promise<void>;
   setCombos: (updater: (prev: ComboRecord[]) => ComboRecord[]) => void;
   setError: (error: string | null) => void;
+  onComboSaved?: (isEdit: boolean, name: string) => void;
+  onComboDeleted?: (name: string) => void;
 }
 
 export function useComboMutations({
@@ -32,6 +34,8 @@ export function useComboMutations({
   refreshCombos,
   setCombos,
   setError,
+  onComboSaved,
+  onComboDeleted,
 }: UseComboMutationsParams) {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -93,6 +97,7 @@ export function useComboMutations({
         await createComboByBusinessId(businessId, payload);
       }
 
+      onComboSaved?.(Boolean(editingCombo), nombre);
       closeFormModal();
       await refreshCombos();
     } catch (err) {
@@ -110,6 +115,7 @@ export function useComboMutations({
     refreshCombos,
     saving,
     setError,
+    onComboSaved,
   ]);
 
   const askDeleteCombo = useCallback(
@@ -132,6 +138,7 @@ export function useComboMutations({
         businessId,
         comboId: comboToDelete.id,
       });
+      onComboDeleted?.(comboToDelete.nombre || 'Combo');
       setShowDeleteModal(false);
       setComboToDelete(null);
       await refreshCombos();
@@ -161,7 +168,7 @@ export function useComboMutations({
     } finally {
       setDeleting(false);
     }
-  }, [businessId, canManageCombos, comboToDelete, deleting, refreshCombos, setCombos, setError]);
+  }, [businessId, canManageCombos, comboToDelete, deleting, refreshCombos, setCombos, setError, onComboDeleted]);
 
   const toggleComboStatus = useCallback(
     async (combo: ComboRecord) => {

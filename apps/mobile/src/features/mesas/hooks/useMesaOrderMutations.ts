@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-import { Alert } from 'react-native';
 import * as Print from 'expo-print';
 import { ensureBluetoothEnabled, BLUETOOTH_PRINT_REQUIRED_MESSAGE } from '../../../utils/bluetooth';
 import { getSavedPrinter, printBytes } from '../../../services/bluetoothPrinterService';
@@ -198,6 +197,10 @@ type UseMesaOrderMutationsParams = {
 
   setPrintSalesData: (v: { saleRecord: VentaRecord; saleDetails: VentaDetailRecord[] }[]) => void;
   setShowPrintModal: (v: boolean) => void;
+
+  onOrderSaved?: () => void;
+  onOrderClosed?: (mesaLabel: string, total: number) => void;
+  onKitchenPrinted?: () => void;
 };
 
 export function useMesaOrderMutations({
@@ -230,6 +233,9 @@ export function useMesaOrderMutations({
   buildCashBreakdown,
   setPrintSalesData,
   setShowPrintModal,
+  onOrderSaved,
+  onOrderClosed,
+  onKitchenPrinted,
 }: UseMesaOrderMutationsParams) {
   const {
     showOrderModal: _showOrderModal,
@@ -826,6 +832,7 @@ export function useMesaOrderMutations({
         'confirmed',
       );
       closeOrderModal();
+      onOrderSaved?.();
     } catch (err) {
       const fallbackMessage = 'No se pudo guardar la orden.';
       const message =
@@ -847,6 +854,7 @@ export function useMesaOrderMutations({
     isSavingOrder,
     latestOrderItemsRef,
     loadingOrder,
+    onOrderSaved,
     orderItemsCacheRef,
     patchMesaOrderTotal,
     pendingQuantityUpdatesRef,
@@ -1147,6 +1155,9 @@ export function useMesaOrderMutations({
       markMesaAsAvailableAfterSale(selectedMesa.id);
       closeOrderModal();
 
+      const mesaLabel = selectedMesa.table_number ?? selectedMesa.table_name ?? '-';
+      onOrderClosed?.(String(mesaLabel), Number(orderTotal || 0));
+
       if (closeResult.saleId) {
         askReceiptPrintConfirmation([closeResult.saleId]);
       }
@@ -1166,6 +1177,7 @@ export function useMesaOrderMutations({
     getStockValidationMessage,
     loadData,
     markMesaAsAvailableAfterSale,
+    onOrderClosed,
     orderItems,
     paymentMethod,
     selectedMesa,
@@ -1200,6 +1212,9 @@ export function useMesaOrderMutations({
         markMesaAsAvailableAfterSale(selectedMesa.id);
         closeOrderModal();
 
+        const mesaLabel = selectedMesa.table_number ?? selectedMesa.table_name ?? '-';
+        onOrderClosed?.(String(mesaLabel), Number(orderTotal || 0));
+
         if (Array.isArray(splitResult.saleIds) && splitResult.saleIds.length > 0) {
           askReceiptPrintConfirmation(splitResult.saleIds);
         }
@@ -1216,10 +1231,11 @@ export function useMesaOrderMutations({
       askReceiptPrintConfirmation,
       businessId,
       closeOrderAsSplit,
-      closeOrderModal,
-      getStockValidationMessage,
-      loadData,
-      markMesaAsAvailableAfterSale,
+    closeOrderModal,
+    getStockValidationMessage,
+    loadData,
+    markMesaAsAvailableAfterSale,
+    onOrderClosed,
       selectedMesa,
       setIsClosingOrder,
       setOrderModalError,
@@ -1228,12 +1244,12 @@ export function useMesaOrderMutations({
 
   const handlePrintKitchen = useCallback(async () => {
     if (!selectedMesa) {
-      Alert.alert('Impresion de cocina', 'No hay una mesa seleccionada.');
+      setOrderModalError('No hay una mesa seleccionada.');
       return;
     }
 
     if (!Array.isArray(orderItems) || orderItems.length === 0) {
-      Alert.alert('Impresion de cocina', 'No hay productos en la orden para imprimir.');
+      setOrderModalError('No hay productos en la orden para imprimir.');
       return;
     }
 
@@ -1307,18 +1323,18 @@ export function useMesaOrderMutations({
     });
 
     if (itemsParaCocinaConNombre.length === 0) {
-      Alert.alert('Impresion de cocina', 'No hay productos que requieran preparación en cocina.');
+      setOrderModalError('No hay productos que requieran preparación en cocina.');
       return;
     }
 
     const btReady = await ensureBluetoothEnabled();
     if (!btReady) {
-      Alert.alert('Bluetooth desactivado', BLUETOOTH_PRINT_REQUIRED_MESSAGE);
+      setOrderModalError(BLUETOOTH_PRINT_REQUIRED_MESSAGE);
       return;
     }
 
     if (!beginPrintFlow()) {
-      Alert.alert('Impresion de cocina', 'Ya hay una impresión en curso. Espera a que finalice.');
+      setOrderModalError('Ya hay una impresión en curso. Espera a que finalice.');
       return;
     }
 
@@ -1340,13 +1356,10 @@ export function useMesaOrderMutations({
         });
         const result = await printBytes(savedPrinter.address, escposData);
         if (result.ok) {
-          Alert.alert('Impresion de cocina', 'Orden enviada a la impresora.');
+          onKitchenPrinted?.();
           return;
         }
-        Alert.alert(
-          'Impresion de cocina',
-          result.error || 'No se pudo enviar a la impresora. Verifica la conexion Bluetooth.',
-        );
+        setOrderModalError(result.error || 'No se pudo enviar a la impresora. Verifica la conexion Bluetooth.');
         return;
       }
 
@@ -1359,16 +1372,14 @@ export function useMesaOrderMutations({
       if (__DEV__) console.warn('[Print] Kitchen: calling Print.printAsync for mesa ' + mesaLabel);
       await Print.printAsync({ html });
       if (__DEV__) console.warn('[Print] Kitchen: Print.printAsync resolved');
+      onKitchenPrinted?.();
     } catch (err) {
-      console.error('[Print] Kitchen: Print.printAsync error', err);
-      Alert.alert(
-        'Impresion de cocina',
-        err instanceof Error ? err.message : 'No se pudo imprimir la orden.',
-      );
+      if (__DEV__) console.error('[Print] Kitchen: Print.printAsync error', err);
+      setOrderModalError(err instanceof Error ? err.message : 'No se pudo imprimir la orden.');
     } finally {
       endPrintFlow();
     }
-  }, [beginPrintFlow, catalogItemsRef, endPrintFlow, orderItems, selectedMesa]);
+  }, [beginPrintFlow, catalogItemsRef, endPrintFlow, onKitchenPrinted, orderItems, selectedMesa, setOrderModalError]);
 
   return {
     closeAuxiliaryOrderModals,

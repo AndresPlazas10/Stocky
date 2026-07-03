@@ -1,9 +1,9 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  Dimensions,
   Easing,
-  InteractionManager,
   Modal,
   Platform,
   Pressable,
@@ -14,10 +14,8 @@ import {
   type ViewStyle,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../theme/tokens';
-import { perfDurationMs, perfMark } from '../utils/perfAudit';
 
 type Props = PropsWithChildren<{
   visible: boolean;
@@ -27,7 +25,6 @@ type Props = PropsWithChildren<{
   backdropVariant?: 'dim' | 'blur';
   layout?: 'sheet' | 'centered';
   centeredOffsetY?: number;
-  modalAnimationType?: 'none' | 'slide' | 'fade';
   headerSlot?: ReactNode;
   sheetStyle?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
@@ -36,18 +33,12 @@ type Props = PropsWithChildren<{
   deferContent?: boolean;
   deferFallback?: ReactNode;
   deferBehavior?: 'unmount' | 'hide';
-  animationStyle?: 'default' | 'web';
-  animationDurationMs?: number;
-  entryEffect?: 'none' | 'blur';
-  animationScaleFrom?: number;
   bodyFlex?: boolean;
-  instantOpen?: boolean;
   perfTag?: string;
   dismissable?: boolean;
   hideCloseButton?: boolean;
 }>;
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const MODAL_HEIGHT_REDUCTION_FACTOR = 0.95;
 
 function scaleModalHeightValue<T>(value: T): T {
@@ -75,7 +66,6 @@ export function StockyModal({
   backdropVariant = 'blur',
   layout = 'sheet',
   centeredOffsetY = 0,
-  modalAnimationType = 'fade',
   headerSlot,
   sheetStyle,
   contentStyle,
@@ -84,56 +74,21 @@ export function StockyModal({
   deferContent = false,
   deferFallback,
   deferBehavior = 'unmount',
-  animationStyle = 'web',
-  animationDurationMs = 220,
-  entryEffect = 'none',
-  animationScaleFrom,
   bodyFlex,
-  instantOpen = false,
-  perfTag,
   dismissable = false,
   hideCloseButton = false,
 }: Props) {
   const isCentered = layout === 'centered';
   const centeredShift = Math.max(0, centeredOffsetY);
-  const effectiveBackdrop =
-    backdropVariant === 'blur' && Platform.OS === 'android' ? 'dim' : backdropVariant;
-  const openDuration = Math.max(
-    120,
-    Math.min(animationDurationMs + (modalAnimationType === 'slide' ? 20 : 0) - 20, 240),
-  );
-  const closeDuration = Math.max(100, Math.min(animationDurationMs - 40, 200));
-  const openEasing = useMemo(
-    () => (animationStyle === 'web' ? Easing.out(Easing.cubic) : Easing.out(Easing.exp)),
-    [animationStyle],
-  );
-  const closeEasing = useMemo(
-    () => (animationStyle === 'web' ? Easing.inOut(Easing.cubic) : Easing.in(Easing.cubic)),
-    [animationStyle],
-  );
-  const resolvedScaleFrom =
-    typeof animationScaleFrom === 'number'
-      ? Math.min(1, Math.max(0.94, animationScaleFrom))
-      : modalAnimationType === 'fade'
-        ? 0.985
-        : 1;
-  const initialTranslateY = useMemo(() => {
-    if (modalAnimationType === 'slide') return isCentered ? 24 : 32;
-    if (modalAnimationType === 'fade') return isCentered ? 10 : 14;
-    return 0;
-  }, [isCentered, modalAnimationType]);
-  const [appear] = useState(() => new Animated.Value(0));
+  const effectiveBackdrop = backdropVariant === 'blur' ? 'dim' : backdropVariant;
+
+  const screenHeight = useRef(Dimensions.get('window').height).current;
+  const translateY = useRef(new Animated.Value(screenHeight)).current;
+  const scrimOpacity = useRef(new Animated.Value(0)).current;
   const [renderVisible, setRenderVisible] = useState(visible);
-  const visibilityAnimationIdRef = useRef(0);
-  const modalOpenStartedAtRef = useRef(0);
-  const openPaintLoggedRef = useRef(false);
-  const contentReadyLoggedRef = useRef(false);
-  const animationStartedRef = useRef(false);
   const [contentReady, setContentReady] = useState(!deferContent);
-  const [contentOpacity] = useState(() => new Animated.Value(deferContent ? 0 : 1));
-  const shouldHideContent = deferContent && deferBehavior === 'hide';
   const shouldUnmountContent = deferContent && deferBehavior === 'unmount';
-  const wrapperOpacity = shouldHideContent ? contentOpacity : 1;
+  const shouldHideContent = deferContent && deferBehavior === 'hide';
   const wrapperPointerEvents = shouldHideContent && !contentReady ? 'none' : 'auto';
   const shouldFlexBody = typeof bodyFlex === 'boolean' ? bodyFlex : !isCentered;
   const wrapperLayoutStyle = shouldFlexBody ? styles.sheetBody : undefined;
@@ -161,175 +116,83 @@ export function StockyModal({
     return adjusted;
   }, [sheetStyle]);
 
+  const animateIn = useCallback(() => {
+    translateY.setValue(screenHeight);
+    scrimOpacity.setValue(0);
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(scrimOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [translateY, scrimOpacity, screenHeight]);
+
+  const animateOut = useCallback(
+    (onDone: () => void) => {
+      Animated.parallel([
+        Animated.timing(translateY, {
+          toValue: screenHeight,
+          duration: 200,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scrimOpacity, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+      ]).start(onDone);
+    },
+    [translateY, scrimOpacity, screenHeight],
+  );
+
   useEffect(() => {
-    if (!visible) return;
-    setRenderVisible(true); // eslint-disable-line react-hooks/set-state-in-effect -- control interno de visibilidad del modal
-    modalOpenStartedAtRef.current = Date.now();
-    openPaintLoggedRef.current = false;
-    contentReadyLoggedRef.current = false;
-    perfMark('modal_open_start', {
-      modal: perfTag || title || 'untagged',
-      animation: modalAnimationType,
-      layout,
-      backdrop: effectiveBackdrop,
-      deferContent,
-      instantOpen,
-    });
-  }, [
-    visible,
-    perfTag,
-    title,
-    modalAnimationType,
-    layout,
-    effectiveBackdrop,
-    deferContent,
-    instantOpen,
-  ]);
+    if (visible) {
+      setRenderVisible(true);
+    } else if (renderVisible) {
+      animateOut(() => {
+        setRenderVisible(false);
+      });
+    }
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!renderVisible) return;
-    visibilityAnimationIdRef.current += 1;
-    const animationId = visibilityAnimationIdRef.current;
-
-    appear.stopAnimation();
-
-    if (visible) {
-      if (instantOpen) {
-        appear.setValue(1);
-        animationStartedRef.current = true;
-        if (!openPaintLoggedRef.current) {
-          openPaintLoggedRef.current = true;
-          perfMark('modal_open_painted', {
-            modal: perfTag || title || 'untagged',
-            openMs: perfDurationMs(modalOpenStartedAtRef.current),
-            mode: 'instant',
-          });
-        }
-      } else {
-        if (!animationStartedRef.current) {
-          appear.setValue(0);
-        }
-        animationStartedRef.current = true;
-        Animated.timing(appear, {
-          toValue: 1,
-          duration: openDuration,
-          easing: openEasing,
-          useNativeDriver: true,
-        }).start(({ finished }) => {
-          if (!finished || openPaintLoggedRef.current) return;
-          openPaintLoggedRef.current = true;
-          perfMark('modal_open_painted', {
-            modal: perfTag || title || 'untagged',
-            openMs: perfDurationMs(modalOpenStartedAtRef.current),
-            mode: 'animated',
-          });
-        });
-      }
-      return;
-    }
-
-    Animated.timing(appear, {
-      toValue: 0,
-      duration: closeDuration,
-      easing: closeEasing,
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (!finished) return;
-      if (visibilityAnimationIdRef.current !== animationId) return;
-      animationStartedRef.current = false;
-      perfMark('modal_close_complete', {
-        modal: perfTag || title || 'untagged',
-        closeMs: closeDuration,
-      });
-      setRenderVisible(false);
-    });
-  }, [
-    appear,
-    closeDuration,
-    closeEasing,
-    openDuration,
-    openEasing,
-    instantOpen,
-    perfTag,
-    renderVisible,
-    title,
-    visible,
-  ]);
+    animateIn();
+  }, [renderVisible, animateIn]);
 
   useEffect(() => {
-    if (!deferContent || instantOpen) {
-      setContentReady(true); // eslint-disable-line react-hooks/set-state-in-effect -- control interno de contenido diferido
-      contentOpacity.setValue(1);
+    if (!deferContent) {
+      setContentReady(true);
       return;
     }
 
     if (!renderVisible) {
       setContentReady(false);
-      contentOpacity.setValue(0);
       return;
     }
 
     if (!visible) return;
 
-    if (contentReady && !contentReadyLoggedRef.current) {
-      contentReadyLoggedRef.current = true;
-      perfMark('modal_content_ready', {
-        modal: perfTag || title || 'untagged',
-        readyMs: perfDurationMs(modalOpenStartedAtRef.current),
-        deferContent,
+    if (!contentReady) {
+      let cancelled = false;
+      const frameId = requestAnimationFrame(() => {
+        if (!cancelled) setContentReady(true);
       });
-      contentOpacity.setValue(0);
-      Animated.timing(contentOpacity, {
-        toValue: 1,
-        duration: 120,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-      return;
+
+      return () => {
+        cancelled = true;
+        cancelAnimationFrame(frameId);
+      };
     }
-
-    if (contentReady) return;
-
-    setContentReady(false);
-    contentOpacity.setValue(0);
-    let cancelled = false;
-    const handle = InteractionManager.runAfterInteractions(() => {
-      if (!cancelled) setContentReady(true);
-    });
-
-    return () => {
-      cancelled = true;
-      (handle as { cancel?: () => void }).cancel?.();
-    };
-  }, [
-    deferContent,
-    instantOpen,
-    renderVisible,
-    visible,
-    contentReady,
-    contentOpacity,
-    perfTag,
-    title,
-  ]);
-
-  const scrimOpacity = appear;
-  const sheetOpacity = appear.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
-  const sheetTranslateY = appear.interpolate({
-    inputRange: [0, 1],
-    outputRange: [initialTranslateY, 0],
-  });
-  const sheetScale = appear.interpolate({
-    inputRange: [0, 1],
-    outputRange: [resolvedScaleFrom, 1],
-  });
-  const blurOverlayOpacity = appear.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
+  }, [deferContent, renderVisible, visible, contentReady]);
 
   return (
     <Modal
@@ -342,45 +205,24 @@ export function StockyModal({
       navigationBarTranslucent={Platform.OS === 'android'}
     >
       <View style={[styles.overlay, isCentered ? styles.overlayCentered : styles.overlaySheet]}>
-        {effectiveBackdrop === 'blur' ? (
-          <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: scrimOpacity }]}>
-            <BlurView
-              style={StyleSheet.absoluteFillObject}
-              tint="dark"
-              intensity={26}
-              experimentalBlurMethod="dimezisBlurView"
-            />
-          </Animated.View>
-        ) : null}
-        <AnimatedPressable
-          style={[
-            styles.scrim,
-            effectiveBackdrop === 'blur' ? styles.scrimBlur : styles.scrimDim,
-            { opacity: scrimOpacity },
-          ]}
-          onPress={dismissable ? onClose : undefined}
-        />
+        <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: scrimOpacity }]}>
+          <Pressable
+            style={[styles.scrim, styles.scrimDim]}
+            onPress={dismissable ? onClose : undefined}
+          />
+        </Animated.View>
         <Animated.View
           style={[
             styles.sheet,
             isCentered && styles.centeredSheet,
             Platform.OS === 'android' && styles.sheetAndroid,
-            {
-              opacity: sheetOpacity,
-              transform: [
-                ...(isCentered && centeredShift > 0 ? [{ translateY: -centeredShift }] : []),
-                { translateY: sheetTranslateY },
-                { scale: sheetScale },
-              ],
-            },
+            centeredShift > 0 ? { marginTop: -centeredShift } : undefined,
             sheetFlexStyle,
             adjustedSheetStyle,
+            { transform: [{ translateY }] },
           ]}
         >
-          <Animated.View
-            style={[wrapperLayoutStyle, { opacity: wrapperOpacity }]}
-            pointerEvents={wrapperPointerEvents}
-          >
+          <View style={wrapperLayoutStyle} pointerEvents={wrapperPointerEvents}>
             {headerSlot ? (
               <View style={styles.customHeader}>
                 {headerSlot}
@@ -415,21 +257,7 @@ export function StockyModal({
             )}
 
             {footer ? <View style={[styles.footer, footerStyle]}>{footer}</View> : null}
-          </Animated.View>
-
-          {entryEffect === 'blur' && Platform.OS === 'ios' ? (
-            <Animated.View
-              pointerEvents="none"
-              style={[styles.sheetBlurOverlay, { opacity: blurOverlayOpacity }]}
-            >
-              <BlurView
-                style={StyleSheet.absoluteFillObject}
-                tint="light"
-                intensity={24}
-                experimentalBlurMethod="dimezisBlurView"
-              />
-            </Animated.View>
-          ) : null}
+          </View>
         </Animated.View>
       </View>
     </Modal>
@@ -440,10 +268,6 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'transparent',
-  },
-  sheetBlurOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: STOCKY_RADIUS.lg,
   },
   customHeader: {
     borderBottomWidth: 1,
@@ -474,9 +298,6 @@ const styles = StyleSheet.create({
   },
   scrimDim: {
     backgroundColor: 'rgba(2, 34, 37, 0.38)',
-  },
-  scrimBlur: {
-    backgroundColor: 'rgba(2, 34, 37, 0.20)',
   },
   sheet: {
     backgroundColor: STOCKY_COLORS.surface,

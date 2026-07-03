@@ -19,6 +19,10 @@ interface UseInventoryMutationsParams {
   closeFormModal: () => void;
   refreshProducts: () => Promise<void>;
   setError: (error: string | null) => void;
+  onProductSaved?: (isEdit: boolean, name: string) => void;
+  onProductDeleted?: (name: string) => void;
+  onProductDeactivated?: (name: string) => void;
+  onProductActivated?: (name: string) => void;
 }
 
 export function useInventoryMutations({
@@ -29,6 +33,10 @@ export function useInventoryMutations({
   closeFormModal,
   refreshProducts,
   setError,
+  onProductSaved,
+  onProductDeleted,
+  onProductDeactivated,
+  onProductActivated,
 }: UseInventoryMutationsParams) {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -112,6 +120,7 @@ export function useInventoryMutations({
         });
       }
 
+      onProductSaved?.(Boolean(editingProduct), normalizedName);
       closeFormModal();
       invalidateCatalogItemsCache(businessId);
       await refreshProducts();
@@ -128,6 +137,7 @@ export function useInventoryMutations({
     form,
     refreshProducts,
     setError,
+    onProductSaved,
   ]);
 
   const askDeleteProduct = useCallback(async (product: InventoryProductRecord) => {
@@ -158,6 +168,7 @@ export function useInventoryMutations({
         businessId,
         productId: productTarget.id,
       });
+      onProductDeleted?.(productTarget.name);
       setShowDeleteModal(false);
       setProductTarget(null);
       invalidateCatalogItemsCache(businessId);
@@ -168,7 +179,7 @@ export function useInventoryMutations({
       setDeleting(false);
       setDeleteCheckResult(null);
     }
-  }, [businessId, productTarget, refreshProducts, setError]);
+  }, [businessId, productTarget, refreshProducts, setError, onProductDeleted]);
 
   const confirmDeactivateProduct = useCallback(async () => {
     if (!productTarget) return;
@@ -180,6 +191,7 @@ export function useInventoryMutations({
         productId: productTarget.id,
         isActive: false,
       });
+      onProductDeactivated?.(productTarget.name);
       setShowDeactivateModal(false);
       setProductTarget(null);
       setDeleteCheckResult(null);
@@ -190,7 +202,7 @@ export function useInventoryMutations({
     } finally {
       setDeleting(false);
     }
-  }, [businessId, productTarget, refreshProducts, setError]);
+  }, [businessId, productTarget, refreshProducts, setError, onProductDeactivated]);
 
   const activateProduct = useCallback(
     async (product: InventoryProductRecord) => {
@@ -202,6 +214,7 @@ export function useInventoryMutations({
           productId: product.id,
           isActive: true,
         });
+        onProductActivated?.(product.name);
         invalidateCatalogItemsCache(businessId);
         await refreshProducts();
       } catch (err) {
@@ -210,7 +223,7 @@ export function useInventoryMutations({
         setDeleting(false);
       }
     },
-    [businessId, refreshProducts, setError],
+    [businessId, refreshProducts, setError, onProductActivated],
   );
 
   const closeDeleteModals = useCallback(() => {

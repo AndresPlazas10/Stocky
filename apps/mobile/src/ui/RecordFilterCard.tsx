@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../theme/tokens';
 
 type FilterFieldState = {

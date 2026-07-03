@@ -114,6 +114,35 @@ const orderItemsInFlightByOrderId = new Map<string, Promise<MesaOrderItem[]>>();
 let openOrderSnapshotFastRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
 let openOrderSnapshotRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
 
+let rpcPreloadPromise: Promise<void> | null = null;
+
+export function preloadRpcCompatibility(): Promise<void> {
+  if (rpcPreloadPromise) return rpcPreloadPromise;
+
+  rpcPreloadPromise = (async () => {
+    try {
+      const client = getSupabaseClient();
+      const { error } = await client.rpc('list_open_order_snapshot_fast', {
+        p_order_id: '00000000-0000-0000-0000-000000000000',
+      });
+
+      if (error) {
+        if (isMissingListOpenOrderSnapshotFastRpcError(error)) {
+          openOrderSnapshotFastRpcCompatibility = 'unsupported';
+        } else {
+          openOrderSnapshotFastRpcCompatibility = 'supported';
+        }
+      } else {
+        openOrderSnapshotFastRpcCompatibility = 'supported';
+      }
+    } catch {
+      openOrderSnapshotFastRpcCompatibility = 'unknown';
+    }
+  })();
+
+  return rpcPreloadPromise;
+}
+
 function normalizeBusinessId(value: unknown): string {
   return String(value || '').trim();
 }

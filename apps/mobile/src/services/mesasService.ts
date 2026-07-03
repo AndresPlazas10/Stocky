@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { EXPO_CONFIG } from '../config/env';
 import { getSupabaseClient } from '../lib/supabase';
 import { normalizeReference } from '../utils/normalization';
+import { dedupedRequest } from '../utils/requestDedup';
 
 import type { SupabaseErrorLike } from '../types/errors';
 
@@ -790,6 +791,7 @@ export async function resolveBusinessContext(
 }
 
 export async function fetchMesasByBusinessId(businessId: string): Promise<MesaRecord[]> {
+  return dedupedRequest(`fetchMesas:${businessId}`, async () => {
   if (mesasSummaryFastRpcCompatibility !== 'unsupported') {
     try {
       const mesas = await fetchMesasWithOrderSummaryFastRpc(businessId);
@@ -837,6 +839,7 @@ export async function fetchMesasByBusinessId(businessId: string): Promise<MesaRe
   }
 
   throw initial.error;
+  });
 }
 
 function buildMesaEditLockMap(rows: Record<string, unknown>[]): MesaEditLock[] {
@@ -951,6 +954,8 @@ export async function listActiveMesaEditLocks(businessId: string): Promise<MesaE
   const normalizedBusinessId = String(businessId || '').trim();
   if (!normalizedBusinessId) return [];
 
+  return dedupedRequest(`listLocks:${normalizedBusinessId}`, async () => {
+
   const client = getSupabaseClient();
   const nowIso = new Date().toISOString();
 
@@ -1004,6 +1009,7 @@ export async function listActiveMesaEditLocks(businessId: string): Promise<MesaE
   return buildMesaEditLockMap(
     (Array.isArray(fallback.data) ? fallback.data : []) as unknown as Record<string, unknown>[],
   );
+  });
 }
 
 export async function acquireMesaEditLock({

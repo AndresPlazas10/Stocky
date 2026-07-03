@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { StockyButton } from '../../ui/StockyButton';
 import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
@@ -5,10 +6,15 @@ import { STOCKY_COLORS } from '../../theme/tokens';
 import { useProveedorData } from './hooks/useProveedorData';
 import { useProveedorForm } from './hooks/useProveedorForm';
 import { useProveedorMutations } from './hooks/useProveedorMutations';
+import { useToast } from '../../hooks/useToast';
+import { StockyToast } from '../../ui/StockyToast';
+import { TOAST_MESSAGES } from '../../constants/toastMessages';
 import { SupplierCard } from './components/SupplierCard';
 import { SupplierListHeader } from './components/SupplierListHeader';
 import { SupplierFormModal } from './components/SupplierFormModal';
 import { proveedoresStyles as styles } from './proveedoresStyles';
+
+const ItemSeparator = () => <View style={styles.listItemSeparator} />;
 
 type Props = {
   businessId: string;
@@ -23,6 +29,7 @@ export function ProveedoresPanel({
   userId,
   source,
 }: Props) {
+  const toast = useToast();
   const {
     loading,
     refreshing,
@@ -69,15 +76,35 @@ export function ProveedoresPanel({
     closeFormModal,
     refreshSuppliers,
     setError,
+    onSupplierSaved: (isEdit, name) => {
+      toast.showSuccess(isEdit ? TOAST_MESSAGES.proveedores.updated(name) : TOAST_MESSAGES.proveedores.created(name));
+    },
+    onSupplierDeleted: (name) => {
+      toast.showSuccess(TOAST_MESSAGES.proveedores.deleted(name));
+    },
   });
 
   const suspendBackgroundList = showFormModal || showDeleteModal;
+
+  const supplierKeyExtractor = useCallback((item: { id: string }) => item.id, []);
+
+  const renderSupplierItem = useCallback(
+    ({ item }: { item: any }) => (
+      <SupplierCard
+        supplier={item}
+        canManageSuppliers={canManageSuppliers}
+        onEdit={openEditModal}
+        onDelete={askDeleteSupplier}
+      />
+    ),
+    [canManageSuppliers, openEditModal, askDeleteSupplier],
+  );
 
   return (
     <>
       <FlatList
         data={suspendBackgroundList ? [] : suppliers}
-        keyExtractor={(item) => item.id}
+        keyExtractor={supplierKeyExtractor}
         style={styles.screenList}
         contentContainerStyle={styles.screenListContent}
         ListHeaderComponentStyle={styles.listHeader}
@@ -106,7 +133,7 @@ export function ProveedoresPanel({
             <Text style={styles.emptyText}>No hay proveedores registrados.</Text>
           ) : null
         }
-        ItemSeparatorComponent={() => <View style={styles.listItemSeparator} />}
+        ItemSeparatorComponent={ItemSeparator}
         ListFooterComponent={
           !suspendBackgroundList && hasMoreSuppliers ? (
             <View style={styles.loadMoreWrap}>
@@ -119,14 +146,7 @@ export function ProveedoresPanel({
             <View style={styles.listFooterSpacer} />
           )
         }
-        renderItem={({ item }) => (
-          <SupplierCard
-            supplier={item}
-            canManageSuppliers={canManageSuppliers}
-            onEdit={openEditModal}
-            onDelete={askDeleteSupplier}
-          />
-        )}
+        renderItem={renderSupplierItem}
       />
 
       <SupplierFormModal
@@ -151,6 +171,16 @@ export function ProveedoresPanel({
         loading={deleting}
         onCancel={closeDeleteModal}
         onConfirm={confirmDeleteSupplier}
+      />
+
+      <StockyToast
+        visible={toast.toast.visible}
+        type={toast.toast.type}
+        title={toast.toast.title}
+        message={toast.toast.message}
+        ctaText={toast.toast.ctaText}
+        durationMs={toast.toast.durationMs}
+        onClose={toast.hideToast}
       />
     </>
   );

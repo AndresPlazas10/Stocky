@@ -39,6 +39,8 @@ interface UseVentaMutationsParams {
   setSelectedVentaDetails: (details: VentaDetailRecord[]) => void;
   setVentas: (ventas: VentaRecord[] | ((prev: VentaRecord[]) => VentaRecord[])) => void;
   setError: (error: string | null) => void;
+  onSaleCreated?: (total: number) => void;
+  onSaleDeleted?: () => void;
 }
 
 export function useVentaMutations({
@@ -61,6 +63,8 @@ export function useVentaMutations({
   setSelectedVentaDetails,
   setVentas,
   setError,
+  onSaleCreated,
+  onSaleDeleted,
 }: UseVentaMutationsParams) {
   const [submitting, setSubmitting] = useState(false);
   const [ventaToDelete, setVentaToDelete] = useState<VentaRecord | null>(null);
@@ -190,6 +194,7 @@ export function useVentaMutations({
         }
       }
 
+      onSaleCreated?.(cartTotal);
       clearCart();
       setShowCreateSaleModal(false);
       await Promise.all([
@@ -246,6 +251,7 @@ export function useVentaMutations({
         setSelectedVentaDetails([]);
       }
 
+      onSaleDeleted?.();
       setShowDeleteVentaModal(false);
       setVentaToDelete(null);
     } catch (err) {
@@ -263,6 +269,7 @@ export function useVentaMutations({
     setSelectedVenta,
     setSelectedVentaDetails,
     setError,
+    onSaleDeleted,
   ]);
 
   return {

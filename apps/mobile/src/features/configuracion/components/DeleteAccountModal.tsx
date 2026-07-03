@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StockyModal } from '../../../ui/StockyModal';
 import { configuracionStyles as styles } from '../configuracionStyles';
@@ -23,7 +23,6 @@ export function DeleteAccountModal({
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={16}
-      modalAnimationType="fade"
       sheetStyle={styles.deleteAccountSheet}
       onClose={onClose}
       headerSlot={

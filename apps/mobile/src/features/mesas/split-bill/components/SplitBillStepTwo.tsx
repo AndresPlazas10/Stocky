@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { STOCKY_COLORS } from '../../../../theme/tokens';
 import type { PaymentMethod } from '../../../../services/mesaCheckoutService';
 import type { MesaOrderItem } from '../../../../services/mesaOrderService';

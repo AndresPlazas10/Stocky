@@ -43,8 +43,6 @@ export const ProductPickerModal = React.memo(function ProductPickerModal({
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={24}
-      modalAnimationType="fade"
-      animationDurationMs={150}
       bodyFlex
       perfTag="combos.picker_producto"
       onClose={onClose}

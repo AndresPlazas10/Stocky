@@ -1,7 +1,7 @@
 import React from 'react';
 import type { PropsWithChildren } from 'react';
 import { StyleSheet, Text, View, Pressable, ActivityIndicator, TextInput } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { StockyModal } from './StockyModal';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../theme/tokens';
 
@@ -26,7 +26,7 @@ export const PrintReceiptConfirmModal = React.memo(function PrintReceiptConfirmM
     try {
       await onConfirm();
     } catch (error) {
-      console.error('Error confirming print:', error);
+      if (__DEV__) console.error('Error confirming print:', error);
     }
   };
 

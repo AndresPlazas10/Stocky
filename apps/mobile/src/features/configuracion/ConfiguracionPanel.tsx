@@ -1,9 +1,12 @@
 import { ActivityIndicator, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { STOCKY_COLORS } from '../../theme/tokens';
 import { useConfiguracionData } from './hooks/useConfiguracionData';
 import { useBusinessForm } from './hooks/useBusinessForm';
 import { useAccountActions } from './hooks/useAccountActions';
+import { useToast } from '../../hooks/useToast';
+import { StockyToast } from '../../ui/StockyToast';
+import { TOAST_MESSAGES } from '../../constants/toastMessages';
 import { UserSection } from './components/UserSection';
 import { BusinessSection } from './components/BusinessSection';
 import { SystemSection } from './components/SystemSection';
@@ -35,6 +38,7 @@ export function ConfiguracionPanel({
   onRefreshBusiness,
   onSignOut,
 }: Props) {
+  const toast = useToast();
   const {
     snapshot,
     loading,
@@ -78,6 +82,9 @@ export function ConfiguracionPanel({
     onRefreshBusiness,
     loadSnapshot,
     setError,
+    onBusinessSaved: () => {
+      toast.showSuccess(TOAST_MESSAGES.configuracion.updated());
+    },
   });
 
   if (loading) {
@@ -170,6 +177,16 @@ export function ConfiguracionPanel({
         Última actualización:{' '}
         {snapshot?.generatedAt ? formatShortDateTime(snapshot.generatedAt) : 'n/a'}
       </Text>
+
+      <StockyToast
+        visible={toast.toast.visible}
+        type={toast.toast.type}
+        title={toast.toast.title}
+        message={toast.toast.message}
+        ctaText={toast.toast.ctaText}
+        durationMs={toast.toast.durationMs}
+        onClose={toast.hideToast}
+      />
     </View>
   );
 }
