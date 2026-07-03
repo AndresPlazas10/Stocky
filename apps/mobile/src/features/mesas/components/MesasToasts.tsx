@@ -1,77 +1,68 @@
+import React from 'react';
 import { StockyStatusToast } from '../../../ui/StockyStatusToast';
 
-interface MesasToastsProps {
-  showCreated: boolean;
-  createdLabel: string;
-  showDeleted: boolean;
-  deletedLabel: string;
-  showSale: boolean;
+type ToastsReturn = {
+  showMesaCreatedToast: boolean;
+  setShowMesaCreatedToast: (v: boolean) => void;
+  mesaCreatedLabel: string;
+  showMesaDeletedToast: boolean;
+  setShowMesaDeletedToast: (v: boolean) => void;
+  mesaDeletedLabel: string;
+  showSaleToast: boolean;
+  setShowSaleToast: (v: boolean) => void;
   saleMesaLabel: string;
   saleTotalLabel: string;
-  showSaved: boolean;
-  savedLabel: string;
-  onCloseCreated: () => void;
-  onCloseDeleted: () => void;
-  onCloseSale: () => void;
-  onCloseSaved: () => void;
-}
+  showMesaSavedToast: boolean;
+  setShowMesaSavedToast: (v: boolean) => void;
+  mesaSavedLabel: string;
+};
 
-export function MesasToasts({
-  showCreated,
-  createdLabel,
-  showDeleted,
-  deletedLabel,
-  showSale,
-  saleMesaLabel,
-  saleTotalLabel,
-  showSaved,
-  savedLabel,
-  onCloseCreated,
-  onCloseDeleted,
-  onCloseSale,
-  onCloseSaved,
-}: MesasToastsProps) {
+type Props = {
+  toasts: ToastsReturn;
+};
+
+export function MesasToasts({ toasts }: Props) {
   return (
     <>
       <StockyStatusToast
-        visible={showCreated}
+        visible={toasts.showMesaCreatedToast}
         title="Mesa Creada"
         primaryLabel="Mesa"
-        primaryValue={createdLabel}
+        primaryValue={toasts.mesaCreatedLabel}
         secondaryLabel="Estado"
         secondaryValue="Disponible"
         durationMs={1000}
-        onClose={onCloseCreated}
+        onClose={() => toasts.setShowMesaCreatedToast(false)}
       />
       <StockyStatusToast
-        visible={showDeleted}
+        visible={toasts.showMesaDeletedToast}
         title="Mesa Eliminada"
         primaryLabel="Mesa"
-        primaryValue={deletedLabel}
+        primaryValue={toasts.mesaDeletedLabel}
         secondaryLabel="Estado"
         secondaryValue="Eliminada"
         durationMs={1000}
-        onClose={onCloseDeleted}
+        onClose={() => toasts.setShowMesaDeletedToast(false)}
       />
       <StockyStatusToast
-        visible={showSale}
+        visible={toasts.showSaleToast}
         title="Venta Confirmada"
         primaryLabel="Mesa"
-        primaryValue={saleMesaLabel}
+        primaryValue={toasts.saleMesaLabel}
         secondaryLabel="Total"
-        secondaryValue={saleTotalLabel}
+        secondaryValue={toasts.saleTotalLabel}
         durationMs={1000}
-        onClose={onCloseSale}
+        onClose={() => toasts.setShowSaleToast(false)}
       />
       <StockyStatusToast
-        visible={showSaved}
+        visible={toasts.showMesaSavedToast}
         title="Mesa Actualizada"
         primaryLabel="Mesa"
-        primaryValue={savedLabel}
+        primaryValue={toasts.mesaSavedLabel}
         secondaryLabel="Estado"
         secondaryValue="Actualizada"
         durationMs={1000}
-        onClose={onCloseSaved}
+        onClose={() => toasts.setShowMesaSavedToast(false)}
       />
     </>
   );
