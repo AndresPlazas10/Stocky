@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ProveedorRecord } from '../../../services/proveedoresService';
 import { proveedoresStyles as styles } from '../proveedoresStyles';
 

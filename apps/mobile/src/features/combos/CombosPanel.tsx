@@ -5,11 +5,16 @@ import { useComboData } from './hooks/useComboData';
 import { useComboForm } from './hooks/useComboForm';
 import { useComboMutations } from './hooks/useComboMutations';
 import { useComboSearch } from './hooks/useComboSearch';
+import { useToast } from '../../hooks/useToast';
+import { StockyToast } from '../../ui/StockyToast';
+import { TOAST_MESSAGES } from '../../constants/toastMessages';
 import { CombosListHeader } from './components/CombosListHeader';
 import { ComboCard } from './components/ComboCard';
 import { ComboFormModal } from './components/ComboFormModal';
 import { ProductPickerModal } from './components/ProductPickerModal';
 import { combosStyles as styles } from './combosStyles';
+
+const ItemSeparator = () => <View style={styles.listItemSeparator} />;
 
 type Props = {
   businessId: string;
@@ -19,6 +24,7 @@ type Props = {
 };
 
 export function CombosPanel({ businessId, businessName: _businessName, userId, source }: Props) {
+  const toast = useToast();
   const {
     loading,
     refreshing,
@@ -73,6 +79,12 @@ export function CombosPanel({ businessId, businessName: _businessName, userId, s
     refreshCombos,
     setCombos,
     setError,
+    onComboSaved: (isEdit, name) => {
+      toast.showSuccess(isEdit ? TOAST_MESSAGES.combos.updated(name) : TOAST_MESSAGES.combos.created(name));
+    },
+    onComboDeleted: (name) => {
+      toast.showSuccess(TOAST_MESSAGES.combos.deleted(name));
+    },
   });
 
   const handleSelectProduct = useCallback(
@@ -88,11 +100,25 @@ export function CombosPanel({ businessId, businessName: _businessName, userId, s
 
   const suspendBackgroundList = showFormModal || showProductPickerModal || showDeleteModal;
 
+  const comboKeyExtractor = useCallback((item: { id: string }) => item.id, []);
+
+  const renderComboItem = useCallback(
+    ({ item }: { item: any }) => (
+      <ComboCard
+        combo={item}
+        canManageCombos={canManageCombos}
+        onEdit={openEditModal}
+        onDelete={askDeleteCombo}
+      />
+    ),
+    [canManageCombos, openEditModal, askDeleteCombo],
+  );
+
   return (
     <>
       <FlatList
         data={suspendBackgroundList ? [] : filteredCombos}
-        keyExtractor={(item) => item.id}
+        keyExtractor={comboKeyExtractor}
         style={styles.screenList}
         contentContainerStyle={styles.screenListContent}
         ListHeaderComponentStyle={styles.listHeader}
@@ -117,16 +143,9 @@ export function CombosPanel({ businessId, businessName: _businessName, userId, s
             <Text style={styles.emptyText}>No hay combos para los filtros seleccionados.</Text>
           ) : null
         }
-        ItemSeparatorComponent={() => <View style={styles.listItemSeparator} />}
+        ItemSeparatorComponent={ItemSeparator}
         ListFooterComponent={<View style={styles.listFooterSpacer} />}
-        renderItem={({ item }) => (
-          <ComboCard
-            combo={item}
-            canManageCombos={canManageCombos}
-            onEdit={openEditModal}
-            onDelete={askDeleteCombo}
-          />
-        )}
+        renderItem={renderComboItem}
       />
 
       <ComboFormModal
@@ -166,6 +185,16 @@ export function CombosPanel({ businessId, businessName: _businessName, userId, s
         loading={deleting}
         onCancel={closeDeleteModal}
         onConfirm={confirmDeleteCombo}
+      />
+
+      <StockyToast
+        visible={toast.toast.visible}
+        type={toast.toast.type}
+        title={toast.toast.title}
+        message={toast.toast.message}
+        ctaText={toast.toast.ctaText}
+        durationMs={toast.toast.durationMs}
+        onClose={toast.hideToast}
       />
     </>
   );

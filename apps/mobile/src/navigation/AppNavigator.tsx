@@ -10,7 +10,7 @@ import {
   type DrawerContentComponentProps,
   type DrawerHeaderProps,
 } from '@react-navigation/drawer';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetInfo } from '@react-native-community/netinfo';

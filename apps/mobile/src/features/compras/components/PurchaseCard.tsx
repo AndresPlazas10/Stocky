@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { formatDateTime } from '../../../utils/dateHelpers';
 import { getBankLogoSource, isBankPaymentMethod } from '../../../utils/paymentMethodBranding';

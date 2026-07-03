@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StockyModal } from '../../../ui/StockyModal';
 import type { MesaOrderItem } from '../../../services/mesaOrderService';
@@ -69,7 +69,6 @@ export const SplitBillModalRN = React.memo(function SplitBillModalRN({
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={14}
-      modalAnimationType="fade"
       deferContent
       deferBehavior="hide"
       sheetStyle={styles.modalSheet}

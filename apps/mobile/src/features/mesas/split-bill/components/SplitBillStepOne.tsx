@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { STOCKY_COLORS } from '../../../../theme/tokens';
 import { MAX_SUB_ACCOUNTS, type AccountState } from '../splitBillUtils';
 import { splitBillStyles as styles } from '../splitBillStyles';

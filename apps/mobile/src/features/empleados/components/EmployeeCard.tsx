@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { type EmpleadoRecord } from '../../../services/empleadosService';
 import { empleadosStyles as s } from '../empleadosStyles';
 import { formatRoleLabel } from '../empleadosUtils';

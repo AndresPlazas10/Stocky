@@ -44,5 +44,5 @@ export function traceMesaSync(label: string, data: Record<string, unknown>) {
     },
     {},
   );
-  console.warn(`[mesa-sync] ${label}`, safeData);
+  if (__DEV__) console.warn(`[mesa-sync] ${label}`, safeData);
 }

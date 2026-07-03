@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { ActivityIndicator, FlatList, Platform, Text, View } from 'react-native';
 import { STOCKY_COLORS } from '../../theme/tokens';
 import { StockyButton } from '../../ui/StockyButton';
@@ -10,6 +11,9 @@ import { EmployeeListHeader } from './components/EmployeeListHeader';
 import { useEmpleadoData } from './hooks/useEmpleadoData';
 import { useEmpleadoForm } from './hooks/useEmpleadoForm';
 import { useEmpleadoMutations } from './hooks/useEmpleadoMutations';
+import { useToast } from '../../hooks/useToast';
+import { StockyToast } from '../../ui/StockyToast';
+import { TOAST_MESSAGES } from '../../constants/toastMessages';
 
 type Props = {
   businessId: string;
@@ -19,6 +23,7 @@ type Props = {
 };
 
 export function EmpleadosPanel({ businessId, userId, source }: Props) {
+  const toast = useToast();
   const data = useEmpleadoData({ businessId, source, userId });
   const form = useEmpleadoForm();
   const mutations = useEmpleadoMutations({
@@ -27,7 +32,29 @@ export function EmpleadosPanel({ businessId, userId, source }: Props) {
     userId,
     canManageEmployees: data.canManageEmployees,
     onRefresh: data.refreshEmployees,
+    onEmployeeCreated: (name) => {
+      toast.showSuccess(TOAST_MESSAGES.empleados.created(name));
+    },
+    onEmployeeDeleted: () => {
+      toast.showSuccess(TOAST_MESSAGES.empleados.deleted());
+    },
   });
+
+  const employeeKeyExtractor = useCallback((item: { id: string }) => item.id, []);
+
+  const renderEmployeeItem = useCallback(
+    ({ item }: { item: any }) => (
+      <EmployeeCard
+        employee={item}
+        userId={userId}
+        canManageEmployees={data.canManageEmployees}
+        checkingPermissions={data.checkingPermissions}
+        deleting={mutations.deleting}
+        onDelete={mutations.askDeleteEmployee}
+      />
+    ),
+    [userId, data.canManageEmployees, data.checkingPermissions, mutations.deleting, mutations.askDeleteEmployee],
+  );
 
   return (
     <>
@@ -50,17 +77,8 @@ export function EmpleadosPanel({ businessId, userId, source }: Props) {
         ) : (
           <FlatList
             data={data.employees}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <EmployeeCard
-                employee={item}
-                userId={userId}
-                canManageEmployees={data.canManageEmployees}
-                checkingPermissions={data.checkingPermissions}
-                deleting={mutations.deleting}
-                onDelete={mutations.askDeleteEmployee}
-              />
-            )}
+            keyExtractor={employeeKeyExtractor}
+            renderItem={renderEmployeeItem}
             refreshing={data.refreshing}
             onRefresh={data.refreshEmployees}
             onEndReached={data.loadMoreEmployees}
@@ -122,6 +140,16 @@ export function EmpleadosPanel({ businessId, userId, source }: Props) {
           form.setShowCredentialsModal(false);
           form.setGeneratedCredentials(null);
         }}
+      />
+
+      <StockyToast
+        visible={toast.toast.visible}
+        type={toast.toast.type}
+        title={toast.toast.title}
+        message={toast.toast.message}
+        ctaText={toast.toast.ctaText}
+        durationMs={toast.toast.durationMs}
+        onClose={toast.hideToast}
       />
     </>
   );

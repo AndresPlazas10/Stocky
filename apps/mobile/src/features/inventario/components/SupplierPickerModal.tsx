@@ -26,8 +26,6 @@ export function SupplierPickerModal({
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={26}
-      modalAnimationType="fade"
-      animationDurationMs={150}
       bodyFlex
       perfTag="inventario.picker_proveedor"
       onClose={onClose}

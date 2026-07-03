@@ -44,14 +44,7 @@
     },
     "plugins": [
       "expo-notifications",
-      "./plugins/withFirebaseAppInit",
-      [
-        "react-native-ble-plx",
-        {
-          "isBackgroundEnabled": false,
-          "modes": ["central"]
-        }
-      ]
+      "./plugins/withFirebaseAppInit"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

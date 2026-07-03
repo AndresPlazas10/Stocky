@@ -18,8 +18,6 @@ export function CategoryPickerModal({ visible, selectedCategory, onSelect, onClo
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={26}
-      modalAnimationType="fade"
-      animationDurationMs={150}
       bodyFlex
       perfTag="inventario.picker_categoria"
       onClose={onClose}

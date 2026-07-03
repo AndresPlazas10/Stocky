@@ -9,6 +9,9 @@ import { useInventoryForm } from './hooks/useInventoryForm';
 import { useInventoryMutations } from './hooks/useInventoryMutations';
 import { useInventoryPermissions } from './hooks/useInventoryPermissions';
 import { useInventorySearch } from './hooks/useInventorySearch';
+import { useToast } from '../../hooks/useToast';
+import { StockyToast } from '../../ui/StockyToast';
+import { TOAST_MESSAGES } from '../../constants/toastMessages';
 import { InventoryListHeader } from './components/InventoryListHeader';
 import { ProductCard } from './components/ProductCard';
 import { ProductFormModal } from './components/ProductFormModal';
@@ -17,6 +20,8 @@ import { UnitPickerModal } from './components/UnitPickerModal';
 import { SupplierPickerModal } from './components/SupplierPickerModal';
 import { DeactivateConfirmModal } from './components/DeactivateConfirmModal';
 import { inventarioStyles as styles } from './inventarioStyles';
+
+const ItemSeparator = () => <View style={styles.listItemSeparator} />;
 
 type Props = {
   businessId: string;
@@ -55,6 +60,7 @@ export function InventarioPanel({
     source,
   );
 
+  const toast = useToast();
   const { search, setSearch, filteredProducts } = useInventorySearch(products);
 
   const form = useInventoryForm();
@@ -67,6 +73,18 @@ export function InventarioPanel({
     closeFormModal: form.closeFormModal,
     refreshProducts,
     setError,
+    onProductSaved: (isEdit, name) => {
+      toast.showSuccess(isEdit ? TOAST_MESSAGES.productos.updated(name) : TOAST_MESSAGES.productos.created(name));
+    },
+    onProductDeleted: (name) => {
+      toast.showSuccess(TOAST_MESSAGES.productos.deleted(name));
+    },
+    onProductDeactivated: (name) => {
+      toast.showSuccess(TOAST_MESSAGES.productos.deactivated(name));
+    },
+    onProductActivated: (name) => {
+      toast.showSuccess(TOAST_MESSAGES.productos.activated(name));
+    },
   });
 
   useEffect(() => {
@@ -132,6 +150,25 @@ export function InventarioPanel({
     mutations.showDeleteModal ||
     mutations.showDeactivateModal;
 
+  const productKeyExtractor = useCallback((item: { id: string }) => item.id, []);
+
+  const renderProductItem = useCallback(
+    ({ item }: { item: any }) => (
+      <ProductCard
+        product={item}
+        canManageProducts={canManageProducts}
+        deleting={mutations.deleting}
+        openEditModal={(p) => {
+          setError(null);
+          form.openEditModal(p);
+        }}
+        askDeleteProduct={mutations.askDeleteProduct}
+        activateProduct={mutations.activateProduct}
+      />
+    ),
+    [canManageProducts, mutations.deleting, mutations.askDeleteProduct, mutations.activateProduct, setError, form.openEditModal],
+  );
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -144,7 +181,7 @@ export function InventarioPanel({
     <>
       <FlatList
         data={suspendBackgroundList ? [] : filteredProducts}
-        keyExtractor={(item) => item.id}
+        keyExtractor={productKeyExtractor}
         style={styles.screenList}
         contentContainerStyle={styles.screenListContent}
         ListHeaderComponentStyle={styles.listHeader}
@@ -174,7 +211,7 @@ export function InventarioPanel({
             <Text style={styles.emptyText}>No hay productos para la busqueda actual.</Text>
           ) : null
         }
-        ItemSeparatorComponent={() => <View style={styles.listItemSeparator} />}
+        ItemSeparatorComponent={ItemSeparator}
         ListFooterComponent={
           !suspendBackgroundList && hasMoreProducts ? (
             <View style={styles.loadMoreWrap}>
@@ -187,19 +224,7 @@ export function InventarioPanel({
             <View style={styles.listFooterSpacer} />
           )
         }
-        renderItem={({ item }) => (
-          <ProductCard
-            product={item}
-            canManageProducts={canManageProducts}
-            deleting={mutations.deleting}
-            openEditModal={(p) => {
-              setError(null);
-              form.openEditModal(p);
-            }}
-            askDeleteProduct={mutations.askDeleteProduct}
-            activateProduct={mutations.activateProduct}
-          />
-        )}
+        renderItem={renderProductItem}
       />
 
       <ProductFormModal
@@ -267,6 +292,16 @@ export function InventarioPanel({
         deleteCheckResult={mutations.deleteCheckResult}
         onClose={mutations.closeDeleteModals}
         onConfirm={mutations.confirmDeactivateProduct}
+      />
+
+      <StockyToast
+        visible={toast.toast.visible}
+        type={toast.toast.type}
+        title={toast.toast.title}
+        message={toast.toast.message}
+        ctaText={toast.toast.ctaText}
+        durationMs={toast.toast.durationMs}
+        onClose={toast.hideToast}
       />
     </>
   );

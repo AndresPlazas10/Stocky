@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StockyModal } from '../../../ui/StockyModal';
 import { STOCKY_COLORS } from '../../../theme/tokens';
@@ -31,7 +31,6 @@ export function EmployeeFormModal({
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={16}
-      modalAnimationType="fade"
       bodyFlex
       sheetStyle={s.employeeFormSheet}
       onClose={() => {

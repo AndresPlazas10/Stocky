@@ -11,6 +11,7 @@ interface UseBusinessFormParams {
   onRefreshBusiness: () => Promise<void>;
   loadSnapshot: () => Promise<void>;
   setError: (error: string | null) => void;
+  onBusinessSaved?: () => void;
 }
 
 export function useBusinessForm({
@@ -21,6 +22,7 @@ export function useBusinessForm({
   onRefreshBusiness,
   loadSnapshot,
   setError,
+  onBusinessSaved,
 }: UseBusinessFormParams) {
   const [showBusinessEditModal, setShowBusinessEditModal] = useState(false);
   const [savingBusiness, setSavingBusiness] = useState(false);
@@ -77,6 +79,7 @@ export function useBusinessForm({
         },
       });
 
+      onBusinessSaved?.();
       await onRefreshBusiness();
       await loadSnapshot();
       setShowBusinessEditModal(false);
@@ -97,6 +100,7 @@ export function useBusinessForm({
     snapshot?.businessName,
     source,
     setError,
+    onBusinessSaved,
   ]);
 
   return {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 
@@ -9,7 +9,7 @@ type Props = {
   onOpenAddMesa: () => void;
 };
 
-export function MesasPanelHeader({ isCreatingMesa, onOpenAddMesa }: Props) {
+export const MesasPanelHeader = React.memo(function MesasPanelHeader({ isCreatingMesa, onOpenAddMesa }: Props) {
   return (
     <View style={styles.header}>
       <View style={styles.titleRow}>
@@ -43,7 +43,7 @@ export function MesasPanelHeader({ isCreatingMesa, onOpenAddMesa }: Props) {
       </Pressable>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   header: {

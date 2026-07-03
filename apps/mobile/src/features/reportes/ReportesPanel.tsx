@@ -1,3 +1,4 @@
+import React, { Suspense } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { STOCKY_COLORS } from '../../theme/tokens';
 import { reportesStyles as s } from './reportesStyles';
@@ -5,13 +6,14 @@ import { ReportsHeroCard } from './components/ReportsHeroCard';
 import { PeriodSelector } from './components/PeriodSelector';
 import { KpiGrid } from './components/KpiGrid';
 import { FinancialSummary } from './components/FinancialSummary';
-import { FinanceBarChart } from './components/FinanceBarChart';
 import { PaymentBreakdown } from './components/PaymentBreakdown';
-import { PaymentPieChart } from './components/PaymentPieChart';
 import { TopSellers } from './components/TopSellers';
-import { TopSellersChart } from './components/TopSellersChart';
 import { Insights } from './components/Insights';
 import { useReportesData } from './hooks/useReportesData';
+
+const LazyFinanceBarChart = React.lazy(() => import('./components/FinanceBarChart'));
+const LazyPaymentPieChart = React.lazy(() => import('./components/PaymentPieChart'));
+const LazyTopSellersChart = React.lazy(() => import('./components/TopSellersChart'));
 
 type Props = {
   businessId: string;
@@ -58,33 +60,39 @@ export function ReportesPanel({ businessId, businessName, source }: Props) {
         grossPercent={data.grossPercent}
       />
 
-      <FinanceBarChart
-        data={data.financeBarData}
-        width={data.chartWidth}
-        height={data.chartHeight}
-        chartConfig={data.chartConfig}
-      />
+      <Suspense fallback={null}>
+        <LazyFinanceBarChart
+          data={data.financeBarData}
+          width={data.chartWidth}
+          height={data.chartHeight}
+          chartConfig={data.chartConfig}
+        />
+      </Suspense>
 
       <PaymentBreakdown
         items={data.snapshot?.paymentBreakdown || []}
         ventasTotal={data.ventasTotal}
       />
 
-      <PaymentPieChart
-        data={data.paymentPieData}
-        width={data.chartWidth}
-        height={data.chartHeight}
-        chartConfig={data.chartConfig}
-      />
+      <Suspense fallback={null}>
+        <LazyPaymentPieChart
+          data={data.paymentPieData}
+          width={data.chartWidth}
+          height={data.chartHeight}
+          chartConfig={data.chartConfig}
+        />
+      </Suspense>
 
       <TopSellers items={data.snapshot?.topSellers || []} />
 
-      <TopSellersChart
-        data={data.sellerBarData}
-        width={data.chartWidth}
-        height={data.chartHeight}
-        chartConfig={data.chartConfig}
-      />
+      <Suspense fallback={null}>
+        <LazyTopSellersChart
+          data={data.sellerBarData}
+          width={data.chartWidth}
+          height={data.chartHeight}
+          chartConfig={data.chartConfig}
+        />
+      </Suspense>
 
       <Insights items={data.insights} />
     </View>

@@ -65,7 +65,7 @@ export function useComboData(businessId: string, userId: string, source: 'owner'
       const nextCombos = await listCombosByBusiness(businessId);
       setCombos(nextCombos);
     } catch (err) {
-      console.error('[Combos] error al refrescar combos silenciosamente:', getErrorMessage(err));
+      if (__DEV__) console.error('[Combos] error al refrescar combos silenciosamente:', getErrorMessage(err));
     }
   }, [businessId]);
 
@@ -74,7 +74,7 @@ export function useComboData(businessId: string, userId: string, source: 'owner'
       const nextProducts = await listComboProducts(businessId);
       setProducts(nextProducts);
     } catch (err) {
-      console.error('[Combos] error al refrescar productos silenciosamente:', getErrorMessage(err));
+      if (__DEV__) console.error('[Combos] error al refrescar productos silenciosamente:', getErrorMessage(err));
     }
   }, [businessId]);
 

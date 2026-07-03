@@ -11,9 +11,12 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import BluetoothClassic from 'react-native-bluetooth-classic';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
+import { useToast } from '../../hooks/useToast';
+import { StockyToast } from '../../ui/StockyToast';
+import { TOAST_MESSAGES } from '../../constants/toastMessages';
 import {
   type BluetoothDevice,
   type PrinterConfig,
@@ -68,6 +71,7 @@ export function ImpresionPanel({ businessName }: Props) {
   const [autoCut, setAutoCut] = useState(false);
   const [isPrintingTest, setIsPrintingTest] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
+  const toast = useToast();
 
   useEffect(() => {
     (async () => {
@@ -133,12 +137,14 @@ export function ImpresionPanel({ businessName }: Props) {
         await savePrinter(config);
         setSavedPrinter(config);
         setConnected(true);
-        setStatusMsg(`Conectado a ${device.name}`);
+        toast.showSuccess(TOAST_MESSAGES.impresion.connectionSuccess());
+        setStatusMsg('');
       } else {
-        setStatusMsg('No se pudo conectar');
+        toast.showError({ title: 'Error de conexión', message: 'No se pudo conectar a la impresora.' });
+        setStatusMsg('');
       }
     } catch {
-      setStatusMsg('Error de conexion');
+      toast.showError(TOAST_MESSAGES.impresion.connectionError());
     } finally {
       setIsConnecting(false);
     }
@@ -171,7 +177,7 @@ export function ImpresionPanel({ businessName }: Props) {
     }
     const btReady = await ensureBluetoothEnabled();
     if (!btReady) {
-      Alert.alert('Bluetooth desactivado', BLUETOOTH_PRINT_REQUIRED_MESSAGE);
+      toast.showWarning({ title: 'Bluetooth desactivado', message: BLUETOOTH_PRINT_REQUIRED_MESSAGE });
       return;
     }
     setIsPrintingTest(true);
@@ -203,18 +209,56 @@ export function ImpresionPanel({ businessName }: Props) {
       const escposData = buildSaleEscPos(receipt, paperWidthMm, autoCut);
       const result = await printBytes(savedPrinter.address, escposData);
       if (result.ok) {
-        setStatusMsg('Prueba enviada correctamente');
+        toast.showSuccess(TOAST_MESSAGES.impresion.testSent());
+        setStatusMsg('');
       } else {
         const errorMsg = result.error || 'No se pudo imprimir. Verifica la conexion Bluetooth.';
-        setStatusMsg('Error al imprimir la prueba');
-        Alert.alert('Error', errorMsg);
+        toast.showError(TOAST_MESSAGES.impresion.printError(errorMsg));
+        setStatusMsg('');
       }
     } catch {
-      setStatusMsg('Error inesperado');
+      toast.showError(TOAST_MESSAGES.impresion.printError());
     } finally {
       setIsPrintingTest(false);
     }
   }, [savedPrinter, paperWidthMm, businessName, autoCut]);
+
+  const deviceKeyExtractor = useCallback((item: { address: string }) => item.address, []);
+
+  const renderDeviceItem = useCallback(
+    ({ item }: { item: { address: string; name: string } }) => {
+      const isSaved = savedPrinter?.address === item.address;
+      return (
+        <Pressable
+          style={[styles.deviceRow, isSaved && styles.deviceRowActive]}
+          onPress={() => handleConnect(item)}
+          disabled={isConnecting}
+        >
+          <Ionicons
+            name="hardware-chip-outline"
+            size={20}
+            color={STOCKY_COLORS.textSecondary}
+          />
+          <View style={styles.deviceTextCol}>
+            <Text style={styles.deviceName} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <Text style={styles.deviceAddr}>{item.address}</Text>
+          </View>
+          {isConnecting && isSaved ? (
+            <ActivityIndicator size="small" color={STOCKY_COLORS.primary700} />
+          ) : isSaved ? (
+            <Ionicons name="checkmark-circle" size={20} color={STOCKY_COLORS.successText} />
+          ) : (
+            <Pressable style={styles.connectBtnSmall} onPress={() => handleConnect(item)}>
+              <Text style={styles.connectTextSmall}>Conectar</Text>
+            </Pressable>
+          )}
+        </Pressable>
+      );
+    },
+    [savedPrinter, isConnecting, handleConnect],
+  );
 
   return (
     <View style={styles.container}>
@@ -281,39 +325,9 @@ export function ImpresionPanel({ businessName }: Props) {
           <Text style={styles.listTitle}>Dispositivos encontrados</Text>
           <FlatList
             data={devices}
-            keyExtractor={(item) => item.address}
+            keyExtractor={deviceKeyExtractor}
             scrollEnabled={false}
-            renderItem={({ item }) => {
-              const isSaved = savedPrinter?.address === item.address;
-              return (
-                <Pressable
-                  style={[styles.deviceRow, isSaved && styles.deviceRowActive]}
-                  onPress={() => handleConnect(item)}
-                  disabled={isConnecting}
-                >
-                  <Ionicons
-                    name="hardware-chip-outline"
-                    size={20}
-                    color={STOCKY_COLORS.textSecondary}
-                  />
-                  <View style={styles.deviceTextCol}>
-                    <Text style={styles.deviceName} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <Text style={styles.deviceAddr}>{item.address}</Text>
-                  </View>
-                  {isConnecting && isSaved ? (
-                    <ActivityIndicator size="small" color={STOCKY_COLORS.primary700} />
-                  ) : isSaved ? (
-                    <Ionicons name="checkmark-circle" size={20} color={STOCKY_COLORS.successText} />
-                  ) : (
-                    <Pressable style={styles.connectBtnSmall} onPress={() => handleConnect(item)}>
-                      <Text style={styles.connectTextSmall}>Conectar</Text>
-                    </Pressable>
-                  )}
-                </Pressable>
-              );
-            }}
+            renderItem={renderDeviceItem}
           />
         </View>
       ) : null}
@@ -377,6 +391,16 @@ export function ImpresionPanel({ businessName }: Props) {
       ) : null}
 
       {statusMsg ? <Text style={styles.statusText}>{statusMsg}</Text> : null}
+
+      <StockyToast
+        visible={toast.toast.visible}
+        type={toast.toast.type}
+        title={toast.toast.title}
+        message={toast.toast.message}
+        ctaText={toast.toast.ctaText}
+        durationMs={toast.toast.durationMs}
+        onClose={toast.hideToast}
+      />
     </View>
   );
 }

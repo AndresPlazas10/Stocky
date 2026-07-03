@@ -25,6 +25,8 @@ interface UseCompraMutationsParams {
   setSelectedPurchaseDetails: (d: CompraDetailRecord[]) => void;
   setPurchases: (p: CompraRecord[] | ((prev: CompraRecord[]) => CompraRecord[])) => void;
   setError: (error: string | null) => void;
+  onPurchaseCreated?: () => void;
+  onPurchaseDeleted?: () => void;
 }
 
 export function useCompraMutations({
@@ -45,6 +47,8 @@ export function useCompraMutations({
   setSelectedPurchaseDetails,
   setPurchases,
   setError,
+  onPurchaseCreated,
+  onPurchaseDeleted,
 }: UseCompraMutationsParams) {
   const [creatingPurchase, setCreatingPurchase] = useState(false);
   const [purchaseToDelete, setPurchaseToDelete] = useState<CompraRecord | null>(null);
@@ -98,6 +102,7 @@ export function useCompraMutations({
         cart,
       });
 
+      onPurchaseCreated?.();
       clearForm();
       await Promise.all([refreshPurchases(), refreshProducts()]);
     } catch (err) {
@@ -117,6 +122,7 @@ export function useCompraMutations({
     supplierId,
     userId,
     setError,
+    onPurchaseCreated,
   ]);
 
   const askDeletePurchase = useCallback(
@@ -146,6 +152,7 @@ export function useCompraMutations({
         setSelectedPurchaseDetails([]);
       }
 
+      onPurchaseDeleted?.();
       setShowDeleteModal(false);
       setPurchaseToDelete(null);
       await refreshProducts();
@@ -165,6 +172,7 @@ export function useCompraMutations({
     setSelectedPurchase,
     setSelectedPurchaseDetails,
     setError,
+    onPurchaseDeleted,
   ]);
 
   return {

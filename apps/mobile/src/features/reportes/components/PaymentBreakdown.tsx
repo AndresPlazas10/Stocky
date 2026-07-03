@@ -1,5 +1,5 @@
 import { Image, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { getBankLogoSource, isBankPaymentMethod } from '../../../utils/paymentMethodBranding';
 import { getPaymentMethodIcon } from '../../../utils/paymentMethods';

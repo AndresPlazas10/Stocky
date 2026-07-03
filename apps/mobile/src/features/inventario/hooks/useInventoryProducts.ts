@@ -83,7 +83,7 @@ export function useInventoryProducts(businessId: string) {
       setHasMoreProducts(nextProducts.length === INVENTORY_PAGE_SIZE);
       setPage(1);
     } catch (err) {
-      console.error(
+      if (__DEV__) console.error(
         '[Inventario] error al refrescar productos silenciosamente:',
         getErrorMessage(err),
       );
@@ -96,7 +96,7 @@ export function useInventoryProducts(businessId: string) {
       setSuppliers(nextSuppliers);
       setProducts((prev) => hydrateProductsWithSuppliers(prev, nextSuppliers));
     } catch (err) {
-      console.error(
+      if (__DEV__) console.error(
         '[Inventario] error al refrescar proveedores silenciosamente:',
         getErrorMessage(err),
       );
@@ -119,7 +119,7 @@ export function useInventoryProducts(businessId: string) {
       setHasMoreProducts(nextProducts.length === INVENTORY_PAGE_SIZE);
       setPage(nextPage);
     } catch (err) {
-      console.error('[Inventario] error al cargar más productos:', getErrorMessage(err));
+      if (__DEV__) console.error('[Inventario] error al cargar más productos:', getErrorMessage(err));
     } finally {
       setLoadingMore(false);
     }

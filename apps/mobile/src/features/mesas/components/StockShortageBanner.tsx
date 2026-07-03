@@ -1,3 +1,4 @@
+import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { STOCKY_RADIUS } from '../../../theme/tokens';
 import type { ComboComponentShortage, StockShortage } from '../../../services/mesaOrderService';
@@ -7,7 +8,7 @@ interface StockShortageBannerProps {
   insufficientComboComponents: ComboComponentShortage[];
 }
 
-export function StockShortageBanner({
+export const StockShortageBanner = React.memo(function StockShortageBanner({
   insufficientItems,
   insufficientComboComponents,
 }: StockShortageBannerProps) {
@@ -42,7 +43,7 @@ export function StockShortageBanner({
       ) : null}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   shortageContainer: {

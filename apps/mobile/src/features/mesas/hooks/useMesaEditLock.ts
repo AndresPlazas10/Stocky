@@ -197,7 +197,7 @@ export function useMesaEditLock({
 
         const held = heldMesaLockRef.current;
         if (held && (held.tableId !== tableId || held.businessId !== context.businessId)) {
-          await releaseHeldMesaLock(held);
+          void releaseHeldMesaLock(held);
         }
 
         publishMesaLockBroadcast({

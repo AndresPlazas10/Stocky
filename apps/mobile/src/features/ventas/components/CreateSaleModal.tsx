@@ -8,7 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 import { StockyModal } from '../../../ui/StockyModal';
@@ -162,7 +162,6 @@ export const CreateSaleModal = memo(function CreateSaleModal({
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={16}
-      modalAnimationType="fade"
       bodyFlex
       sheetStyle={s.saleOrderModalSheet}
       perfTag="ventas.form_nueva_venta"

@@ -19,6 +19,8 @@ interface UseProveedorMutationsParams {
   closeFormModal: () => void;
   refreshSuppliers: () => Promise<void>;
   setError: (error: string | null) => void;
+  onSupplierSaved?: (isEdit: boolean, name: string) => void;
+  onSupplierDeleted?: (name: string) => void;
 }
 
 export function useProveedorMutations({
@@ -31,6 +33,8 @@ export function useProveedorMutations({
   closeFormModal,
   refreshSuppliers,
   setError,
+  onSupplierSaved,
+  onSupplierDeleted,
 }: UseProveedorMutationsParams) {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -67,6 +71,7 @@ export function useProveedorMutations({
         setTaxColumn(result.taxColumn);
       }
 
+      onSupplierSaved?.(Boolean(editingSupplier), businessName);
       invalidatePurchaseCatalogCache(businessId);
       closeFormModal();
       await refreshSuppliers();
@@ -86,6 +91,7 @@ export function useProveedorMutations({
     setTaxColumn,
     taxColumn,
     setError,
+    onSupplierSaved,
   ]);
 
   const askDeleteSupplier = useCallback(
@@ -106,6 +112,7 @@ export function useProveedorMutations({
         supplierId: supplierToDelete.id,
         businessId,
       });
+      onSupplierDeleted?.(supplierToDelete.business_name || 'Proveedor');
       setShowDeleteModal(false);
       setSupplierToDelete(null);
       invalidatePurchaseCatalogCache(businessId);
@@ -119,7 +126,7 @@ export function useProveedorMutations({
     } finally {
       setDeleting(false);
     }
-  }, [businessId, canManageSuppliers, deleting, refreshSuppliers, supplierToDelete, setError]);
+  }, [businessId, canManageSuppliers, deleting, refreshSuppliers, supplierToDelete, setError, onSupplierDeleted]);
 
   const closeDeleteModal = useCallback(() => {
     if (deleting) return;

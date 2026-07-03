@@ -5,17 +5,13 @@
 ALTER TABLE IF EXISTS public.tables ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.audit_log ENABLE ROW LEVEL SECURITY;
 
--- Política para `tables`: permitir SELECT/UPDATE sólo si business_id coincide con el claim JWT
--- Supabase expone los claims JWT con current_setting('jwt.claims', true)
--- Se asume que el claim contiene {"business": "<uuid>"}
-DROP POLICY IF EXISTS tables_business_policy ON public.tables CASCADE;
-CREATE POLICY tables_business_policy ON public.tables
-  USING (
-    business_id = (current_setting('jwt.claims', true)::json->>'business')::uuid
-  )
-  WITH CHECK (
-    business_id = (current_setting('jwt.claims', true)::json->>'business')::uuid
-  );
+-- [ELIMINADA 2026-07-03] tables_business_policy
+-- Esta policy para rol 'public' usaba jwt.claims->>'business' que NO existe
+-- en JWTs estándar de Supabase Auth. Causaba problemas de evaluación RLS
+-- en realtime, haciendo que mesas desaparecieran de la UI.
+-- Es redundante con las policies de rol 'authenticated' que usan get_user_business_ids().
+-- NO recrear esta policy.
+-- Ver migración: 20260703_0100_drop_redundant_tables_business_policy.sql
 
 -- Política para `audit_log`: permitir SELECT sólo a usuarios del mismo business
 DROP POLICY IF EXISTS audit_log_business_policy ON public.audit_log CASCADE;

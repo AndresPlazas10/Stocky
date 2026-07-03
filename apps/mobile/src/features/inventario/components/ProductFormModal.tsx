@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import { useEffect, useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 import { StockyModal } from '../../../ui/StockyModal';
@@ -83,8 +83,6 @@ export function ProductFormModal({
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={16}
-      modalAnimationType="fade"
-      animationDurationMs={180}
       bodyFlex
       sheetStyle={styles.productFormSheet}
       contentContainerStyle={styles.productFormContent}
