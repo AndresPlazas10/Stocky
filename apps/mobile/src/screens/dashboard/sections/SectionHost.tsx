@@ -1,20 +1,27 @@
+import React, { Suspense } from 'react';
+import { ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { DrawerNavigationProp } from '@react-navigation/drawer';
 import type { SectionId } from '../../../navigation/sections';
 import type { RootDrawerParamList } from '../../../navigation/types';
 import { isSectionEnabled } from '../../../config/features';
-import { HomeSection } from './HomeSection';
-import { CombosSection } from './CombosSection';
-import { ComprasSection } from './ComprasSection';
-import { ConfiguracionSection } from './ConfiguracionSection';
-import { EmpleadosSection } from './EmpleadosSection';
-import { ImpresionSection } from './ImpresionSection';
-import { InventarioSection } from './InventarioSection';
-import { ProveedoresSection } from './ProveedoresSection';
-import { ReportesSection } from './ReportesSection';
-import { VentasSection } from './VentasSection';
 import { SectionComingSoon } from './SectionComingSoon';
 import { StockyErrorBoundary } from '../../../ui/StockyErrorBoundary';
+
+const HomeSection = React.lazy(() => import('./HomeSection').then((m) => ({ default: m.HomeSection })));
+const VentasSection = React.lazy(() => import('./VentasSection').then((m) => ({ default: m.VentasSection })));
+const ComprasSection = React.lazy(() => import('./ComprasSection').then((m) => ({ default: m.ComprasSection })));
+const InventarioSection = React.lazy(() => import('./InventarioSection').then((m) => ({ default: m.InventarioSection })));
+const CombosSection = React.lazy(() => import('./CombosSection').then((m) => ({ default: m.CombosSection })));
+const ProveedoresSection = React.lazy(() => import('./ProveedoresSection').then((m) => ({ default: m.ProveedoresSection })));
+const EmpleadosSection = React.lazy(() => import('./EmpleadosSection').then((m) => ({ default: m.EmpleadosSection })));
+const ReportesSection = React.lazy(() => import('./ReportesSection').then((m) => ({ default: m.ReportesSection })));
+const ConfiguracionSection = React.lazy(() => import('./ConfiguracionSection').then((m) => ({ default: m.ConfiguracionSection })));
+const ImpresionSection = React.lazy(() => import('./ImpresionSection').then((m) => ({ default: m.ImpresionSection })));
+
+const SectionFallback = () => (
+  <ActivityIndicator size="large" color="#0AC946" style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} />
+);
 
 export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   const navigation = useNavigation<DrawerNavigationProp<RootDrawerParamList>>();
@@ -23,7 +30,9 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'home') {
     return (
       <StockyErrorBoundary>
-        <HomeSection />
+        <Suspense fallback={<SectionFallback />}>
+          <HomeSection />
+        </Suspense>
       </StockyErrorBoundary>
     );
   }
@@ -31,7 +40,9 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'ventas' && enabled) {
     return (
       <StockyErrorBoundary>
-        <VentasSection />
+        <Suspense fallback={<SectionFallback />}>
+          <VentasSection />
+        </Suspense>
       </StockyErrorBoundary>
     );
   }
@@ -39,7 +50,9 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'compras' && enabled) {
     return (
       <StockyErrorBoundary>
-        <ComprasSection />
+        <Suspense fallback={<SectionFallback />}>
+          <ComprasSection />
+        </Suspense>
       </StockyErrorBoundary>
     );
   }
@@ -47,7 +60,9 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'inventario' && enabled) {
     return (
       <StockyErrorBoundary>
-        <InventarioSection />
+        <Suspense fallback={<SectionFallback />}>
+          <InventarioSection />
+        </Suspense>
       </StockyErrorBoundary>
     );
   }
@@ -55,7 +70,9 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'combos' && enabled) {
     return (
       <StockyErrorBoundary>
-        <CombosSection />
+        <Suspense fallback={<SectionFallback />}>
+          <CombosSection />
+        </Suspense>
       </StockyErrorBoundary>
     );
   }
@@ -63,7 +80,9 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'proveedores' && enabled) {
     return (
       <StockyErrorBoundary>
-        <ProveedoresSection />
+        <Suspense fallback={<SectionFallback />}>
+          <ProveedoresSection />
+        </Suspense>
       </StockyErrorBoundary>
     );
   }
@@ -71,7 +90,9 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'empleados' && enabled) {
     return (
       <StockyErrorBoundary>
-        <EmpleadosSection />
+        <Suspense fallback={<SectionFallback />}>
+          <EmpleadosSection />
+        </Suspense>
       </StockyErrorBoundary>
     );
   }
@@ -79,7 +100,9 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'reportes' && enabled) {
     return (
       <StockyErrorBoundary>
-        <ReportesSection />
+        <Suspense fallback={<SectionFallback />}>
+          <ReportesSection />
+        </Suspense>
       </StockyErrorBoundary>
     );
   }
@@ -87,7 +110,9 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'configuracion' && enabled) {
     return (
       <StockyErrorBoundary>
-        <ConfiguracionSection />
+        <Suspense fallback={<SectionFallback />}>
+          <ConfiguracionSection />
+        </Suspense>
       </StockyErrorBoundary>
     );
   }
@@ -95,7 +120,9 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'impresion' && enabled) {
     return (
       <StockyErrorBoundary>
-        <ImpresionSection />
+        <Suspense fallback={<SectionFallback />}>
+          <ImpresionSection />
+        </Suspense>
       </StockyErrorBoundary>
     );
   }
