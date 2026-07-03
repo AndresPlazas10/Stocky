@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -319,109 +319,122 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
     [supplierNameById],
   );
 
+  const handleViewDetails = useCallback(
+    (purchase: CompraRecord) => openPurchaseDetails(purchase, setError),
+    [openPurchaseDetails, setError],
+  );
+
   return (
     <>
-      <View style={s.container}>
-        <LinearGradient
-          colors={['#4F46E5', '#7C3AED']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={s.heroCard}
-        >
-          <View style={s.heroTop}>
-            <View style={s.heroIconBox}>
-              <Ionicons name="bag-handle-outline" size={28} color={STOCKY_COLORS.white} />
-            </View>
-            <View style={s.heroTitleWrap}>
-              <Text style={s.heroTitle}>Compras</Text>
-              <Text style={s.heroSubtitle}>{businessName || businessId}</Text>
-            </View>
-          </View>
-
-          <Pressable style={s.heroCreateButton} onPress={openCreatePurchaseModal}>
-            <Ionicons name="add" size={20} color="rgba(255,255,255,0.9)" />
-            <Text style={s.heroCreateButtonText}>Nueva Compra</Text>
-          </Pressable>
-        </LinearGradient>
-
-        {loading ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
-        {loadingPurchases ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
-        <RecordFilterCard
-          title="Filtros de Compras"
-          subtitle="Filtra por un día específico."
-          expanded={showFiltersExpanded}
-          onToggle={() => setShowFiltersExpanded((prev) => !prev)}
-          dayField={{
-            icon: 'calendar-clear-outline',
-            label: 'Día',
-            selectedLabel: selectedDayLabel,
-            isActive: dayFilter !== 'all',
-            onOpen: openDayFilterCalendar,
-          }}
-          secondField={{
-            icon: 'storefront-outline',
-            label: 'Proveedor',
-            selectedLabel: selectedSupplierLabel,
-            isActive: supplierFilter !== 'all',
-            onOpen: () => setShowSupplierFilterModal(true),
-          }}
-          onClearFilters={clearFilters}
-        />
-
-        <View style={s.paginationCard}>
-          <Text style={s.paginationText}>
-            Mostrando {pageRange.from} a {pageRange.to} de {filteredPurchases.length} registros
-          </Text>
-          <View style={s.paginationControls}>
-            <Pressable
-              style={[
-                s.paginationArrowButton,
-                canPrevPage && s.paginationArrowButtonActive,
-                !canPrevPage && s.buttonDisabled,
-              ]}
-              onPress={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-              disabled={!canPrevPage}
-            >
-              <Ionicons name="chevron-back" size={19} color={canPrevPage ? '#4F46E5' : '#9CA3AF'} />
-            </Pressable>
-            <View style={s.paginationPageBadge}>
-              <Text style={s.paginationPageText}>
-                Pagina {currentPage} de {totalPages}
-              </Text>
-            </View>
-            <Pressable
-              style={[
-                s.paginationArrowButton,
-                canNextPage && s.paginationArrowButtonActive,
-                !canNextPage && s.buttonDisabled,
-              ]}
-              onPress={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={!canNextPage}
-            >
-              <Ionicons
-                name="chevron-forward"
-                size={19}
-                color={canNextPage ? '#4F46E5' : '#9CA3AF'}
-              />
-            </Pressable>
-          </View>
-        </View>
-
-        {!loading && paginatedPurchases.length === 0 ? (
-          <Text style={s.emptyTextLarge}>No hay compras para esos filtros.</Text>
-        ) : null}
-
-        {paginatedPurchases.map((purchase) => (
+      <FlatList
+        data={paginatedPurchases}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
           <PurchaseCard
-            key={purchase.id}
-            purchase={purchase}
+            purchase={item}
             canDelete={canDeletePurchases}
-            supplierLabel={resolvePurchaseSupplierLabel(purchase)}
-            onViewDetails={(p: CompraRecord) => openPurchaseDetails(p, setError)}
+            supplierLabel={resolvePurchaseSupplierLabel(item)}
+            onViewDetails={handleViewDetails}
             onDelete={askDeletePurchase}
           />
-        ))}
-      </View>
+        )}
+        ListHeaderComponent={
+          <>
+            <LinearGradient
+              colors={['#4F46E5', '#7C3AED']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.heroCard}
+            >
+              <View style={s.heroTop}>
+                <View style={s.heroIconBox}>
+                  <Ionicons name="bag-handle-outline" size={28} color={STOCKY_COLORS.white} />
+                </View>
+                <View style={s.heroTitleWrap}>
+                  <Text style={s.heroTitle}>Compras</Text>
+                  <Text style={s.heroSubtitle}>{businessName || businessId}</Text>
+                </View>
+              </View>
+
+              <Pressable style={s.heroCreateButton} onPress={openCreatePurchaseModal}>
+                <Ionicons name="add" size={20} color="rgba(255,255,255,0.9)" />
+                <Text style={s.heroCreateButtonText}>Nueva Compra</Text>
+              </Pressable>
+            </LinearGradient>
+
+            {loading ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
+            {loadingPurchases ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
+            <RecordFilterCard
+              title="Filtros de Compras"
+              subtitle="Filtra por un día específico."
+              expanded={showFiltersExpanded}
+              onToggle={() => setShowFiltersExpanded((prev) => !prev)}
+              dayField={{
+                icon: 'calendar-clear-outline',
+                label: 'Día',
+                selectedLabel: selectedDayLabel,
+                isActive: dayFilter !== 'all',
+                onOpen: openDayFilterCalendar,
+              }}
+              secondField={{
+                icon: 'storefront-outline',
+                label: 'Proveedor',
+                selectedLabel: selectedSupplierLabel,
+                isActive: supplierFilter !== 'all',
+                onOpen: () => setShowSupplierFilterModal(true),
+              }}
+              onClearFilters={clearFilters}
+            />
+
+            <View style={s.paginationCard}>
+              <Text style={s.paginationText}>
+                Mostrando {pageRange.from} a {pageRange.to} de {filteredPurchases.length} registros
+              </Text>
+              <View style={s.paginationControls}>
+                <Pressable
+                  style={[
+                    s.paginationArrowButton,
+                    canPrevPage && s.paginationArrowButtonActive,
+                    !canPrevPage && s.buttonDisabled,
+                  ]}
+                  onPress={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={!canPrevPage}
+                >
+                  <Ionicons name="chevron-back" size={19} color={canPrevPage ? '#4F46E5' : '#9CA3AF'} />
+                </Pressable>
+                <View style={s.paginationPageBadge}>
+                  <Text style={s.paginationPageText}>
+                    Pagina {currentPage} de {totalPages}
+                  </Text>
+                </View>
+                <Pressable
+                  style={[
+                    s.paginationArrowButton,
+                    canNextPage && s.paginationArrowButtonActive,
+                    !canNextPage && s.buttonDisabled,
+                  ]}
+                  onPress={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={!canNextPage}
+                >
+                  <Ionicons
+                    name="chevron-forward"
+                    size={19}
+                    color={canNextPage ? '#4F46E5' : '#9CA3AF'}
+                  />
+                </Pressable>
+              </View>
+            </View>
+
+            {!loading && paginatedPurchases.length === 0 ? (
+              <Text style={s.emptyTextLarge}>No hay compras para esos filtros.</Text>
+            ) : null}
+          </>
+        }
+        contentContainerStyle={s.container}
+        removeClippedSubviews
+        maxToRenderPerBatch={10}
+        windowSize={5}
+      />
 
       <CreatePurchaseModal
         visible={showCreatePurchaseModal}
