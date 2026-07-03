@@ -164,9 +164,7 @@ export async function createSaleOptimized({
         p_user_id: user.id,
         p_seller_name: sellerName,
         p_payment_method: paymentMethod,
-        p_items: itemsForRpc,
-        p_amount_received: null,
-        p_change_breakdown: []
+        p_items: itemsForRpc
       }));
 
       const missingBaseFn = isFunctionUnavailableError(error, 'create_sale_complete');
@@ -177,8 +175,6 @@ export async function createSaleOptimized({
           p_seller_name: sellerName,
           p_payment_method: paymentMethod,
           p_items: itemsForRpc,
-          p_amount_received: null,
-          p_change_breakdown: [],
           p_idempotency_key: idempotencyKey
         }));
       }
@@ -189,8 +185,6 @@ export async function createSaleOptimized({
         p_seller_name: sellerName,
         p_payment_method: paymentMethod,
         p_items: itemsForRpc,
-        p_amount_received: null,
-        p_change_breakdown: [],
         p_idempotency_key: idempotencyKey
       }));
 
@@ -204,9 +198,7 @@ export async function createSaleOptimized({
           p_user_id: user.id,
           p_seller_name: sellerName,
           p_payment_method: paymentMethod,
-          p_items: itemsForRpc,
-          p_amount_received: null,
-          p_change_breakdown: []
+          p_items: itemsForRpc
         }));
       }
     }
