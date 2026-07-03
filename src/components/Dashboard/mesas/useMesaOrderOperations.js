@@ -112,9 +112,10 @@ export function useMesaOrderOperations({
   mesaSyncClientIdRef,
   heldMesaLockRef,
   getMesaLockState,
-  showAddForm,
-  setShowAddForm
-}) {
+    showAddForm,
+    setShowAddForm,
+    isOpeningTableRef,
+  }) {
   const pendingOrderItemOpsCountRef = pendingOrderItemOpsRef;
 
   const ensureCurrentUser = useCallback(async () => {
@@ -381,7 +382,9 @@ export function useMesaOrderOperations({
       if (!newOrder?.__localOnly) {
         await loadMesas();
       }
+      isOpeningTableRef.current = false;
     } catch (error) {
+      isOpeningTableRef.current = false;
       setMesaOpenDebugStage('create:catch');
       if (isOfflinePersistenceEnabled()) {
         setMesaOpenDebugStage('create:catch-local-fallback-1');
@@ -687,6 +690,7 @@ export function useMesaOrderOperations({
       }
     }
 
+    isOpeningTableRef.current = true;
     setSelectedMesa(normalizedMesa);
     setModalOpenIntent(true);
     setShowOrderDetails(true);

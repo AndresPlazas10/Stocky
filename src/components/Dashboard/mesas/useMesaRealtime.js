@@ -36,7 +36,8 @@ export function useMesaRealtime({
   setModalOpenIntent,
   pendingRemoteOrderTotalsRef,
   loadCombos,
-  comboCatalogByIdRef
+  comboCatalogByIdRef,
+  isOpeningTableRef,
 }) {
   const orderRealtimeRefreshTimersRef = useRef({});
 
@@ -71,7 +72,7 @@ export function useMesaRealtime({
 
     setSelectedMesa(prev => {
       if (prev?.id === normalizedTable.id) {
-        if (normalizedTable.status === 'available' && !normalizedTable.current_order_id) {
+        if (normalizedTable.status === 'available' && !normalizedTable.current_order_id && !isOpeningTableRef?.current) {
           setShowOrderDetails(false);
           setModalOpenIntent(false);
           return null;
@@ -86,7 +87,7 @@ export function useMesaRealtime({
       }
       return prev;
     });
-  }, [justCompletedSaleRef, setMesas, setSelectedMesa, setShowOrderDetails, setModalOpenIntent]);
+  }, [justCompletedSaleRef, setMesas, setSelectedMesa, setShowOrderDetails, setModalOpenIntent, isOpeningTableRef]);
 
   const handleTableDelete = useCallback((deletedTable) => {
     setMesas(prev => {
