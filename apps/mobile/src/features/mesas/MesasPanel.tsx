@@ -41,7 +41,11 @@ import { useMesaRealtime } from './hooks/useMesaRealtime';
 import { useMesaOrderMutations } from './hooks/useMesaOrderMutations';
 import { useMesaPrint } from './hooks/useMesaPrint';
 import { useMesaCreate } from './hooks/useMesaCreate';
+import { useMesaRefSync } from './hooks/useMesaRefSync';
+import { useMesaKeyboard } from './hooks/useMesaKeyboard';
 import { MesasGrid } from './components/MesasGrid';
+import { MesasPanelHeader } from './components/MesasPanelHeader';
+import { MesasToasts } from './components/MesasToasts';
 import { OrderModal } from './components/OrderModal';
 import { CreateMesaModal } from './components/CreateMesaModal';
 import { DeleteMesaModal } from './components/DeleteMesaModal';
@@ -109,7 +113,7 @@ export function MesasPanel({ session, businessContext }: Props) {
   const [_error, setError] = useState<string | null>(null);
   const [actingMesaId, setActingMesaId] = useState<string | null>(null);
 
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const { isKeyboardVisible } = useMesaKeyboard();
 
   const [showDeleteMesaModal, setShowDeleteMesaModal] = useState(false);
   const [mesaToDelete, setMesaToDelete] = useState<MesaRecord | null>(null);
@@ -278,6 +282,20 @@ export function MesasPanel({ session, businessContext }: Props) {
     realtimeClientInstanceIdRef,
     traceAsyncDuration,
   } = realtime;
+
+  useMesaRefSync({
+    selectedMesaId: selectedMesa?.id ?? undefined,
+    mesas,
+    orderItems,
+    catalogItems,
+    currentOrderId: selectedMesa?.current_order_id ?? undefined,
+    pendingUiTraceRef,
+    latestOrderItemsRef,
+    catalogItemsRef,
+    orderItemsCacheRef,
+    selectedMesaIdRef,
+    mesasLengthRef,
+  });
 
   const bumpMesaActionVersion = useCallback((mesaId: string) => {
     const normalizedMesaId = String(mesaId || '').trim();
@@ -486,28 +504,6 @@ export function MesasPanel({ session, businessContext }: Props) {
   }, [loadData]);
 
   useEffect(() => {
-    selectedMesaIdRef.current = String(selectedMesa?.id || '').trim();
-  }, [selectedMesa?.id]);
-
-  useEffect(() => {
-    mesasLengthRef.current = Array.isArray(mesas) ? mesas.length : 0;
-  }, [mesas]);
-
-  useEffect(() => {
-    const trace = pendingUiTraceRef.current;
-    if (!trace) return;
-    const uiLagMs = Math.max(0, Date.now() - trace.receivedAt);
-    traceMesaSync('ui_painted', {
-      source: trace.source,
-      eventType: trace.eventType,
-      rowRef: trace.rowRef,
-      commitLagMs: trace.commitLagMs,
-      uiLagMs,
-    });
-    pendingUiTraceRef.current = null;
-  }, [mesas, pendingUiTraceRef]);
-
-  useEffect(() => {
     const held = heldMesaLockRef.current;
     const activeBusinessId = String(context?.businessId || '').trim();
     if (!held) return;
@@ -515,34 +511,6 @@ export function MesasPanel({ session, businessContext }: Props) {
       void releaseHeldMesaLock(held);
     }
   }, [context?.businessId, heldMesaLockRef, releaseHeldMesaLock]);
-
-  useEffect(() => {
-    latestOrderItemsRef.current = orderItems;
-  }, [latestOrderItemsRef, orderItems]);
-
-  useEffect(() => {
-    catalogItemsRef.current = catalogItems;
-  }, [catalogItems, catalogItemsRef]);
-
-  useEffect(() => {
-    const onShow = Keyboard.addListener('keyboardDidShow', () => {
-      setIsKeyboardVisible(true);
-    });
-    const onHide = Keyboard.addListener('keyboardDidHide', () => {
-      setIsKeyboardVisible(false);
-    });
-
-    return () => {
-      onShow.remove();
-      onHide.remove();
-    };
-  }, []);
-
-  useEffect(() => {
-    const orderId = String(selectedMesa?.current_order_id || '').trim();
-    if (!orderId) return;
-    orderItemsCacheRef.current.set(orderId, orderItems);
-  }, [orderItems, orderItemsCacheRef, selectedMesa?.current_order_id]);
 
   useEffect(
     () => () => {
@@ -1159,22 +1127,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     setShowOrderModal(true);
   }, [isClosingOrder, setShowSplitBillModal, setShowCloseOrderChoiceModal, setShowOrderModal]);
 
-  const handleCloseMesaCreatedToast = useCallback(() => {
-    toasts.setShowMesaCreatedToast(false);
-  }, [toasts]);
-
-  const handleCloseMesaDeletedToast = useCallback(() => {
-    toasts.setShowMesaDeletedToast(false);
-  }, [toasts]);
-
-  const handleCloseSaleToast = useCallback(() => {
-    toasts.setShowSaleToast(false);
-  }, [toasts]);
-
-  const handleCloseMesaSavedToast = useCallback(() => {
-    toasts.setShowMesaSavedToast(false);
-  }, [toasts]);
-
   const memoizedOrderState = useMemo(
     () => ({
       selectedMesa,
@@ -1238,37 +1190,10 @@ export function MesasPanel({ session, businessContext }: Props) {
   return (
     <>
       <View style={styles.mesasContainer}>
-        <View style={styles.mesasPanelHeader}>
-          <View style={styles.mesasPanelTitleRow}>
-            <LinearGradient
-              colors={['#4F46E5', '#7C3AED']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.mesasPanelIcon}
-            >
-              <Ionicons name="layers-outline" size={30} color={STOCKY_COLORS.white} />
-            </LinearGradient>
-            <Text style={styles.mesasPanelTitle} numberOfLines={2}>
-              Gestión de Mesas
-            </Text>
-          </View>
-
-          <Pressable
-            style={styles.addMesaButtonWrap}
-            onPress={handleOpenAddMesa}
-            disabled={isCreatingMesa}
-          >
-            <LinearGradient
-              colors={isCreatingMesa ? ['#7D8AA7', '#9CA3AF'] : ['#4F46E5', '#7C3AED']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.addMesaButton}
-            >
-              <Ionicons name="add" size={16} color={STOCKY_COLORS.white} />
-              <Text style={styles.addMesaButtonText}>Agregar Mesa</Text>
-            </LinearGradient>
-          </Pressable>
-        </View>
+        <MesasPanelHeader
+          isCreatingMesa={isCreatingMesa}
+          onOpenAddMesa={handleOpenAddMesa}
+        />
 
         <View style={styles.mesasPanelDivider} />
 
@@ -1347,46 +1272,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         onClose={handleCloseSplitBill}
         onConfirm={processSplitPaymentAndClose}
       />
-      <StockyStatusToast
-        visible={toasts.showMesaCreatedToast}
-        title="Mesa Creada"
-        primaryLabel="Mesa"
-        primaryValue={toasts.mesaCreatedLabel}
-        secondaryLabel="Estado"
-        secondaryValue="Disponible"
-        durationMs={1000}
-        onClose={handleCloseMesaCreatedToast}
-      />
-      <StockyStatusToast
-        visible={toasts.showMesaDeletedToast}
-        title="Mesa Eliminada"
-        primaryLabel="Mesa"
-        primaryValue={toasts.mesaDeletedLabel}
-        secondaryLabel="Estado"
-        secondaryValue="Eliminada"
-        durationMs={1000}
-        onClose={handleCloseMesaDeletedToast}
-      />
-      <StockyStatusToast
-        visible={toasts.showSaleToast}
-        title="Venta Confirmada"
-        primaryLabel="Mesa"
-        primaryValue={toasts.saleMesaLabel}
-        secondaryLabel="Total"
-        secondaryValue={toasts.saleTotalLabel}
-        durationMs={1000}
-        onClose={handleCloseSaleToast}
-      />
-      <StockyStatusToast
-        visible={toasts.showMesaSavedToast}
-        title="Mesa Actualizada"
-        primaryLabel="Mesa"
-        primaryValue={toasts.mesaSavedLabel}
-        secondaryLabel="Estado"
-        secondaryValue="Actualizada"
-        durationMs={1000}
-        onClose={handleCloseMesaSavedToast}
-      />
+      <MesasToasts toasts={toasts} />
       <PrintReceiptConfirmModal
         visible={showPrintModal}
         onConfirm={handlePrintConfirm}
