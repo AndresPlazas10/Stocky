@@ -115,7 +115,7 @@ type CreateSaleModalProps = {
   onSubmit: () => void;
 };
 
-export function CreateSaleModal({
+export const CreateSaleModal = memo(function CreateSaleModal({
   visible,
   submitting,
   cart,
@@ -354,4 +354,4 @@ export function CreateSaleModal({
       </View>
     </StockyModal>
   );
-}
+});

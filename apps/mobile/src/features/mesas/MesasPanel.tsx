@@ -922,7 +922,6 @@ export function MesasPanel({ session, businessContext }: Props) {
         });
         setOrderItems([]);
         setOrderModalError(null);
-        setShowOrderModal(true);
         setLoadingOrder(true);
         if (context?.businessId) {
           void ensureCatalogLoaded(context.businessId, { forceRefresh: true }).catch(() => {
@@ -1014,7 +1013,6 @@ export function MesasPanel({ session, businessContext }: Props) {
       setOrderItems,
       setOrderModalError,
       setSelectedMesa,
-      setShowOrderModal,
     ],
   );
 

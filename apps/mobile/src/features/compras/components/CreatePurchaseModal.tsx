@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,7 +36,7 @@ type CreatePurchaseModalProps = {
   onSubmit: () => void;
 };
 
-export function CreatePurchaseModal({
+export const CreatePurchaseModal = memo(function CreatePurchaseModal({
   visible,
   creatingPurchase,
   cart,
@@ -260,4 +261,4 @@ export function CreatePurchaseModal({
       </View>
     </StockyModal>
   );
-}
+});
