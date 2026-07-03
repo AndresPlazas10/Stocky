@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { StatusPill } from './StatusPill';
 import { MESA_IN_USE_MESSAGE, mesaDisplayName } from '../utils/mesaHelpers';
@@ -62,16 +61,7 @@ export function MesaCard({
 
       {lockedByOther ? (
         <View pointerEvents="none" style={styles.lockOverlay}>
-          {Platform.OS === 'android' ? (
-            <View style={styles.lockScrimStrong} />
-          ) : (
-            <BlurView
-              style={StyleSheet.absoluteFillObject}
-              tint="light"
-              intensity={24}
-              experimentalBlurMethod="dimezisBlurView"
-            />
-          )}
+          <View style={styles.lockScrimStrong} />
           <View style={styles.lockScrim} />
           <Text style={styles.lockText}>{MESA_IN_USE_MESSAGE}</Text>
         </View>
