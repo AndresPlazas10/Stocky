@@ -9,7 +9,7 @@ export function OfflineScreen() {
         <View style={styles.iconWrap}>
           <Ionicons name="cloud-offline-outline" size={40} color={STOCKY_COLORS.primary900} />
         </View>
-        <Text style={styles.title}>Estas sin conexion</Text>
+        <Text style={styles.title}>Estás sin conexión</Text>
         <Text style={styles.subtitle}>Intentando reconectar...</Text>
       </View>
     </View>
