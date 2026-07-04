@@ -64,12 +64,30 @@ export function useSupabaseRealtime({
     let fallbackTimer: ReturnType<typeof setInterval> | null = null;
     let dbChannel: ReturnType<ReturnType<typeof getSupabaseClient>['channel']> | null = null;
     let broadcastChannel: ReturnType<ReturnType<typeof getSupabaseClient>['channel']> | null = null;
+    let realtimeConnected = false;
 
     let client;
     try {
       client = getSupabaseClient();
     } catch {
       return undefined;
+    }
+
+    const hasPollHandler = pollIntervalMs > 0 && !!onPollTickRef.current;
+    const canPollByFocus = !pausePollingWhenHidden || isFocused;
+
+    function startPolling() {
+      if (fallbackTimer || cancelled || !hasPollHandler || !canPollByFocus) return;
+      fallbackTimer = setInterval(() => {
+        onPollTickRef.current?.();
+      }, pollIntervalMs);
+    }
+
+    function stopPolling() {
+      if (fallbackTimer) {
+        clearInterval(fallbackTimer);
+        fallbackTimer = null;
+      }
     }
 
     const channelId = userId
@@ -92,8 +110,15 @@ export function useSupabaseRealtime({
     }
 
     dbChannel?.subscribe((status) => {
+      if (cancelled) return;
+
       if (status === 'SUBSCRIBED') {
+        realtimeConnected = true;
+        stopPolling();
         onSubscribedRef.current?.();
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        realtimeConnected = false;
+        startPolling();
       }
     });
 
@@ -113,18 +138,13 @@ export function useSupabaseRealtime({
       broadcastChannel.subscribe();
     }
 
-    const shouldPoll =
-      pollIntervalMs > 0 && onPollTickRef.current && (!pausePollingWhenHidden || isFocused);
-
-    if (shouldPoll) {
-      fallbackTimer = setInterval(() => {
-        onPollTickRef.current?.();
-      }, pollIntervalMs);
+    if (!realtimeConnected && hasPollHandler && canPollByFocus) {
+      startPolling();
     }
 
     return () => {
       cancelled = true;
-      if (fallbackTimer) clearInterval(fallbackTimer);
+      stopPolling();
       if (dbChannel) void client.removeChannel(dbChannel);
       if (broadcastChannel) void client.removeChannel(broadcastChannel);
       onCleanupRef.current?.();
