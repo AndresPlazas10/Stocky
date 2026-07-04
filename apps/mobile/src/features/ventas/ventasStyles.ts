@@ -966,4 +966,18 @@ export const ventasStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
+  errorContainer: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: 8,
+    padding: 12,
+    marginHorizontal: 16,
+    marginTop: 8,
+  },
+  errorText: {
+    color: '#991B1B',
+    fontSize: 13,
+  },
+  filtersWrapper: {
+    marginTop: 8,
+  },
 });
