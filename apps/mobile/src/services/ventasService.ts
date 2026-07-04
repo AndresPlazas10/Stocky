@@ -64,7 +64,7 @@ type SellerContext = {
 };
 
 const SELLER_CONTEXT_CACHE_TTL_MS = 60_000;
-const DEFAULT_SALES_HISTORY_CACHE_TTL_MS = 15_000;
+const DEFAULT_SALES_HISTORY_CACHE_TTL_MS = 45_000;
 const DEFAULT_FIRST_VENTA_DAY_CACHE_TTL_MS = 5 * 60_000;
 const sellerContextCacheByKey = new Map<
   string,

@@ -6,7 +6,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../theme/tokens';
 import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
 import { StockyMoneyText } from '../../ui/StockyMoneyText';
-import { PrintReceiptConfirmModal } from '../../ui/PrintReceiptConfirmModal';
 import { DayFilterCalendarModal } from '../../ui/DayFilterCalendarModal';
 import { RecordFilterCard } from '../../ui/RecordFilterCard';
 import { formatCop } from '../../utils/money';
@@ -20,8 +19,7 @@ import { useVentaDetails } from './hooks/useVentaDetails';
 import { useVentaPrint } from './hooks/useVentaPrint';
 import { useVentaMutations } from './hooks/useVentaMutations';
 import { useVentaPayment } from './hooks/useVentaPayment';
-import { useToast } from '../../hooks/useToast';
-import { StockyToast } from '../../ui/StockyToast';
+import { useToastContext } from '../../hooks/useToastContext';
 import { TOAST_MESSAGES } from '../../constants/toastMessages';
 import { SaleCard } from './components/SaleCard';
 import { SaleDetailsModal } from './components/SaleDetailsModal';
@@ -111,34 +109,36 @@ const VentasListHeader = memo(function VentasListHeader({
       {loading ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
       {loadingSales ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
       {error ? (
-        <View style={{ backgroundColor: '#FEE2E2', borderRadius: 8, padding: 12, marginHorizontal: 16, marginTop: 8 }}>
-          <Text style={{ color: '#991B1B', fontSize: 13 }}>{error}</Text>
+        <View style={s.errorContainer}>
+          <Text style={s.errorText}>{error}</Text>
         </View>
       ) : null}
 
-      <RecordFilterCard
-        title="Filtros de Ventas"
-        subtitle="Filtra por un día específico."
-        expanded={showFiltersExpanded}
-        onToggle={() => setShowFiltersExpanded((prev) => !prev)}
-        dayField={{
-          icon: 'calendar-clear-outline',
-          label: 'Día',
-          selectedLabel: selectedDayLabel,
-          isActive: dayFilter !== 'all',
-          onOpen: openDayFilterCalendar,
-        }}
-        secondField={{
-          icon: 'person-outline',
-          label: 'Vendedor',
-          selectedLabel: selectedSellerLabel,
-          isActive: sellerFilter !== 'all',
-          onOpen: () => setShowSellerFilterModal(true),
-        }}
-        onClearFilters={clearFilters}
-      />
+      <View style={s.filtersWrapper}>
+        <RecordFilterCard
+          title="Filtros de Ventas"
+          subtitle="Filtra por un día específico."
+          expanded={showFiltersExpanded}
+          onToggle={() => setShowFiltersExpanded((prev) => !prev)}
+          dayField={{
+            icon: 'calendar-clear-outline',
+            label: 'Día',
+            selectedLabel: selectedDayLabel,
+            isActive: dayFilter !== 'all',
+            onOpen: openDayFilterCalendar,
+          }}
+          secondField={{
+            icon: 'person-outline',
+            label: 'Vendedor',
+            selectedLabel: selectedSellerLabel,
+            isActive: sellerFilter !== 'all',
+            onOpen: () => setShowSellerFilterModal(true),
+          }}
+          onClearFilters={clearFilters}
+        />
+      </View>
 
-      <View style={s.paginationCard}>
+      <View style={[s.paginationCard, { marginTop: 4 }]}>
         <Text style={s.paginationText}>
           Mostrando {pageRange.from} a {pageRange.to} de {filteredVentas.length} registros
         </Text>
@@ -266,17 +266,11 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
   } = useVentaDetails();
 
   const {
-    showPrintModal,
     isPrinting,
-    printCustomerName,
-    setPrintCustomerName,
-    showPrintModalForSale,
-    handlePrintConfirm,
-    handlePrintCancel,
     handlePrintSale,
   } = useVentaPrint(businessName, setError);
 
-  const toast = useToast();
+  const toast = useToastContext();
   const canDeleteSales = source === 'owner';
 
   const {
@@ -314,7 +308,6 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
       }
     },
     setCatalogItems,
-    showPrintModalForSale,
     setShowCreateSaleModal,
     setShowVentaDetails: () => {},
     setSelectedVenta: () => {},
@@ -476,8 +469,10 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         ListHeaderComponentStyle={{ paddingBottom: 16 }}
         contentContainerStyle={s.container}
         removeClippedSubviews
-        maxToRenderPerBatch={10}
+        maxToRenderPerBatch={8}
         windowSize={5}
+        initialNumToRender={8}
+        updateCellsBatchingPeriod={50}
       />
 
       <CreateSaleModal
@@ -557,23 +552,6 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
           setVentaToDelete(null);
         }}
         onConfirm={confirmDeleteVenta}
-      />
-      <PrintReceiptConfirmModal
-        visible={showPrintModal}
-        onConfirm={handlePrintConfirm}
-        onCancel={handlePrintCancel}
-        isLoading={isPrinting}
-        customerName={printCustomerName}
-        onCustomerNameChange={setPrintCustomerName}
-      />
-      <StockyToast
-        visible={toast.toast.visible}
-        type={toast.toast.type}
-        title={toast.toast.title}
-        message={toast.toast.message}
-        ctaText={toast.toast.ctaText}
-        durationMs={toast.toast.durationMs}
-        onClose={toast.hideToast}
       />
     </>
   );

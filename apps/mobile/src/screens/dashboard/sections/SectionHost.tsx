@@ -1,5 +1,5 @@
-import React, { Suspense } from 'react';
-import { ActivityIndicator } from 'react-native';
+import React, { memo, Suspense } from 'react';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { DrawerNavigationProp } from '@react-navigation/drawer';
 import type { SectionId } from '../../../navigation/sections';
@@ -19,9 +19,15 @@ const ReportesSection = React.lazy(() => import('./ReportesSection').then((m) =>
 const ConfiguracionSection = React.lazy(() => import('./ConfiguracionSection').then((m) => ({ default: m.ConfiguracionSection })));
 const ImpresionSection = React.lazy(() => import('./ImpresionSection').then((m) => ({ default: m.ImpresionSection })));
 
-const SectionFallback = () => (
-  <ActivityIndicator size="large" color="#0AC946" style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} />
-);
+const SectionFallback = memo(function SectionFallback() {
+  return <ActivityIndicator size="large" color="#0AC946" style={fallbackStyles.loader} />;
+});
+
+const fallbackStyles = StyleSheet.create({
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+});
+
+const SECTION_LOADING_FALLBACK = <SectionFallback />;
 
 export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   const navigation = useNavigation<DrawerNavigationProp<RootDrawerParamList>>();
@@ -30,7 +36,7 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'home') {
     return (
       <StockyErrorBoundary>
-        <Suspense fallback={<SectionFallback />}>
+        <Suspense fallback={SECTION_LOADING_FALLBACK}>
           <HomeSection />
         </Suspense>
       </StockyErrorBoundary>
@@ -40,7 +46,7 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'ventas' && enabled) {
     return (
       <StockyErrorBoundary>
-        <Suspense fallback={<SectionFallback />}>
+        <Suspense fallback={SECTION_LOADING_FALLBACK}>
           <VentasSection />
         </Suspense>
       </StockyErrorBoundary>
@@ -50,7 +56,7 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'compras' && enabled) {
     return (
       <StockyErrorBoundary>
-        <Suspense fallback={<SectionFallback />}>
+        <Suspense fallback={SECTION_LOADING_FALLBACK}>
           <ComprasSection />
         </Suspense>
       </StockyErrorBoundary>
@@ -60,7 +66,7 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'inventario' && enabled) {
     return (
       <StockyErrorBoundary>
-        <Suspense fallback={<SectionFallback />}>
+        <Suspense fallback={SECTION_LOADING_FALLBACK}>
           <InventarioSection />
         </Suspense>
       </StockyErrorBoundary>
@@ -70,7 +76,7 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'combos' && enabled) {
     return (
       <StockyErrorBoundary>
-        <Suspense fallback={<SectionFallback />}>
+        <Suspense fallback={SECTION_LOADING_FALLBACK}>
           <CombosSection />
         </Suspense>
       </StockyErrorBoundary>
@@ -80,7 +86,7 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'proveedores' && enabled) {
     return (
       <StockyErrorBoundary>
-        <Suspense fallback={<SectionFallback />}>
+        <Suspense fallback={SECTION_LOADING_FALLBACK}>
           <ProveedoresSection />
         </Suspense>
       </StockyErrorBoundary>
@@ -90,7 +96,7 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'empleados' && enabled) {
     return (
       <StockyErrorBoundary>
-        <Suspense fallback={<SectionFallback />}>
+        <Suspense fallback={SECTION_LOADING_FALLBACK}>
           <EmpleadosSection />
         </Suspense>
       </StockyErrorBoundary>
@@ -100,7 +106,7 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'reportes' && enabled) {
     return (
       <StockyErrorBoundary>
-        <Suspense fallback={<SectionFallback />}>
+        <Suspense fallback={SECTION_LOADING_FALLBACK}>
           <ReportesSection />
         </Suspense>
       </StockyErrorBoundary>
@@ -110,7 +116,7 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'configuracion' && enabled) {
     return (
       <StockyErrorBoundary>
-        <Suspense fallback={<SectionFallback />}>
+        <Suspense fallback={SECTION_LOADING_FALLBACK}>
           <ConfiguracionSection />
         </Suspense>
       </StockyErrorBoundary>
@@ -120,7 +126,7 @@ export function SectionHost({ sectionId }: { sectionId: SectionId }) {
   if (sectionId === 'impresion' && enabled) {
     return (
       <StockyErrorBoundary>
-        <Suspense fallback={<SectionFallback />}>
+        <Suspense fallback={SECTION_LOADING_FALLBACK}>
           <ImpresionSection />
         </Suspense>
       </StockyErrorBoundary>
