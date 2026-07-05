@@ -4,8 +4,7 @@ import { STOCKY_COLORS } from '../../theme/tokens';
 import { useConfiguracionData } from './hooks/useConfiguracionData';
 import { useBusinessForm } from './hooks/useBusinessForm';
 import { useAccountActions } from './hooks/useAccountActions';
-import { useToast } from '../../hooks/useToast';
-import { StockyToast } from '../../ui/StockyToast';
+import { useToastContext } from '../../hooks/useToastContext';
 import { TOAST_MESSAGES } from '../../constants/toastMessages';
 import { UserSection } from './components/UserSection';
 import { BusinessSection } from './components/BusinessSection';
@@ -38,7 +37,7 @@ export function ConfiguracionPanel({
   onRefreshBusiness,
   onSignOut,
 }: Props) {
-  const toast = useToast();
+  const toast = useToastContext();
   const {
     snapshot,
     loading,
@@ -176,17 +175,8 @@ export function ConfiguracionPanel({
       <Text style={styles.footerText}>
         Última actualización:{' '}
         {snapshot?.generatedAt ? formatShortDateTime(snapshot.generatedAt) : 'n/a'}
+        {' · '}v30
       </Text>
-
-      <StockyToast
-        visible={toast.toast.visible}
-        type={toast.toast.type}
-        title={toast.toast.title}
-        message={toast.toast.message}
-        ctaText={toast.toast.ctaText}
-        durationMs={toast.toast.durationMs}
-        onClose={toast.hideToast}
-      />
     </View>
   );
 }
