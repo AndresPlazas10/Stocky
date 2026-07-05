@@ -175,7 +175,7 @@ export function ConfiguracionPanel({
       <Text style={styles.footerText}>
         Última actualización:{' '}
         {snapshot?.generatedAt ? formatShortDateTime(snapshot.generatedAt) : 'n/a'}
-        {' · '}v30
+        {' · '}v31
       </Text>
     </View>
   );
