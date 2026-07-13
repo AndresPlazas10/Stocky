@@ -15,7 +15,7 @@ import {
   getTotalProductUnits,
   calculateOrderItemsTotal,
   compareTableIdentifiers
-} from './mesaHelpers.js';
+} from './mesaHelpers';
 import { logger } from '@/utils/logger';
 
 export function useMesaRealtime({
@@ -72,7 +72,7 @@ export function useMesaRealtime({
 
     setSelectedMesa(prev => {
       if (prev?.id === normalizedTable.id) {
-        if (normalizedTable.status === 'available' && !normalizedTable.current_order_id && !isOpeningTableRef?.current) {
+        if (normalizedTable.status === 'available' && !normalizedTable.current_order_id && !isOpeningTableRef?.current && !prev?.current_order_id) {
           setShowOrderDetails(false);
           setModalOpenIntent(false);
           return null;

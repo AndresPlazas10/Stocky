@@ -1,5 +1,6 @@
 import type { DashboardModuleProps } from '@/types/components';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { logger } from '@/utils/logger';
 import PurchaseFilters from '../Filters/PurchaseFilters';
@@ -21,6 +22,7 @@ import {
   getBusinessOwnerById
 } from '../../data/queries/authQueries';
 import { formatPrice, formatDateOnly } from '../../utils/formatters';
+import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
@@ -52,6 +54,14 @@ import { getPaymentMethodLabel } from '../ui/PaymentMethodBankLogo';
 
 
 function Compras({ businessId }: DashboardModuleProps) {
+  const { t } = useTranslation(['compras', 'common']);
+  const config = useBusinessConfig();
+  const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
+  const dateConfig = { timezone: config.timezone, locale: config.locale };
+  
+  const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
+  const fmtDateOnly = (timestamp) => formatDateOnly(timestamp, dateConfig);
+  
   const [purchases, setPurchases] = useState([]);
   const [pagePurchases, setPagePurchases] = useState(1);
   const [limitPurchases] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 768 ? 20 : 30));
@@ -147,7 +157,7 @@ function Compras({ businessId }: DashboardModuleProps) {
       ]);
 
       const employeeMap = new Map();
-      employeesData.forEach((emp: any) => employeeMap.set(emp.user_id, { full_name: emp.full_name || 'Usuario', role: emp.role }));
+      employeesData.forEach((emp: any) => employeeMap.set(emp.user_id, { full_name: emp.full_name || t('compras:labels.unknownUser'), role: emp.role }));
 
       const supplierMap = new Map();
       suppliersData.forEach(s => supplierMap.set(s.id, s));
@@ -163,7 +173,7 @@ function Compras({ businessId }: DashboardModuleProps) {
         return {
           ...purchase,
           supplier,
-          employees: isOwner ? { full_name: 'Administrador', role: 'owner' } : isAdmin ? { full_name: 'Administrador', role: 'admin' } : employee || { full_name: 'Responsable desconocido', role: 'employee' }
+          employees: isOwner ? { full_name: t('compras:labels.administrator'), role: 'owner' } : isAdmin ? { full_name: t('compras:labels.administrator'), role: 'admin' } : employee || { full_name: t('compras:labels.unknownResponsible'), role: 'employee' }
         };
       });
 
@@ -183,12 +193,12 @@ function Compras({ businessId }: DashboardModuleProps) {
         setPurchases(safe);
         setTotalCountPurchases(safe.length);
       } else {
-        setError(formatLoadError('las compras', error));
+        setError(formatLoadError(t('compras:errors.loadFailed'), error));
       }
     } finally {
       setLoading(false);
     }
-  }, [businessId, pagePurchases, limitPurchases, currentFiltersPurchases]);
+  }, [businessId, pagePurchases, limitPurchases, currentFiltersPurchases, t]);
 
   const loadProductos = useCallback(async () => {
     const offline = isOfflineMode();
@@ -251,12 +261,12 @@ function Compras({ businessId }: DashboardModuleProps) {
         setSuppliers(Array.isArray(cached) ? cached : []);
       } else {
         setSuppliers([]);
-        setError(formatLoadError('proveedores', error));
+        setError(formatLoadError(t('compras:errors.loadSuppliersFailed'), error));
       }
     } finally {
       setLoadingSuppliers(false);
     }
-  }, [businessId]);
+  }, [businessId, t]);
 
   // Verificar permisos de admin
   useEffect(() => {
@@ -316,7 +326,7 @@ function Compras({ businessId }: DashboardModuleProps) {
       // Crear mapa de empleados
       const employeeMap = new Map();
       employeesData?.forEach((emp: any) => {
-        employeeMap.set(emp.user_id, { full_name: emp.full_name || 'Usuario', role: emp.role });
+        employeeMap.set(emp.user_id, { full_name: emp.full_name || t('compras:labels.unknownUser'), role: emp.role });
       });
 
       const employee = employeeMap.get(newPurchase.user_id);
@@ -327,10 +337,10 @@ function Compras({ businessId }: DashboardModuleProps) {
         ...newPurchase,
         supplier,
         employees: isOwner
-          ? { full_name: 'Administrador', role: 'owner' }
+          ? { full_name: t('compras:labels.administrator'), role: 'owner' }
           : isAdmin
-          ? { full_name: 'Administrador', role: 'admin' }
-          : employee || { full_name: 'Responsable desconocido', role: 'employee' }
+          ? { full_name: t('compras:labels.administrator'), role: 'admin' }
+          : employee || { full_name: t('compras:labels.unknownResponsible'), role: 'employee' }
       };
       
       // Verificar si la compra ya existe antes de agregarla
@@ -342,7 +352,7 @@ function Compras({ businessId }: DashboardModuleProps) {
         return [purchaseWithDetails, ...prev];
       });
       
-      setSuccess('✨ Nueva compra registrada');
+      setSuccess(t('compras:alerts.purchaseCreated'));
       setTimeout(() => setSuccess(''), 3000);
     },
     onUpdate: (updatedPurchase) => {
@@ -384,7 +394,7 @@ function Compras({ businessId }: DashboardModuleProps) {
 
   const addToCart = useCallback((product) => {
     if (product?.manage_stock === false) {
-      setError('❌ Este producto no maneja stock y no puede registrarse en compras.');
+      setError(t('compras:errors.stockNotManaged'));
       return;
     }
 
@@ -407,7 +417,7 @@ function Compras({ businessId }: DashboardModuleProps) {
         manage_stock: product.manage_stock !== false
       }];
     });
-  }, []);
+  }, [t]);
 
   const removeFromCart = useCallback((productId) => {
     setCart(prevCart => prevCart.filter(item => item.product_id !== productId));
@@ -467,10 +477,10 @@ function Compras({ businessId }: DashboardModuleProps) {
     setSuccess('');
     
     try {
-      if (!supplierId) throw new Error('Selecciona un proveedor');
-      if (cart.length === 0) throw new Error('Agrega al menos un producto a la compra');
+      if (!supplierId) throw new Error(t('compras:alerts.selectSupplierFirst'));
+      if (cart.length === 0) throw new Error(t('compras:alerts.addProductFirst'));
       if (cart.some((item) => item?.manage_stock === false)) {
-        throw new Error('Hay productos sin control de stock en el carrito. Retíralos para continuar.');
+        throw new Error(t('compras:errors.noStockInCart'));
       }
       if (cart.some((item) => {
         const quantity = Number(item.quantity);
@@ -482,12 +492,12 @@ function Compras({ businessId }: DashboardModuleProps) {
           || unitPrice < 0
         );
       })) {
-        throw new Error('Hay productos con cantidad o precio inválido.');
+        throw new Error(t('compras:errors.invalidQuantityOrPrice'));
       }
-      if (!total || total <= 0) throw new Error('El total de la compra debe ser mayor a 0');
+      if (!total || total <= 0) throw new Error(t('compras:errors.totalMustBePositive'));
 
       const user = await getAuthenticatedUser();
-      if (!user) throw new Error('Tu sesión ha expirado. Inicia sesión nuevamente.');
+      if (!user) throw new Error(t('compras:errors.sessionExpired'));
 
       const result = await createPurchaseWithRpcFallback({
         businessId,
@@ -503,7 +513,7 @@ function Compras({ businessId }: DashboardModuleProps) {
         }))
       });
 
-      setSuccess('✅ Compra registrada exitosamente');
+      setSuccess(t('compras:alerts.purchaseCreated'));
       resetForm();
       setShowModal(false);
       void result;
@@ -511,7 +521,7 @@ function Compras({ businessId }: DashboardModuleProps) {
       loadProductos();
       
     } catch (err) {
-      setError('❌ Error al registrar la compra: ' + err.message);
+      setError(t('compras:errors.processFailed') + ': ' + err.message);
     } finally {
       setIsCreatingPurchase(false);
     }
@@ -527,7 +537,8 @@ function Compras({ businessId }: DashboardModuleProps) {
     limitPurchases,
     pagePurchases,
     loadCompras,
-    loadProductos
+    loadProductos,
+    t
   ]);
 
   const resetForm = () => {
@@ -544,9 +555,9 @@ function Compras({ businessId }: DashboardModuleProps) {
       setSelectedPurchase({ ...purchase, details: data });
       setShowDetailsModal(true);
     } catch {
-      setError('❌ Error al cargar los detalles de la compra');
+      setError(t('compras:errors.detailsFailed'));
     }
-  }, []);
+  }, [t]);
 
   // Funciones de eliminación de compra (solo admin)
   const handleDeletePurchase = (purchaseId) => {
@@ -569,8 +580,8 @@ function Compras({ businessId }: DashboardModuleProps) {
 
       setSuccess(
         appliedManualFallback
-          ? '✅ Compra eliminada y stock ajustado manualmente'
-          : '✅ Compra eliminada exitosamente y stock revertido'
+          ? t('compras:alerts.purchaseDeletedManualStock')
+          : t('compras:alerts.purchaseDeleted')
       );
       setTimeout(() => setSuccess(''), 4000);
 
@@ -582,7 +593,7 @@ function Compras({ businessId }: DashboardModuleProps) {
       setPurchaseToDelete(null);
 
     } catch (error) {
-      setError('❌ ' + (error.message || 'Error al eliminar la compra'));
+      setError(t('compras:errors.deleteFailed') + ': ' + (error.message || t('compras:errors.deleteFailed')));
       setTimeout(() => setError(''), 8000);
       setShowDeleteModal(false);
       setPurchaseToDelete(null);
@@ -617,8 +628,8 @@ function Compras({ businessId }: DashboardModuleProps) {
       onRetry={() => loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (pagePurchases - 1) * limitPurchases })}
       skeletonType="compras"
       hasFilters={Boolean(searchTerm.trim() || Object.keys(currentFiltersPurchases || {}).length > 0)}
-      noResultsTitle="No hay compras para esos filtros"
-      noResultsDescription="Ajusta los filtros o registra una nueva purchase."
+      noResultsTitle={t('compras:empty.noResultsTitle')}
+      noResultsDescription={t('compras:empty.noResultsDescription')}
       noResultsAction={
         <div className="flex flex-col sm:flex-row gap-3">
           <Button
@@ -631,26 +642,26 @@ function Compras({ businessId }: DashboardModuleProps) {
             }}
             className="bg-white text-gray-700 border-2 border-gray-300 hover:bg-gray-100 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
           >
-            Limpiar Filtros
+            {t('compras:buttons.clearFilters')}
           </Button>
           <Button
             type="button"
             onClick={() => setShowModal(true)}
             className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
           >
-            Nueva Compra
+            {t('compras:buttons.newPurchase')}
           </Button>
         </div>
       }
-      emptyTitle="No hay compras registradas"
-      emptyDescription="Crea la primer compra para poder visualizarlas."
+      emptyTitle={t('compras:empty.noPurchases')}
+      emptyDescription={t('compras:empty.noPurchasesDescription')}
       emptyAction={
         <Button
           type="button"
           onClick={() => setShowModal(true)}
           className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
         >
-          Crear Primera Compra
+          {t('compras:empty.createFirstPurchase')}
         </Button>
       }
       bypassStateRendering={showModal}
@@ -671,8 +682,8 @@ function Compras({ businessId }: DashboardModuleProps) {
                 <ShoppingBag className="w-6 h-6 sm:w-8 sm:h-8" />
               </div>
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold">Compras</h1>
-                <p className="text-white/80 mt-1 text-sm sm:text-base">Gestión de compras a proveedores</p>
+                <h1 className="text-2xl sm:text-3xl font-bold">{t('compras:title')}</h1>
+                <p className="text-white/80 mt-1 text-sm sm:text-base">{t('compras:subtitle')}</p>
               </div>
             </div>
             <Button
@@ -680,7 +691,7 @@ function Compras({ businessId }: DashboardModuleProps) {
               className="w-full sm:w-auto gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-xl flex items-center justify-center gap-2 text-sm sm:text-base"
             >
               <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span>Nueva Compra</span>
+              <span>{t('compras:buttons.newPurchase')}</span>
             </Button>
           </div>
         </Card>
@@ -690,7 +701,7 @@ function Compras({ businessId }: DashboardModuleProps) {
       <SaleErrorAlert 
         isVisible={!!error}
         onClose={() => setError('')}
-        title="Error"
+        title={t('common:error')}
         message={error}
         duration={5000}
       />
@@ -698,7 +709,7 @@ function Compras({ businessId }: DashboardModuleProps) {
       <SaleUpdateAlert
         isVisible={isCreatingPurchase}
         onClose={() => {}}
-        title="Generando purchase..."
+        title={t('compras:alerts.generatingPurchase')}
         details={[]}
         duration={600000}
       />
@@ -706,8 +717,8 @@ function Compras({ businessId }: DashboardModuleProps) {
       <SaleSuccessAlert 
         isVisible={!!success}
         onClose={() => setSuccess('')}
-        title="✨ Compra Registrada"
-        details={[{ label: 'Acción', value: success }]}
+        title={t('compras:alerts.purchaseRegistered')}
+        details={[{ label: t('compras:labels.action'), value: success }]}
         duration={5000}
       />
 
@@ -732,7 +743,7 @@ function Compras({ businessId }: DashboardModuleProps) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <Input
             type="text"
-            placeholder="Buscar por proveedor o monto..."
+            placeholder={t('compras:labels.searchPurchase')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 h-12 rounded-xl border-gray-300 focus:border-[#66A5AD] focus:ring-[#66A5AD]"
@@ -750,8 +761,8 @@ function Compras({ businessId }: DashboardModuleProps) {
           <Card className="shadow-xl rounded-2xl bg-white border-none">
             <div className="p-12 text-center">
               <ShoppingBag className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-              <p className="text-gray-500 font-medium text-lg mb-2">No hay compras registradas</p>
-              <p className="text-gray-400">Haz clic en "Nueva Compra" para comenzar</p>
+              <p className="text-gray-500 font-medium text-lg mb-2">{t('empty.noPurchases')}</p>
+              <p className="text-gray-400">{t('empty.noPurchasesDescription')}</p>
             </div>
           </Card>
           ) : (
@@ -773,11 +784,11 @@ function Compras({ businessId }: DashboardModuleProps) {
                         </div>
                         <div>
                           <p className="font-bold text-lg">
-                            {purchase.supplier?.business_name || purchase.supplier?.contact_name || 'Sin proveedor'}
+                            {purchase.supplier?.business_name || purchase.supplier?.contact_name || t('compras:labels.noSupplier')}
                           </p>
                           <p className="text-white/80 text-sm flex items-center gap-1">
                             <Calendar className="w-4 h-4" />
-                            {formatDateOnly(purchase.created_at)}
+                            {fmtDateOnly(purchase.created_at)}
                           </p>
                         </div>
                       </div>
@@ -788,17 +799,17 @@ function Compras({ businessId }: DashboardModuleProps) {
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-600 flex items-center gap-2">
                         <DollarSign className="w-4 h-4" />
-                        Total
+                        {t('compras:details.total')}
                       </span>
                       <span className="text-lg font-bold text-green-600">
-                        {formatPrice(purchase.total)}
+                        {fmtPrice(purchase.total)}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Método de pago</span>
+                      <span className="text-sm text-gray-600">{t('compras:labels.paymentMethod')}</span>
                       <Badge className="bg-gray-100 text-gray-800 capitalize">
-                        {getPaymentMethodLabel(purchase.payment_method)}
+                        {getPaymentMethodLabel(purchase.payment_method, t)}
                       </Badge>
                     </div>
 
@@ -814,13 +825,13 @@ function Compras({ businessId }: DashboardModuleProps) {
                         className="flex-1 h-10 gradient-primary text-white hover:shadow-lg transition-all duration-300 rounded-xl flex items-center justify-center gap-2"
                       >
                         <Eye className="w-4 h-4" />
-                        Ver Detalles
+                        {t('buttons.viewDetails', { ns: 'common' })}
                       </Button>
                       {isAdmin && (
                         <Button
                           onClick={() => handleDeletePurchase(purchase.id)}
                           className="h-10 px-3 bg-red-500 hover:bg-red-600 text-white transition-all duration-300 rounded-xl"
-                          title="Eliminar compra"
+                          title={t('compras:buttons.deletePurchase')}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -874,7 +885,7 @@ function Compras({ businessId }: DashboardModuleProps) {
                   <div className="p-2 bg-white/20 rounded-lg">
                     <Plus className="w-6 h-6" />
                   </div>
-                  <h3 className="text-2xl font-bold">Nueva Compra</h3>
+                  <h3 className="text-2xl font-bold">{t('buttons.newPurchase')}</h3>
                 </div>
                 <button
                   onClick={() => setShowModal(false)}
@@ -889,14 +900,14 @@ function Compras({ businessId }: DashboardModuleProps) {
                   <Card className="border-dashed border-gray-300 bg-gray-50 shadow-none">
                     <div className="p-8 text-center">
                       <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                      <p className="text-lg font-semibold text-gray-700 mb-2">No hay proveedores registrados</p>
-                      <p className="text-sm text-gray-500 mb-5">No es posible registrar compras hasta que exista al menos un proveedor.</p>
+                      <p className="text-lg font-semibold text-gray-700 mb-2">{t('compras:labels.noSuppliersRegistered')}</p>
+                      <p className="text-sm text-gray-500 mb-5">{t('compras:labels.cannotRegisterWithoutSupplier')}</p>
                       <Button
                         type="button"
                         onClick={() => setShowModal(false)}
                         className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
                       >
-                        Entendido
+                        {t('compras:buttons.understood')}
                       </Button>
                     </div>
                   </Card>
@@ -906,7 +917,7 @@ function Compras({ businessId }: DashboardModuleProps) {
                   <Card className="border-dashed border-gray-300 bg-gray-50 shadow-none">
                     <div className="p-8 text-center">
                       <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-400 animate-pulse" />
-                      <p className="text-lg font-semibold text-gray-700 mb-2">Cargando proveedores...</p>
+                      <p className="text-lg font-semibold text-gray-700 mb-2">{t('compras:labels.loadingSuppliers')}</p>
                     </div>
                   </Card>
                 </div>
@@ -916,7 +927,7 @@ function Compras({ businessId }: DashboardModuleProps) {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                     <Building2 className="w-4 h-4" />
-                    Proveedor *
+                    {t('compras:labels.supplier')} *
                   </label>
                   <select
                     value={supplierId}
@@ -924,7 +935,7 @@ function Compras({ businessId }: DashboardModuleProps) {
                     required
                     className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#66A5AD] focus:ring-1 focus:ring-[#66A5AD] outline-none"
                   >
-                    <option value="">Seleccionar proveedor</option>
+                    <option value="">{t('compras:labels.selectSupplier')}</option>
                     {suppliers.map(supplier => (
                       <option key={supplier.id} value={supplier.id}>
                         {supplier.business_name || supplier.contact_name}
@@ -937,16 +948,16 @@ function Compras({ businessId }: DashboardModuleProps) {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                     <DollarSign className="w-4 h-4" />
-                    Método de pago
+                    {t('compras:labels.paymentMethod')}
                   </label>
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
                     className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#66A5AD] focus:ring-1 focus:ring-[#66A5AD] outline-none"
                   >
-                    <option value="cash">Efectivo</option>
-                    <option value="card">Tarjeta</option>
-                    <option value="transfer">Transferencia</option>
+                    <option value="cash">{t('compras:paymentMethods.cash')}</option>
+                    <option value="card">{t('compras:paymentMethods.card')}</option>
+                    <option value="transfer">{t('compras:paymentMethods.transfer')}</option>
                   </select>
                 </div>
 
@@ -954,7 +965,7 @@ function Compras({ businessId }: DashboardModuleProps) {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                     <Package className="w-4 h-4" />
-                    Agregar producto
+                    {t('compras:labels.addProduct')}
                   </label>
                   <select
                     value=""
@@ -971,7 +982,7 @@ function Compras({ businessId }: DashboardModuleProps) {
                     className="w-full h-11 px-4 rounded-xl border border-gray-300 focus:border-[#66A5AD] focus:ring-1 focus:ring-[#66A5AD] outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">
-                      {!supplierId ? 'Primero selecciona un proveedor...' : 'Seleccionar producto...'}
+                      {!supplierId ? t('compras:labels.selectSupplierFirst') : t('compras:labels.selectProduct')}
                     </option>
                     {products
                       .filter(product => (!supplierId || product.supplier_id === supplierId) && product.manage_stock !== false && product.stock > 0)
@@ -981,8 +992,8 @@ function Compras({ businessId }: DashboardModuleProps) {
                           value={product.id}
                           disabled={product.manage_stock === false}
                         >
-                          {product.name} - {formatPrice(product.purchase_price)}
-                          {product.manage_stock === false ? ' (Sin control de stock)' : ''}
+                          {product.name} - {fmtPrice(product.purchase_price)}
+                          {product.manage_stock === false ? ` (${t('compras:labels.noStockControl')})` : ''}
                         </option>
                       ))
                     }
@@ -990,7 +1001,7 @@ function Compras({ businessId }: DashboardModuleProps) {
                   {supplierId && products.filter(p => p.supplier_id === supplierId).length === 0 && (
                     <p className="text-sm text-amber-600 mt-2 flex items-center gap-1">
                       <AlertCircle className="w-4 h-4" />
-                      Este proveedor no tiene productos asignados. Puedes asignar productos en Inventario.
+                      {t('compras:labels.supplierNoProducts')}
                     </p>
                   )}
                 </div>
@@ -1000,7 +1011,7 @@ function Compras({ businessId }: DashboardModuleProps) {
                   <div className="border border-gray-200 rounded-xl p-4">
                     <h4 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
                       <ShoppingBag className="w-5 h-5" />
-                      Productos ({cart.length})
+                      {t('compras:labels.products')} ({cart.length})
                     </h4>
                     <div className="space-y-3">
                       {cart.map(item => (
@@ -1013,7 +1024,7 @@ function Compras({ businessId }: DashboardModuleProps) {
                               type="button"
                               onClick={() => removeFromCart(item.product_id)}
                               className="p-2 hover:bg-red-100 rounded-lg text-red-600 transition-colors shrink-0"
-                              aria-label="Eliminar producto"
+                              aria-label={t('compras:labels.removeProduct')}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1036,15 +1047,15 @@ function Compras({ businessId }: DashboardModuleProps) {
                               className="w-full h-10 border-gray-300"
                             />
                             <span className="text-left sm:text-right font-semibold text-gray-700">
-                              {formatPrice((Number(item.quantity) || 0) * (Number(item.unit_price) || 0))}
+                              {fmtPrice((Number(item.quantity) || 0) * (Number(item.unit_price) || 0))}
                             </span>
                           </div>
                         </div>
                       ))}
                     </div>
                     <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
-                      <span className="text-lg font-semibold text-gray-700">Total:</span>
-                      <span className="text-2xl font-bold text-green-600">{formatPrice(total)}</span>
+                      <span className="text-lg font-semibold text-gray-700">{t('compras:labels.totalLabel')}</span>
+                      <span className="text-2xl font-bold text-green-600">{fmtPrice(total)}</span>
                     </div>
                   </div>
                 )}
@@ -1052,14 +1063,14 @@ function Compras({ businessId }: DashboardModuleProps) {
                 {/* Notas */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Notas (opcional)
+                    {t('compras:labels.notes')}
                   </label>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     rows={3}
                     className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:border-[#66A5AD] focus:ring-1 focus:ring-[#66A5AD] outline-none"
-                    placeholder="Observaciones adicionales..."
+                    placeholder={t('compras:labels.additionalNotes')}
                   />
                 </div>
 
@@ -1070,7 +1081,7 @@ function Compras({ businessId }: DashboardModuleProps) {
                     onClick={() => setShowModal(false)}
                     className="order-2 sm:order-1 w-full sm:flex-1 h-10 sm:h-12 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl border-none"
                   >
-                    Cancelar
+                    {t('buttons.cancel', { ns: 'common' })}
                   </Button>
                   <Button
                     type="submit"
@@ -1080,12 +1091,12 @@ function Compras({ businessId }: DashboardModuleProps) {
                     {isCreatingPurchase ? (
                       <>
                         <CheckCircle2 className="w-5 h-5 mr-2 animate-spin" />
-                        Procesando...
+                        {t('status.processing', { ns: 'common' })}
                       </>
                     ) : (
                       <>
                         <CheckCircle2 className="w-5 h-5 mr-2" />
-                        Registrar Compra
+                        {t('buttons.registerPurchase')}
                       </>
                     )}
                   </Button>
@@ -1121,9 +1132,9 @@ function Compras({ businessId }: DashboardModuleProps) {
                     <Eye className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold">Detalles de Compra</h3>
+                    <h3 className="text-2xl font-bold">{t('compras:details.title')}</h3>
                     <p className="text-white/80 text-sm">
-                      {formatDateOnly(selectedPurchase.created_at)}
+                      {fmtDateOnly(selectedPurchase.created_at)}
                     </p>
                   </div>
                 </div>
@@ -1139,15 +1150,15 @@ function Compras({ businessId }: DashboardModuleProps) {
                 {/* Información general */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-gray-50 rounded-xl">
-                    <p className="text-sm text-gray-600 mb-1">Proveedor</p>
+                    <p className="text-sm text-gray-600 mb-1">{t('compras:labels.supplier')}</p>
                     <p className="font-semibold text-gray-800">
                       {selectedPurchase.supplier?.business_name || selectedPurchase.supplier?.contact_name}
                     </p>
                   </div>
                   <div className="p-4 bg-gray-50 rounded-xl">
-                    <p className="text-sm text-gray-600 mb-1">Método de pago</p>
+                    <p className="text-sm text-gray-600 mb-1">{t('compras:labels.paymentMethod')}</p>
                     <p className="font-semibold text-gray-800 capitalize">
-                      {getPaymentMethodLabel(selectedPurchase.payment_method)}
+                      {getPaymentMethodLabel(selectedPurchase.payment_method, t)}
                     </p>
                   </div>
                 </div>
@@ -1156,7 +1167,7 @@ function Compras({ businessId }: DashboardModuleProps) {
                 <div>
                   <h4 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
                     <Package className="w-5 h-5" />
-                    Productos
+                    {t('compras:labels.products')}
                   </h4>
                   <div className="space-y-2">
                     {selectedPurchase.details?.map(detail => (
@@ -1164,11 +1175,11 @@ function Compras({ businessId }: DashboardModuleProps) {
                         <div>
                           <p className="font-medium text-gray-800">{detail.product?.name}</p>
                           <p className="text-sm text-gray-600">
-                            {detail.quantity} x {formatPrice(detail.product?.purchase_price || 0)}
+                            {detail.quantity} x {fmtPrice(detail.product?.purchase_price || 0)}
                           </p>
                         </div>
                         <span className="font-semibold text-gray-700">
-                          {formatPrice(detail.quantity * (detail.product?.purchase_price || 0))}
+                          {fmtPrice(detail.quantity * (detail.product?.purchase_price || 0))}
                         </span>
                       </div>
                     ))}
@@ -1178,16 +1189,16 @@ function Compras({ businessId }: DashboardModuleProps) {
                 {/* Total */}
                 <div className="border-t border-gray-200 pt-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-xl font-semibold text-gray-700">Total:</span>
+                    <span className="text-xl font-semibold text-gray-700">{t('compras:details.total')}:</span>
                     <span className="text-3xl font-bold text-green-600">
-                      {formatPrice(selectedPurchase.total)}
+                      {fmtPrice(selectedPurchase.total)}
                     </span>
                   </div>
                 </div>
 
                 {selectedPurchase.notes && (
                   <div className="p-4 bg-gray-50 rounded-xl border-l-4 border-gray-500">
-                    <p className="text-sm font-medium text-gray-800 mb-1">Notas</p>
+                    <p className="text-sm font-medium text-gray-800 mb-1">{t('compras:details.notes')}</p>
                     <p className="text-gray-700">{selectedPurchase.notes}</p>
                   </div>
                 )}
@@ -1220,19 +1231,19 @@ function Compras({ businessId }: DashboardModuleProps) {
                   <AlertCircle className="w-6 h-6 text-red-600" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-gray-800">Eliminar Compra</h3>
-                  <p className="text-sm text-gray-600">Esta acción no se puede deshacer</p>
+                  <h3 className="text-xl font-bold text-gray-800">{t('compras:buttons.deletePurchase')}</h3>
+                  <p className="text-sm text-gray-600">{t('messages.actionCannotBeUndone', { ns: 'common' })}</p>
                 </div>
               </div>
 
               <div className="mb-6 p-4 bg-amber-50 border-l-4 border-amber-500 rounded">
                 <p className="text-sm text-amber-800">
-                  <strong>⚠️ Importante:</strong> Al eliminar esta compra, el stock de los productos se revertirá automáticamente.
+                  <strong>⚠️ {t('compras:alerts.important')}:</strong> {t('compras:alerts.purchaseDeletedStockReverted')}
                 </p>
               </div>
 
               <p className="text-gray-700 mb-6">
-                ¿Estás seguro de que deseas eliminar esta compra? El inventario se ajustará restando las cantidades compradas.
+                {t('compras:alerts.confirmDeleteMessage')}
               </p>
 
               <div className="flex gap-3">
@@ -1240,14 +1251,14 @@ function Compras({ businessId }: DashboardModuleProps) {
                   onClick={cancelDelete}
                   className="flex-1 h-11 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl"
                 >
-                  Cancelar
+                  {t('buttons.cancel', { ns: 'common' })}
                 </Button>
                 <Button
                   onClick={confirmDeletePurchase}
                   className="flex-1 h-11 bg-red-500 hover:bg-red-600 text-white rounded-xl flex items-center justify-center gap-2"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Eliminar
+                  {t('buttons.delete', { ns: 'common' })}
                 </Button>
               </div>
             </motion.div>

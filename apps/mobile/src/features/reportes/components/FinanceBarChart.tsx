@@ -15,7 +15,12 @@ interface FinanceBarChartProps {
   chartConfig: Record<string, unknown>;
 }
 
-export default function FinanceBarChart({ data, width, height, chartConfig }: FinanceBarChartProps) {
+export default function FinanceBarChart({
+  data,
+  width,
+  height,
+  chartConfig,
+}: FinanceBarChartProps) {
   return (
     <View style={s.blockCard}>
       <Text style={s.sectionTitle}>Comparativo Ventas vs Compras</Text>

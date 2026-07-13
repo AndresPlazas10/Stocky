@@ -1,6 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { SectionId } from '../../../navigation/sections';
-import { SECTION_BY_ID } from '../../../navigation/sections';
+import { useSectionMeta } from '../../../navigation/sections';
 import { StockyButton } from '../../../ui/StockyButton';
 import { StockyCard } from '../../../ui/StockyCard';
 import { STOCKY_COLORS } from '../../../theme/tokens';
@@ -12,12 +14,17 @@ type Props = {
 };
 
 export function SectionComingSoon({ sectionId, disabledByFlag, onGoHome }: Props) {
-  const section = SECTION_BY_ID[sectionId];
+  const { t } = useTranslation();
+  const sectionMeta = useSectionMeta();
+  const section = useMemo(
+    () => sectionMeta.find((s) => s.id === sectionId),
+    [sectionMeta, sectionId],
+  );
 
   return (
     <StockyCard
-      title={section.label}
-      subtitle={disabledByFlag ? 'Módulo desactivado por feature flag' : 'Módulo en construcción'}
+      title={section?.label || sectionId}
+      subtitle={disabledByFlag ? t('errors.moduleDisabled') : t('errors.moduleComingSoon')}
     >
       <View style={styles.checklist}>
         <Text style={styles.title}>Checklist de paridad</Text>
@@ -28,7 +35,7 @@ export function SectionComingSoon({ sectionId, disabledByFlag, onGoHome }: Props
       </View>
 
       <StockyButton variant="secondary" onPress={onGoHome}>
-        Volver a Inicio
+        {t('buttons.backToHome')}
       </StockyButton>
     </StockyCard>
   );

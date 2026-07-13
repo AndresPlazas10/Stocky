@@ -1,14 +1,15 @@
 import React, { useMemo } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 import { STOCKY_COLORS } from '../../../../theme/tokens';
 import type { PaymentMethod } from '../../../../services/mesaCheckoutService';
 import type { MesaOrderItem } from '../../../../services/mesaOrderService';
 import { getOrderItemName } from '../../../../services/mesaOrderService';
 import { getBankLogoSource, isBankPaymentMethod } from '../../../../utils/paymentMethodBranding';
 import { formatCopAmount } from '../../../../utils/money';
+import { useBusinessConfig } from '../../../../contexts/BusinessConfigContext';
 import {
-  PAYMENT_OPTIONS,
   getPaymentOptionIcon,
   getPaymentOptionLabel,
   type AccountState,
@@ -43,6 +44,17 @@ export const SplitBillStepTwo = React.memo(function SplitBillStepTwo({
   onAdjustQuantity,
   getItemExpectedQuantity: _getItemExpectedQuantity,
 }: SplitBillStepTwoProps) {
+  const { t } = useTranslation('mesas');
+  const config = useBusinessConfig();
+
+  const paymentOptions = useMemo(() => {
+    const availableMethods = config.country.paymentMethods;
+    return availableMethods.map((method) => ({
+      value: method as PaymentMethod,
+      label: t(`paymentMethods.${method}`, { defaultValue: method }),
+    }));
+  }, [config.country.paymentMethods, t]);
+
   const itemMaxQuantities = useMemo(() => {
     const map = new Map<string, number>();
     for (const item of orderItems) {
@@ -60,12 +72,12 @@ export const SplitBillStepTwo = React.memo(function SplitBillStepTwo({
 
   return (
     <>
-      <Text
-        style={styles.sectionTitle}
-      >{`Cuenta ${currentAccountIndex + 1}/${accountsCount}`}</Text>
+      <Text style={styles.sectionTitle}>
+        {t('splitBill.accountName', { number: currentAccountIndex + 1 })} / {accountsCount}
+      </Text>
       {currentAccount ? (
         <>
-          <Text style={styles.fieldLabel}>Método de pago</Text>
+          <Text style={styles.fieldLabel}>{t('labels.paymentMethod')}</Text>
           <View style={styles.dropdownWrap}>
             <Pressable style={styles.dropdownTrigger} onPress={onTogglePaymentMenu}>
               <View style={styles.dropdownTriggerLeft}>
@@ -87,7 +99,7 @@ export const SplitBillStepTwo = React.memo(function SplitBillStepTwo({
                   />
                 )}
                 <Text style={styles.dropdownTriggerText}>
-                  {getPaymentOptionLabel(currentAccount.paymentMethod as PaymentMethod)}
+                  {getPaymentOptionLabel(currentAccount.paymentMethod as PaymentMethod, t)}
                 </Text>
               </View>
               <Ionicons
@@ -99,7 +111,7 @@ export const SplitBillStepTwo = React.memo(function SplitBillStepTwo({
 
             {isPaymentMenuOpen ? (
               <View style={styles.dropdownMenu}>
-                {PAYMENT_OPTIONS.map((option) => {
+                {paymentOptions.map((option) => {
                   const selected = currentAccount.paymentMethod === option.value;
                   return (
                     <Pressable
@@ -142,7 +154,9 @@ export const SplitBillStepTwo = React.memo(function SplitBillStepTwo({
         </>
       ) : null}
 
-      <Text style={styles.fieldLabel}>Productos que paga esta cuenta</Text>
+      <Text style={styles.fieldLabel}>
+        {t('splitBill.assignItems', { defaultValue: 'Productos que paga esta cuenta' })}
+      </Text>
       {orderItems.map((item) => {
         const expected = Math.max(0, Math.floor(Number(item.quantity || 0)));
         const byAccount = itemAssignments[item.id] || {};
@@ -158,7 +172,9 @@ export const SplitBillStepTwo = React.memo(function SplitBillStepTwo({
                 <Text style={styles.assignmentInfoTitle}>
                   {resolveItemName ? resolveItemName(item) : getOrderItemName(item)}
                 </Text>
-                <Text style={styles.assignmentInfoText}>Máximo disponible: {maxForSelected}</Text>
+                <Text style={styles.assignmentInfoText}>
+                  {t('labels.showing', { defaultValue: 'Máximo disponible' })}: {maxForSelected}
+                </Text>
               </View>
               <View style={styles.assignmentControls}>
                 <Pressable
@@ -190,7 +206,9 @@ export const SplitBillStepTwo = React.memo(function SplitBillStepTwo({
       })}
 
       <View style={styles.accountTotalDueRow}>
-        <Text style={styles.accountTotalDueLabel}>Total de esta cuenta</Text>
+        <Text style={styles.accountTotalDueLabel}>
+          {t('labels.orderTotal', { defaultValue: 'Total de esta cuenta' })}
+        </Text>
         <Text style={styles.accountTotalDueValue}>
           {formatCopAmount(currentAccount?.total || 0)}
         </Text>

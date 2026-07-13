@@ -652,12 +652,13 @@ export async function checkInventoryProductCanDelete(productId: string): Promise
   if (error) throw new Error(error.message || 'No se pudo verificar el producto.');
   const fallback = { has_sales: false, has_purchases: false, sales_count: 0, purchases_count: 0 };
   if (!data || typeof data !== 'object') return fallback;
-  const record = data as Record<string, unknown>;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return fallback;
   return {
-    has_sales: record.has_sales !== false,
-    has_purchases: record.has_purchases !== false,
-    sales_count: normalizeNumber(record.sales_count, 0),
-    purchases_count: normalizeNumber(record.purchases_count, 0),
+    has_sales: Boolean(row.has_sales),
+    has_purchases: Boolean(row.has_purchases),
+    sales_count: normalizeNumber(row.sales_count, 0),
+    purchases_count: normalizeNumber(row.purchases_count, 0),
   };
 }
 

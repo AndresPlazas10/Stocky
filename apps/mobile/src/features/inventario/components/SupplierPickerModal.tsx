@@ -1,4 +1,5 @@
 import { Pressable, Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { StockyModal } from '../../../ui/StockyModal';
 import type { InventorySupplierRecord } from '../../../services/inventoryService';
 import { getSupplierDisplayName } from '../inventoryUtils';
@@ -19,10 +20,11 @@ export function SupplierPickerModal({
   onSelect,
   onClose,
 }: Props) {
+  const { t } = useTranslation();
   return (
     <StockyModal
       visible={visible}
-      title="Seleccionar proveedor"
+      title={t('form.selectSupplier')}
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={26}
@@ -40,7 +42,7 @@ export function SupplierPickerModal({
             !selectedSupplierId && styles.modalOptionItemTextSelected,
           ]}
         >
-          Sin proveedor
+          {t('form.noSupplier')}
         </Text>
       </Pressable>
       {suppliers.map((supplier) => {

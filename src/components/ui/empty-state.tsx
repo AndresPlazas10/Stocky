@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import type { ElementType } from 'react';
 import { Package, FileText, Inbox } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface EmptyStateProps {
   icon?: ElementType;
@@ -12,11 +13,13 @@ interface EmptyStateProps {
 
 export const EmptyState = ({
   icon: _Icon = Inbox,
-  title = 'No hay datos',
-  message = 'No se encontraron elementos para mostrar',
+  title,
+  message,
   action,
-  actionLabel = 'Crear nuevo'
+  actionLabel
 }: EmptyStateProps) => {
+  const { t } = useTranslation();
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -26,14 +29,14 @@ export const EmptyState = ({
       <div className="w-20 h-20 rounded-full bg-accent-100 flex items-center justify-center mb-4">
         <_Icon className="w-10 h-10 text-accent-600" />
       </div>
-      <h3 className="text-xl font-semibold text-primary-900 mb-2">{title}</h3>
-      <p className="text-primary-600 mb-6 max-w-sm">{message}</p>
+      <h3 className="text-xl font-semibold text-primary-900 mb-2">{title || t('emptyState.noData')}</h3>
+      <p className="text-primary-600 mb-6 max-w-sm">{message || t('emptyState.noItemsToShow')}</p>
       {action && (
         <button
           onClick={action}
           className="btn-primary"
         >
-          {actionLabel}
+          {actionLabel || t('emptyState.createNew')}
         </button>
       )}
     </motion.div>
@@ -45,23 +48,27 @@ interface EmptyProductsProps {
 }
 
 export const EmptyProducts = ({ onAdd }: EmptyProductsProps) => {
+  const { t } = useTranslation();
+
   return (
     <EmptyState
       icon={Package}
-      title="No hay productos"
-      message="Aún no has agregado productos a tu inventario. Comienza agregando tu primer producto."
+      title={t('emptyState.noProducts')}
+      message={t('emptyState.noProductsYet')}
       action={onAdd}
-      actionLabel="Agregar Producto"
+      actionLabel={t('emptyState.addProduct')}
     />
   );
 };
 
 export const EmptyOrders = () => {
+  const { t } = useTranslation();
+
   return (
     <EmptyState
       icon={FileText}
-      title="No hay pedidos"
-      message="No se encontraron pedidos para mostrar."
+      title={t('emptyState.noOrders')}
+      message={t('emptyState.noOrdersFound')}
     />
   );
 };

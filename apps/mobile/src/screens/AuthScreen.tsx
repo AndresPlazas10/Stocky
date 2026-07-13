@@ -15,11 +15,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { getSupabaseClient } from '../lib/supabase';
 import { useToast } from '../hooks/useToast';
 import { StockyToast } from '../ui/StockyToast';
-import { TOAST_MESSAGES } from '../constants/toastMessages';
+import { useToastMessages } from '../hooks/useToastMessages';
 import { getErrorMessage } from '../utils/error';
+import { LanguageSwitch } from '../ui/LanguageSwitch';
+import { STOCKY_COLORS, STOCKY_RADIUS } from '../theme/tokens';
 
 type AuthMode = 'signin' | 'signup';
 
@@ -67,23 +70,23 @@ function isMissingCreateBusinessRpc(errorLike: unknown) {
   );
 }
 
-function mapSignUpError(errorLike: unknown): Error {
+function mapSignUpError(errorLike: unknown, t: (key: string) => string): Error {
   const errorMsg = getErrorMessage(errorLike);
   const lower = errorMsg.toLowerCase();
 
   if (lower.includes('already registered') || errorMsg === 'User already registered') {
-    return new Error(
-      '❌ Ya existe una cuenta con este nombre de usuario. Intenta con otro nombre.',
-    );
+    return new Error(`❌ ${t('auth.errors.usernameExists')}`);
   }
   if (lower.includes('password')) {
-    return new Error('❌ La contraseña debe tener al menos 6 caracteres');
+    return new Error(`❌ ${t('auth.errors.passwordTooShort')}`);
   }
   if (lower.includes('email')) {
-    return new Error('❌ El formato del correo es inválido');
+    return new Error(`❌ ${t('auth.errors.invalidEmail')}`);
   }
 
-  return new Error(`❌ Error al crear la cuenta: ${errorMsg || 'Error desconocido'}`);
+  return new Error(
+    `❌ ${t('auth.errors.accountCreationFailed')}: ${errorMsg || t('errors.unknown')}`,
+  );
 }
 
 async function createBusinessWithFallback({
@@ -94,6 +97,7 @@ async function createBusinessWithFallback({
   phone,
   email,
   username,
+  t,
 }: {
   userId: string;
   name: string;
@@ -102,6 +106,7 @@ async function createBusinessWithFallback({
   phone: string;
   email: string;
   username: string;
+  t: (key: string) => string;
 }): Promise<{ id: string }> {
   const client = getSupabaseClient();
 
@@ -118,7 +123,7 @@ async function createBusinessWithFallback({
     const rpcData = rpcResult.data as Record<string, unknown>;
     const businessId = String(rpcData?.id || '').trim();
     if (!businessId) {
-      throw new Error('❌ Error al crear el negocio');
+      throw new Error(`❌ ${t('auth.errors.businessCreationFailed')}`);
     }
     return { id: businessId };
   }
@@ -150,7 +155,7 @@ async function createBusinessWithFallback({
 
   const businessId = String(insertResult.data?.id || '').trim();
   if (!businessId) {
-    throw new Error('❌ Error al crear el negocio');
+    throw new Error(`❌ ${t('auth.errors.businessCreationFailed')}`);
   }
 
   return { id: businessId };
@@ -185,12 +190,12 @@ function AuthInput({
     <View style={styles.inputGroup}>
       <Text style={styles.inputLabel}>{label}</Text>
       <View style={styles.inputShell}>
-        <Ionicons name={icon} size={22} color="#111827" />
+        <Ionicons name={icon} size={22} color={STOCKY_COLORS.textMuted} />
         <TextInput
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#8AABB2"
           style={styles.input}
           secureTextEntry={secure && !isVisible}
           keyboardType={keyboardType}
@@ -202,7 +207,7 @@ function AuthInput({
             <Ionicons
               name={isVisible ? 'eye-off-outline' : 'eye-outline'}
               size={24}
-              color="#9CA3AF"
+              color={STOCKY_COLORS.textMuted}
             />
           </Pressable>
         ) : null}
@@ -212,6 +217,7 @@ function AuthInput({
 }
 
 export function AuthScreen() {
+  const { t } = useTranslation();
   const { height: viewportHeight } = useWindowDimensions();
   const [mode, setMode] = useState<AuthMode>('signin');
   const allowSignUp = false;
@@ -236,8 +242,8 @@ export function AuthScreen() {
   const [showSignUpConfirmPassword, setShowSignUpConfirmPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const toast = useToast();
+  const toastMessages = useToastMessages();
 
   const isSignIn = mode === 'signin';
 
@@ -259,7 +265,7 @@ export function AuthScreen() {
     const password = signInForm.password;
 
     if (!username || !password) {
-      throw new Error('⚠️ Por favor ingresa usuario y contraseña');
+      throw new Error(`⚠️ ${t('auth.errors.credentialsRequired')}`);
     }
 
     const client = getSupabaseClient();
@@ -270,7 +276,7 @@ export function AuthScreen() {
     });
 
     if (signInError) {
-      throw new Error('❌ Usuario o contraseña incorrectos');
+      throw new Error(t('auth.errors.invalidCredentials'));
     }
   };
 
@@ -356,26 +362,24 @@ export function AuthScreen() {
       ]);
 
       if (!isAvailable) {
-        throw new Error('❌ Este nombre de usuario ya está en uso');
+        throw new Error(`❌ ${t('auth.errors.usernameTaken')}`);
       }
 
       if (authResult.error) {
-        throw mapSignUpError(authResult.error);
+        throw mapSignUpError(authResult.error, t);
       }
 
       if (!authResult.data?.user?.id) {
-        throw new Error('❌ Error al crear la cuenta');
+        throw new Error(`❌ ${t('auth.errors.accountCreationFailed')}`);
       }
 
       if (!authResult.data?.session) {
-        throw new Error(
-          '⚠️ Supabase requiere confirmación de email. Desactiva "Confirm email" para este flujo.',
-        );
+        throw new Error(`⚠️ ${t('auth.errors.emailConfirmationRequired')}`);
       }
 
       const userId = authResult.data.user.id;
 
-      toast.showSuccess(TOAST_MESSAGES.auth.accountCreated());
+      toast.showSuccess(toastMessages.auth.accountCreated());
 
       createBusinessWithFallback({
         userId,
@@ -385,6 +389,7 @@ export function AuthScreen() {
         phone: signUpForm.phone,
         email,
         username,
+        t,
       })
         .then((business) =>
           client.from('employees').insert([
@@ -415,7 +420,6 @@ export function AuthScreen() {
     if (!canSubmit || loading) return;
 
     setLoading(true);
-    setError(null);
 
     try {
       if (isSignIn) {
@@ -424,7 +428,8 @@ export function AuthScreen() {
         await submitSignUp();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo autenticar');
+      const msg = err instanceof Error ? err.message : t('auth.errors.accountCreationFailed');
+      toast.showError({ title: msg });
     } finally {
       setLoading(false);
     }
@@ -433,7 +438,6 @@ export function AuthScreen() {
   const switchMode = () => {
     if (!allowSignUp) return;
     setMode((prev) => (prev === 'signin' ? 'signup' : 'signin'));
-    setError(null);
   };
 
   const contentContainerStyle = [
@@ -449,11 +453,15 @@ export function AuthScreen() {
 
   return (
     <LinearGradient
-      colors={['#E1E8F8', '#E8EEF8', '#EDE9FB']}
+      colors={[STOCKY_COLORS.primary900, STOCKY_COLORS.primary700, STOCKY_COLORS.accent500]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
     >
+      <View style={styles.blob1} />
+      <View style={styles.blob2} />
+      <View style={styles.blob3} />
+
       <SafeAreaView style={styles.container}>
         <KeyboardAvoidingView
           style={styles.keyboardAvoiding}
@@ -466,186 +474,207 @@ export function AuthScreen() {
             keyboardDismissMode="on-drag"
             automaticallyAdjustKeyboardInsets
           >
+            <StockyToast
+              visible={toast.toast.visible}
+              type={toast.toast.type}
+              title={toast.toast.title}
+              message={toast.toast.message}
+              ctaText={toast.toast.ctaText}
+              durationMs={toast.toast.durationMs}
+              onClose={toast.hideToast}
+            />
+
             <View style={cardStyle}>
+              <View style={styles.languageSwitchContainer}>
+                <LanguageSwitch />
+              </View>
+
               <LinearGradient
-                colors={['#4F46E5', '#A21CAF']}
+                colors={[STOCKY_COLORS.primary700, STOCKY_COLORS.accent500]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.logoBox}
               >
                 <Ionicons
                   name={isSignIn ? 'storefront-outline' : 'business-outline'}
-                  size={44}
+                  size={36}
                   color="#FFFFFF"
                 />
               </LinearGradient>
 
-              <Text style={styles.title}>{isSignIn ? 'Iniciar Sesión' : 'Registrar Negocio'}</Text>
+              <Text style={styles.title}>{isSignIn ? t('auth.login') : t('auth.register')}</Text>
+
               <Text style={styles.subtitle}>
-                {isSignIn
-                  ? 'Ingresa tus credenciales para acceder'
-                  : 'Completa la información de tu negocio para comenzar'}
+                {isSignIn ? t('auth.loginSubtitle') : t('auth.registerSubtitle')}
               </Text>
 
               {isSignIn ? (
-                <Pressable
-                  onPress={() => Linking.openURL('https://www.stockypos.app')}
-                  style={styles.registerPromptWrap}
-                >
-                  <Text style={styles.registerPromptText}>
-                    ¿No has registrado tu negocio? Registrate gratis en www.stockypos.app
-                  </Text>
-                </Pressable>
+                <>
+                  <Pressable
+                    onPress={() => Linking.openURL('https://www.stockypos.app')}
+                    style={styles.registerPromptWrap}
+                  >
+                    <Text style={styles.registerPromptText}>{t('auth.registerPrompt')}</Text>
+                  </Pressable>
+                  <View style={styles.separator} />
+                </>
               ) : null}
 
-              {error ? <Text style={styles.error}>{error}</Text> : null}
-              <StockyToast
-                visible={toast.toast.visible}
-                type={toast.toast.type}
-                title={toast.toast.title}
-                message={toast.toast.message}
-                ctaText={toast.toast.ctaText}
-                durationMs={toast.toast.durationMs}
-                onClose={toast.hideToast}
-              />
+              <View>
+                {isSignIn ? (
+                  <>
+                    <AuthInput
+                      label={t('auth.username')}
+                      value={signInForm.username}
+                      onChangeText={(next) =>
+                        setSignInForm((prev) => ({ ...prev, username: next }))
+                      }
+                      placeholder={t('auth.usernamePlaceholder')}
+                      icon="person-outline"
+                      autoCapitalize="none"
+                    />
 
-              {isSignIn ? (
-                <>
-                  <AuthInput
-                    label="Usuario"
-                    value={signInForm.username}
-                    onChangeText={(next) => setSignInForm((prev) => ({ ...prev, username: next }))}
-                    placeholder="Tu nombre de usuario"
-                    icon="person-outline"
-                    autoCapitalize="none"
-                  />
+                    <AuthInput
+                      label={t('auth.password')}
+                      value={signInForm.password}
+                      onChangeText={(next) =>
+                        setSignInForm((prev) => ({ ...prev, password: next }))
+                      }
+                      placeholder={t('auth.passwordPlaceholder')}
+                      icon="lock-closed-outline"
+                      secure
+                      showToggle
+                      isVisible={showSignInPassword}
+                      onToggleVisibility={() => setShowSignInPassword((prev) => !prev)}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <AuthInput
+                      label={t('auth.businessName')}
+                      value={signUpForm.name}
+                      onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, name: next }))}
+                      placeholder={t('auth.businessNamePlaceholder')}
+                      icon="storefront-outline"
+                      autoCapitalize="words"
+                    />
 
-                  <AuthInput
-                    label="Contraseña"
-                    value={signInForm.password}
-                    onChangeText={(next) => setSignInForm((prev) => ({ ...prev, password: next }))}
-                    placeholder="Tu contraseña"
-                    icon="lock-closed-outline"
-                    secure
-                    showToggle
-                    isVisible={showSignInPassword}
-                    onToggleVisibility={() => setShowSignInPassword((prev) => !prev)}
-                  />
-                </>
-              ) : (
-                <>
-                  <AuthInput
-                    label="Nombre del negocio"
-                    value={signUpForm.name}
-                    onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, name: next }))}
-                    placeholder="Ej: Mi Cafetería"
-                    icon="storefront-outline"
-                    autoCapitalize="words"
-                  />
+                    <AuthInput
+                      label={t('auth.username')}
+                      value={signUpForm.username}
+                      onChangeText={(next) =>
+                        setSignUpForm((prev) => ({ ...prev, username: next }))
+                      }
+                      placeholder={t('auth.usernamePlaceholder')}
+                      icon="person-outline"
+                      autoCapitalize="none"
+                    />
 
-                  <AuthInput
-                    label="Usuario"
-                    value={signUpForm.username}
-                    onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, username: next }))}
-                    placeholder="usuario_negocio"
-                    icon="person-outline"
-                    autoCapitalize="none"
-                  />
+                    <AuthInput
+                      label={t('auth.nitOptional')}
+                      value={signUpForm.nit}
+                      onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, nit: next }))}
+                      placeholder="900.123.456-7"
+                      icon="business-outline"
+                    />
 
-                  <AuthInput
-                    label="NIT (opcional)"
-                    value={signUpForm.nit}
-                    onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, nit: next }))}
-                    placeholder="900.123.456-7"
-                    icon="business-outline"
-                  />
+                    <AuthInput
+                      label={t('auth.phone')}
+                      value={signUpForm.phone}
+                      onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, phone: next }))}
+                      placeholder="+57 300 123 4567"
+                      icon="call-outline"
+                      keyboardType="phone-pad"
+                    />
 
-                  <AuthInput
-                    label="Teléfono"
-                    value={signUpForm.phone}
-                    onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, phone: next }))}
-                    placeholder="+57 300 123 4567"
-                    icon="call-outline"
-                    keyboardType="phone-pad"
-                  />
+                    <AuthInput
+                      label={t('auth.address')}
+                      value={signUpForm.address}
+                      onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, address: next }))}
+                      placeholder={t('auth.addressPlaceholder')}
+                      icon="location-outline"
+                      autoCapitalize="words"
+                    />
 
-                  <AuthInput
-                    label="Dirección"
-                    value={signUpForm.address}
-                    onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, address: next }))}
-                    placeholder="Calle 123 #45-67"
-                    icon="location-outline"
-                    autoCapitalize="words"
-                  />
+                    <AuthInput
+                      label={t('auth.password')}
+                      value={signUpForm.password}
+                      onChangeText={(next) =>
+                        setSignUpForm((prev) => ({ ...prev, password: next }))
+                      }
+                      placeholder={t('auth.passwordPlaceholder')}
+                      icon="lock-closed-outline"
+                      secure
+                      showToggle
+                      isVisible={showSignUpPassword}
+                      onToggleVisibility={() => setShowSignUpPassword((prev) => !prev)}
+                    />
 
-                  <AuthInput
-                    label="Contraseña"
-                    value={signUpForm.password}
-                    onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, password: next }))}
-                    placeholder="Mínimo 6 caracteres"
-                    icon="lock-closed-outline"
-                    secure
-                    showToggle
-                    isVisible={showSignUpPassword}
-                    onToggleVisibility={() => setShowSignUpPassword((prev) => !prev)}
-                  />
+                    <AuthInput
+                      label={t('auth.confirmPassword')}
+                      value={signUpForm.confirmPassword}
+                      onChangeText={(next) =>
+                        setSignUpForm((prev) => ({
+                          ...prev,
+                          confirmPassword: next,
+                        }))
+                      }
+                      placeholder={t('auth.confirmPasswordPlaceholder')}
+                      icon="lock-closed-outline"
+                      secure
+                      showToggle
+                      isVisible={showSignUpConfirmPassword}
+                      onToggleVisibility={() => setShowSignUpConfirmPassword((prev) => !prev)}
+                    />
+                  </>
+                )}
+              </View>
 
-                  <AuthInput
-                    label="Confirmar contraseña"
-                    value={signUpForm.confirmPassword}
-                    onChangeText={(next) =>
-                      setSignUpForm((prev) => ({ ...prev, confirmPassword: next }))
-                    }
-                    placeholder="Repite la contraseña"
-                    icon="lock-closed-outline"
-                    secure
-                    showToggle
-                    isVisible={showSignUpConfirmPassword}
-                    onToggleVisibility={() => setShowSignUpConfirmPassword((prev) => !prev)}
-                  />
-                </>
-              )}
-
-              <Pressable
-                onPress={submit}
-                disabled={!canSubmit || loading}
-                style={styles.submitWrap}
-              >
-                <LinearGradient
-                  colors={!canSubmit || loading ? ['#7D8AA7', '#9CA3AF'] : ['#4F46E5', '#A21CAF']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.submitButton}
-                >
-                  {loading ? <ActivityIndicator color="#FFFFFF" /> : null}
-                  <Text style={styles.submitText}>
-                    {isSignIn ? 'Iniciar Sesión' : 'Registrar Negocio'}
-                  </Text>
-                </LinearGradient>
-              </Pressable>
-
-              {!allowSignUp ? (
+              <View>
                 <Pressable
-                  onPress={() => Linking.openURL('https://wa.me/573188246925')}
-                  style={styles.signInHelperWrap}
+                  onPress={submit}
+                  disabled={!canSubmit || loading}
+                  style={styles.submitWrap}
                 >
-                  <Text style={styles.signInHelper}>
-                    ¿Tienes problemas con el acceso? Escríbenos a nuestro correo
-                    soporte@stockypos.app y te responderemos con gusto.
-                  </Text>
-                </Pressable>
-              ) : (
-                <View style={styles.switchRow}>
-                  <Text style={styles.switchPrompt}>
-                    {isSignIn ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
-                  </Text>
-                  <Pressable onPress={switchMode}>
-                    <Text style={styles.switchAction}>
-                      {isSignIn ? 'Registrar negocio' : 'Iniciar sesión'}
+                  <LinearGradient
+                    colors={
+                      !canSubmit || loading
+                        ? [STOCKY_COLORS.accent300, STOCKY_COLORS.backgroundBase]
+                        : [STOCKY_COLORS.primary900, STOCKY_COLORS.primary700]
+                    }
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.submitButton}
+                  >
+                    {loading ? <ActivityIndicator color="#FFFFFF" /> : null}
+                    <Text style={styles.submitText}>
+                      {isSignIn ? t('buttons.signIn') : t('buttons.signUp')}
                     </Text>
+                  </LinearGradient>
+                </Pressable>
+              </View>
+
+              <View>
+                {!allowSignUp ? (
+                  <Pressable
+                    onPress={() => Linking.openURL('https://wa.me/573188246925')}
+                    style={styles.signInHelperWrap}
+                  >
+                    <Text style={styles.signInHelper}>{t('auth.supportMessage')}</Text>
                   </Pressable>
-                </View>
-              )}
+                ) : (
+                  <View style={styles.switchRow}>
+                    <Text style={styles.switchPrompt}>
+                      {isSignIn ? t('auth.noAccount') : t('auth.hasAccount')}
+                    </Text>
+                    <Pressable onPress={switchMode}>
+                      <Text style={styles.switchAction}>
+                        {isSignIn ? t('auth.registerBusiness') : t('auth.signIn')}
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -664,6 +693,33 @@ const styles = StyleSheet.create({
   keyboardAvoiding: {
     flex: 1,
   },
+  blob1: {
+    position: 'absolute',
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    top: -60,
+    right: -80,
+    backgroundColor: 'rgba(102, 165, 173, 0.18)',
+  },
+  blob2: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    bottom: -40,
+    left: -60,
+    backgroundColor: 'rgba(153, 211, 219, 0.15)',
+  },
+  blob3: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    top: '40%',
+    right: -40,
+    backgroundColor: 'rgba(0, 59, 70, 0.12)',
+  },
   content: {
     flexGrow: 1,
     paddingHorizontal: 18,
@@ -681,153 +737,151 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: '100%',
     maxWidth: 430,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(209, 213, 219, 0.9)',
+    borderRadius: STOCKY_RADIUS.xl,
+    backgroundColor: STOCKY_COLORS.surface,
     paddingHorizontal: 16,
     paddingVertical: 18,
-    shadowColor: '#111827',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowColor: STOCKY_COLORS.primary900,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
   },
   cardSignUp: {
     justifyContent: 'flex-start',
   },
+  languageSwitchContainer: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    zIndex: 10,
+  },
   logoBox: {
-    width: 76,
-    height: 76,
-    borderRadius: 22,
+    width: 64,
+    height: 64,
+    borderRadius: 20,
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
-    shadowColor: '#6D28D9',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
+    marginBottom: 12,
+    shadowColor: STOCKY_COLORS.primary700,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
     elevation: 10,
   },
   title: {
     textAlign: 'center',
-    color: '#5B33D6',
-    fontSize: 34,
-    lineHeight: 40,
-    fontWeight: '700',
+    color: STOCKY_COLORS.primary900,
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '800',
   },
   subtitle: {
     marginTop: 4,
-    marginBottom: 12,
+    marginBottom: 6,
     textAlign: 'center',
-    color: '#4B5563',
-    fontSize: 16,
-    lineHeight: 22,
+    color: STOCKY_COLORS.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '500',
   },
   registerPromptWrap: {
-    marginBottom: 10,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(91, 51, 214, 0.14)',
-    backgroundColor: 'rgba(91, 51, 214, 0.06)',
+    borderColor: 'rgba(7, 87, 91, 0.14)',
+    backgroundColor: 'rgba(7, 87, 91, 0.06)',
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   registerPromptText: {
     textAlign: 'center',
-    color: '#4338CA',
+    color: STOCKY_COLORS.primary700,
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '600',
   },
+  separator: {
+    height: 1,
+    backgroundColor: STOCKY_COLORS.borderSoft,
+    marginVertical: 8,
+    width: '35%',
+    alignSelf: 'center',
+  },
   inputGroup: {
-    gap: 8,
-    marginTop: 8,
+    gap: 5,
+    marginTop: 6,
   },
   inputLabel: {
-    color: '#111827',
-    fontSize: 15,
-    fontWeight: '700',
+    color: STOCKY_COLORS.textPrimary,
+    fontSize: 14,
+    fontWeight: '600',
   },
   inputShell: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    borderRadius: 16,
+    gap: 12,
+    borderRadius: STOCKY_RADIUS.md,
     borderWidth: 1.5,
-    borderColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
-    minHeight: 54,
-    paddingHorizontal: 12,
+    borderColor: STOCKY_COLORS.borderSoft,
+    backgroundColor: STOCKY_COLORS.surface,
+    minHeight: 46,
+    paddingHorizontal: 14,
   },
   input: {
     flex: 1,
-    color: '#111827',
+    color: STOCKY_COLORS.textPrimary,
     fontSize: 15,
     fontWeight: '500',
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   submitWrap: {
-    marginTop: 16,
+    marginTop: 14,
   },
   submitButton: {
-    minHeight: 50,
-    borderRadius: 14,
+    minHeight: 44,
+    borderRadius: STOCKY_RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 10,
     paddingHorizontal: 16,
-    shadowColor: '#5B33D6',
+    shadowColor: STOCKY_COLORS.primary900,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 7,
   },
   submitText: {
-    color: '#E5E7EB',
-    fontSize: 18,
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '700',
   },
   switchRow: {
-    marginTop: 14,
+    marginTop: 16,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     flexWrap: 'wrap',
   },
   switchPrompt: {
-    color: '#4B5563',
+    color: STOCKY_COLORS.textMuted,
     fontSize: 15,
     fontWeight: '500',
   },
   switchAction: {
-    color: '#4C3CB0',
+    color: STOCKY_COLORS.primary700,
     fontSize: 15,
     fontWeight: '700',
   },
   signInHelperWrap: {
-    marginTop: 12,
+    marginTop: 10,
   },
   signInHelper: {
     textAlign: 'center',
-    color: '#4B5563',
+    color: STOCKY_COLORS.textMuted,
     fontSize: 13,
     fontWeight: '600',
     lineHeight: 18,
-  },
-  error: {
-    color: '#B91C1C',
-    backgroundColor: '#FEE2E2',
-    borderColor: '#FECACA',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    marginBottom: 4,
-    fontSize: 13,
-    fontWeight: '600',
   },
 });

@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Animated, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
-import { DashboardProvider } from './DashboardContext';
+import { DashboardProvider, useDashboardContext } from './DashboardContext';
+import { BusinessConfigProvider } from '../../contexts/BusinessConfigContext';
 import { AppNavigator } from '../../navigation/AppNavigator';
 import { StockyErrorBoundary } from '../../ui/StockyErrorBoundary';
 import { perfMark } from '../../utils/perfAudit';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
 import type { AppUpdateNotice } from '../../services/appUpdateService';
+import { ToastProvider } from '../../contexts/ToastContext';
+import { ToastHost } from '../../ui/ToastHost';
 
 export function DashboardApp({
   session,
@@ -55,39 +58,85 @@ export function DashboardApp({
 
   return (
     <DashboardProvider session={session}>
-      <StockyErrorBoundary>
-        <AppNavigator />
-      </StockyErrorBoundary>
-      <Modal visible={Boolean(updateNotice)} transparent animationType="fade" statusBarTranslucent>
-        <View style={styles.overlay}>
-          <Animated.View
-            style={[
-              styles.card,
-              {
-                transform: [{ scale: scaleAnim }],
-                opacity: fadeAnim,
-              },
-            ]}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.title}>Actualización disponible</Text>
-              <Text style={styles.version}>v{updateNotice?.latestVersion}</Text>
-            </View>
-
-            <Text style={styles.message}>{updateNotice?.message}</Text>
-
-            <View style={styles.actions}>
-              <Pressable style={styles.downloadBtn} onPress={handleDownload}>
-                <Text style={styles.downloadText}>Descargar</Text>
-              </Pressable>
-              <Pressable style={styles.dismissBtn} onPress={dismissUpdateNotice}>
-                <Text style={styles.dismissText}>Ahora no</Text>
-              </Pressable>
-            </View>
-          </Animated.View>
-        </View>
-      </Modal>
+      <DashboardContent
+        updateNotice={updateNotice}
+        dismissUpdateNotice={dismissUpdateNotice}
+        scaleAnim={scaleAnim}
+        fadeAnim={fadeAnim}
+        handleDownload={handleDownload}
+      />
     </DashboardProvider>
+  );
+}
+
+function DashboardContent({
+  updateNotice,
+  dismissUpdateNotice,
+  scaleAnim,
+  fadeAnim,
+  handleDownload,
+}: {
+  updateNotice: AppUpdateNotice | null;
+  dismissUpdateNotice: () => void;
+  scaleAnim: Animated.Value;
+  fadeAnim: Animated.Value;
+  handleDownload: () => void;
+}) {
+  const { businessContext } = useDashboardContext();
+
+  return (
+    <BusinessConfigProvider
+      business={
+        businessContext
+          ? {
+              country_code: businessContext.country_code || undefined,
+              timezone: businessContext.timezone || undefined,
+              currency: businessContext.currency || undefined,
+            }
+          : null
+      }
+    >
+      <ToastProvider>
+        <StockyErrorBoundary>
+          <AppNavigator />
+        </StockyErrorBoundary>
+        <ToastHost />
+        <Modal
+          visible={Boolean(updateNotice)}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+        >
+          <View style={styles.overlay}>
+            <Animated.View
+              style={[
+                styles.card,
+                {
+                  transform: [{ scale: scaleAnim }],
+                  opacity: fadeAnim,
+                },
+              ]}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.title}>Actualización disponible</Text>
+                <Text style={styles.version}>v{updateNotice?.latestVersion}</Text>
+              </View>
+
+              <Text style={styles.message}>{updateNotice?.message}</Text>
+
+              <View style={styles.actions}>
+                <Pressable style={styles.downloadBtn} onPress={handleDownload}>
+                  <Text style={styles.downloadText}>Descargar</Text>
+                </Pressable>
+                <Pressable style={styles.dismissBtn} onPress={dismissUpdateNotice}>
+                  <Text style={styles.dismissText}>Ahora no</Text>
+                </Pressable>
+              </View>
+            </Animated.View>
+          </View>
+        </Modal>
+      </ToastProvider>
+    </BusinessConfigProvider>
   );
 }
 

@@ -10,6 +10,15 @@ const getPaymentMethodLabel = (method) => {
   if (method === 'banco_bogota') return 'Banco de Bogota';
   if (method === 'nu') return 'Nu';
   if (method === 'davivienda') return 'Davivienda';
+  if (method === 'daviplata') return 'Daviplata';
+  if (method === 'spei') return 'SPEI';
+  if (method === 'oxxo') return 'OXXO';
+  if (method === 'yape') return 'Yape';
+  if (method === 'plin') return 'Plin';
+  if (method === 'mercadopago') return 'Mercado Pago';
+  if (method === 'venmo') return 'Venmo';
+  if (method === 'cashapp') return 'Cash App';
+  if (method === 'zelle') return 'Zelle';
   return String(method || 'No especificado');
 };
 
@@ -24,12 +33,30 @@ const getSaleDetailDisplayName = (detail) => (
 export const buildSaleReceiptTemplate = ({
   sale,
   saleDetails = [],
-  sellerName = 'Empleado',
-  businessName = 'Sistema Stocky',
-  footerMessage = 'Gracias por su compra',
+  sellerName,
+  businessName,
+  footerMessage,
   voluntaryTip = null,
-  customerName = 'Venta general',
+  customerName,
+  labels,
 }) => {
+  const l = labels || {
+    title: 'COMPROBANTE DE VENTA',
+    receiptNumber: 'Comprobante',
+    seller: 'Vendedor',
+    sellerDefault: 'Empleado',
+    customer: 'Cliente',
+    customerDefault: 'Venta general',
+    productHeader: 'Producto',
+    quantityAbbreviation: 'Cant.',
+    total: 'TOTAL',
+    tip: 'Propina',
+    method: 'Método',
+    notSpecified: 'No especificado',
+    footer: '¡Gracias por su compra!',
+    kitchenSystem: 'Sistema Stocky',
+  };
+
   const subtotal = Number(sale?.total || 0);
   const tipAmount = voluntaryTip?.enabled ? Number(voluntaryTip?.amount || 0) : 0;
   const total = subtotal + tipAmount;
@@ -39,14 +66,14 @@ export const buildSaleReceiptTemplate = ({
     version: 1,
     requiredSections: ['items', 'totals'],
     header: {
-      title: 'COMPROBANTE DE VENTA',
-      businessName: String(businessName || 'Sistema Stocky'),
+      title: l.title,
+      businessName: String(businessName || l.kitchenSystem),
       dateText: formatDateTimeTicket(sale?.created_at || new Date()),
       alignment: 'center',
     },
     metadata: [
-      { label: 'Vendedor', value: String(sellerName || 'Empleado') },
-      { label: 'Cliente', value: String(customerName || 'Venta general') },
+      { label: l.seller, value: String(sellerName || l.sellerDefault) },
+      { label: l.customer, value: String(customerName || l.customerDefault) },
     ],
     items: saleDetails.map((item) => {
       const quantity = Number(item?.quantity || 0);
@@ -74,9 +101,14 @@ export const buildSaleReceiptTemplate = ({
       methodText: getPaymentMethodLabel(sale?.payment_method),
     },
     footer: {
-      message: String(footerMessage || 'Gracias por su compra'),
+      message: String(footerMessage || l.footer),
       alignment: 'center',
     },
+    itemsHeader: `${l.productHeader}       ${l.quantityAbbreviation}      ${l.total}`,
+    tipLabel: l.tip,
+    totalLabel: l.total,
+    methodLabel: l.method,
+    notSpecified: l.notSpecified,
   };
 };
 

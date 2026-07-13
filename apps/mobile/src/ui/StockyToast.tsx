@@ -1,7 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Platform, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  runOnUI,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  withSpring,
+  cancelAnimation,
+} from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useToastSound } from '../hooks/useToastSound';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -11,6 +22,7 @@ export type ToastOptions = {
   message?: string;
   ctaText?: string;
   durationMs?: number;
+  sound?: boolean;
 };
 
 type Props = ToastOptions & {
@@ -28,6 +40,8 @@ const TYPE_CONFIG: Record<
   info: { iconName: 'information', iconBg: '#3B82F6', progressColor: '#3B82F6' },
 };
 
+const SPRING_CONFIG = { damping: 12, stiffness: 80, mass: 0.8 };
+
 export function StockyToast({
   visible,
   type,
@@ -35,13 +49,15 @@ export function StockyToast({
   message,
   ctaText,
   durationMs = 2500,
+  sound = true,
   onClose,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const [progress] = useState(() => new Animated.Value(0));
-  const translateY = useState(() => new Animated.Value(100))[0];
-  const opacity = useState(() => new Animated.Value(0))[0];
+  const progress = useSharedValue(0);
+  const translateY = useSharedValue(-100);
+  const opacity = useSharedValue(0);
   const onCloseRef = useRef(onClose);
+  const { playSound } = useToastSound();
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -49,56 +65,49 @@ export function StockyToast({
 
   useEffect(() => {
     if (!visible) {
-      progress.stopAnimation();
-      progress.setValue(0);
-      Animated.parallel([
-        Animated.timing(translateY, { toValue: 100, duration: 200, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }),
-      ]).start();
+      cancelAnimation(progress);
+      progress.value = 0;
+      translateY.value = withTiming(-100, { duration: 200 });
+      opacity.value = withTiming(0, { duration: 200 });
       return;
     }
 
-    progress.setValue(0);
-    translateY.setValue(100);
-    opacity.setValue(0);
+    if (sound) {
+      playSound(type);
+    }
 
-    Animated.parallel([
-      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, tension: 60, friction: 9 }),
-      Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-    ]).start();
+    runOnUI(() => {
+      'worklet';
+      progress.value = 0;
+      translateY.value = withSpring(0, SPRING_CONFIG);
+      opacity.value = withTiming(1, { duration: 200 });
+      progress.value = withTiming(
+        1,
+        { duration: durationMs, easing: Easing.linear },
+        (finished) => {
+          if (finished) {
+            runOnJS(onCloseRef.current)();
+          }
+        },
+      );
+    })();
+  }, [visible, durationMs, progress, translateY, opacity, sound, type, playSound]);
 
-    const anim = Animated.timing(progress, {
-      toValue: 1,
-      duration: durationMs,
-      useNativeDriver: false,
-    });
-    let cancelled = false;
-    anim.start(({ finished }) => {
-      if (finished && !cancelled) onCloseRef.current();
-    });
-    return () => {
-      cancelled = true;
-      anim.stop();
-    };
-  }, [durationMs, progress, translateY, opacity, visible]);
+  const progressStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleX: progress.value }],
+  }));
 
-  const scaleX = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
+  const containerStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
 
   const config = TYPE_CONFIG[type];
+  const topOffset = Math.max(insets.top - 32, 0);
 
   return (
     <Animated.View
-      style={[
-        styles.container,
-        {
-          bottom: Math.max(insets.bottom, 16) + 16,
-          opacity,
-          transform: [{ translateY }],
-        },
-      ]}
+      style={[styles.container, { top: topOffset }, containerStyle]}
       pointerEvents={visible ? 'auto' : 'none'}
     >
       <View style={styles.card}>
@@ -114,10 +123,7 @@ export function StockyToast({
         </View>
         <View style={styles.progressTrack}>
           <Animated.View
-            style={[
-              styles.progressFill,
-              { backgroundColor: config.progressColor, transform: [{ scaleX }] },
-            ]}
+            style={[styles.progressFill, { backgroundColor: config.progressColor }, progressStyle]}
           />
         </View>
       </View>

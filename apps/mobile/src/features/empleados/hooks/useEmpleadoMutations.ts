@@ -19,7 +19,15 @@ type UseEmpleadoMutationsParams = {
 };
 
 export function useEmpleadoMutations(params: UseEmpleadoMutationsParams) {
-  const { form, businessId, userId, canManageEmployees, onRefresh, onEmployeeCreated, onEmployeeDeleted } = params;
+  const {
+    form,
+    businessId,
+    userId,
+    canManageEmployees,
+    onRefresh,
+    onEmployeeCreated,
+    onEmployeeDeleted,
+  } = params;
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);

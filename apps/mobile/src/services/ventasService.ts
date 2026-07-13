@@ -146,7 +146,15 @@ function resolveUserDisplayName(user: unknown): string | null {
   return null;
 }
 
-function buildIdempotencyKey({ businessId, userId, seed }: { businessId: string; userId: string; seed: string }) {
+function buildIdempotencyKey({
+  businessId,
+  userId,
+  seed,
+}: {
+  businessId: string;
+  userId: string;
+  seed: string;
+}) {
   return `stocky:mobile:sale:${businessId}:${userId}:${seed}`;
 }
 

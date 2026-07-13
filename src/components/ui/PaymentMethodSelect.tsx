@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   getPaymentMethodLabel,
   getPaymentMethodLogoCandidates,
@@ -11,14 +12,27 @@ const BASE_OPTIONS = [
   { value: 'card', emoji: '💳' },
   { value: 'transfer', emoji: '🏦' },
   { value: 'mixed', emoji: '🔀' },
+  // Colombia
   { value: 'nequi', emoji: '🏦' },
   { value: 'bancolombia', emoji: '🏦' },
   { value: 'banco_bogota', emoji: '🏦' },
   { value: 'nu', emoji: '🏦' },
-  { value: 'davivienda', emoji: '🏦' }
+  { value: 'davivienda', emoji: '🏦' },
+  // México
+  { value: 'spei', emoji: '🏦' },
+  { value: 'oxxo', emoji: '🏪' },
+  // Perú
+  { value: 'yape', emoji: '📱' },
+  { value: 'plin', emoji: '📱' },
+  // Argentina
+  { value: 'mercadopago', emoji: '💰' },
+  // USA
+  { value: 'venmo', emoji: '📱' },
+  { value: 'cashapp', emoji: '📱' },
+  { value: 'zelle', emoji: '🏦' },
 ];
 
-function BankLogo({ method, sizeClass = 'h-4' }: { method: string; sizeClass?: string }) {
+function BankLogo({ method, sizeClass = 'h-4', t }: { method: string; sizeClass?: string; t?: (key: string) => string }) {
   const [index, setIndex] = useState(0);
   const candidates = getPaymentMethodLogoCandidates(method);
 
@@ -36,7 +50,7 @@ function BankLogo({ method, sizeClass = 'h-4' }: { method: string; sizeClass?: s
   return (
     <img
       src={src}
-      alt={`Logo ${getPaymentMethodLabel(method)}`}
+      alt={`Logo ${getPaymentMethodLabel(method, t)}`}
       className={`${sizeClass} w-auto object-contain`}
       loading="lazy"
       onError={() => {
@@ -50,6 +64,7 @@ interface PaymentMethodSelectProps {
   value?: string;
   onChange: (value: string) => void;
   includeMixed?: boolean;
+  allowedMethods?: string[];
   className?: string;
   menuClassName?: string;
 }
@@ -58,16 +73,29 @@ export default function PaymentMethodSelect({
   value,
   onChange,
   includeMixed = true,
+  allowedMethods,
   className = '',
   menuClassName = ''
 }: PaymentMethodSelectProps) {
+  const { t } = useTranslation('common');
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const options = useMemo(() => {
-    if (includeMixed) return BASE_OPTIONS;
-    return BASE_OPTIONS.filter((option) => option.value !== 'mixed');
-  }, [includeMixed]);
+    let filtered = BASE_OPTIONS;
+    
+    // Filtrar por métodos permitidos si se proporcionan
+    if (allowedMethods && allowedMethods.length > 0) {
+      filtered = filtered.filter((option) => allowedMethods.includes(option.value));
+    }
+    
+    // Filtrar 'mixed' si no se incluye
+    if (!includeMixed) {
+      filtered = filtered.filter((option) => option.value !== 'mixed');
+    }
+    
+    return filtered;
+  }, [includeMixed, allowedMethods]);
 
   const selected = options.find((option) => option.value === value) || options[0];
 
@@ -91,12 +119,12 @@ export default function PaymentMethodSelect({
       >
         <span className="flex items-center gap-2 min-w-0">
           {isBankPaymentMethod(selected?.value) ? (
-            <BankLogo method={selected.value} sizeClass="h-5" />
+            <BankLogo method={selected.value} sizeClass="h-5" t={t} />
           ) : (
             <span className="text-sm">{selected?.emoji || '💳'}</span>
           )}
           <span className="truncate text-sm font-medium text-primary-900">
-            {getPaymentMethodLabel(selected?.value)}
+            {getPaymentMethodLabel(selected?.value, t)}
           </span>
         </span>
         <ChevronDown className={`w-4 h-4 text-primary-600 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -118,12 +146,12 @@ export default function PaymentMethodSelect({
                 }}
               >
                 {isBankPaymentMethod(option.value) ? (
-                  <BankLogo method={option.value} sizeClass="h-4" />
+                  <BankLogo method={option.value} sizeClass="h-4" t={t} />
                 ) : (
                   <span className="text-sm">{option.emoji}</span>
                 )}
                 <span className="text-sm text-primary-900">
-                  {getPaymentMethodLabel(option.value)}
+                  {getPaymentMethodLabel(option.value, t)}
                 </span>
               </button>
             );

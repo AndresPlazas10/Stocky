@@ -5,22 +5,41 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { X, Plus, Trash2, CheckCircle2, CreditCard, DollarSign } from 'lucide-react';
 import { formatPrice } from '../../utils/formatters';
+import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 import { calcularCambio } from '../../utils/cambio.js';
+import { useTranslation } from 'react-i18next';
 import type { SplitBillModalProps, SplitBillOrderItem, ChangeBreakdown } from '@/types/components';
 
 const MAX_SUB_ACCOUNTS = 10;
 
-const PAYMENT_OPTIONS = [
-  { value: 'cash', label: '💵 Efectivo', icon: DollarSign },
-  { value: 'card', label: '💳 Tarjeta', icon: CreditCard },
-  { value: 'transfer', label: '🏦 Transferencia', icon: CreditCard },
-  { value: 'mixed', label: '🔄 Mixto', icon: DollarSign },
-  { value: 'nequi', label: '🏦 Nequi', icon: CreditCard },
-  { value: 'bancolombia', label: '🏦 Bancolombia', icon: CreditCard },
-  { value: 'banco_bogota', label: '🏦 Banco de Bogotá', icon: CreditCard },
-  { value: 'nu', label: '🏦 Nu', icon: CreditCard },
-  { value: 'davivienda', label: '🏦 Davivienda', icon: CreditCard },
-];
+const PAYMENT_METHOD_VALUES = [
+  'cash', 'card', 'transfer', 'mixed',
+  'nequi', 'bancolombia', 'banco_bogota', 'nu', 'davivienda',
+  'spei', 'oxxo',
+  'yape', 'plin',
+  'mercadopago',
+  'venmo', 'cashapp', 'zelle'
+] as const;
+
+const PAYMENT_METHOD_EMOJIS: Record<string, string> = {
+  cash: '💵',
+  card: '💳',
+  transfer: '🏦',
+  mixed: '🔄',
+  nequi: '🏦',
+  bancolombia: '🏦',
+  banco_bogota: '🏦',
+  nu: '🏦',
+  davivienda: '🏦',
+  spei: '🏦',
+  oxxo: '🏪',
+  yape: '📱',
+  plin: '📱',
+  mercadopago: '💰',
+  venmo: '📱',
+  cashapp: '📱',
+  zelle: '🏦',
+};
 
 const getOrderItemName = (item: SplitBillOrderItem) => (
   item?.products?.name
@@ -39,8 +58,26 @@ function getInitialAssignments(orderItems: SplitBillOrderItem[], defaultAccountI
 }
 
 export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }: SplitBillModalProps) {
+  const { t } = useTranslation(['mesas', 'common']);
+  const config = useBusinessConfig();
+  const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
+  
+  const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
+  
+  // Filtrar opciones de pago por país
+  const paymentOptions = useMemo(() => {
+    const allowedMethods = config.country.paymentMethods;
+    return PAYMENT_METHOD_VALUES
+      .filter((value) => allowedMethods.includes(value))
+      .map((value) => ({
+        value,
+        label: `${PAYMENT_METHOD_EMOJIS[value] || '💳'} ${t(`paymentMethods.${value}`, { ns: 'common', defaultValue: value })}`,
+        icon: value === 'cash' || value === 'mixed' || value === 'oxxo' ? DollarSign : CreditCard,
+      }));
+  }, [config.country.paymentMethods, t]);
+  
   const [accounts, setAccounts] = useState([
-    { id: 1, name: 'Cuenta 1', paymentMethod: 'cash', amountReceived: '' },
+    { id: 1, name: t('mesas:splitBill.accountName', { number: 1 }), paymentMethod: 'cash', amountReceived: '' },
   ]);
   const [itemAssignments, setItemAssignments] = useState<Record<string, Record<number, number>>>(() =>
     getInitialAssignments(orderItems, 1)
@@ -51,7 +88,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
     const nextId = Math.max(...accounts.map((a) => a.id), 0) + 1;
     setAccounts((prev) => [
       ...prev,
-      { id: nextId, name: `Cuenta ${nextId}`, paymentMethod: 'cash', amountReceived: '' },
+      { id: nextId, name: t('mesas:splitBill.accountName', { number: nextId }), paymentMethod: 'cash', amountReceived: '' },
     ]);
   };
 
@@ -130,7 +167,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
       const normalizedTotal = Math.round(total);
       const cashInput = acc.amountReceived === '' ? String(normalizedTotal) : acc.amountReceived;
       const cashInfo = acc.paymentMethod === 'cash'
-        ? calcularCambio(normalizedTotal, cashInput)
+        ? calcularCambio(normalizedTotal, cashInput, config.currency)
         : { isValid: true, change: 0, breakdown: [] as ChangeBreakdown[], paid: null };
 
       return {
@@ -211,10 +248,10 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
             <div className="flex justify-between items-start gap-4">
               <div className="min-w-0 flex-1">
                 <CardTitle className="text-xl sm:text-2xl font-bold text-primary-900">
-                  💳 Dividir cuenta
+                  💳 {t('mesas:splitBill.title')}
                 </CardTitle>
                 <p className="text-sm sm:text-base text-primary-600 mt-2 leading-relaxed">
-                  Asigna cantidades a cada sub-cuenta. Si un producto tiene varias unidades, puedes repartirlas entre cuentas.
+                  {t('mesas:splitBill.subtitle')}
                 </p>
               </div>
               <Button
@@ -236,7 +273,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
                   <thead>
                     <tr className="border-b-2 border-accent-200 bg-accent-50/50">
                       <th className="p-3 text-left text-sm font-semibold text-primary-700 min-w-[180px] max-w-[260px] align-top">
-                        Producto
+                        {t('labels.product')}
                       </th>
                       {subAccounts.map((acc) => (
                         <th
@@ -247,7 +284,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
                             <div className="flex items-center justify-between gap-1">
                               <span
                                 className="text-xs font-semibold text-primary-900 truncate"
-                                aria-label={`Cuenta ${acc.id}`}
+                                aria-label={`${t('mesas:labels.table')} ${acc.id}`}
                               >
                                 {acc.name}
                               </span>
@@ -257,7 +294,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
                                   size="sm"
                                   onClick={() => removeAccount(acc.id)}
                                   className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 shrink-0 -mr-1"
-                                  aria-label="Eliminar cuenta"
+                                  aria-label={t('buttons.delete')}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
@@ -268,14 +305,14 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
                               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateAccountPayment(acc.id, e.target.value)}
                               className="h-8 px-2 rounded-lg border-2 border-accent-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 text-xs font-medium w-full"
                             >
-                              {PAYMENT_OPTIONS.map((opt) => (
+                              {paymentOptions.map((opt) => (
                                 <option key={opt.value} value={opt.value}>
                                   {opt.label}
                                 </option>
                               ))}
                             </select>
                             <span className="text-sm font-bold text-primary-900">
-                              {formatPrice(acc.total)}
+                              {fmtPrice(acc.total)}
                             </span>
                             {acc.paymentMethod === 'cash' && (
                               <>
@@ -285,7 +322,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
                                   step={50}
                                   value={acc.amountReceived}
                                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAccountAmountReceived(acc.id, e.target.value)}
-                                  placeholder="Recibido"
+                                   placeholder={t('mesas:labels.amountReceived')}
                                   className="h-8 w-full text-xs border-accent-300"
                                   aria-label={`Monto recibido ${acc.name}`}
                                 />
@@ -294,7 +331,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
                                   if (!sa) return null;
                                   return (
                                     <span className={`text-[11px] font-semibold ${sa.cashInfo?.isValid ? 'text-green-700' : 'text-red-600'}`}>
-                                      {sa.cashInfo?.isValid ? `Cambio: ${formatPrice(sa.changeAmount)}` : 'Pago insuficiente'}
+                                       {sa.cashInfo?.isValid ? `${t('mesas:labels.change')}: ${fmtPrice(sa.changeAmount)}` : t('mesas:labels.insufficientAmount')}
                                     </span>
                                   );
                                 })()}
@@ -314,7 +351,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
                           title={atAccountLimit ? `Máximo ${MAX_SUB_ACCOUNTS} sub-cuentas` : 'Agregar cuenta'}
                         >
                           <Plus className="w-5 h-5" />
-                          <span className="text-xs font-medium">Agregar</span>
+                          <span className="text-xs font-medium">{t('mesas:splitBill.addAccount')}</span>
                           <span className="text-[10px] text-primary-500">{accounts.length}/{MAX_SUB_ACCOUNTS}</span>
                         </Button>
                       </th>
@@ -337,7 +374,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
                               {getOrderItemName(item)}
                             </p>
                             <p className="text-xs text-accent-600 mt-0.5">
-                              {totalQty} × {formatPrice(parseFloat(item.price) || 0)} = {formatPrice(parseFloat(String(item.subtotal)) || 0)}
+                              {totalQty} × {fmtPrice(parseFloat(item.price) || 0)} = {fmtPrice(parseFloat(String(item.subtotal)) || 0)}
                             </p>
                             {hasError && (
                               <p className="text-xs text-amber-700 font-medium mt-2">
@@ -382,7 +419,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
                 onClick={(e: React.MouseEvent) => { if (e && e.stopPropagation) e.stopPropagation(); onCancel(); }}
                 className="flex-1 h-12 sm:h-14 text-base border-2 border-accent-300 text-accent-700 hover:bg-accent-50 min-h-[48px]"
               >
-                Cancelar
+                {t('buttons.cancel', { ns: 'common' })}
               </Button>
               <Button
                 onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleConfirm?.(); }}
@@ -390,7 +427,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
                 className="flex-1 h-12 sm:h-14 text-base gradient-primary text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px]"
               >
                 <CheckCircle2 className="w-5 h-5 mr-2" />
-                Confirmar ventas
+                {t('mesas:splitBill.confirm')}
               </Button>
             </div>
             {validationErrors.length > 0 && (
@@ -401,7 +438,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
             {!canConfirm && validationErrors.length === 0 && (
               <p className="text-sm text-amber-700 text-center font-medium">
                 {hasCashValidationErrors
-                  ? 'Hay sub-cuentas en efectivo con pago insuficiente.'
+                  ? t('mesas:labels.insufficientAmount')
                   : 'Asigna al menos un producto a alguna sub-cuenta.'}
               </p>
             )}

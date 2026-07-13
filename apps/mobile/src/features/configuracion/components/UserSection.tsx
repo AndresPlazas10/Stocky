@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { InfoItem } from './InfoItem';
 import { SectionHeader } from './SectionHeader';
@@ -23,17 +24,30 @@ export function UserSection({
   onSignOut,
   onDeleteAccount,
 }: UserSectionProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.sectionCard}>
       <SectionHeader
         icon="person-outline"
-        title="Información del Usuario"
-        subtitle="Datos de tu cuenta"
+        title={t('configuracion.user.title')}
+        subtitle={t('configuracion.user.subtitle')}
       />
       <View style={styles.sectionBody}>
-        <InfoItem icon="mail-outline" label="Email" value={userEmailLabel} />
-        <InfoItem icon="shield-outline" label="ID de Usuario" value={userIdLabel} />
-        <InfoItem icon="person-circle-outline" label="Perfil" value={profileLabel} />
+        <InfoItem
+          icon="mail-outline"
+          label={t('configuracion.user.email')}
+          value={userEmailLabel}
+        />
+        <InfoItem
+          icon="shield-outline"
+          label={t('configuracion.user.userId')}
+          value={userIdLabel}
+        />
+        <InfoItem
+          icon="person-circle-outline"
+          label={t('configuracion.user.profile')}
+          value={profileLabel}
+        />
 
         <Pressable
           style={[styles.signOutButton, signingOut && styles.disabled]}
@@ -41,7 +55,9 @@ export function UserSection({
           disabled={signingOut}
         >
           <Ionicons name="log-out-outline" size={24} color="#B91C1C" />
-          <Text style={styles.signOutText}>{signingOut ? 'Cerrando...' : 'Cerrar Sesión'}</Text>
+          <Text style={styles.signOutText}>
+            {signingOut ? t('configuracion.user.signingOut') : t('configuracion.user.signOut')}
+          </Text>
         </Pressable>
 
         <Pressable
@@ -50,7 +66,7 @@ export function UserSection({
           disabled={deletingAccount}
         >
           <Ionicons name="trash-outline" size={22} color="#DC2626" />
-          <Text style={styles.deleteAccountText}>Eliminar cuenta</Text>
+          <Text style={styles.deleteAccountText}>{t('configuracion.user.deleteAccount')}</Text>
         </Pressable>
       </View>
     </View>

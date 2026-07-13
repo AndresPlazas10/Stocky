@@ -1,5 +1,14 @@
 import { memo, useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Keyboard,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,7 +29,7 @@ import { useVentaPrint } from './hooks/useVentaPrint';
 import { useVentaMutations } from './hooks/useVentaMutations';
 import { useVentaPayment } from './hooks/useVentaPayment';
 import { useToastContext } from '../../hooks/useToastContext';
-import { TOAST_MESSAGES } from '../../constants/toastMessages';
+import { useToastMessages } from '../../hooks/useToastMessages';
 import { SaleCard } from './components/SaleCard';
 import { SaleDetailsModal } from './components/SaleDetailsModal';
 import { CreateSaleModal } from './components/CreateSaleModal';
@@ -82,6 +91,7 @@ const VentasListHeader = memo(function VentasListHeader({
   setCurrentPage,
   paginatedVentas,
 }: VentasListHeaderProps) {
+  const { t } = useTranslation();
   return (
     <>
       <LinearGradient
@@ -95,14 +105,14 @@ const VentasListHeader = memo(function VentasListHeader({
             <Ionicons name="cart-outline" size={28} color={STOCKY_COLORS.white} />
           </View>
           <View style={s.heroTitleWrap}>
-            <Text style={s.heroTitle}>Ventas</Text>
-            <Text style={s.heroSubtitle}>Sistema de punto de venta</Text>
+            <Text style={s.heroTitle}>{t('ventas.title')}</Text>
+            <Text style={s.heroSubtitle}>{t('ventas.subtitle')}</Text>
           </View>
         </View>
 
         <Pressable style={s.heroCreateButton} onPress={openCreateSaleModal}>
           <Ionicons name="add" size={20} color="rgba(255,255,255,0.9)" />
-          <Text style={s.heroCreateButtonText}>Nueva Venta</Text>
+          <Text style={s.heroCreateButtonText}>{t('buttons.newSale')}</Text>
         </Pressable>
       </LinearGradient>
 
@@ -116,20 +126,20 @@ const VentasListHeader = memo(function VentasListHeader({
 
       <View style={s.filtersWrapper}>
         <RecordFilterCard
-          title="Filtros de Ventas"
-          subtitle="Filtra por un día específico."
+          title={t('ventas.filters')}
+          subtitle={t('ventas.filtersDescription')}
           expanded={showFiltersExpanded}
           onToggle={() => setShowFiltersExpanded((prev) => !prev)}
           dayField={{
             icon: 'calendar-clear-outline',
-            label: 'Día',
+            label: t('ventasSection.day'),
             selectedLabel: selectedDayLabel,
             isActive: dayFilter !== 'all',
             onOpen: openDayFilterCalendar,
           }}
           secondField={{
             icon: 'person-outline',
-            label: 'Vendedor',
+            label: t('ventasSection.seller'),
             selectedLabel: selectedSellerLabel,
             isActive: sellerFilter !== 'all',
             onOpen: () => setShowSellerFilterModal(true),
@@ -140,7 +150,11 @@ const VentasListHeader = memo(function VentasListHeader({
 
       <View style={[s.paginationCard, { marginTop: 4 }]}>
         <Text style={s.paginationText}>
-          Mostrando {pageRange.from} a {pageRange.to} de {filteredVentas.length} registros
+          {t('ventas.showingRecords', {
+            from: pageRange.from,
+            to: pageRange.to,
+            total: filteredVentas.length,
+          })}
         </Text>
         <View style={s.paginationControls}>
           <Pressable
@@ -156,7 +170,7 @@ const VentasListHeader = memo(function VentasListHeader({
           </Pressable>
           <View style={s.paginationPageBadge}>
             <Text style={s.paginationPageText}>
-              Página {currentPage} de {totalPages}
+              {t('ventas.page', { current: currentPage, total: totalPages })}
             </Text>
           </View>
           <Pressable
@@ -178,13 +192,14 @@ const VentasListHeader = memo(function VentasListHeader({
       </View>
 
       {!loading && paginatedVentas.length === 0 ? (
-        <Text style={s.emptyText}>No hay ventas para esos filtros.</Text>
+        <Text style={s.emptyText}>{t('ventas.emptyState')}</Text>
       ) : null}
     </>
   );
 });
 
 export function VentasPanel({ businessId, businessName, source }: Props) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [loadingSales, setLoadingSales] = useState(false);
   const [_error, setError] = useState<string | null>(null);
@@ -265,12 +280,10 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
     refreshDetailsForCurrentVenta,
   } = useVentaDetails();
 
-  const {
-    isPrinting,
-    handlePrintSale,
-  } = useVentaPrint(businessName, setError);
+  const { isPrinting, handlePrintSale } = useVentaPrint(businessName, setError);
 
   const toast = useToastContext();
+  const toastMessages = useToastMessages();
   const canDeleteSales = source === 'owner';
 
   const {
@@ -302,7 +315,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         const recentSales = await listRecentVentas(businessId, 50, { forceRefresh: true });
         setVentas(recentSales);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'No se pudo refrescar el historial.');
+        setError(err instanceof Error ? err.message : t('errors.refreshFailed'));
       } finally {
         setLoadingSales(false);
       }
@@ -315,10 +328,10 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
     setVentas,
     setError,
     onSaleCreated: (total) => {
-      toast.showSuccess(TOAST_MESSAGES.ventas.registered(formatCop(total)));
+      toast.showSuccess(toastMessages.ventas.registered(formatCop(total)));
     },
     onSaleDeleted: () => {
-      toast.showSuccess(TOAST_MESSAGES.ventas.deleted());
+      toast.showSuccess(toastMessages.ventas.deleted());
     },
   });
 
@@ -329,14 +342,14 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
       const recentSales = await listRecentVentas(businessId, 50, { ttlMs: 45_000 });
       setVentas(recentSales);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudieron cargar las ventas.');
+      setError(err instanceof Error ? err.message : t('errors.loadFailed'));
     } finally {
       setLoading(false);
     }
     try {
       await loadCatalogData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar el catálogo de ventas.');
+      setError(err instanceof Error ? err.message : t('ventasSection.catalogLoadError'));
     }
   }, [businessId, loadCatalogData]);
 
@@ -350,7 +363,8 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
       const recentSales = await listRecentVentas(businessId, 50, { forceRefresh: true });
       setVentas(recentSales);
     } catch (err) {
-      if (__DEV__) console.error('[Ventas] error al refrescar ventas silenciosamente:', getErrorMessage(err));
+      if (__DEV__)
+        console.error('[Ventas] error al refrescar ventas silenciosamente:', getErrorMessage(err));
     }
   }, [businessId]);
 
@@ -394,9 +408,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
       setError(null);
       listRecentVentas(businessId, 50, { forceRefresh: true })
         .then(setVentas)
-        .catch((err) =>
-          setError(err instanceof Error ? err.message : 'No se pudo refrescar el historial.'),
-        )
+        .catch((err) => setError(err instanceof Error ? err.message : t('errors.refreshFailed')))
         .finally(() => setLoadingSales(false));
     }, [businessId]),
   );
@@ -541,10 +553,12 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
 
       <StockyDeleteConfirmModal
         visible={showDeleteVentaModal}
-        title="Eliminar venta"
-        message="Esta acción eliminará la venta y su detalle asociado."
-        warning="No se puede deshacer."
-        itemLabel={ventaToDelete ? `Total: ${formatCop(ventaToDelete.total)}` : null}
+        title={t('ventas.deleteTitle')}
+        message={t('ventas.deleteMessage')}
+        warning={t('errors.deleteFailed')}
+        itemLabel={
+          ventaToDelete ? `${t('ventasSection.total')} ${formatCop(ventaToDelete.total)}` : null
+        }
         loading={deletingVenta}
         onCancel={() => {
           if (deletingVenta) return;

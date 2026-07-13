@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StockyModal } from '../../../ui/StockyModal';
@@ -17,6 +18,7 @@ export function DeleteAccountModal({
   onClose,
   onConfirm,
 }: DeleteAccountModalProps) {
+  const { t } = useTranslation();
   return (
     <StockyModal
       visible={visible}
@@ -36,8 +38,12 @@ export function DeleteAccountModal({
             <Ionicons name="alert-circle-outline" size={22} color="#B91C1C" />
           </View>
           <View>
-            <Text style={styles.deleteAccountTitle}>Eliminar cuenta</Text>
-            <Text style={styles.deleteAccountSubtitle}>Esta acción es permanente</Text>
+            <Text style={styles.deleteAccountTitle}>
+              {t('configuracion.deleteAccountModal.title')}
+            </Text>
+            <Text style={styles.deleteAccountSubtitle}>
+              {t('configuracion.deleteAccountModal.subtitle')}
+            </Text>
           </View>
         </LinearGradient>
       }
@@ -49,7 +55,9 @@ export function DeleteAccountModal({
             onPress={onClose}
             disabled={deleting}
           >
-            <Text style={styles.deleteAccountCancelText}>Cancelar</Text>
+            <Text style={styles.deleteAccountCancelText}>
+              {t('configuracion.deleteAccountModal.cancel')}
+            </Text>
           </Pressable>
           <Pressable
             style={[styles.deleteAccountConfirm, deleting && styles.disabled]}
@@ -57,7 +65,9 @@ export function DeleteAccountModal({
             disabled={deleting}
           >
             <Text style={styles.deleteAccountConfirmText}>
-              {deleting ? 'Eliminando...' : 'Eliminar'}
+              {deleting
+                ? t('configuracion.deleteAccountModal.deleting')
+                : t('configuracion.deleteAccountModal.confirm')}
             </Text>
           </Pressable>
         </View>
@@ -65,9 +75,11 @@ export function DeleteAccountModal({
     >
       <View style={styles.deleteAccountBody}>
         <Text style={styles.deleteAccountBodyText}>
-          Al eliminar tu cuenta se revocará tu acceso y los negocios asociados quedarán suspendidos.
+          {t('configuracion.deleteAccountModal.warning')}
         </Text>
-        <Text style={styles.deleteAccountBodyText}>Si estás seguro, confirma para continuar.</Text>
+        <Text style={styles.deleteAccountBodyText}>
+          {t('configuracion.deleteAccountModal.confirmPrompt')}
+        </Text>
       </View>
     </StockyModal>
   );

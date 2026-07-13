@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../../theme/tokens';
@@ -57,6 +58,7 @@ export const CreatePurchaseModal = memo(function CreatePurchaseModal({
   onClearForm,
   onSubmit,
 }: CreatePurchaseModalProps) {
+  const { t } = useTranslation();
   return (
     <StockyModal
       visible={visible}
@@ -81,7 +83,7 @@ export const CreatePurchaseModal = memo(function CreatePurchaseModal({
           >
             <Ionicons name="cart-outline" size={30} color="#D1D5DB" />
           </LinearGradient>
-          <Text style={s.purchaseOrderModalHeaderTitle}>Nueva Compra</Text>
+          <Text style={s.purchaseOrderModalHeaderTitle}>{t('comprasSection.newPurchase')}</Text>
           <Pressable
             style={[s.purchaseOrderModalHeaderClose, creatingPurchase && s.buttonDisabled]}
             onPress={() => {
@@ -99,7 +101,7 @@ export const CreatePurchaseModal = memo(function CreatePurchaseModal({
       footer={
         <View style={s.purchaseOrderFooterContainer}>
           <View style={s.purchaseOrderFooterTotalBlock}>
-            <Text style={s.purchaseOrderFooterTotalLabel}>Total compra:</Text>
+            <Text style={s.purchaseOrderFooterTotalLabel}>{t('comprasSection.totalPurchase')}</Text>
             <StockyMoneyText value={cartTotal} style={s.purchaseOrderFooterTotalValue} />
           </View>
 
@@ -109,7 +111,7 @@ export const CreatePurchaseModal = memo(function CreatePurchaseModal({
               onPress={onClearForm}
               disabled={creatingPurchase || cart.length === 0}
             >
-              <Text style={s.purchaseOrderSecondaryButtonText}>Limpiar</Text>
+              <Text style={s.purchaseOrderSecondaryButtonText}>{t('ventasSection.clear')}</Text>
             </Pressable>
             <Pressable
               style={[
@@ -120,7 +122,9 @@ export const CreatePurchaseModal = memo(function CreatePurchaseModal({
               disabled={creatingPurchase || cart.length === 0}
             >
               <Text style={s.purchaseOrderPrimaryButtonText}>
-                {creatingPurchase ? 'Registrando...' : 'Registrar compra'}
+                {creatingPurchase
+                  ? t('comprasSection.registering')
+                  : t('comprasSection.registerPurchase')}
               </Text>
             </Pressable>
           </View>
@@ -129,10 +133,10 @@ export const CreatePurchaseModal = memo(function CreatePurchaseModal({
     >
       <View style={s.purchaseOrderBlock}>
         <View style={s.purchaseOrderBlockHeader}>
-          <Text style={s.purchaseOrderBlockTitle}>Proveedor</Text>
+          <Text style={s.purchaseOrderBlockTitle}>{t('comprasSection.supplier')}</Text>
           <Text style={s.purchaseOrderBlockHint}>{purchaseSupplierLabel}</Text>
         </View>
-        <Text style={s.helperText}>Selecciona proveedor para filtrar productos.</Text>
+        <Text style={s.helperText}>{t('comprasSection.selectSupplierHint')}</Text>
         <View style={s.filterRow}>
           {suppliers.map((supplier) => {
             const selected = supplierId === supplier.id;
@@ -155,12 +159,14 @@ export const CreatePurchaseModal = memo(function CreatePurchaseModal({
 
       <View style={s.catalogSearchHeader}>
         <Ionicons name="search-outline" size={24} color="#111827" />
-        <Text style={s.catalogSearchHeaderText}>Agregar Producto</Text>
+        <Text style={s.catalogSearchHeaderText}>{t('comprasSection.addProduct')}</Text>
       </View>
       <TextInput
         value={productSearch}
         onChangeText={onProductSearchChange}
-        placeholder={supplierId ? 'Buscar producto...' : 'Primero selecciona un proveedor...'}
+        placeholder={
+          supplierId ? t('comprasSection.searchProduct') : t('comprasSection.selectSupplierFirst')
+        }
         placeholderTextColor={STOCKY_COLORS.textMuted}
         style={s.searchInput}
         autoCapitalize="none"
@@ -169,14 +175,14 @@ export const CreatePurchaseModal = memo(function CreatePurchaseModal({
       />
 
       {!supplierId ? (
-        <Text style={s.emptyText}>Selecciona proveedor para habilitar catalogo de compra.</Text>
+        <Text style={s.emptyText}>{t('comprasSection.selectSupplierCatalog')}</Text>
       ) : loadingCatalog ? (
         <View style={s.modalLoadingInline}>
           <ActivityIndicator color={STOCKY_COLORS.primary900} />
-          <Text style={s.emptyText}>Cargando productos...</Text>
+          <Text style={s.emptyText}>{t('comprasSection.loadingProducts')}</Text>
         </View>
       ) : productsFiltered.length === 0 ? (
-        <Text style={s.emptyText}>No hay productos para este proveedor.</Text>
+        <Text style={s.emptyText}>{t('comprasSection.noProductsForSupplier')}</Text>
       ) : (
         <View style={s.catalogResultsCard}>
           <ScrollView
@@ -198,7 +204,9 @@ export const CreatePurchaseModal = memo(function CreatePurchaseModal({
                   <Text style={s.catalogResultName} numberOfLines={1}>
                     {product.name}
                   </Text>
-                  <Text style={s.catalogResultMeta}>Stock: {product.stock}</Text>
+                  <Text style={s.catalogResultMeta}>
+                    {t('comprasSection.stock')} {product.stock}
+                  </Text>
                 </View>
                 <View style={s.catalogResultRight}>
                   <StockyMoneyText value={product.purchase_price} style={s.catalogResultPrice} />
@@ -209,11 +217,11 @@ export const CreatePurchaseModal = memo(function CreatePurchaseModal({
         </View>
       )}
 
-      <Text style={s.orderItemsTitle}>Items de la compra</Text>
+      <Text style={s.orderItemsTitle}>{t('comprasSection.purchaseItems')}</Text>
       {cart.length === 0 ? (
         <View style={s.orderItemsEmpty}>
           <Ionicons name="cart-outline" size={56} color="#0F172A" />
-          <Text style={s.orderItemsEmptyText}>Aun no hay productos en el carrito</Text>
+          <Text style={s.orderItemsEmptyText}>{t('comprasSection.noItemsYet')}</Text>
         </View>
       ) : (
         cart.map((item) => (
@@ -253,7 +261,7 @@ export const CreatePurchaseModal = memo(function CreatePurchaseModal({
 
       <View style={s.purchasePaymentBlock}>
         <View style={s.purchasePaymentHeader}>
-          <Text style={s.purchasePaymentTitle}>Pago</Text>
+          <Text style={s.purchasePaymentTitle}>{t('comprasSection.payment')}</Text>
           <Text style={s.purchasePaymentHint}>{getPaymentMethodLabel(paymentMethod)}</Text>
         </View>
         <PaymentMethodSelector value={paymentMethod} onChange={onPaymentMethodChange} />

@@ -41,9 +41,7 @@ export function getOrderItemName(item: MesaOrderItem): string {
 
 export function calculateOrderTotal(items: MesaOrderItem[]): number {
   return (Array.isArray(items) ? items : []).reduce(
-    (sum, item) =>
-      sum +
-      normalizeNumber(item.quantity, 0) * normalizeNumber(item.price, 0),
+    (sum, item) => sum + normalizeNumber(item.quantity, 0) * normalizeNumber(item.price, 0),
     0,
   );
 }
@@ -246,7 +244,10 @@ export function reconcileOrderItemsFromServer(
   return merged;
 }
 
-export function compareCatalogNames(left: MesaOrderCatalogItem, right: MesaOrderCatalogItem): number {
+export function compareCatalogNames(
+  left: MesaOrderCatalogItem,
+  right: MesaOrderCatalogItem,
+): number {
   const leftName = String(left?.name || '').trim();
   const rightName = String(right?.name || '').trim();
   return leftName.localeCompare(rightName, 'es', { sensitivity: 'base' });

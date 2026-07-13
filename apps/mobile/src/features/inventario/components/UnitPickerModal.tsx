@@ -1,4 +1,5 @@
 import { Pressable, Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { StockyModal } from '../../../ui/StockyModal';
 import { UNIT_OPTIONS } from '../inventoryUtils';
 import { inventarioStyles as styles } from '../inventarioStyles';
@@ -11,10 +12,11 @@ type Props = {
 };
 
 export function UnitPickerModal({ visible, selectedUnit, onSelect, onClose }: Props) {
+  const { t } = useTranslation();
   return (
     <StockyModal
       visible={visible}
-      title="Seleccionar unidad"
+      title={t('inventarioSection.selectUnit')}
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={26}
@@ -33,7 +35,7 @@ export function UnitPickerModal({ visible, selectedUnit, onSelect, onClose }: Pr
             <Text
               style={[styles.modalOptionItemText, selected && styles.modalOptionItemTextSelected]}
             >
-              {unit.label}
+              {t(unit.labelKey)}
             </Text>
           </Pressable>
         );

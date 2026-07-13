@@ -1,9 +1,11 @@
 import { Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
+import { useTranslation } from 'react-i18next';
 import type { MesaHeaderProps } from '@/types/components';
 
 export function MesasHeader({ canManageTables, onToggleAddForm }: MesaHeaderProps) {
+  const { t } = useTranslation(['mesas', 'common']);
   return (
     <Card className="border-accent-200 shadow-lg">
       <CardHeader className="border-b border-accent-100 bg-gradient-to-r from-primary-50 to-accent-50">
@@ -14,7 +16,7 @@ export function MesasHeader({ canManageTables, onToggleAddForm }: MesaHeaderProp
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
             </div>
-            Gestion de Mesas
+            {t('mesas:title')}
           </CardTitle>
           {canManageTables && (
             <Button
@@ -22,7 +24,7 @@ export function MesasHeader({ canManageTables, onToggleAddForm }: MesaHeaderProp
               className="gradient-primary text-white hover:opacity-90 text-sm sm:text-base px-3 sm:px-4 h-9 sm:h-11"
             >
               <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" />
-              Agregar Mesa
+              {t('mesas:buttons.addTable')}
             </Button>
           )}
         </div>

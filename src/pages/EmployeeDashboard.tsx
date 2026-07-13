@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { logger } from '@/utils/logger';
 import {
   getAuthenticatedUser,
@@ -41,6 +42,7 @@ interface EmployeeInfo {
 }
 
 function EmployeeDashboard() {
+  const { t } = useTranslation('common');
   const navigate = useNavigate();
   const [employee, setEmployee] = useState<EmployeeInfo | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
@@ -76,19 +78,19 @@ function EmployeeDashboard() {
       }
 
       if (employeeError) {
-        setError('❌ Error al verificar permisos de empleado');
+        setError(t('employeeDashboard.permissionError'));
         setLoading(false);
         return;
       }
 
       if (!employeeData) {
-        setError('❌ No tienes permisos de empleado. Tu usuario no está registrado como empleado.');
+        setError(t('employeeDashboard.noPermission'));
         setLoading(false);
         return;
       }
 
       if (!employeeData.business_id) {
-        setError('❌ Tu cuenta de empleado no tiene un negocio asignado.');
+        setError(t('employeeDashboard.noBusiness'));
         setLoading(false);
         return;
       }
@@ -102,7 +104,7 @@ function EmployeeDashboard() {
       }
 
       if (businessError || !businessData) {
-        setError('❌ Error al cargar información del negocio');
+        setError(t('employeeDashboard.loadBusinessError'));
         setLoading(false);
         return;
       }
@@ -144,7 +146,7 @@ function EmployeeDashboard() {
                 || user?.user_metadata?.username
                 || user?.email?.split('@')[0]
                 || employeeData.full_name
-                || 'Empleado'
+                || t('employeeDashboard.employee')
               );
               const result = await notifyAdminEmployeeLoginWeb({
                 accessToken,
@@ -179,7 +181,7 @@ function EmployeeDashboard() {
       setLoading(false);
 
     } catch {
-      setError('❌ Error al cargar información del empleado');
+      setError(t('employeeDashboard.loadEmployeeError'));
       setLoading(false);
     }
   }, [navigate]);
@@ -208,9 +210,9 @@ function EmployeeDashboard() {
   };
 
   const menuItems = [
-    { id: 'home', label: 'Inicio', icon: Home },
-    { id: 'ventas', label: 'Ventas', icon: ShoppingCart },
-    { id: 'inventario', label: 'Inventario', icon: Package }
+    { id: 'home', label: t('employeeDashboard.home'), icon: Home },
+    { id: 'ventas', label: t('employeeDashboard.sales'), icon: ShoppingCart },
+    { id: 'inventario', label: t('employeeDashboard.inventory'), icon: Package }
   ];
 
   const renderContent = () => {
@@ -224,24 +226,24 @@ function EmployeeDashboard() {
               className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100"
             >
               <h2 className="text-2xl font-bold text-gray-800 mb-4">
-                Bienvenido, {employee?.fullName || employee?.email}
+                {t('messages.welcome')}, {employee?.fullName || employee?.email}
               </h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
                   <div className="flex items-center gap-3 mb-2">
                     <Shield className="w-5 h-5 text-gray-600" />
-                    <span className="text-sm text-gray-700 font-medium">Tu Rol</span>
+                    <span className="text-sm text-gray-700 font-medium">{t('labels.role')}</span>
                   </div>
                   <p className="text-lg font-bold text-gray-800 pl-8">
-                    {employee?.role === 'admin' ? 'Administrador' : 'Empleado'}
+                    {employee?.role === 'admin' ? t('roles.admin') : t('roles.employee')}
                   </p>
                 </div>
 
                 <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
                   <div className="flex items-center gap-3 mb-2">
                     <Building2 className="w-5 h-5 text-gray-600" />
-                    <span className="text-sm text-gray-700 font-medium">Negocio</span>
+                    <span className="text-sm text-gray-700 font-medium">{t('form.businessName')}</span>
                   </div>
                   <p className="text-lg font-bold text-gray-800 pl-8">{business?.name}</p>
                 </div>
@@ -259,7 +261,7 @@ function EmployeeDashboard() {
         return <Inventario businessId={business?.id} userRole={employee?.role as UserRole} />;
       
       default:
-        return <p>Selecciona una opción del menú</p>;
+        return <p>{t('messages.selectOption')}</p>;
     }
   };
 
@@ -268,7 +270,7 @@ function EmployeeDashboard() {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-600 border-t-transparent"></div>
-          <p className="text-gray-600">Cargando...</p>
+          <p className="text-gray-600">{t('buttons.loading')}</p>
         </div>
       </div>
     );
@@ -286,13 +288,13 @@ function EmployeeDashboard() {
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <X className="w-8 h-8 text-red-600" />
             </div>
-            <h2 className="text-xl font-bold text-gray-800 mb-2">Error</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">{t('employeeDashboard.error')}</h2>
             <p className="text-gray-600 mb-6">{error}</p>
             <button 
               onClick={handleSignOut}
               className="px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all"
             >
-              Volver al inicio
+              {t('employeeDashboard.backHome')}
             </button>
           </div>
         </div>
@@ -337,7 +339,7 @@ function EmployeeDashboard() {
           <div className="flex items-center gap-2 px-3 py-2 bg-white/10 rounded-lg backdrop-blur-sm">
             <Shield className="w-4 h-4" />
             <span className="text-sm font-medium">
-              {employee?.role === 'admin' ? 'Administrador' : 'Empleado'}
+              {employee?.role === 'admin' ? t('roles.admin') : t('roles.employee')}
             </span>
           </div>
         </div>
@@ -386,7 +388,7 @@ function EmployeeDashboard() {
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium transition-all shadow-lg"
           >
             <LogOut className="w-5 h-5" />
-            Cerrar Sesión
+            {t('buttons.signOut')}
           </button>
         </div>
       </motion.aside>
@@ -408,7 +410,7 @@ function EmployeeDashboard() {
               <Menu className="w-6 h-6 text-gray-600" />
             </button>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl md:text-2xl font-bold text-gray-800">Panel de Empleado</h1>
+              <h1 className="text-xl md:text-2xl font-bold text-gray-800">{t('navigation.employees')}</h1>
               <WarmupStatusBadge status={warmupStatus} />
             </div>
           </div>

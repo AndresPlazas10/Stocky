@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../../theme/tokens';
@@ -26,6 +27,7 @@ export const InventoryListHeader = memo(function InventoryListHeader({
   totalCount,
   refreshing,
 }: Props) {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -39,8 +41,8 @@ export const InventoryListHeader = memo(function InventoryListHeader({
             <Ionicons name="cube-outline" size={40} color="#D1D5DB" />
           </View>
           <View style={styles.heroTitleWrap}>
-            <Text style={styles.heroTitle}>Inventario</Text>
-            <Text style={styles.heroSubtitle}>Gestión de productos y stock</Text>
+            <Text style={styles.heroTitle}>{t('inventory.title')}</Text>
+            <Text style={styles.heroSubtitle}>{t('inventory.subtitle')}</Text>
           </View>
         </View>
 
@@ -53,23 +55,23 @@ export const InventoryListHeader = memo(function InventoryListHeader({
           disabled={!canManageProducts || checkingPermissions}
         >
           <Ionicons name="add" size={22} color="rgba(255,255,255,0.88)" />
-          <Text style={styles.heroCreateButtonText}>Agregar Producto</Text>
+          <Text style={styles.heroCreateButtonText}>{t('inventory.addProduct')}</Text>
         </Pressable>
       </LinearGradient>
 
       {!canManageProducts ? (
-        <Text style={styles.permissionText}>Modo consulta: sin permisos de edición</Text>
+        <Text style={styles.permissionText}>{t('inventoryHeader.employeeView')}</Text>
       ) : null}
 
       <View style={styles.searchCard}>
         <View style={styles.searchTitleRow}>
           <Ionicons name="search-outline" size={18} color="#1E3A8A" />
-          <Text style={styles.searchTitle}>Buscar producto por nombre</Text>
+          <Text style={styles.searchTitle}>{t('inventory.searchPlaceholder')}</Text>
         </View>
         <TextInput
           value={search}
           onChangeText={setSearch}
-          placeholder="Ej: Coca Cola, Arroz, Cerveza..."
+          placeholder={t('inventory.searchExample')}
           placeholderTextColor={STOCKY_COLORS.textMuted}
           style={styles.searchInput}
           autoCapitalize="none"
@@ -77,7 +79,7 @@ export const InventoryListHeader = memo(function InventoryListHeader({
           returnKeyType="search"
         />
         <Text style={styles.searchResultText}>
-          Mostrando {filteredCount} de {totalCount} productos
+          {t('inventory.showingProducts', { count: filteredCount })}
         </Text>
       </View>
 

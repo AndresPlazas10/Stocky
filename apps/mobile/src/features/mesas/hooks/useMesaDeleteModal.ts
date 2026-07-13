@@ -1,5 +1,10 @@
 import { useCallback, useState } from 'react';
-import { deleteMesaCascade, type MesaRecord, type BusinessContext } from '../../../services/mesasService';
+import { useTranslation } from 'react-i18next';
+import {
+  deleteMesaCascade,
+  type MesaRecord,
+  type BusinessContext,
+} from '../../../services/mesasService';
 import { mesaDisplayName } from '../utils/mesaHelpers';
 
 type UseMesaDeleteModalParams = {
@@ -19,6 +24,7 @@ export function useMesaDeleteModal({
   setError,
   showDeletedToast,
 }: UseMesaDeleteModalParams) {
+  const { t } = useTranslation('mesas');
   const [showDeleteMesaModal, setShowDeleteMesaModal] = useState(false);
   const [mesaToDelete, setMesaToDelete] = useState<MesaRecord | null>(null);
   const [isDeletingMesa, setIsDeletingMesa] = useState(false);
@@ -46,7 +52,7 @@ export function useMesaDeleteModal({
     setError(null);
 
     try {
-      const deletedLabel = mesaDisplayName(mesaToDelete);
+      const deletedLabel = mesaDisplayName(mesaToDelete, t('labels.table'));
       await deleteMesaCascade({
         businessId: context.businessId,
         tableId: mesaToDelete.id,

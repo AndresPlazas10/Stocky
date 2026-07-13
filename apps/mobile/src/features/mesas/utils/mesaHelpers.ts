@@ -1,25 +1,21 @@
 import type { Session } from '@supabase/supabase-js';
-import type { PaymentMethod } from '../../../services/mesaCheckoutService';
 import type { MesaOrderCatalogItem, MesaOrderItem } from '../../../services/mesaOrderService';
 import type { MesaRecord } from '../../../services/mesasService';
 
 export const MESA_IN_USE_MESSAGE = 'Alguien esta usando esta mesa.';
 
-export const COLOMBIAN_DENOMINATIONS = [
-  100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50,
-];
+const DENOMINATIONS_BY_COUNTRY: Record<string, number[]> = {
+  CO: [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50],
+  EC: [100, 50, 20, 10, 5, 1],
+  PE: [200, 100, 50, 20, 10, 5, 2, 1],
+  MX: [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1],
+  AR: [10000, 5000, 2000, 1000, 500, 200, 100, 50, 10],
+  US: [100, 50, 20, 10, 5, 1],
+};
 
-export const PAYMENT_METHOD_OPTIONS: { value: PaymentMethod; label: string }[] = [
-  { value: 'cash', label: 'Efectivo' },
-  { value: 'card', label: 'Tarjeta' },
-  { value: 'transfer', label: 'Transferencia' },
-  { value: 'mixed', label: 'Mixto' },
-  { value: 'nequi', label: 'Nequi' },
-  { value: 'bancolombia', label: 'Bancolombia' },
-  { value: 'banco_bogota', label: 'Banco de Bogotá' },
-  { value: 'nu', label: 'Nu' },
-  { value: 'davivienda', label: 'Davivienda' },
-];
+export function getDenominationsForCountry(countryCode: string): number[] {
+  return DENOMINATIONS_BY_COUNTRY[countryCode] || DENOMINATIONS_BY_COUNTRY.CO;
+}
 
 export function isMesaOccupied(status: string | null | undefined) {
   return (
@@ -49,16 +45,17 @@ export function resolveMesaSyncVersion(mesa: Partial<MesaRecord> | null | undefi
   return Math.max(0, Math.floor(raw));
 }
 
-export function mesaDisplayName(mesa: MesaRecord): string {
+export function mesaDisplayName(mesa: MesaRecord, tablePrefix?: string): string {
   if (mesa.table_name && String(mesa.table_name).trim()) return String(mesa.table_name).trim();
+  const prefix = tablePrefix || 'Mesa';
   if (
     mesa.table_number !== null &&
     mesa.table_number !== undefined &&
     String(mesa.table_number).trim()
   ) {
-    return `Mesa ${String(mesa.table_number).trim()}`;
+    return `${prefix} ${String(mesa.table_number).trim()}`;
   }
-  return `Mesa ${mesa.id.slice(0, 6)}`;
+  return `${prefix} ${mesa.id.slice(0, 6)}`;
 }
 
 export function resolveSessionDisplayName(session: Session): string {
@@ -83,11 +80,12 @@ export function resolveSessionDisplayName(session: Session): string {
   return 'Usuario';
 }
 
-export function buildCashBreakdown(change: number) {
+export function buildCashBreakdown(change: number, denominations?: number[]) {
+  const denoms = denominations || DENOMINATIONS_BY_COUNTRY.CO;
   let remaining = Math.round(Number(change || 0));
   const breakdown: { denomination: number; count: number }[] = [];
 
-  for (const denomination of COLOMBIAN_DENOMINATIONS) {
+  for (const denomination of denoms) {
     const count = Math.floor(remaining / denomination);
     if (count > 0) {
       breakdown.push({ denomination, count });

@@ -69,7 +69,8 @@ public class ReceiptSerializer {
         bold(out, true);
         size(out, true);
         align(out, 0);
-        writeLine(out, "PRODUCTO       CANT.      TOTAL");
+        String itemsHeader = receipt.optString("itemsHeader", "PRODUCTO       CANT.      TOTAL");
+        writeLine(out, itemsHeader);
         size(out, false);
         bold(out, false);
         feed(out, 1);
@@ -95,7 +96,8 @@ public class ReceiptSerializer {
             if (voluntaryTip > 0) {
                 bold(out, true);
                 String tipText = totals.optString("voluntaryTipText", String.valueOf(voluntaryTip));
-                twoColumns(out, "Propina:", tipText, columns);
+                String tipLabel = receipt.optString("tipLabel", "Tip");
+                twoColumns(out, tipLabel + ":", tipText, columns);
                 bold(out, false);
                 feed(out, 1);
             }
@@ -103,7 +105,8 @@ public class ReceiptSerializer {
             bold(out, true);
             size(out, true);
             String totalText = totals.optString("totalText", "");
-            twoColumns(out, "TOTAL:", totalText, columns);
+            String totalLabel = receipt.optString("totalLabel", "TOTAL");
+            twoColumns(out, totalLabel + ":", totalText, columns);
             size(out, false);
             bold(out, false);
         }
@@ -113,9 +116,11 @@ public class ReceiptSerializer {
         feed(out, 1);
 
         JSONObject payment = receipt.optJSONObject("payment");
-        String methodText = payment != null ? payment.optString("methodText", "No especificado") : "No especificado";
+        String notSpecified = receipt.optString("notSpecified", "Not specified");
+        String methodText = payment != null ? payment.optString("methodText", notSpecified) : notSpecified;
+        String methodLabel = receipt.optString("methodLabel", "Method");
         bold(out, true);
-        twoColumns(out, "Metodo:", methodText, columns);
+        twoColumns(out, methodLabel + ":", methodText, columns);
         bold(out, false);
 
         feed(out, 3);
@@ -126,7 +131,7 @@ public class ReceiptSerializer {
 
         bold(out, true);
         size(out, true);
-        String footerMessage = ft != null ? ft.optString("message", "Gracias por su compra") : "Gracias por su compra";
+        String footerMessage = ft != null ? ft.optString("message", "Thank you for your purchase") : "Thank you for your purchase";
         writeLine(out, footerMessage);
         size(out, false);
         bold(out, false);

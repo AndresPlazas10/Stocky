@@ -3,9 +3,11 @@ import { Plus, X } from 'lucide-react';
 import { Card, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
+import { useTranslation } from 'react-i18next';
 import type { AddMesaFormProps } from '@/types/components';
 
 export function AddMesaForm({ showAddForm, canManageTables, isCreatingTable, newTableNumber, onNewTableNumberChange, onSubmit, onCancel }: AddMesaFormProps) {
+  const { t } = useTranslation(['mesas', 'common']);
   return (
     <AnimatePresence>
       {showAddForm && canManageTables && (
@@ -20,7 +22,7 @@ export function AddMesaForm({ showAddForm, canManageTables, isCreatingTable, new
               <form onSubmit={onSubmit} className="flex flex-col sm:flex-row gap-4 sm:items-end">
                 <div className="flex-1">
                   <label className="block text-sm font-semibold text-primary-700 mb-2">
-                    Identificador de Mesa *
+                    {t('mesas:labels.tableNumber', { number: '' })}
                   </label>
                   <Input
                     type="text"
@@ -38,11 +40,11 @@ export function AddMesaForm({ showAddForm, canManageTables, isCreatingTable, new
                     className="gradient-primary text-white h-12 w-full sm:w-auto disabled:opacity-50"
                   >
                     {isCreatingTable ? (
-                      'Creando mesa...'
+                      t('mesas:buttons.createTable')
                     ) : (
                       <>
                         <Plus className="w-4 h-4 mr-2" />
-                        Crear Mesa
+                        {t('mesas:buttons.createTable')}
                       </>
                     )}
                   </Button>
@@ -53,7 +55,7 @@ export function AddMesaForm({ showAddForm, canManageTables, isCreatingTable, new
                     onClick={onCancel}
                   >
                     <X className="w-4 h-4 mr-2" />
-                    Cancelar
+                    {t('buttons.cancel', { ns: 'common' })}
                   </Button>
                 </div>
               </form>

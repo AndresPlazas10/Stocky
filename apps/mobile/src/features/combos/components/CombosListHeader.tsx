@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../../theme/tokens';
@@ -22,6 +23,7 @@ export const CombosListHeader = memo(function CombosListHeader({
   checkingPermissions,
   onOpenCreate,
 }: Props) {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -35,8 +37,8 @@ export const CombosListHeader = memo(function CombosListHeader({
             <Ionicons name="layers-outline" size={32} color="#D1D5DB" />
           </View>
           <View style={styles.heroTitleWrap}>
-            <Text style={styles.heroTitle}>Combos</Text>
-            <Text style={styles.heroSubtitle}>Gestiona combos estructurados de productos</Text>
+            <Text style={styles.heroTitle}>{t('combos.title')}</Text>
+            <Text style={styles.heroSubtitle}>{t('combos.subtitle')}</Text>
           </View>
         </View>
 
@@ -49,7 +51,7 @@ export const CombosListHeader = memo(function CombosListHeader({
           disabled={!canManageCombos || checkingPermissions}
         >
           <Ionicons name="add" size={20} color="rgba(255,255,255,0.88)" />
-          <Text style={styles.heroCreateButtonText}>Nuevo Combo</Text>
+          <Text style={styles.heroCreateButtonText}>{t('combos.addCombo')}</Text>
         </Pressable>
       </LinearGradient>
 

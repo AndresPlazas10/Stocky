@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useProgressiveList } from '../../../hooks/useProgressiveList.js';
-import { normalizeEntityId, calculateOrderItemsTotal, ORDER_ITEM_TYPE } from './mesaHelpers.js';
+import { normalizeEntityId, calculateOrderItemsTotal, ORDER_ITEM_TYPE } from './mesaHelpers';
 import { calcularCambio } from '../../../utils/cambio.js';
 
 export function useMesasCatalog({

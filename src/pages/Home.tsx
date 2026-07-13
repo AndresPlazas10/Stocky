@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { logger } from '@/utils/logger';
 import { signOutSession } from '../data/commands/authCommands';
 import WhatsNewModal from '../components/Modals/WhatsNewModal';
@@ -21,61 +22,62 @@ import {
   Clock3,
   Check,
   Smartphone,
-  Share2,
 } from 'lucide-react';
 import logoStocky from '../assets/logoStocky.png';
+import { LanguageSwitch } from '../components/ui/language-switch';
 
-
-const quickStats = [
-  { value: 'Siempre activo', label: 'Funciona incluso sin internet' },
-  { value: 'Cobro express', label: 'Tu mesero cobra en segundos' },
-  { value: 'Más ventas', label: 'Menos errores, más pedidos' },
-];
-
-const modules = [
-  {
-    icon: ShoppingCart,
-    title: 'Cobro rápido',
-    text: 'Atiende más mesas en menos tiempo.',
-  },
-  {
-    icon: Receipt,
-    title: 'Facturación simple',
-    text: 'Todo queda registrado automáticamente.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Reportes claros',
-    text: 'Entiende tu negocio de un vistazo.',
-  },
-  {
-    icon: Users,
-    title: 'Control por empleado',
-    text: 'Cada quien ve solo lo que necesita.',
-  },
-  {
-    icon: Shield,
-    title: 'Información segura',
-    text: 'Tus datos siempre protegidos.',
-  },
-  {
-    icon: Clock3,
-    title: 'Cierre fácil',
-    text: 'Termina el día en un solo paso.',
-  },
-];
-
-const process = [
-  'Agrega tus productos y crea usuarios.',
-  'Vende y controla tu inventario.',
-  'Revisa resultados y mejora.',
-];
 
 function Home() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showIosBanner, setShowIosBanner] = useState(false);
   const { isMobile } = useViewport();
+
+  const quickStats = [
+    { value: t('home.alwaysActive'), label: t('home.worksOffline') },
+    { value: t('home.quickCheckout'), label: t('home.waiterCollects') },
+    { value: t('home.moreSales'), label: t('home.fewerErrors') },
+  ];
+
+  const modules = [
+    {
+      icon: ShoppingCart,
+      title: t('home.fastCheckout'),
+      text: t('home.fastCheckoutDesc'),
+    },
+    {
+      icon: Receipt,
+      title: t('home.simpleBilling'),
+      text: t('home.simpleBillingDesc'),
+    },
+    {
+      icon: BarChart3,
+      title: t('home.clearReports'),
+      text: t('home.clearReportsDesc'),
+    },
+    {
+      icon: Users,
+      title: t('home.employeeControl'),
+      text: t('home.employeeControlDesc'),
+    },
+    {
+      icon: Shield,
+      title: t('home.secureInfo'),
+      text: t('home.secureInfoDesc'),
+    },
+    {
+      icon: Clock3,
+      title: t('home.easyCloseout'),
+      text: t('home.easyCloseoutDesc'),
+    },
+  ];
+
+  const process = [
+    t('home.addProducts'),
+    t('home.sellAndControl'),
+    t('home.reviewAndImprove'),
+  ];
 
   useEffect(() => {
     const signOut = async () => {
@@ -135,10 +137,9 @@ function Home() {
                   <Smartphone className="h-4 w-4 text-primary-200" />
                 </div>
                 <div className="text-sm">
-                  <p className="font-semibold text-white">Instala Stocky en tu iPhone</p>
+                  <p className="font-semibold text-white">{t('home.installOnIphone')}</p>
                   <p className="text-xs text-primary-300">
-                    Abre en Safari, toca{' '}
-                    <Share2 className="mx-0.5 inline h-3 w-3" /> y selecciona &ldquo;Añadir a pantalla de inicio&rdquo;
+                    {t('home.safariShareInstruction')}
                   </p>
                 </div>
               </div>
@@ -147,12 +148,12 @@ function Home() {
                   onClick={() => navigate('/descargar')}
                   className="cursor-pointer rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-primary-900 transition-colors duration-200 hover:bg-primary-50"
                 >
-                  Ver guía
+                  {t('home.viewGuide')}
                 </button>
                 <button
                   onClick={dismissIosBanner}
                   className="cursor-pointer rounded-lg p-1.5 text-primary-400 transition-colors duration-200 hover:bg-primary-800 hover:text-white"
-                  aria-label="Cerrar"
+                  aria-label={t('buttons.close')}
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -176,35 +177,36 @@ function Home() {
 
           <nav className="hidden items-center gap-8 md:flex">
             <a href="#process" className="cursor-pointer text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-primary-700">
-              Proceso
+              {t('home.process')}
             </a>
             <a href="#modules" className="cursor-pointer text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-primary-700">
-              Módulos
+              {t('home.modules')}
             </a>
             <a href="#start" className="cursor-pointer text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-primary-700">
-              Empezar
+              {t('home.getStarted')}
             </a>
             <button
               onClick={() => navigate('/descargar')}
               className="cursor-pointer text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-primary-700"
             >
-              Descargas
+              {t('home.downloads')}
             </button>
           </nav>
 
           <div className="hidden items-center gap-2 md:flex">
+            <LanguageSwitch />
             <button
               onClick={() => navigate('/login')}
               className="cursor-pointer rounded-xl px-4 py-2 text-sm font-semibold text-black transition-colors duration-200 hover:bg-primary-50"
             >
-              Iniciar sesión
+              {t('home.signIn')}
             </button>
             <GradientButton
               onClick={() => navigate('/register')}
               variant="small"
               className="text-sm"
             >
-              Crear cuenta
+              {t('home.createAccount')}
             </GradientButton>
           </div>
 
@@ -212,7 +214,7 @@ function Home() {
             <button
               className="cursor-pointer rounded-lg p-2 text-muted-foreground transition-colors duration-200 hover:bg-primary-50 hover:text-primary-700"
               onClick={() => setMobileMenuOpen((prev) => !prev)}
-              aria-label="Abrir menú"
+              aria-label={t('home.openMenu')}
             >
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -229,32 +231,35 @@ function Home() {
               className="border-t border-primary-100 bg-white px-4 py-4 md:hidden"
             >
               <div className="flex flex-col gap-1">
+                <div className="mb-2">
+                  <LanguageSwitch />
+                </div>
                 <a
                   href="#process"
                   onClick={() => setMobileMenuOpen(false)}
                   className="cursor-pointer rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-primary-50 hover:text-primary-700"
                 >
-                  Proceso
+                  {t('home.process')}
                 </a>
                 <a
                   href="#modules"
                   onClick={() => setMobileMenuOpen(false)}
                   className="cursor-pointer rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-primary-50 hover:text-primary-700"
                 >
-                  Módulos
+                  {t('home.modules')}
                 </a>
                 <a
                   href="#start"
                   onClick={() => setMobileMenuOpen(false)}
                   className="cursor-pointer rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-primary-50 hover:text-primary-700"
                 >
-                  Empezar
+                  {t('home.getStarted')}
                 </a>
                 <button
                   onClick={() => { setMobileMenuOpen(false); navigate('/descargar'); }}
                   className="cursor-pointer rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-primary-50 hover:text-primary-700 text-left"
                 >
-                  Descargas
+                  {t('home.downloads')}
                 </button>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <GradientButton
@@ -263,7 +268,7 @@ function Home() {
                     height="40px"
                     variant="small"
                   >
-                    Entrar
+                    {t('home.enter')}
                   </GradientButton>
                   <GradientButton
                     onClick={() => navigate('/register')}
@@ -271,7 +276,7 @@ function Home() {
                     height="40px"
                     variant="small"
                   >
-                    Registro
+                    {t('home.register')}
                   </GradientButton>
                 </div>
               </div>
@@ -299,7 +304,7 @@ function Home() {
                   transition={{ duration: 0.4, delay: 0.1 }}
                   className="text-4xl font-bold leading-[1.08] tracking-tight text-primary-900 sm:text-5xl lg:text-6xl"
                 >
-                  Con StockyPOS vende, controla y crece sin complicaciones
+                  {t('home.stockyDescription')}
                 </motion.h1>
 
                 <motion.p
@@ -308,8 +313,7 @@ function Home() {
                   transition={{ duration: 0.4, delay: 0.2 }}
                   className="mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg mx-auto lg:mx-0"
                 >
-                  Stocky reúne ventas, inventario y reportes en una sola plataforma.
-                  Diseñado para que tu equipo trabaje más rápido, con menos errores y mejor control diario.
+                  {t('home.platformDescription')}
                 </motion.p>
 
                 <motion.div
@@ -324,7 +328,7 @@ function Home() {
                     height="44px"
                   >
                     <span className="flex items-center gap-2">
-                      Crear cuenta gratis
+                      {t('home.createFreeAccount')}
                       <ArrowRight className="h-4 w-4" />
                     </span>
                   </GradientButton>
@@ -333,7 +337,7 @@ function Home() {
                     minWidth="180px"
                     height="44px"
                   >
-                    Ya tengo cuenta
+                    {t('home.alreadyHaveAccount')}
                   </GradientButton>
                 </motion.div>
               </div>
@@ -368,10 +372,10 @@ function Home() {
               className="mb-12"
             >
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary-400">
-                Proceso
+                {t('home.process')}
               </p>
               <h2 className="max-w-2xl text-3xl font-bold tracking-tight text-primary-900 sm:text-4xl">
-                Empieza en 3 pasos
+                {t('home.startIn3Steps')}
               </h2>
             </motion.div>
 
@@ -391,7 +395,7 @@ function Home() {
                   <p className="text-sm leading-relaxed text-muted-foreground">{line}</p>
                   <div className="mt-4 inline-flex items-center gap-1.5 text-primary-700">
                     <Check className="h-3.5 w-3.5" />
-                    <span className="text-xs font-semibold">Listo para ejecutar</span>
+                    <span className="text-xs font-semibold">{t('home.readyToExecute')}</span>
                   </div>
                 </motion.div>
               ))}
@@ -433,10 +437,10 @@ function Home() {
               className="mb-12"
             >
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary-400">
-                Módulos
+                {t('home.modules')}
               </p>
               <h2 className="max-w-2xl text-3xl font-bold tracking-tight text-primary-900 sm:text-4xl">
-                Seis piezas para una operación más ordenada
+                {t('home.sixPieces')}
               </h2>
             </motion.div>
 
@@ -465,10 +469,10 @@ function Home() {
           <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 rounded-3xl bg-gradient-to-br from-primary-700 to-primary-900 p-8 sm:p-10 lg:flex-row lg:items-center lg:p-12">
             <div className="max-w-xl">
               <h3 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                Empieza hoy y moderniza la operación de tu negocio
+                {t('home.startToday')}
               </h3>
               <p className="mt-3 text-sm leading-relaxed text-primary-100 sm:text-base">
-                Crea tu cuenta en minutos y gestiona ventas, inventario y reportes desde una sola plataforma.
+                {t('home.createAccountMinutes')}
               </p>
             </div>
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row items-center">
@@ -477,14 +481,14 @@ function Home() {
                 minWidth="180px"
                 height="44px"
               >
-                Comenzar ahora
+                {t('home.startNow')}
               </GradientButton>
               <GradientButton
                 onClick={() => navigate('/terms')}
                 minWidth="200px"
                 height="44px"
               >
-                Términos del servicio
+                {t('home.termsOfService')}
               </GradientButton>
             </div>
           </div>
@@ -499,25 +503,25 @@ function Home() {
             </span>
             <div>
               <p className="text-sm font-bold text-primary-900">Stocky</p>
-              <p className="text-xs text-muted-foreground">Sistema POS para restaurantes y bares</p>
+              <p className="text-xs text-muted-foreground">{t('home.posSystem')}</p>
             </div>
           </div>
           <div className="flex items-center gap-5 text-xs">
             <a href="/terms" className="cursor-pointer font-medium text-muted-foreground transition-colors duration-200 hover:text-primary-700">
-              Términos
+              {t('home.terms')}
             </a>
             <a href="/privacy" className="cursor-pointer font-medium text-muted-foreground transition-colors duration-200 hover:text-primary-700">
-              Privacidad
+              {t('home.privacy')}
             </a>
             <a
               href="/legal/delete-account.html"
               className="cursor-pointer font-medium text-muted-foreground transition-colors duration-200 hover:text-primary-700"
             >
-              Eliminar cuenta
+              {t('home.deleteAccount')}
             </a>
           </div>
           <div className="text-xs text-muted-foreground">
-            &copy; 2026 Stocky. Todos los derechos reservados.
+            &copy; 2026 Stocky. {t('home.allRightsReserved')}
           </div>
         </div>
       </footer>

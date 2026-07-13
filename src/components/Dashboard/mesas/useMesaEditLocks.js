@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   normalizeEntityId,
   normalizeDisplayName,
@@ -7,7 +8,7 @@ import {
   isMissingTableEditLocksRelationError,
   isMissingTableEditLocksColumnError,
   MESA_LOCK_TTL_SECONDS,
-} from './mesaHelpers.js';
+} from './mesaHelpers';
 import { supabase } from '../../../supabase/Client';
 
 export function useMesaEditLocks({
@@ -19,6 +20,7 @@ export function useMesaEditLocks({
   _activeMesaBroadcastRef,
   mesaLockHeartbeatTimerRef,
 }) {
+  const { t } = useTranslation(['mesas', 'common']);
   const [mesaLocksByTableId, setMesaLocksByTableId] = useState({});
 
   const resolveWebUserId = useCallback(
@@ -27,8 +29,8 @@ export function useMesaEditLocks({
   );
 
   const resolveWebUserName = useCallback(
-    () => normalizeDisplayName(currentUser?.email || currentUser?.name || 'Admin', 'Admin'),
-    [currentUser?.email, currentUser?.name],
+    () => normalizeDisplayName(currentUser?.email || currentUser?.name || 'Admin', t),
+    [currentUser?.email, currentUser?.name, t],
   );
 
   useEffect(() => {
@@ -45,7 +47,7 @@ export function useMesaEditLocks({
     const tableId = String(row?.table_id || '').trim();
     if (!tableId) return null;
     const normalizedBusinessId = String(row?.business_id || '').trim();
-    const lockOwnerName = normalizeDisplayName(row?.lock_owner_name || 'Alguien', 'Alguien');
+    const lockOwnerName = normalizeDisplayName(row?.lock_owner_name || 'Alguien', t);
     const normalized = {
       ...row,
       table_id: tableId,
@@ -237,10 +239,10 @@ export function useMesaEditLocks({
 
       return {
         lockedByOther,
-        lockOwnerName: normalizeDisplayName(mesaLock?.lock_owner_name || 'Alguien', 'Alguien'),
+        lockOwnerName: normalizeDisplayName(mesaLock?.lock_owner_name || 'Alguien', t),
       };
     },
-    [businessId, isOfflineFirstRuntime, mesaLocksByTableId, resolveWebUserId],
+    [businessId, isOfflineFirstRuntime, mesaLocksByTableId, resolveWebUserId, t],
   );
 
   const selectMesaEditLockByTableId = useCallback(
@@ -295,19 +297,29 @@ export function useMesaEditLocks({
       const lockExpiresAt = new Date(now.getTime() + MESA_LOCK_TTL_SECONDS * 1000).toISOString();
       const normalizedLockToken = String(lockToken || '').trim() || null;
 
-      const cleanupExpired = await supabase
-        .from('table_edit_locks')
-        .delete()
-        .eq('business_id', normalizedBusinessId)
-        .eq('table_id', normalizedTableId)
-        .lte('lock_expires_at', nowIso);
+      const existing = await selectMesaEditLockByTableId({
+        businessId: normalizedBusinessId,
+        tableId: normalizedTableId,
+      });
 
-      if (cleanupExpired.error) {
-        if (isMissingTableEditLocksRelationError(cleanupExpired.error)) {
-          return { ok: true, unsupported: true, lock: null, lockToken: null };
-        }
-        if (!isMissingTableEditLocksColumnError(cleanupExpired.error, 'lock_expires_at')) {
-          return { ok: false, unsupported: false, lock: null, lockToken: null };
+      const isExpired = existing ? isMesaLockExpired(existing) : true;
+
+      if (existing && !isExpired && String(existing.lock_owner_user_id || '').trim() !== resolvedUserId) {
+        return { ok: false, unsupported: false, lock: existing, lockToken: null };
+      }
+
+      if (existing && isExpired) {
+        const deleteExpired = await supabase
+          .from('table_edit_locks')
+          .delete()
+          .eq('business_id', normalizedBusinessId)
+          .eq('table_id', normalizedTableId);
+
+        if (deleteExpired.error) {
+          if (isMissingTableEditLocksRelationError(deleteExpired.error)) {
+            return { ok: true, unsupported: true, lock: null, lockToken: null };
+          }
+          throw deleteExpired.error;
         }
       }
 
@@ -330,28 +342,77 @@ export function useMesaEditLocks({
         updated_at: nowIso,
       };
 
-      const insertWithToken = await supabase
+      if (existing && !isExpired && String(existing.lock_owner_user_id || '').trim() === resolvedUserId) {
+        const updatePayload = normalizedLockToken ? payloadWithToken : payloadNoToken;
+        const updateAttempt = await supabase
+          .from('table_edit_locks')
+          .update(updatePayload)
+          .eq('business_id', normalizedBusinessId)
+          .eq('table_id', normalizedTableId)
+          .eq('lock_owner_user_id', resolvedUserId)
+          .select(
+            'table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at',
+          )
+          .maybeSingle();
+
+        if (!updateAttempt.error && updateAttempt.data) {
+          return {
+            ok: true,
+            unsupported: false,
+            lock: updateAttempt.data,
+            lockToken: normalizedLockToken,
+          };
+        }
+
+        if (
+          updateAttempt.error &&
+          isMissingTableEditLocksColumnError(updateAttempt.error, 'lock_token')
+        ) {
+          const fallbackUpdate = await supabase
+            .from('table_edit_locks')
+            .update(payloadNoToken)
+            .eq('business_id', normalizedBusinessId)
+            .eq('table_id', normalizedTableId)
+            .eq('lock_owner_user_id', resolvedUserId)
+            .select(
+              'table_id,business_id,lock_owner_user_id,lock_owner_name,lock_expires_at,updated_at',
+            )
+            .maybeSingle();
+
+          if (!fallbackUpdate.error && fallbackUpdate.data) {
+            return { ok: true, unsupported: false, lock: fallbackUpdate.data, lockToken: null };
+          }
+          if (fallbackUpdate.error) throw fallbackUpdate.error;
+        }
+
+        if (updateAttempt.error) throw updateAttempt.error;
+      }
+
+      const insertPayload = normalizedLockToken ? payloadWithToken : payloadNoToken;
+
+      const insertResult = await supabase
         .from('table_edit_locks')
-        .insert([payloadWithToken])
+        .insert([insertPayload])
         .select(
           'table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at',
         )
         .maybeSingle();
 
-      if (!insertWithToken.error && insertWithToken.data) {
+      if (!insertResult.error && insertResult.data) {
         return {
           ok: true,
           unsupported: false,
-          lock: insertWithToken.data,
+          lock: insertResult.data,
           lockToken: normalizedLockToken,
         };
       }
 
-      if (insertWithToken.error) {
-        if (isMissingTableEditLocksRelationError(insertWithToken.error)) {
+      if (insertResult.error) {
+        if (isMissingTableEditLocksRelationError(insertResult.error)) {
           return { ok: true, unsupported: true, lock: null, lockToken: null };
         }
-        if (isMissingTableEditLocksColumnError(insertWithToken.error, 'lock_token')) {
+
+        if (isMissingTableEditLocksColumnError(insertResult.error, 'lock_token')) {
           const fallbackInsert = await supabase
             .from('table_edit_locks')
             .insert([payloadNoToken])
@@ -359,48 +420,61 @@ export function useMesaEditLocks({
               'table_id,business_id,lock_owner_user_id,lock_owner_name,lock_expires_at,updated_at',
             )
             .maybeSingle();
+
           if (!fallbackInsert.error && fallbackInsert.data) {
             return { ok: true, unsupported: false, lock: fallbackInsert.data, lockToken: null };
           }
-        } else if (!isDuplicateKeyError(insertWithToken.error)) {
-          return { ok: false, unsupported: false, lock: null, lockToken: null };
+
+          if (fallbackInsert.error) {
+            if (
+              isMissingTableEditLocksColumnError(fallbackInsert.error, 'lock_expires_at') ||
+              isMissingTableEditLocksColumnError(fallbackInsert.error, 'updated_at')
+            ) {
+              const legacyPayload = {
+                business_id: normalizedBusinessId,
+                table_id: normalizedTableId,
+                lock_owner_user_id: resolvedUserId,
+                lock_owner_name: resolvedUserName,
+              };
+              const legacyInsert = await supabase
+                .from('table_edit_locks')
+                .insert([legacyPayload])
+                .select('table_id,business_id,lock_owner_user_id,lock_owner_name')
+                .maybeSingle();
+              if (!legacyInsert.error && legacyInsert.data) {
+                return { ok: true, unsupported: false, lock: legacyInsert.data, lockToken: null };
+              }
+              if (legacyInsert.error) throw legacyInsert.error;
+            }
+            throw fallbackInsert.error;
+          }
         }
+
+        if (
+          isMissingTableEditLocksColumnError(insertResult.error, 'lock_expires_at') ||
+          isMissingTableEditLocksColumnError(insertResult.error, 'updated_at')
+        ) {
+          const legacyPayload = {
+            business_id: normalizedBusinessId,
+            table_id: normalizedTableId,
+            lock_owner_user_id: resolvedUserId,
+            lock_owner_name: resolvedUserName,
+          };
+          const legacyInsert = await supabase
+            .from('table_edit_locks')
+            .insert([legacyPayload])
+            .select('table_id,business_id,lock_owner_user_id,lock_owner_name')
+            .maybeSingle();
+          if (!legacyInsert.error && legacyInsert.data) {
+            return { ok: true, unsupported: false, lock: legacyInsert.data, lockToken: null };
+          }
+          if (legacyInsert.error) throw legacyInsert.error;
+        }
+
+        throw insertResult.error;
       }
 
-      const existing = await selectMesaEditLockByTableId({
-        businessId: normalizedBusinessId,
-        tableId: normalizedTableId,
-      });
-
-      if (
-        existing &&
-        String(existing.lock_owner_user_id || '').trim() !== resolvedUserId
-      ) {
-        return { ok: false, unsupported: false, lock: existing, lockToken: null };
-      }
-
-      const updatePayload = normalizedLockToken ? payloadWithToken : payloadNoToken;
-      const updateAttempt = await supabase
-        .from('table_edit_locks')
-        .update(updatePayload)
-        .eq('business_id', normalizedBusinessId)
-        .eq('table_id', normalizedTableId)
-        .eq('lock_owner_user_id', resolvedUserId)
-        .select(
-          'table_id,business_id,lock_owner_user_id,lock_owner_name,lock_token,lock_expires_at,updated_at',
-        )
-        .maybeSingle();
-
-      if (!updateAttempt.error && updateAttempt.data) {
-        return {
-          ok: true,
-          unsupported: false,
-          lock: updateAttempt.data,
-          lockToken: normalizedLockToken,
-        };
-      }
-
-      return { ok: false, unsupported: false, lock: existing || null, lockToken: null };
+      return { ok: false, unsupported: false, lock: null, lockToken: null };
     },
     [resolveWebUserId, resolveWebUserName, selectMesaEditLockByTableId],
   );

@@ -168,7 +168,16 @@ export function useComboMutations({
     } finally {
       setDeleting(false);
     }
-  }, [businessId, canManageCombos, comboToDelete, deleting, refreshCombos, setCombos, setError, onComboDeleted]);
+  }, [
+    businessId,
+    canManageCombos,
+    comboToDelete,
+    deleting,
+    refreshCombos,
+    setCombos,
+    setError,
+    onComboDeleted,
+  ]);
 
   const toggleComboStatus = useCallback(
     async (combo: ComboRecord) => {

@@ -1,9 +1,11 @@
+import { useTranslation } from 'react-i18next';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { AnimatePresence, motion } from 'framer-motion';
 import { WifiOff } from 'lucide-react';
 import { isOfflinePersistenceEnabled } from '../utils/offlineSnapshot';
 
 export default function OfflineBanner() {
+  const { t } = useTranslation();
   const isOnline = useOnlineStatus();
   const offlineFirstEnabled = isOfflinePersistenceEnabled();
   const shouldBlockUI = !offlineFirstEnabled;
@@ -37,13 +39,13 @@ export default function OfflineBanner() {
 
               <p className="text-base sm:text-lg font-semibold">
                 {shouldBlockUI
-                  ? 'Perdiste la conexión, intentando reconectar...'
-                  : 'Sin conexión: puedes seguir operando en modo offline.'}
+                  ? t('offlineBanner.lostConnection')
+                  : t('offlineBanner.noConnectionOfflineMode')}
               </p>
 
               {!shouldBlockUI && (
                 <p className="mt-2 text-xs text-amber-200/90">
-                  Las ventas se encolarán y se sincronizarán automáticamente al reconectar.
+                  {t('offlineBanner.salesWillSync')}
                 </p>
               )}
 

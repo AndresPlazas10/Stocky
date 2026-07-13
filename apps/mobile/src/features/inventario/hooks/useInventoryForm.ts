@@ -5,8 +5,8 @@ import {
 } from '../../../services/inventoryService';
 import {
   getSupplierDisplayName,
+  getUnitLabel,
   INITIAL_FORM,
-  UNIT_OPTIONS,
   type ProductFormState,
 } from '../inventoryUtils';
 
@@ -17,12 +17,8 @@ export function useInventoryForm() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
-  const [formDetailsReady, setFormDetailsReady] = useState(false);
 
-  const selectedUnitLabel = useMemo(
-    () => UNIT_OPTIONS.find((item) => item.value === form.unit)?.label || 'Unidad',
-    [form.unit],
-  );
+  const selectedUnitLabel = useMemo(() => getUnitLabel(form.unit), [form.unit]);
 
   const selectedSupplierLabel = useMemo(() => {
     if (!form.supplierId) return 'Sin proveedor';
@@ -51,7 +47,6 @@ export function useInventoryForm() {
     setEditingProduct(null);
     setForm(INITIAL_FORM);
     setShowCategoryModal(false);
-    setFormDetailsReady(true);
     setShowFormModal(true);
   }, []);
 
@@ -70,7 +65,6 @@ export function useInventoryForm() {
       isActive: product.is_active !== false,
     });
     setShowCategoryModal(false);
-    setFormDetailsReady(true);
     setShowFormModal(true);
   }, []);
 
@@ -106,8 +100,6 @@ export function useInventoryForm() {
     setShowUnitModal,
     showSupplierModal,
     setShowSupplierModal,
-    formDetailsReady,
-    setFormDetailsReady,
     selectedUnitLabel,
     selectedSupplierLabel,
     getSelectedSupplierLabel,

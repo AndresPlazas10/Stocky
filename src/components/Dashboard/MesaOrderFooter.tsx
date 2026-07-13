@@ -1,6 +1,8 @@
 import { Save, Printer, CheckCircle2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../ui/button';
 import { formatPrice } from '../../utils/formatters';
+import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 
 interface MesaOrderFooterProps {
   orderTotal: number;
@@ -19,13 +21,19 @@ export function MesaOrderFooter({
   onPrintKitchen,
   onCloseOrder,
 }: MesaOrderFooterProps) {
+  const { t } = useTranslation(['mesas', 'common']);
+  const config = useBusinessConfig();
+  const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
+  
+  const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
+  
   return (
     <div className="border-t-2 border-accent-200 bg-accent-50/30 p-4 sm:p-6 shrink-0">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <p className="text-sm text-primary-600 mb-1">Total a pagar</p>
+          <p className="text-sm text-primary-600 mb-1">{t('mesas:labels.totalToPay')}</p>
           <h3 className="text-2xl sm:text-3xl font-bold text-primary-900">
-            {formatPrice(orderTotal)}
+            {fmtPrice(orderTotal)}
           </h3>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
@@ -36,7 +44,7 @@ export function MesaOrderFooter({
             className="border-2 border-accent-300 text-accent-700 hover:bg-accent-50 h-12 px-6 w-full sm:w-auto"
           >
             <Save className="w-5 h-5 mr-2" />
-            {isOrderItemsSyncing ? 'Sincronizando...' : 'Guardar'}
+            {isOrderItemsSyncing ? t('status.syncing', { ns: 'common' }) : t('mesas:buttons.saveOrder')}
           </Button>
           <Button
             onClick={onPrintKitchen}
@@ -45,7 +53,7 @@ export function MesaOrderFooter({
             disabled={orderItemsCount === 0}
           >
             <Printer className="w-5 h-5 mr-2" />
-            Imprimir para cocina
+            {t('mesas:buttons.printKitchen')}
           </Button>
           <Button
             onClick={onCloseOrder}
@@ -53,7 +61,7 @@ export function MesaOrderFooter({
             className="gradient-primary text-white hover:opacity-90 h-12 px-8 text-lg w-full sm:w-auto"
           >
             <CheckCircle2 className="w-5 h-5 mr-2" />
-            Cerrar Orden
+            {t('mesas:buttons.closeOrder')}
           </Button>
         </div>
       </div>

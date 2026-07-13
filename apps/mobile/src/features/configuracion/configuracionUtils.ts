@@ -1,7 +1,6 @@
 export const TERMS_URL = 'https://www.stockypos.app/legal/terms.html';
 export const PRIVACY_URL = 'https://www.stockypos.app/legal/privacy.html';
 export const DELETE_ACCOUNT_URL = 'https://www.stockypos.app/legal/delete-account.html';
-export const SIIGO_URL = 'https://www.siigo.com/';
 
 export type BusinessFormState = {
   nit: string;

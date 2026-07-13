@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlatList, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import type { MesaOrderCatalogItem } from '../../../services/mesaOrderService';
@@ -28,6 +29,7 @@ export const CatalogResultsList = React.memo(function CatalogResultsList({
   disabled = false,
   isKeyboardVisible = false,
 }: CatalogResultsListProps) {
+  const { t } = useTranslation('mesas');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const hasCatalogQuery = searchQuery.trim().length > 0;
 
@@ -52,10 +54,7 @@ export const CatalogResultsList = React.memo(function CatalogResultsList({
             </View>
           ) : null}
         </View>
-        <StockyMoneyText
-          value={Number(item.sale_price || 0)}
-          style={styles.catalogResultPrice}
-        />
+        <StockyMoneyText value={Number(item.sale_price || 0)} style={styles.catalogResultPrice} />
       </Pressable>
     ),
     [disabled, isKeyboardVisible, onItemPress],
@@ -65,13 +64,13 @@ export const CatalogResultsList = React.memo(function CatalogResultsList({
     <>
       <View style={styles.catalogSearchHeader}>
         <Ionicons name="search-outline" size={24} color="#111827" />
-        <Text style={styles.catalogSearchHeaderText}>Agregar Producto o Combo</Text>
+        <Text style={styles.catalogSearchHeaderText}>{t('labels.addProduct')}</Text>
       </View>
 
       <TextInput
         value={searchQuery}
         onChangeText={onSearchChange}
-        placeholder="Buscar por nombre..."
+        placeholder={t('labels.searchProduct')}
         placeholderTextColor={STOCKY_COLORS.textMuted}
         style={[styles.searchInput, isSearchFocused && styles.searchInputFocused]}
         autoCapitalize="none"
@@ -81,9 +80,13 @@ export const CatalogResultsList = React.memo(function CatalogResultsList({
       />
 
       {hasCatalogQuery && loading ? (
-        <Text style={styles.emptyState}>Cargando productos...</Text>
+        <Text style={styles.emptyState}>
+          {t('print.printing', { defaultValue: 'Cargando productos...' })}
+        </Text>
       ) : hasCatalogQuery && catalog.length === 0 ? (
-        <Text style={styles.emptyState}>No hay resultados en el catalogo.</Text>
+        <Text style={styles.emptyState}>
+          {t('empty.noItems', { defaultValue: 'No hay resultados en el catalogo.' })}
+        </Text>
       ) : hasCatalogQuery ? (
         <View style={styles.catalogResultsCard}>
           <FlatList

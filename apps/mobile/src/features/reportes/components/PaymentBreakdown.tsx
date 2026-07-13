@@ -1,5 +1,6 @@
 import { Image, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { getBankLogoSource, isBankPaymentMethod } from '../../../utils/paymentMethodBranding';
 import { getPaymentMethodIcon } from '../../../utils/paymentMethods';
@@ -18,11 +19,12 @@ interface PaymentBreakdownProps {
 }
 
 export function PaymentBreakdown({ items, ventasTotal }: PaymentBreakdownProps) {
+  const { t } = useTranslation();
   return (
     <View style={s.blockCard}>
-      <Text style={s.sectionTitle}>Métodos de pago</Text>
+      <Text style={s.sectionTitle}>{t('reportes.paymentMethods')}</Text>
       {items.length === 0 ? (
-        <Text style={s.emptyText}>No hay ventas para mostrar en este período.</Text>
+        <Text style={s.emptyText}>{t('reportes.noSales')}</Text>
       ) : (
         items.map((item) => {
           const share = ventasTotal > 0 ? (item.total / ventasTotal) * 100 : 0;
@@ -44,7 +46,9 @@ export function PaymentBreakdown({ items, ventasTotal }: PaymentBreakdownProps) 
                 <StockyMoneyText value={item.total} style={s.breakdownValue} />
               </View>
               <View style={s.breakdownMetaRow}>
-                <Text style={s.breakdownMeta}>{item.count} transacciones</Text>
+                <Text style={s.breakdownMeta}>
+                  {item.count} {t('reportes.transactions')}
+                </Text>
                 <Text style={s.breakdownMeta}>{share.toFixed(1)}%</Text>
               </View>
               <View style={s.progressTrack}>

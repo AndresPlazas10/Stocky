@@ -9,11 +9,18 @@ const INITIAL_STATE: ToastState = {
   title: '',
 };
 
-type ShowArgs = ToastOptions | { title: string; message?: string; ctaText?: string };
+type ShowArgs =
+  ToastOptions | { title: string; message?: string; ctaText?: string; sound?: boolean };
 
 function resolveArgs(type: ToastType, args: ShowArgs): ToastOptions {
   if ('type' in args) return args;
-  return { type, title: args.title, message: args.message, ctaText: args.ctaText };
+  return {
+    type,
+    title: args.title,
+    message: args.message,
+    ctaText: args.ctaText,
+    sound: args.sound,
+  };
 }
 
 export function useToast() {

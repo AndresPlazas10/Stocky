@@ -10,7 +10,7 @@ export interface Table {
   current_order_id: string | null;
   created_at: string;
   updated_at: string;
-  orders?: { status: string } | null;
+  orders?: { status: string; order_items?: unknown[]; [key: string]: unknown } | null;
 }
 
 export interface OrderItem {

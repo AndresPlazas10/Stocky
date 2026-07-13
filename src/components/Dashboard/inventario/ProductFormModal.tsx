@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Tag,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { PRODUCT_CATEGORIES } from './productFormConstants';
@@ -29,6 +30,7 @@ export function ProductFormModal({
   generatedCode,
   suppliers,
 }: ProductFormModalProps) {
+  const { t } = useTranslation('common');
   const isEdit = mode === 'edit';
 
   return (
@@ -67,10 +69,10 @@ export function ProductFormModal({
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-white">
-                    {isEdit ? 'Editar Producto' : 'Agregar Nuevo Producto'}
+                    {isEdit ? t('buttons.edit') : t('buttons.add')}
                   </h2>
                   {isEdit && generatedCode && (
-                    <p className="text-gray-100 text-sm mt-1">Código: {generatedCode}</p>
+                    <p className="text-gray-100 text-sm mt-1">{t('labels.code')}: {generatedCode}</p>
                   )}
                 </div>
               </div>
@@ -88,7 +90,7 @@ export function ProductFormModal({
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       <Box className="w-4 h-4" />
-                      Nombre del producto *
+                      {t('form.name')} *
                     </label>
                     <Input
                       name="name"
@@ -104,7 +106,7 @@ export function ProductFormModal({
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       <BarChart3 className="w-4 h-4" />
-                      Categoría *
+                      {t('form.category')} *
                     </label>
                     <select
                       name="category"
@@ -113,10 +115,10 @@ export function ProductFormModal({
                       required
                       className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#66A5AD] focus:ring-[#66A5AD] transition-all duration-300"
                     >
-                      <option value="">Seleccionar categoría</option>
+                      <option value="">{t('form.category')}</option>
                       {PRODUCT_CATEGORIES.map((cat) => (
                         <option key={cat.value} value={cat.value}>
-                          {cat.label}
+                          {t(cat.labelKey)}
                         </option>
                       ))}
                     </select>
@@ -126,10 +128,7 @@ export function ProductFormModal({
                     <div className="flex gap-2">
                       <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                       <p className="text-xs text-amber-800">
-                        <span className="font-semibold">Nota importante:</span> Para que los productos aparezcan en los
-                        recibos de cocina, deben estar en la categoría{' '}
-                        <span className="font-semibold">"Platos"</span>. Los productos de otras categorías no se incluirán
-                        en dichos recibos.
+                        {t('form.kitchenReceiptNote')}
                       </p>
                     </div>
                   </div>
@@ -139,7 +138,7 @@ export function ProductFormModal({
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       <DollarSign className="w-4 h-4" />
-                      Precio de compra *
+                      {t('form.price')} *
                     </label>
                     <Input
                       name="purchase_price"
@@ -157,7 +156,7 @@ export function ProductFormModal({
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       <TrendingUp className="w-4 h-4" />
-                      Precio de venta *
+                      {t('form.price')} *
                     </label>
                     <Input
                       name="sale_price"
@@ -176,7 +175,7 @@ export function ProductFormModal({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="md:col-span-3">
                     <label className="flex items-center justify-between p-3 border border-gray-200 rounded-xl bg-gray-50">
-                      <span className="text-sm font-medium text-gray-800">¿Este producto lleva control de stock?</span>
+                      <span className="text-sm font-medium text-gray-800">{t('form.stock')}</span>
                       <input
                         name="manage_stock"
                         type="checkbox"
@@ -190,12 +189,12 @@ export function ProductFormModal({
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       <Package className="w-4 h-4" />
-                      {isEdit ? 'Stock actual' : `Stock inicial ${formData.manage_stock !== false ? '*' : '(deshabilitado)'}`}
+                      {isEdit ? t('form.stock') : `${t('form.stock')} ${formData.manage_stock !== false ? '*' : '(deshabilitado)'}`}
                     </label>
                     {isEdit ? (
                       <div className="h-11 px-4 rounded-xl border border-gray-300 bg-gray-100 flex items-center">
                         <span className="text-gray-500">
-                          {formData.manage_stock === false ? 'Sin control de stock' : formData.stock}
+                          {formData.manage_stock === false ? t('form.stock') : formData.stock}
                         </span>
                       </div>
                     ) : (
@@ -227,7 +226,7 @@ export function ProductFormModal({
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4" />
-                      Stock mínimo
+                      {t('form.minStock')}
                     </label>
                     <Input
                       name="min_stock"
@@ -242,17 +241,17 @@ export function ProductFormModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Unidad</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{t('form.stock')}</label>
                     <select
                       name="unit"
                       value={formData.unit}
                       onChange={onChange}
                       className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#66A5AD] focus:ring-[#66A5AD] transition-all duration-300"
                     >
-                      <option value="unit">Unidad</option>
-                      <option value="kg">Kilogramo</option>
-                      <option value="l">Litro</option>
-                      <option value="box">Caja</option>
+                      <option value="unit">{t('units.unit')}</option>
+                      <option value="kg">{t('units.kg')}</option>
+                      <option value="l">{t('units.l')}</option>
+                      <option value="box">{t('units.box')}</option>
                     </select>
                   </div>
                 </div>
@@ -260,7 +259,7 @@ export function ProductFormModal({
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                     <Building2 className="w-4 h-4" />
-                    Proveedor (opcional)
+                    {t('form.supplier')}
                   </label>
                   <select
                     name="supplier_id"
@@ -268,7 +267,7 @@ export function ProductFormModal({
                     onChange={onChange}
                     className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#66A5AD] focus:ring-[#66A5AD] transition-all duration-300"
                   >
-                    <option value="">Sin proveedor</option>
+                    <option value="">{t('form.supplier')}</option>
                     {suppliers.map((prov) => (
                       <option key={prov.id} value={prov.id}>
                         {prov.business_name || prov.contact_name}
@@ -283,7 +282,7 @@ export function ProductFormModal({
                     onClick={on_cancel}
                     className="order-2 sm:order-1 w-full sm:flex-1 h-10 sm:h-12 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl border-none font-medium text-sm sm:text-base"
                   >
-                    Cancelar
+                    {t('buttons.cancel')}
                   </Button>
                   <Button
                     type="submit"
@@ -297,12 +296,12 @@ export function ProductFormModal({
                     {isSubmitting ? (
                       <>
                         <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        {isEdit ? 'Actualizando...' : 'Creando producto...'}
+                        {isEdit ? t('buttons.loading') : t('buttons.loading')}
                       </>
                     ) : (
                       <>
                         <CheckCircle2 className="w-5 h-5" />
-                        {isEdit ? 'Actualizar Producto' : 'Guardar Producto'}
+                        {isEdit ? t('buttons.save') : t('buttons.save')}
                       </>
                     )}
                   </Button>

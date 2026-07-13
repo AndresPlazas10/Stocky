@@ -202,17 +202,19 @@ export async function createOrderAndOccupyTable({
         throw new Error('open_close_table_transaction no devolvió current_order_id');
       }
 
-      await enqueueOutboxMutation({
-        businessId,
-        mutationType: 'order.create',
-        payload: {
-          order_id: orderId,
-          table_id: tableId,
-          user_id: actorUserId
-        },
-        mutationId: buildMutationId('order.create', businessId)
-      });
-      await invalidateOrderCache({ businessId, tableId, orderId });
+      await Promise.all([
+        enqueueOutboxMutation({
+          businessId,
+          mutationType: 'order.create',
+          payload: {
+            order_id: orderId,
+            table_id: tableId,
+            user_id: actorUserId
+          },
+          mutationId: buildMutationId('order.create', businessId)
+        }),
+        invalidateOrderCache({ businessId, tableId, orderId }),
+      ]);
 
       return {
         id: orderId,
@@ -291,17 +293,19 @@ export async function createOrderAndOccupyTable({
     && !isMissingTablesOpenedAtColumnError(updateError)
   ) throw updateError;
 
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'order.create',
-    payload: {
-      order_id: newOrder?.id || null,
-      table_id: tableId,
-      user_id: actorUserId
-    },
-    mutationId: buildMutationId('order.create', businessId)
-  });
-  await invalidateOrderCache({ businessId, tableId, orderId: newOrder?.id || null });
+  await Promise.all([
+    enqueueOutboxMutation({
+      businessId,
+      mutationType: 'order.create',
+      payload: {
+        order_id: newOrder?.id || null,
+        table_id: tableId,
+        user_id: actorUserId
+      },
+      mutationId: buildMutationId('order.create', businessId)
+    }),
+    invalidateOrderCache({ businessId, tableId, orderId: newOrder?.id || null }),
+  ]);
 
   return {
     ...newOrder,

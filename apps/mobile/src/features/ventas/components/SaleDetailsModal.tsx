@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../../theme/tokens';
@@ -29,11 +30,10 @@ export const SaleDetailsModal = React.memo(function SaleDetailsModal({
   ventaDetailsError,
   onClose,
 }: SaleDetailsModalProps) {
+  const { t } = useTranslation();
   const selectedVentaItemsCount = useMemo(
-    () => selectedVentaDetails.reduce(
-      (sum, item) => sum + Math.max(0, Number(item.quantity || 0)),
-      0,
-    ),
+    () =>
+      selectedVentaDetails.reduce((sum, item) => sum + Math.max(0, Number(item.quantity || 0)), 0),
     [selectedVentaDetails],
   );
   const selectedVentaPaymentTheme = selectedVenta
@@ -63,11 +63,11 @@ export const SaleDetailsModal = React.memo(function SaleDetailsModal({
               <Ionicons name="receipt-outline" size={19} color="#EDE9FE" />
             </View>
             <View style={s.saleDetailsHeaderTextWrap}>
-              <Text style={s.saleDetailsHeaderTitle}>Detalle de venta</Text>
+              <Text style={s.saleDetailsHeaderTitle}>{t('ventasSection.saleDetail')}</Text>
               <Text style={s.saleDetailsHeaderSubtitle}>
                 {selectedVenta
                   ? `ID ${selectedVenta.id.slice(0, 8).toUpperCase()}`
-                  : 'Sin referencia'}
+                  : t('ventasSection.noReference')}
               </Text>
             </View>
           </View>
@@ -81,7 +81,7 @@ export const SaleDetailsModal = React.memo(function SaleDetailsModal({
         <View style={s.saleDetailsHeroCard}>
           <View style={s.saleDetailsHeroTopRow}>
             <View style={s.saleDetailsHeroTotalWrap}>
-              <Text style={s.saleDetailsHeroLabel}>Total pagado</Text>
+              <Text style={s.saleDetailsHeroLabel}>{t('ventasSection.totalPaid')}</Text>
               <StockyMoneyText value={selectedVenta.total} style={s.saleDetailsHeroTotal} />
             </View>
             <View
@@ -123,13 +123,14 @@ export const SaleDetailsModal = React.memo(function SaleDetailsModal({
             <View style={s.saleDetailsHeroMetaItem}>
               <Ionicons name="person-outline" size={14} color="#64748B" />
               <Text style={s.saleDetailsHeroMetaText}>
-                {selectedVenta.seller_name || 'Vendedor'}
+                {selectedVenta.seller_name || t('ventasSection.seller')}
               </Text>
             </View>
             <View style={s.saleDetailsHeroMetaItem}>
               <Ionicons name="basket-outline" size={14} color="#64748B" />
               <Text style={s.saleDetailsHeroMetaText}>
-                {selectedVentaItemsCount} {selectedVentaItemsCount === 1 ? 'unidad' : 'unidades'}
+                {selectedVentaItemsCount}{' '}
+                {selectedVentaItemsCount === 1 ? t('ventasSection.unit') : t('ventasSection.units')}
               </Text>
             </View>
           </View>
@@ -137,7 +138,7 @@ export const SaleDetailsModal = React.memo(function SaleDetailsModal({
           {selectedVenta.payment_method === 'cash' ? (
             <View style={s.saleDetailsHeroCashGrid}>
               <View style={s.saleDetailsHeroCashCard}>
-                <Text style={s.saleDetailsHeroCashLabel}>Recibido</Text>
+                <Text style={s.saleDetailsHeroCashLabel}>{t('ventasSection.received')}</Text>
                 {selectedVenta.amount_received !== null ? (
                   <StockyMoneyText
                     value={selectedVenta.amount_received}
@@ -148,7 +149,7 @@ export const SaleDetailsModal = React.memo(function SaleDetailsModal({
                 )}
               </View>
               <View style={s.saleDetailsHeroCashCard}>
-                <Text style={s.saleDetailsHeroCashLabel}>Cambio</Text>
+                <Text style={s.saleDetailsHeroCashLabel}>{t('labels.change')}</Text>
                 {selectedVenta.change_amount !== null ? (
                   <StockyMoneyText
                     value={selectedVenta.change_amount}
@@ -170,7 +171,7 @@ export const SaleDetailsModal = React.memo(function SaleDetailsModal({
       ) : null}
 
       <View style={s.saleDetailsItemsSectionHeader}>
-        <Text style={s.saleDetailsItemsSectionTitle}>Productos vendidos</Text>
+        <Text style={s.saleDetailsItemsSectionTitle}>{t('ventasSection.productsSold')}</Text>
         <View style={s.saleDetailsItemsCountBadge}>
           <Text style={s.saleDetailsItemsCountText}>
             {selectedVentaDetails.length} {selectedVentaDetails.length === 1 ? 'item' : 'items'}
@@ -179,7 +180,7 @@ export const SaleDetailsModal = React.memo(function SaleDetailsModal({
       </View>
       {loadingVentaDetails ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
       {!loadingVentaDetails && selectedVentaDetails.length === 0 ? (
-        <Text style={s.emptyText}>No hay detalles para esta venta.</Text>
+        <Text style={s.emptyText}>{t('ventasSection.noDetails')}</Text>
       ) : null}
       {!loadingVentaDetails && selectedVentaDetails.length > 0 ? (
         <View style={s.saleDetailsListCard}>
@@ -209,8 +210,8 @@ export const SaleDetailsModal = React.memo(function SaleDetailsModal({
                       {getOrderItemName(item as unknown as MesaOrderItem)}
                     </Text>
                     <Text style={s.saleDetailsListMeta}>
-                      <StockyMoneyText value={item.unit_price} style={s.saleDetailsListMeta} /> por
-                      unidad
+                      <StockyMoneyText value={item.unit_price} style={s.saleDetailsListMeta} />{' '}
+                      {t('ventasSection.perUnit')}
                     </Text>
                   </View>
                 </View>
@@ -219,7 +220,7 @@ export const SaleDetailsModal = React.memo(function SaleDetailsModal({
             )}
             ListFooterComponent={
               <View style={s.saleDetailsListFooter}>
-                <Text style={s.saleDetailsListFooterLabel}>Total final</Text>
+                <Text style={s.saleDetailsListFooterLabel}>{t('ventasSection.finalTotal')}</Text>
                 <StockyMoneyText
                   value={selectedVenta?.total || 0}
                   style={s.saleDetailsListFooterValue}

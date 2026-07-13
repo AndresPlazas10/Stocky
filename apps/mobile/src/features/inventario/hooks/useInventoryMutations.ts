@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   createInventoryProductWithRpcFallback,
   deleteInventoryProductById,
@@ -38,6 +39,7 @@ export function useInventoryMutations({
   onProductDeactivated,
   onProductActivated,
 }: UseInventoryMutationsParams) {
+  const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -52,7 +54,7 @@ export function useInventoryMutations({
 
   const handleSaveProduct = useCallback(async () => {
     if (!canManageProducts) {
-      setError('No tienes permisos para gestionar productos.');
+      setError(t('inventarioSection.noPermission'));
       return;
     }
 
@@ -64,26 +66,26 @@ export function useInventoryMutations({
     const minStock = form.manageStock ? parseIntegerText(form.minStock, 5) : 0;
 
     if (!normalizedName) {
-      setError('El nombre del producto es obligatorio.');
+      setError(t('inventarioSection.nameRequired'));
       return;
     }
     if (!normalizedCategory) {
-      setError('La categoría es obligatoria.');
+      setError(t('inventarioSection.categoryRequiredError'));
       return;
     }
     if (!Number.isFinite(purchasePrice) || purchasePrice < 0) {
-      setError('El precio de compra no es válido.');
+      setError(t('inventarioSection.invalidPurchasePrice'));
       return;
     }
     if (!Number.isFinite(salePrice) || salePrice < 0) {
-      setError('El precio de venta no es válido.');
+      setError(t('inventarioSection.invalidSalePrice'));
       return;
     }
     if (
       form.manageStock &&
       (!Number.isFinite(stock) || stock < 0 || !Number.isFinite(minStock) || minStock < 0)
     ) {
-      setError('Stock y stock mínimo deben ser valores válidos.');
+      setError(t('inventarioSection.invalidStock'));
       return;
     }
 
@@ -125,7 +127,7 @@ export function useInventoryMutations({
       invalidateCatalogItemsCache(businessId);
       await refreshProducts();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar el producto.');
+      setError(err instanceof Error ? err.message : t('inventarioSection.saveError'));
     } finally {
       setSaving(false);
     }
@@ -198,7 +200,7 @@ export function useInventoryMutations({
       invalidateCatalogItemsCache(businessId);
       await refreshProducts();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo desactivar el producto.');
+      setError(err instanceof Error ? err.message : t('inventarioSection.deactivateError'));
     } finally {
       setDeleting(false);
     }
@@ -218,7 +220,7 @@ export function useInventoryMutations({
         invalidateCatalogItemsCache(businessId);
         await refreshProducts();
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'No se pudo activar el producto.');
+        setError(err instanceof Error ? err.message : t('inventarioSection.activateError'));
       } finally {
         setDeleting(false);
       }

@@ -1,8 +1,6 @@
 import React from 'react';
 import type { Session } from '@supabase/supabase-js';
 
-import { StockyToast, type ToastType } from '../../../ui/StockyToast';
-import { PrintReceiptConfirmModal } from '../../../ui/PrintReceiptConfirmModal';
 import type { MesaOrderCatalogItem, MesaOrderItem } from '../../../services/mesaOrderService';
 import type { BusinessContext, MesaRecord } from '../../../services/mesasService';
 import type { PaymentMethod, SplitSubAccount } from '../../../services/mesaCheckoutService';
@@ -50,15 +48,6 @@ type CashChangeData = {
   reason: 'invalid' | 'insufficient' | 'empty' | null;
 };
 
-type ToastState = {
-  visible: boolean;
-  type: ToastType;
-  title: string;
-  message?: string;
-  ctaText?: string;
-  durationMs?: number;
-};
-
 export interface MesasModalsProps {
   session: Session;
   context: BusinessContext | null;
@@ -103,20 +92,11 @@ export interface MesasModalsProps {
 
   showSplitBillModal: boolean;
   orderItems: MesaOrderItem[];
+  resolveItemName?: (item: MesaOrderItem) => string;
   isClosingSplitBill: boolean;
   onBackSplitBill: () => void;
   onCloseSplitBill: () => void;
   onConfirmSplitBill: (payload: { subAccounts: SplitSubAccount[] }) => void;
-
-  toast: ToastState;
-  onHideToast: () => void;
-
-  showPrintModal: boolean;
-  isPrintingReceipt: boolean;
-  printCustomerName: string;
-  onCustomerNameChange: (name: string) => void;
-  onPrintConfirm: () => void;
-  onPrintCancel: () => void;
 }
 
 export const MesasModals = React.memo(function MesasModals(props: MesasModalsProps) {
@@ -178,29 +158,11 @@ export const MesasModals = React.memo(function MesasModals(props: MesasModalsPro
       <SplitBillModalRN
         visible={props.showSplitBillModal}
         orderItems={props.orderItems}
+        resolveItemName={props.resolveItemName}
         submitting={props.isClosingSplitBill}
         onBack={props.onBackSplitBill}
         onClose={props.onCloseSplitBill}
         onConfirm={props.onConfirmSplitBill}
-      />
-
-      <StockyToast
-        visible={props.toast.visible}
-        type={props.toast.type}
-        title={props.toast.title}
-        message={props.toast.message}
-        ctaText={props.toast.ctaText}
-        durationMs={props.toast.durationMs}
-        onClose={props.onHideToast}
-      />
-
-      <PrintReceiptConfirmModal
-        visible={props.showPrintModal}
-        onConfirm={props.onPrintConfirm}
-        onCancel={props.onPrintCancel}
-        isLoading={props.isPrintingReceipt}
-        customerName={props.printCustomerName}
-        onCustomerNameChange={props.onCustomerNameChange}
       />
     </>
   );

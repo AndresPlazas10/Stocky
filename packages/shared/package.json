@@ -37,6 +37,10 @@
     "./normalization": {
       "import": "./dist/normalization.js",
       "types": "./dist/normalization.d.ts"
+    },
+    "./i18n": {
+      "import": "./dist/locales/index.js",
+      "types": "./dist/locales/index.d.ts"
     }
   },
   "scripts": {

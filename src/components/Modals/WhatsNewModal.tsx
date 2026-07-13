@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Apple, ShieldCheck, Sparkles } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import nuevoLogo from '../../assets/nuevoLogo.png';
 import { getApkDownloadUrl } from '../../utils/apkDownload';
 
 export default function WhatsNewModal() {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState(0);
   const totalSteps = 3;
@@ -108,7 +110,7 @@ export default function WhatsNewModal() {
               onClick={closeModal}
               className="absolute right-5 top-5 z-20 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white/80 transition hover:bg-white/20"
             >
-              Cerrar
+              {t('whatsNew.close')}
             </button>
 
             <div className="relative z-10 grid gap-6 p-5 sm:p-6 md:grid-cols-[1.1fr_0.9fr] md:items-center md:p-10">
@@ -117,31 +119,30 @@ export default function WhatsNewModal() {
                   <div className="space-y-5 text-white">
                     <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
                       <Sparkles className="h-4 w-4 text-emerald-300" />
-                      Novedades
+                      {t('whatsNew.whatsNew')}
                     </div>
 
                     <div>
                   <h2 className="text-2xl font-black uppercase tracking-tight sm:text-3xl md:text-4xl">
-                        ¡La experiencia nativa de Stocky llega a Android!
+                        {t('whatsNew.nativeAndroid')}
                       </h2>
                   <p className="mt-3 text-sm text-white/80 sm:text-base">
-                        Más velocidad, notificaciones instantáneas y una interfaz optimizada para tu equipo.
-                        Descárgala aquí y lleva Stocky al siguiente nivel.
+                        {t('whatsNew.nativeAndroidDesc')}
                       </p>
                     </div>
 
                     <div className="space-y-3 text-xs text-white/80 sm:text-sm">
                       <div className="flex items-start gap-3">
                         <Sparkles className="mt-0.5 h-4 w-4 text-emerald-300" />
-                        <span>Nuevo logo oficial y mejoras de rendimiento en toda la plataforma.</span>
+                        <span>{t('whatsNew.newLogo')}</span>
                       </div>
                       <div className="flex items-start gap-3">
                         <Sparkles className="mt-0.5 h-4 w-4 text-emerald-300" />
-                        <span>Notificaciones activas en la app nativa para estar siempre al tanto.</span>
+                        <span>{t('whatsNew.notifications')}</span>
                       </div>
                       <div className="flex items-start gap-3">
                         <Sparkles className="mt-0.5 h-4 w-4 text-emerald-300" />
-                        <span>Próxima actualización: app nativa para iOS.</span>
+                        <span>{t('whatsNew.iosComing')}</span>
                       </div>
                     </div>
 
@@ -151,14 +152,14 @@ export default function WhatsNewModal() {
                         className="relative h-11 sm:h-12 w-full sm:w-auto overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-300 via-emerald-400 to-teal-400 text-sm sm:text-base font-semibold text-emerald-950 shadow-[0_16px_35px_rgba(16,185,129,0.45)] hover:opacity-95"
                       >
                         <span className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.55),transparent_55%)]" />
-                        <span className="relative z-10">Descargar para Android</span>
+                        <span className="relative z-10">{t('whatsNew.downloadAndroid')}</span>
                       </Button>
                       <Button
                         variant="outline"
                         onClick={goNext}
                         className="h-11 sm:h-12 w-full sm:w-auto border-white/20 bg-white/10 text-white hover:bg-white/20"
                       >
-                        Siguiente
+                        {t('whatsNew.next')}
                       </Button>
                     </div>
 
@@ -186,30 +187,30 @@ export default function WhatsNewModal() {
                   <div className="space-y-5 text-white">
                     <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
                       <Sparkles className="h-4 w-4 text-emerald-300" />
-                      Nueva identidad
+                      {t('whatsNew.newIdentity')}
                     </div>
 
                     <div>
                       <h2 className="text-2xl font-black uppercase tracking-tight sm:text-3xl md:text-4xl">
-                        ¡Una evolución visual: el nuevo rostro de Stocky!
+                        {t('whatsNew.visualEvolution')}
                       </h2>
                       <p className="mt-3 text-sm text-white/80 sm:text-base">
-                        Nuestra marca creció con ustedes. El nuevo logotipo es más moderno, limpio y listo para el futuro.
+                        {t('whatsNew.visualEvolutionDesc')}
                       </p>
                     </div>
 
                     <div className="space-y-3 text-xs text-white/80 sm:text-sm">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">Evolución del logotipo</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">{t('whatsNew.logoEvolution')}</p>
                       <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
                         <div className="rounded-2xl border border-white/15 bg-white/10 p-4 text-center">
-                          <p className="text-xs font-semibold text-white/70">Anterior</p>
+                          <p className="text-xs font-semibold text-white/70">{t('whatsNew.previous')}</p>
                           <div className="mt-3 flex items-center justify-center rounded-2xl bg-white/10 p-4">
                             <img src={logoViejo} alt="Logo anterior" className="h-16 w-16 object-contain" />
                           </div>
                         </div>
                         <div className="hidden text-3xl font-black text-white/60 sm:block">›</div>
                         <div className="rounded-2xl border border-white/15 bg-white/10 p-4 text-center">
-                          <p className="text-xs font-semibold text-white/70">Actual</p>
+                          <p className="text-xs font-semibold text-white/70">{t('whatsNew.current')}</p>
                           <div className="mt-3 flex items-center justify-center rounded-2xl bg-white/10 p-4">
                             <img src={nuevoLogo} alt="Logo actual" className="h-16 w-16 object-contain" />
                           </div>
@@ -223,13 +224,13 @@ export default function WhatsNewModal() {
                         onClick={goPrev}
                         className="h-11 w-full sm:w-auto border-white/20 bg-white/10 text-white hover:bg-white/20"
                       >
-                        Anterior
+                        {t('whatsNew.previous')}
                       </Button>
                       <Button
                         onClick={goNext}
                         className="h-11 w-full sm:w-auto bg-white text-slate-900 hover:bg-white/90"
                       >
-                        Siguiente
+                        {t('whatsNew.next')}
                       </Button>
                     </div>
 
@@ -257,26 +258,26 @@ export default function WhatsNewModal() {
                   <div className="space-y-5 text-white">
                     <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
                       <Apple className="h-4 w-4 text-emerald-300" />
-                      Próximamente
+                      {t('whatsNew.comingSoon')}
                     </div>
 
                     <div>
                       <h2 className="text-2xl font-black uppercase tracking-tight sm:text-3xl md:text-4xl">
-                        La app nativa para iOS está en camino
+                        {t('whatsNew.iosApp')}
                       </h2>
                       <p className="mt-3 text-sm text-white/80 sm:text-base">
-                        Estamos preparando una experiencia nativa para iPhone con el mismo rendimiento y notificaciones instantáneas.
+                        {t('whatsNew.iosAppDesc')}
                       </p>
                     </div>
 
                     <div className="space-y-3 text-xs text-white/80 sm:text-sm">
                       <div className="flex items-start gap-3">
                         <Sparkles className="mt-0.5 h-4 w-4 text-emerald-300" />
-                        <span>Acceso rápido a ventas, inventario y mesas desde iOS.</span>
+                        <span>{t('whatsNew.iosQuickAccess')}</span>
                       </div>
                       <div className="flex items-start gap-3">
                         <Sparkles className="mt-0.5 h-4 w-4 text-emerald-300" />
-                        <span>Sincronización instantánea con tu cuenta actual.</span>
+                        <span>{t('whatsNew.iosSync')}</span>
                       </div>
                     </div>
 
@@ -286,13 +287,13 @@ export default function WhatsNewModal() {
                         onClick={goPrev}
                         className="h-11 w-full sm:w-auto border-white/20 bg-white/10 text-white hover:bg-white/20"
                       >
-                        Anterior
+                        {t('whatsNew.previous')}
                       </Button>
                       <Button
                         onClick={closeModal}
                         className="h-11 w-full sm:w-auto bg-emerald-300 text-slate-900 hover:bg-emerald-200"
                       >
-                        Entendido
+                        {t('whatsNew.understood')}
                       </Button>
                     </div>
 

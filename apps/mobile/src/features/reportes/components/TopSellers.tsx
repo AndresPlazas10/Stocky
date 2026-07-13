@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { reportesStyles as s } from '../reportesStyles';
 
@@ -13,11 +14,12 @@ interface TopSellersProps {
 }
 
 export function TopSellers({ items }: TopSellersProps) {
+  const { t } = useTranslation();
   return (
     <View style={s.blockCard}>
-      <Text style={s.sectionTitle}>Top vendedores</Text>
+      <Text style={s.sectionTitle}>{t('reportes.topSellers')}</Text>
       {items.length === 0 ? (
-        <Text style={s.emptyText}>No hay ventas asignadas a vendedores en este período.</Text>
+        <Text style={s.emptyText}>{t('reportes.noSellerSales')}</Text>
       ) : (
         items.map((item, index) => (
           <View key={item.sellerName} style={s.sellerRow}>
@@ -26,7 +28,9 @@ export function TopSellers({ items }: TopSellersProps) {
             </View>
             <View style={s.sellerMain}>
               <Text style={s.sellerName}>{item.sellerName}</Text>
-              <Text style={s.sellerMeta}>{item.count} ventas</Text>
+              <Text style={s.sellerMeta}>
+                {item.count} {t('reportes.salesCount')}
+              </Text>
             </View>
             <StockyMoneyText value={item.total} style={s.sellerTotal} />
           </View>

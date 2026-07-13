@@ -126,7 +126,15 @@ export function useProveedorMutations({
     } finally {
       setDeleting(false);
     }
-  }, [businessId, canManageSuppliers, deleting, refreshSuppliers, supplierToDelete, setError, onSupplierDeleted]);
+  }, [
+    businessId,
+    canManageSuppliers,
+    deleting,
+    refreshSuppliers,
+    supplierToDelete,
+    setError,
+    onSupplierDeleted,
+  ]);
 
   const closeDeleteModal = useCallback(() => {
     if (deleting) return;

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { compareTableIdentifiers, MESAS_REMOTE_FALLBACK_POLL_MS, MESA_LOCK_HEARTBEAT_MS } from './mesaHelpers.js';
+import { compareTableIdentifiers, MESAS_REMOTE_FALLBACK_POLL_MS, MESA_LOCK_HEARTBEAT_MS } from './mesaHelpers';
 import { normalizeTableRecord } from '../../../utils/tableStatus';
 import { saveOfflineSnapshot } from '../../../utils/offlineSnapshot.js';
 import { supabase } from '../../../supabase/Client';

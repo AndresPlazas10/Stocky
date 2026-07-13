@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { logger } from '@/utils/logger';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import BusinessDisabledModal from '../components/BusinessDisabledModal';
@@ -7,6 +8,7 @@ import WhatsNewModal from '../components/Modals/WhatsNewModal';
 import { AsyncStateWrapper } from '../ui/system/async-state/index';
 import { ModernToast } from '../components/ui/modern-alert.jsx';
 import { useToast } from '../hooks/useToast.js';
+import { BusinessConfigProvider } from '../contexts/BusinessConfigContext';
 import {
   getAuthenticatedUser,
   getBusinessById,
@@ -55,13 +57,17 @@ const Reports = lazy(() => import('../components/Dashboard/Reports'));
 const Configuracion = lazy(() => import('../components/Dashboard/Configuracion.jsx'));
 const IncidentesSync = lazy(() => import('../components/Dashboard/IncidentesSync.jsx'));
 
-const SectionLoader = () => (
-  <div className="rounded-xl border border-gray-100 bg-white/80 p-4 text-sm text-gray-700">
-    Cargando modulo...
-  </div>
-);
+const SectionLoader = () => {
+  const { t } = useTranslation('common');
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white/80 p-4 text-sm text-gray-700">
+      {t('dashboard.loadingModule')}
+    </div>
+  );
+};
 
 function Dashboard() {
+  const { t } = useTranslation('common');
   const navigate = useNavigate();
   const [business, setBusiness] = useState<DashboardBusiness | null>(null);
   const [loading, setLoading] = useState(true);
@@ -117,14 +123,14 @@ function Dashboard() {
                 setUser(null);
                 setBusiness(cachedBusiness);
                 setBusinessLogo(cachedBusiness.logo_url || null);
-                showWarning('Sin internet (modo offline). Trabajando con datos locales.');
+                showWarning(t('dashboard.offlineMode'));
                 return;
               }
             } catch (err) {
               logger.warn('dashboard:offline_fallback_business failed', err);
             }
           }
-          setError('⚠️ Sin internet y no hay sesión local disponible. Conéctate una vez para habilitar modo offline.');
+          setError(t('dashboard.noLocalSession'));
           return;
         }
 
@@ -158,7 +164,7 @@ function Dashboard() {
 
       if (!finalBusiness && employee) {
         if (offlineMode) {
-          setError('⚠️ Sin internet no se puede validar el contexto de empleado. Intenta de nuevo con conexión.');
+          setError(t('dashboard.employeeContextError'));
           return;
         }
         navigate('/employee-dashboard');
@@ -173,7 +179,7 @@ function Dashboard() {
           return;
         }
         if (offlineMode) {
-          setError('⚠️ Sin internet y no se encontró negocio local cacheado para este usuario.');
+          setError(t('dashboard.noCachedBusiness'));
           return;
         }
         navigate('/register');
@@ -200,11 +206,11 @@ function Dashboard() {
       }
       
     } catch {
-      setError('❌ Error al cargar la información del negocio');
+      setError(t('dashboard.loadBusinessError'));
     } finally {
       setLoading(false);
     }
-  }, [showWarning, navigate]);
+  }, [t, showWarning, navigate]);
 
   useEffect(() => {
     checkAuthAndLoadBusiness();
@@ -276,7 +282,7 @@ function Dashboard() {
       setBusinessLogo(newLogoUrl);
       setBusiness({ ...business, logo_url: newLogoUrl } as DashboardBusiness);
     } catch {
-      setError('Error al actualizar el logo');
+      setError(t('dashboard.updateLogoError'));
     }
   };
 
@@ -318,12 +324,16 @@ function Dashboard() {
         return <IncidentesSync key="incidentes-sync" businessId={business?.id} />;
       
       default:
-        return <p>Selecciona una opción del menú</p>;
+        return <p>{t('dashboard.selectMenuOption')}</p>;
     }
   };
 
   if (isBusinessDisabled) {
-    return <BusinessDisabledModal businessName={business?.name} onSignOut={handleSignOut} />;
+    return (
+      <BusinessConfigProvider business={business}>
+        <BusinessDisabledModal businessName={business?.name} onSignOut={handleSignOut} />
+      </BusinessConfigProvider>
+    );
   }
 
   if (loading || error) {
@@ -336,21 +346,21 @@ function Dashboard() {
           dataCount={business ? 1 : 0}
           onRetry={checkAuthAndLoadBusiness}
           skeletonType="dashboard"
-          emptyTitle="Preparando tu negocio"
-          emptyDescription="Estamos cargando tu configuración y permisos."
+          emptyTitle={t('dashboard.preparingBusiness')}
+          emptyDescription={t('dashboard.loadingConfig')}
         />
       </div>
     );
   }
 
   return (
-    <>
+    <BusinessConfigProvider business={business}>
       {activeSection === 'home' ? <WhatsNewModal /> : null}
       
       <DashboardLayout
-        userName={business?.owner_name || 'Usuario'}
+        userName={business?.owner_name || t('dashboard.user')}
         userEmail={(user as Record<string, unknown>)?.email as string || ''}
-        userRole="Administrador"
+        userRole={t('roles.admin')}
         businessName={business?.name}
         businessId={business?.id}
         businessLogo={businessLogo}
@@ -377,7 +387,7 @@ function Dashboard() {
         activeSection={activeSection}
         onClose={() => setPerfHudEnabled(false)}
       />
-    </>
+    </BusinessConfigProvider>
   );
 }
 

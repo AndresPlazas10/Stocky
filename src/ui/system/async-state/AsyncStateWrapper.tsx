@@ -1,4 +1,5 @@
 import { WifiOff, Search, Database } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useOnlineStatus } from "../../../hooks/useOnlineStatus";
 import { ASYNC_STATES, resolveAsyncState } from "./state.constants";
 import { SkeletonFactory } from "./SkeletonFactory";
@@ -45,12 +46,13 @@ export function AsyncStateWrapper({
   emptyTitle = "",
   emptyDescription = "",
   emptyAction = null,
-  noResultsTitle = "Sin resultados",
-  noResultsDescription = "Prueba ajustando filtros o términos de búsqueda.",
+  noResultsTitle = "",
+  noResultsDescription = "",
   noResultsAction = null,
   bypassStateRendering = false,
   className = "",
 }: AsyncStateWrapperProps) {
+  const { t } = useTranslation();
   const isOnline = useOnlineStatus();
   const hasData = dataCount > 0;
   const offline = showOfflineState ? (offlineMode ?? !isOnline) : false;
@@ -94,8 +96,8 @@ export function AsyncStateWrapper({
       <div className={className}>
         <EmptyState
           icon={WifiOff}
-          title="Sin conexión"
-          description="Mostraremos la información tan pronto vuelva la conexión a internet."
+          title={t('asyncState.noConnection')}
+          description={t('asyncState.showWhenConnected')}
           action={
             onRetry ? (
               <button
@@ -103,7 +105,7 @@ export function AsyncStateWrapper({
                 onClick={onRetry}
                 className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
               >
-                Reintentar
+                {t('asyncState.retry')}
               </button>
             ) : null
           }
@@ -117,8 +119,8 @@ export function AsyncStateWrapper({
       <div className={className}>
         <EmptyState
           icon={Search}
-          title={noResultsTitle}
-          description={noResultsDescription}
+          title={noResultsTitle || t('asyncState.noResults')}
+          description={noResultsDescription || t('asyncState.tryAdjustingFilters')}
           action={noResultsAction}
         />
       </div>
@@ -130,10 +132,10 @@ export function AsyncStateWrapper({
       <div className={className}>
         <EmptyState
           icon={Database}
-          title={emptyTitle || "Aun no hay informacion"}
+          title={emptyTitle || t('asyncState.noInfoYet')}
           description={
             emptyDescription ||
-            "Cuando registres datos, los veras en esta seccion."
+            t('asyncState.whenYouRegisterData')
           }
           action={emptyAction}
         />

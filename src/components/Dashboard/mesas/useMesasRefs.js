@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { logger } from '../../../utils/logger.ts';
-import { normalizeEntityId } from './mesaHelpers.js';
+import { normalizeEntityId } from './mesaHelpers';
 import { isOfflineMode, isOfflinePersistenceEnabled } from '../../../utils/offlineSnapshot.js';
 
 export function useMesasRefs({

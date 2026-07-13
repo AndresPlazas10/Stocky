@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { formatDateTime } from '../../../utils/dateHelpers';
@@ -23,6 +24,7 @@ export const SaleCard = memo(function SaleCard({
   onPrint,
   onDelete,
 }: SaleCardProps) {
+  const { t } = useTranslation();
   return (
     <View style={s.saleCard}>
       <View style={s.saleDateRow}>
@@ -33,15 +35,15 @@ export const SaleCard = memo(function SaleCard({
       <View style={s.saleInfoGrid}>
         <View style={s.saleInfoColumn}>
           <View style={s.saleMetaBlock}>
-            <Text style={s.saleMetaLabel}>CLIENTE</Text>
+            <Text style={s.saleMetaLabel}>{t('ventasSection.customer')}</Text>
             <Text style={s.saleMetaValue} numberOfLines={1}>
-              Venta general
+              {t('ventasSection.generalSale')}
             </Text>
           </View>
           <View style={s.saleMetaBlock}>
-            <Text style={s.saleMetaLabel}>VENDEDOR</Text>
+            <Text style={s.saleMetaLabel}>{t('ventasSection.vendor')}</Text>
             <Text style={s.saleMetaValue} numberOfLines={1}>
-              {venta.seller_name || 'Administrador'}
+              {venta.seller_name || t('ventasSection.admin')}
             </Text>
           </View>
         </View>
@@ -68,7 +70,7 @@ export const SaleCard = memo(function SaleCard({
             </View>
           </View>
           <View style={s.saleTotalBlock}>
-            <Text style={s.saleCardTotalLabel}>TOTAL</Text>
+            <Text style={s.saleCardTotalLabel}>{t('ventasSection.totalLabel')}</Text>
             <StockyMoneyText value={venta.total} style={s.saleCardTotalValue} />
           </View>
         </View>
@@ -80,19 +82,19 @@ export const SaleCard = memo(function SaleCard({
           onPress={() => onViewDetails(venta)}
         >
           <Ionicons name="eye-outline" size={20} color="#D1D5DB" />
-          <Text style={s.saleDetailsText}>Ver Detalles</Text>
+          <Text style={s.saleDetailsText}>{t('buttons.viewDetails')}</Text>
         </Pressable>
 
         <Pressable style={[s.salePrintButton, s.saleActionHalf]} onPress={() => onPrint(venta)}>
           <Ionicons name="print-outline" size={20} color="#DCFCE7" />
-          <Text style={s.salePrintText}>Imprimir</Text>
+          <Text style={s.salePrintText}>{t('buttons.print')}</Text>
         </Pressable>
       </View>
 
       {canDelete ? (
         <Pressable style={s.saleDeleteButton} onPress={() => onDelete(venta)}>
           <Ionicons name="trash-outline" size={20} color="#FEE2E2" />
-          <Text style={s.saleDeleteText}>Eliminar</Text>
+          <Text style={s.saleDeleteText}>{t('buttons.delete')}</Text>
         </Pressable>
       ) : null}
     </View>

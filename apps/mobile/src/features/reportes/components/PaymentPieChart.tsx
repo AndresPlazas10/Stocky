@@ -17,7 +17,12 @@ interface PaymentPieChartProps {
   chartConfig: Record<string, unknown>;
 }
 
-export default function PaymentPieChart({ data, width, height, chartConfig }: PaymentPieChartProps) {
+export default function PaymentPieChart({
+  data,
+  width,
+  height,
+  chartConfig,
+}: PaymentPieChartProps) {
   return (
     <View style={s.blockCard}>
       <Text style={s.sectionTitle}>Distribución por método</Text>

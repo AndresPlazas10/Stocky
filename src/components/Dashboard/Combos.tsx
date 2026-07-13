@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Layers, Plus, X, Edit, Package, Save, Trash2, AlertCircle } from 'lucide-react';
 import { formatPrice } from '../../utils/formatters';
+import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 import { getProductsForCombos } from '../../data/queries/combosQueries';
 import {
   COMBO_STATUS,
@@ -29,9 +31,9 @@ const createInitialForm = () => ({
   items: [{ ...EMPTY_ITEM }]
 });
 
-function getComboDisplayProducts(combo: { combo_items?: Array<{ cantidad: number; products?: { name?: string } }> }) {
+function getComboDisplayProducts(combo: { combo_items?: Array<{ cantidad: number; products?: { name?: string } }> }, t: (key: string) => string) {
   const items = Array.isArray(combo?.combo_items) ? combo.combo_items : [];
-  if (items.length === 0) return 'Sin productos';
+  if (items.length === 0) return t('form.noDescription');
 
   const formatted = items
     .map((item) => `${item.cantidad} x ${item.products?.name || 'Producto'}`)
@@ -42,6 +44,12 @@ function getComboDisplayProducts(combo: { combo_items?: Array<{ cantidad: number
 }
 
 export default function Combos({ businessId }: DashboardModuleProps) {
+  const { t } = useTranslation('common');
+  const config = useBusinessConfig();
+  const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
+  
+  const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
+  
   const [combos, setCombos] = useState<Array<{ id: string; nombre: string; precio_venta: number; descripcion?: string; estado: string; combo_items?: Array<{ producto_id: string; cantidad: number; products?: { name?: string } }> }>>([]);
   const [products, setProducts] = useState<Array<{ id: string; name: string; code?: string; stock: number }>>([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +91,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
       setProducts(loadedProducts || []);
       setError(null);
     } catch (err) {
-      setError(`❌ ${(err as Error)?.message || 'No se pudieron cargar los combos'}`);
+      setError(`❌ ${(err as Error)?.message || t('combos.errors.loadFailed')}`);
       setCombos([]);
     } finally {
       setLoading(false);
@@ -197,16 +205,16 @@ export default function Combos({ businessId }: DashboardModuleProps) {
 
       if (editingCombo?.id) {
         await updateCombo(editingCombo.id, businessId, payload);
-        setSuccess('✅ Combo actualizado correctamente');
+        setSuccess(t('messages.savedSuccessfully'));
       } else {
         await createCombo(businessId, payload);
-        setSuccess('✅ Combo creado correctamente');
+        setSuccess(t('messages.savedSuccessfully'));
       }
 
       closeFormModal();
       await loadData();
     } catch (err) {
-      setError(`❌ ${(err as Error)?.message || 'No se pudo guardar el combo'}`);
+      setError(`❌ ${(err as Error)?.message || t('errors.saveError')}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -229,11 +237,11 @@ export default function Combos({ businessId }: DashboardModuleProps) {
       setIsDeleting(true);
       setError(null);
       await deleteCombo(comboToDelete.id, businessId);
-      setSuccess(`✅ Combo "${comboToDelete.nombre}" eliminado correctamente`);
+      setSuccess(t('messages.deletedSuccessfully'));
       closeDeleteModal();
       await loadData();
     } catch (err) {
-      setError(`❌ ${(err as Error)?.message || 'No se pudo eliminar el combo'}`);
+      setError(`❌ ${(err as Error)?.message || t('errors.deleteError')}`);
     } finally {
       setIsDeleting(false);
     }
@@ -257,15 +265,15 @@ export default function Combos({ businessId }: DashboardModuleProps) {
       dataCount={combos.length}
       onRetry={loadData}
       skeletonType="inventario"
-      emptyTitle="No hay combos creados"
-      emptyDescription="Crea tu primer combo para vender conjuntos de productos con descuento de inventario interno."
+      emptyTitle={t('empty.noDataToShow')}
+      emptyDescription={t('empty.combosDescription')}
       emptyAction={
         <Button
           type="button"
           onClick={openCreateModal}
           className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
         >
-          Crear Primer Combo
+          {t('empty.createFirst')}
         </Button>
       }
       bypassStateRendering={showFormModal}
@@ -284,7 +292,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                   <Layers className="w-6 h-6 sm:w-8 sm:h-8" />
                 </div>
                 <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold">Combos</h1>
+                  <h1 className="text-2xl sm:text-3xl font-bold">{t('navigation.combos')}</h1>
                   <p className="text-white/80 mt-1 text-sm sm:text-base">Gestiona combos estructurados de productos</p>
                 </div>
               </div>
@@ -293,7 +301,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                 className="w-full sm:w-auto gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-xl flex items-center justify-center gap-2 text-sm sm:text-base"
               >
                 <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-                Nuevo Combo
+                {t('buttons.newCombo')}
               </Button>
             </div>
           </Card>
@@ -322,7 +330,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
             {combos.length === 0 ? (
               <div className="text-center py-10 text-gray-500">
                 <Layers className="w-16 h-16 mx-auto mb-3 text-gray-300" />
-                <p className="font-medium text-lg">No hay combos registrados</p>
+                <p className="font-medium text-lg">{t('empty.noDataToShow')}</p>
                 <p className="text-sm mt-1">Crea el primero con el botón "Nuevo Combo"</p>
               </div>
             ) : (
@@ -335,27 +343,27 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="font-bold text-accent-600 text-lg truncate">{combo.nombre}</p>
-                            <p className="text-sm text-gray-500 mt-1 line-clamp-2">{combo.descripcion || 'Sin descripción'}</p>
+                            <p className="text-sm text-gray-500 mt-1 line-clamp-2">{combo.descripcion || t('form.noDescription')}</p>
                           </div>
                           <Badge className={isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'}>
-                            {isActive ? 'Activo' : 'Inactivo'}
+                            {isActive ? t('status.active') : t('status.inactive')}
                           </Badge>
                         </div>
 
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div className="rounded-lg bg-accent-50 p-2">
-                            <p className="text-accent-600 text-xs uppercase">Precio</p>
-                            <p className="font-bold text-primary-900">{formatPrice(combo.precio_venta)}</p>
+                            <p className="text-accent-600 text-xs uppercase">{t('form.price')}</p>
+                            <p className="font-bold text-primary-900">{fmtPrice(combo.precio_venta)}</p>
                           </div>
                           <div className="rounded-lg bg-gray-50 p-2">
-                            <p className="text-gray-700 text-xs uppercase">Productos</p>
+                            <p className="text-gray-700 text-xs uppercase">{t('labels.product')}</p>
                             <p className="font-bold text-gray-900">{combo.combo_items?.length || 0}</p>
                           </div>
                         </div>
 
                         <div className="rounded-lg border border-gray-200 bg-gray-50 p-2.5 text-sm text-gray-700">
-                          <p className="font-medium mb-1 text-gray-800">Composición</p>
-                          <p>{getComboDisplayProducts(combo)}</p>
+                          <p className="font-medium mb-1 text-gray-800">{t('form.description')}</p>
+                          <p>{getComboDisplayProducts(combo, t)}</p>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -364,14 +372,14 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                             className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white rounded-xl"
                           >
                             <Edit className="w-4 h-4 mr-2" />
-                            Editar
+                            {t('buttons.edit')}
                           </Button>
                           <Button
                             onClick={() => openDeleteModal(combo)}
                             className="rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white"
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
-                            Eliminar
+                            {t('buttons.delete')}
                           </Button>
                         </div>
                       </div>
@@ -405,8 +413,8 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                   <AlertCircle className="w-6 h-6 text-red-600" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-gray-800">Eliminar Combo</h3>
-                  <p className="text-sm text-gray-600">Esta acción no se puede deshacer</p>
+                  <h3 className="text-xl font-bold text-gray-800">{t('buttons.delete')}</h3>
+                  <p className="text-sm text-gray-600">{t('messages.actionCannotBeUndone')}</p>
                 </div>
               </div>
 
@@ -422,7 +430,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                   disabled={isDeleting}
                   className="flex-1 h-11 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl"
                 >
-                  Cancelar
+                  {t('buttons.cancel')}
                 </Button>
                 <Button
                   type="button"
@@ -430,7 +438,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                   disabled={isDeleting}
                   className="flex-1 h-11 bg-red-500 hover:bg-red-600 text-white rounded-xl"
                 >
-                  {isDeleting ? 'Eliminando...' : 'Eliminar'}
+                  {isDeleting ? t('buttons.loading') : t('buttons.delete')}
                 </Button>
               </div>
             </motion.div>
@@ -458,7 +466,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                 <div className="flex items-center gap-3">
                   <Package className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                   <h2 className="text-xl sm:text-2xl font-bold text-white">
-                    {editingCombo ? 'Editar Combo' : 'Nuevo Combo'}
+                    {editingCombo ? t('buttons.edit') : t('buttons.newCombo')}
                   </h2>
                 </div>
                 <button
@@ -472,7 +480,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
               <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto max-h-[calc(92vh-80px)] space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-primary-700 mb-2">Nombre del combo *</label>
+                    <label className="block text-sm font-semibold text-primary-700 mb-2">{t('form.name')}</label>
                     <Input
                       value={formData.nombre}
                       onChange={(event) => setFormData((prev) => ({ ...prev, nombre: event.target.value }))}
@@ -483,7 +491,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-primary-700 mb-2">Precio de venta *</label>
+                    <label className="block text-sm font-semibold text-primary-700 mb-2">{t('form.price')}</label>
                     <Input
                       type="number"
                       min="0"
@@ -498,7 +506,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-primary-700 mb-2">Descripción (opcional)</label>
+                  <label className="block text-sm font-semibold text-primary-700 mb-2">{t('form.description')}</label>
                   <textarea
                     value={formData.descripcion}
                     onChange={(event) => setFormData((prev) => ({ ...prev, descripcion: event.target.value }))}
@@ -509,7 +517,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
 
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-semibold text-primary-700">Productos del combo *</label>
+                    <label className="text-sm font-semibold text-primary-700">{t('labels.product')}</label>
                     <Button
                       type="button"
                       variant="outline"
@@ -517,7 +525,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                       className="border-accent-300 text-accent-700 hover:bg-accent-50"
                     >
                       <Plus className="w-4 h-4 mr-2" />
-                      Agregar producto
+                      {t('buttons.add')}
                     </Button>
                   </div>
 
@@ -532,14 +540,14 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                             className="h-11 px-3 rounded-xl border-2 border-accent-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
                             required
                           >
-                            <option value="">Selecciona un producto</option>
+                            <option value="">{t('form.selectProduct')}</option>
                             {(products || []).map((product) => {
                               const optionValue = String(product.id);
                               const isAlreadySelected = selectedProductIds.has(optionValue) && optionValue !== selectedCurrent;
                               if (isAlreadySelected) return null;
                               return (
                                 <option key={product.id} value={product.id}>
-                                  {product.name} ({product.code || 'Sin código'}) - Stock: {product.stock}
+                                  {product.name} ({product.code || t('form.noCode')}) - Stock: {product.stock}
                                 </option>
                               );
                             })}
@@ -571,20 +579,20 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                   </div>
 
                   {hasDuplicateProducts && (
-                    <p className="text-sm text-red-600 mt-2">No se permiten productos repetidos en el combo.</p>
+                    <p className="text-sm text-red-600 mt-2">{t('errors.requiredField')}</p>
                   )}
                 </div>
 
                 {formData.items.length > 0 && (
                   <div className="rounded-xl border border-accent-200 bg-accent-50 p-3">
-                    <p className="text-sm font-semibold text-primary-800 mb-2">Resumen de composición</p>
+                    <p className="text-sm font-semibold text-primary-800 mb-2">{t('form.description')}</p>
                     <div className="space-y-1 text-sm text-primary-700">
                       {formData.items.map((item, index) => {
                         const product = productsById.get(item.producto_id);
                         const quantity = Number(item.cantidad);
                         return (
                           <p key={`summary-${index}`}>
-                            {Number.isFinite(quantity) && quantity > 0 ? quantity : 0} x {product?.name || 'Producto sin seleccionar'}
+                            {Number.isFinite(quantity) && quantity > 0 ? quantity : 0} x {product?.name || t('form.selectProduct')}
                           </p>
                         );
                       })}
@@ -599,7 +607,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                     onClick={closeFormModal}
                     className="flex-1 h-11 border-2 border-accent-300 text-accent-700 hover:bg-accent-50"
                   >
-                    Cancelar
+                  {t('buttons.cancel')}
                   </Button>
                   <Button
                     type="submit"
@@ -607,11 +615,11 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                     className="flex-1 h-11 gradient-primary text-white hover:opacity-90 disabled:opacity-50"
                   >
                     {isSubmitting ? (
-                      'Guardando...'
+                      t('buttons.loading')
                     ) : (
                       <>
                         <Save className="w-4 h-4 mr-2" />
-                        {editingCombo ? 'Guardar cambios' : 'Crear combo'}
+                        {editingCombo ? t('buttons.saveChanges') : t('buttons.createCombo')}
                       </>
                     )}
                   </Button>

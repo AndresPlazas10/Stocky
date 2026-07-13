@@ -129,6 +129,8 @@ export function SupplierFormModal({
           <TextInput
             value={form.business_name}
             onChangeText={(next) => onFormChange({ business_name: next })}
+            placeholder="Ej: Distribuidora ABC"
+            placeholderTextColor={STOCKY_COLORS.textMuted}
             style={styles.input}
           />
         </View>
@@ -141,6 +143,8 @@ export function SupplierFormModal({
                 <TextInput
                   value={form.contact_name}
                   onChangeText={(next) => onFormChange({ contact_name: next })}
+                  placeholder="Ej: Juan Pérez"
+                  placeholderTextColor={STOCKY_COLORS.textMuted}
                   style={styles.input}
                 />
               </View>
@@ -150,6 +154,8 @@ export function SupplierFormModal({
                 <TextInput
                   value={form.nit}
                   onChangeText={(next) => onFormChange({ nit: next })}
+                  placeholder="Ej: 900123456-7"
+                  placeholderTextColor={STOCKY_COLORS.textMuted}
                   style={styles.input}
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -163,6 +169,8 @@ export function SupplierFormModal({
                 <TextInput
                   value={form.email}
                   onChangeText={(next) => onFormChange({ email: next })}
+                  placeholder="Ej: empresa@mail.com"
+                  placeholderTextColor={STOCKY_COLORS.textMuted}
                   style={styles.input}
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -175,6 +183,8 @@ export function SupplierFormModal({
                 <TextInput
                   value={form.phone}
                   onChangeText={(next) => onFormChange({ phone: next })}
+                  placeholder="Ej: 300 123 4567"
+                  placeholderTextColor={STOCKY_COLORS.textMuted}
                   style={styles.input}
                   keyboardType="phone-pad"
                 />
@@ -187,6 +197,8 @@ export function SupplierFormModal({
                 <TextInput
                   value={form.address}
                   onChangeText={(next) => onFormChange({ address: next })}
+                  placeholder="Ej: Calle 10 #5-20, Bogotá"
+                  placeholderTextColor={STOCKY_COLORS.textMuted}
                   style={styles.input}
                 />
               </View>
@@ -196,6 +208,8 @@ export function SupplierFormModal({
                 <TextInput
                   value={form.notes}
                   onChangeText={(next) => onFormChange({ notes: next })}
+                  placeholder="Ej: Entregas los lunes y miércoles"
+                  placeholderTextColor={STOCKY_COLORS.textMuted}
                   style={[styles.input, styles.textArea]}
                   multiline
                 />

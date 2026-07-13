@@ -1,5 +1,6 @@
 import type { MesaOrderItem } from '../services/mesaOrderService';
 import type { VentaDetailRecord, VentaRecord } from '../services/ventasService';
+import type { ReceiptLabels } from './receiptLabels';
 
 const DEFAULT_PRINTER_WIDTH_MM = 80;
 const PRINT_FONT_SIZES = {
@@ -13,11 +14,14 @@ const PRINT_FONT_SIZES = {
   price: 110,
 } as const;
 
-function formatDateTimeTicket(timestamp: string | Date | null | undefined) {
-  if (!timestamp) return 'Fecha inválida';
+function formatDateTimeTicket(
+  timestamp: string | Date | null | undefined,
+  invalidDateLabel: string,
+) {
+  if (!timestamp) return invalidDateLabel;
   try {
     const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) return 'Fecha inválida';
+    if (Number.isNaN(date.getTime())) return invalidDateLabel;
     const datePart = date.toLocaleDateString('es-CO', {
       weekday: 'long',
       year: 'numeric',
@@ -33,7 +37,7 @@ function formatDateTimeTicket(timestamp: string | Date | null | undefined) {
     });
     return `${datePart} - ${timePart}`;
   } catch {
-    return 'Fecha inválida';
+    return invalidDateLabel;
   }
 }
 
@@ -64,17 +68,28 @@ function formatPrice(value: number | null | undefined, includeCurrency = true) {
   return includeCurrency ? `$${formattedNumber}` : formattedNumber;
 }
 
-function getPaymentMethodLabel(method?: string | null) {
-  if (method === 'cash') return '💵 Efectivo';
-  if (method === 'card') return '💳 Tarjeta';
-  if (method === 'transfer') return '🏦 Transferencia';
-  if (method === 'mixed') return '🔀 Mixto';
-  if (method === 'nequi') return '🏦 Nequi';
-  if (method === 'bancolombia') return '🏦 Bancolombia';
-  if (method === 'banco_bogota') return '🏦 Banco de Bogotá';
-  if (method === 'nu') return '🏦 Nu';
-  if (method === 'davivienda') return '🏦 Davivienda';
-  return String(method || 'No especificado');
+function getPaymentMethodLabel(method: string | null | undefined, notSpecifiedLabel: string) {
+  const map: Record<string, string> = {
+    cash: '💵 Efectivo',
+    card: '💳 Tarjeta',
+    transfer: '🏦 Transferencia',
+    mixed: '🔀 Mixto',
+    nequi: '🏦 Nequi',
+    bancolombia: '🏦 Bancolombia',
+    banco_bogota: '🏦 Banco de Bogotá',
+    nu: '🏦 Nu',
+    davivienda: '🏦 Davivienda',
+    daviplata: '🏦 Daviplata',
+    spei: '🏦 SPEI',
+    oxxo: '🏪 OXXO',
+    yape: '📱 Yape',
+    plin: '📱 Plin',
+    mercadopago: '💳 Mercado Pago',
+    venmo: '💙 Venmo',
+    cashapp: '💚 Cash App',
+    zelle: '💎 Zelle',
+  };
+  return map[String(method || '')] || String(method || notSpecifiedLabel);
 }
 
 function getSaleDetailDisplayName(detail: VentaDetailRecord) {
@@ -86,8 +101,9 @@ export function buildSaleReceiptHtml({
   saleDetails,
   sellerName,
   printerWidthMm = DEFAULT_PRINTER_WIDTH_MM,
-  customerName = 'Venta general',
-  businessName = 'Sistema Stocky',
+  customerName,
+  businessName,
+  labels,
 }: {
   sale: VentaRecord;
   saleDetails: VentaDetailRecord[];
@@ -95,16 +111,19 @@ export function buildSaleReceiptHtml({
   printerWidthMm?: number;
   customerName?: string;
   businessName?: string;
+  labels: ReceiptLabels;
 }) {
-  const safeSeller = String(sellerName || 'Empleado');
+  const safeSeller = String(sellerName || labels.sellerDefault);
   const printableItems = Array.isArray(saleDetails) ? saleDetails : [];
+  const safeCustomer = String(customerName || labels.customerDefault);
+  const safeBusiness = String(businessName || labels.kitchenSystem);
 
   return `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>Comprobante #${sale.id}</title>
+      <title>${labels.receiptNumber} #${sale.id}</title>
       <style>
         * {
           color: #000 !important;
@@ -226,21 +245,21 @@ export function buildSaleReceiptHtml({
     <body>
       <div class="receipt">
         <div class="header">
-          <h1>COMPROBANTE DE VENTA</h1>
-          <p>${String(businessName || 'Sistema Stocky')}</p>
-          <p>${formatDateTimeTicket(sale.created_at || new Date())}</p>
+          <h1>${labels.title}</h1>
+          <p>${safeBusiness}</p>
+          <p>${formatDateTimeTicket(sale.created_at || new Date(), labels.invalidDate)}</p>
         </div>
 
-        <div class="row"><span><strong>Comprobante:</strong></span><span>CPV-${String(sale.id).substring(0, 8).toUpperCase()}</span></div>
-        <div class="row"><span><strong>Vendedor:</strong></span><span>${safeSeller}</span></div>
-        <div class="row"><span><strong>Cliente:</strong></span><span>${String(customerName || 'Venta general')}</span></div>
+        <div class="row"><span><strong>${labels.receiptNumber}:</strong></span><span>CPV-${String(sale.id).substring(0, 8).toUpperCase()}</span></div>
+        <div class="row"><span><strong>${labels.seller}:</strong></span><span>${safeSeller}</span></div>
+        <div class="row"><span><strong>${labels.customer}:</strong></span><span>${safeCustomer}</span></div>
 
         <div class="separator"></div>
 
         <div class="items-header">
-          <span style="flex:1">Producto</span>
-          <span class="item-qty">Cant.</span>
-          <span class="item-price">Total</span>
+          <span style="flex:1">${labels.productHeader}</span>
+          <span class="item-qty">${labels.quantityAbbreviation}</span>
+          <span class="item-price">${labels.total}</span>
         </div>
 
         ${printableItems
@@ -256,13 +275,13 @@ export function buildSaleReceiptHtml({
           .join('')}
 
         <div class="total">
-          <span>TOTAL:</span>
+          <span>${labels.total}:</span>
           <span>${formatPrice(Number(sale.total || 0))}</span>
         </div>
 
         <div class="footer">
-          <p><strong>Método:</strong> ${getPaymentMethodLabel(sale.payment_method)}</p>
-          <p>¡Gracias por su compra!</p>
+          <p><strong>${labels.method}:</strong> ${getPaymentMethodLabel(sale.payment_method, labels.notSpecified)}</p>
+          <p>${labels.footer}</p>
         </div>
       </div>
     </body>
@@ -283,14 +302,16 @@ export function buildKitchenOrderHtml({
   items,
   createdAt,
   printerWidthMm = DEFAULT_PRINTER_WIDTH_MM,
+  labels,
 }: {
   mesaNumber: string | number;
   mesaStatus: 'occupied' | 'available' | string | null | undefined;
   items: MesaOrderItem[];
   createdAt?: string | Date | null;
   printerWidthMm?: number;
+  labels: ReceiptLabels;
 }) {
-  const statusLabel = mesaStatus === 'occupied' ? 'Ocupada' : 'Disponible';
+  const statusLabel = mesaStatus === 'occupied' ? labels.statusOccupied : labels.statusAvailable;
   const totalUnits = sumOrderItemsQuantity(items);
 
   return `
@@ -298,7 +319,7 @@ export function buildKitchenOrderHtml({
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>Orden Mesa ${mesaNumber}</title>
+      <title>${labels.kitchenTable}${mesaNumber}</title>
       <style>
         @media print {
           @page {
@@ -421,14 +442,14 @@ export function buildKitchenOrderHtml({
     <body>
       <div class="receipt">
       <div class="header">
-        <h1>ORDEN DE COCINA</h1>
-        <p>Mesa #${mesaNumber}</p>
-        <p>${formatDateTimeTicket(createdAt || new Date())}</p>
+        <h1>${labels.kitchenTitle}</h1>
+        <p>${labels.kitchenTable}${mesaNumber}</p>
+        <p>${formatDateTimeTicket(createdAt || new Date(), labels.invalidDate)}</p>
       </div>
       
       <div class="info">
-        <p><strong>Estado:</strong> ${statusLabel}</p>
-        <p><strong>Productos:</strong> ${totalUnits} item${totalUnits !== 1 ? 's' : ''}</p>
+        <p><strong>${labels.statusOccupied === statusLabel ? labels.statusOccupied : labels.statusAvailable}:</strong> ${statusLabel}</p>
+        <p><strong>${labels.itemsLabel}:</strong> ${totalUnits} item${totalUnits !== 1 ? 's' : ''}</p>
       </div>
       
       <div class="separator"></div>
@@ -447,12 +468,12 @@ export function buildKitchenOrderHtml({
       </div>
       
       <div class="total">
-        TOTAL: 0
+        ${labels.total}: 0
       </div>
       
       <div class="footer">
-        <p>*** ORDEN PARA COCINA ***</p>
-        <p>Sistema Stocky</p>
+        <p>${labels.kitchenFooter}</p>
+        <p>${labels.kitchenSystem}</p>
       </div>
       </div>
     </body>

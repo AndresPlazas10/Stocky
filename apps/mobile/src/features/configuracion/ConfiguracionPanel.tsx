@@ -1,15 +1,15 @@
 import { ActivityIndicator, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { STOCKY_COLORS } from '../../theme/tokens';
 import { useConfiguracionData } from './hooks/useConfiguracionData';
 import { useBusinessForm } from './hooks/useBusinessForm';
 import { useAccountActions } from './hooks/useAccountActions';
 import { useToastContext } from '../../hooks/useToastContext';
-import { TOAST_MESSAGES } from '../../constants/toastMessages';
+import { useToastMessages } from '../../hooks/useToastMessages';
 import { UserSection } from './components/UserSection';
 import { BusinessSection } from './components/BusinessSection';
 import { SystemSection } from './components/SystemSection';
-import { BillingSection } from './components/BillingSection';
 import { LegalSection } from './components/LegalSection';
 import { BusinessEditModal } from './components/BusinessEditModal';
 import { DeleteAccountModal } from './components/DeleteAccountModal';
@@ -37,7 +37,9 @@ export function ConfiguracionPanel({
   onRefreshBusiness,
   onSignOut,
 }: Props) {
+  const { t } = useTranslation();
   const toast = useToastContext();
+  const toastMessages = useToastMessages();
   const {
     snapshot,
     loading,
@@ -59,7 +61,6 @@ export function ConfiguracionPanel({
     deletingAccount,
     handleSignOut,
     handleDeleteAccount,
-    handleOpenSiigo,
     handleOpenTerms,
     handleOpenPrivacy,
     handleOpenDeleteAccountInfo,
@@ -82,7 +83,7 @@ export function ConfiguracionPanel({
     loadSnapshot,
     setError,
     onBusinessSaved: () => {
-      toast.showSuccess(TOAST_MESSAGES.configuracion.updated());
+      toast.showSuccess(toastMessages.configuracion.updated());
     },
   });
 
@@ -94,14 +95,17 @@ export function ConfiguracionPanel({
     );
   }
 
-  const userEmailLabel = snapshot?.userEmail || userEmail || 'Sin email';
+  const userEmailLabel = snapshot?.userEmail || userEmail || t('configuracion.noEmail');
   const userIdLabel = shortenUserId(snapshot?.userId || userId);
-  const businessNameLabel = snapshot?.businessName || businessName || 'Sin nombre';
-  const businessNitLabel = snapshot?.businessNit || 'Sin NIT';
-  const businessEmailLabel = snapshot?.businessEmail || userEmail || 'Sin email';
-  const businessPhoneLabel = snapshot?.businessPhone || 'Sin teléfono';
-  const businessAddressLabel = snapshot?.businessAddress || 'Sin dirección';
-  const systemStatusLabel = snapshot?.connectionStatus === 'connected' ? 'Conectado' : 'Revisar';
+  const businessNameLabel = snapshot?.businessName || businessName || t('configuracion.noName');
+  const businessNitLabel = snapshot?.businessNit || t('configuracion.noNit');
+  const businessEmailLabel = snapshot?.businessEmail || userEmail || t('configuracion.noEmail');
+  const businessPhoneLabel = snapshot?.businessPhone || t('configuracion.noPhone');
+  const businessAddressLabel = snapshot?.businessAddress || t('configuracion.noAddress');
+  const systemStatusLabel =
+    snapshot?.connectionStatus === 'connected'
+      ? t('configuracion.connected')
+      : t('configuracion.check');
   const systemVersionLabel = snapshot?.clientVersion
     ? `Stocky ${snapshot.clientVersion}`
     : 'Stocky v1.0.0';
@@ -114,8 +118,8 @@ export function ConfiguracionPanel({
           <Ionicons name="settings-outline" size={34} color="#D1D5DB" />
         </View>
         <View style={styles.pageIntroTextWrap}>
-          <Text style={styles.pageIntroTitle}>Configuración</Text>
-          <Text style={styles.pageIntroSubtitle}>Administra tu cuenta y negocio</Text>
+          <Text style={styles.pageIntroTitle}>{t('configuracion.title')}</Text>
+          <Text style={styles.pageIntroSubtitle}>{t('configuracion.subtitle')}</Text>
         </View>
       </View>
 
@@ -142,8 +146,6 @@ export function ConfiguracionPanel({
         systemVersionLabel={systemVersionLabel}
         systemStatusLabel={systemStatusLabel}
       />
-
-      <BillingSection businessNameLabel={businessNameLabel} onOpenSiigo={handleOpenSiigo} />
 
       <LegalSection
         onOpenTerms={handleOpenTerms}
@@ -173,7 +175,7 @@ export function ConfiguracionPanel({
       />
 
       <Text style={styles.footerText}>
-        Última actualización:{' '}
+        {t('configuracion.lastUpdate')}{' '}
         {snapshot?.generatedAt ? formatShortDateTime(snapshot.generatedAt) : 'n/a'}
         {' · '}v31
       </Text>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from 'react';
 import { ActivityIndicator, FlatList, View, Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { STOCKY_COLORS } from '../../theme/tokens';
 import { StockyButton } from '../../ui/StockyButton';
 import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
@@ -9,9 +10,8 @@ import { useInventoryForm } from './hooks/useInventoryForm';
 import { useInventoryMutations } from './hooks/useInventoryMutations';
 import { useInventoryPermissions } from './hooks/useInventoryPermissions';
 import { useInventorySearch } from './hooks/useInventorySearch';
-import { useToast } from '../../hooks/useToast';
-import { StockyToast } from '../../ui/StockyToast';
-import { TOAST_MESSAGES } from '../../constants/toastMessages';
+import { useToastContext } from '../../hooks/useToastContext';
+import { useToastMessages } from '../../hooks/useToastMessages';
 import { InventoryListHeader } from './components/InventoryListHeader';
 import { ProductCard } from './components/ProductCard';
 import { ProductFormModal } from './components/ProductFormModal';
@@ -36,6 +36,7 @@ export function InventarioPanel({
   userId,
   source,
 }: Props) {
+  const { t } = useTranslation();
   const {
     loading,
     refreshing,
@@ -60,10 +61,18 @@ export function InventarioPanel({
     source,
   );
 
-  const toast = useToast();
+  const toast = useToastContext();
+  const toastMessages = useToastMessages();
   const { search, setSearch, filteredProducts } = useInventorySearch(products);
 
   const form = useInventoryForm();
+
+  const handleFormChange = useCallback(
+    (updates: Partial<typeof form.form>) => {
+      form.setForm((prev) => ({ ...prev, ...updates }));
+    },
+    [form.setForm],
+  );
 
   const mutations = useInventoryMutations({
     businessId,
@@ -74,16 +83,18 @@ export function InventarioPanel({
     refreshProducts,
     setError,
     onProductSaved: (isEdit, name) => {
-      toast.showSuccess(isEdit ? TOAST_MESSAGES.productos.updated(name) : TOAST_MESSAGES.productos.created(name));
+      toast.showSuccess(
+        isEdit ? toastMessages.productos.updated(name) : toastMessages.productos.created(name),
+      );
     },
     onProductDeleted: (name) => {
-      toast.showSuccess(TOAST_MESSAGES.productos.deleted(name));
+      toast.showSuccess(toastMessages.productos.deleted(name));
     },
     onProductDeactivated: (name) => {
-      toast.showSuccess(TOAST_MESSAGES.productos.deactivated(name));
+      toast.showSuccess(toastMessages.productos.deactivated(name));
     },
     onProductActivated: (name) => {
-      toast.showSuccess(TOAST_MESSAGES.productos.activated(name));
+      toast.showSuccess(toastMessages.productos.activated(name));
     },
   });
 
@@ -143,13 +154,6 @@ export function InventarioPanel({
     },
   });
 
-  const suspendBackgroundList =
-    form.showFormModal ||
-    form.showUnitModal ||
-    form.showSupplierModal ||
-    mutations.showDeleteModal ||
-    mutations.showDeactivateModal;
-
   const productKeyExtractor = useCallback((item: { id: string }) => item.id, []);
 
   const renderProductItem = useCallback(
@@ -166,7 +170,14 @@ export function InventarioPanel({
         activateProduct={mutations.activateProduct}
       />
     ),
-    [canManageProducts, mutations.deleting, mutations.askDeleteProduct, mutations.activateProduct, setError, form.openEditModal],
+    [
+      canManageProducts,
+      mutations.deleting,
+      mutations.askDeleteProduct,
+      mutations.activateProduct,
+      setError,
+      form.openEditModal,
+    ],
   );
 
   if (loading) {
@@ -180,7 +191,7 @@ export function InventarioPanel({
   return (
     <>
       <FlatList
-        data={suspendBackgroundList ? [] : filteredProducts}
+        data={filteredProducts}
         keyExtractor={productKeyExtractor}
         style={styles.screenList}
         contentContainerStyle={styles.screenListContent}
@@ -206,18 +217,16 @@ export function InventarioPanel({
             refreshing={refreshing}
           />
         }
-        ListEmptyComponent={
-          !suspendBackgroundList ? (
-            <Text style={styles.emptyText}>No hay productos para la busqueda actual.</Text>
-          ) : null
-        }
+        ListEmptyComponent={<Text style={styles.emptyText}>{t('inventario.emptyState')}</Text>}
         ItemSeparatorComponent={ItemSeparator}
         ListFooterComponent={
-          !suspendBackgroundList && hasMoreProducts ? (
+          hasMoreProducts ? (
             <View style={styles.loadMoreWrap}>
-              <Text style={styles.loadMoreHint}>Mostrando {products.length} productos</Text>
+              <Text style={styles.loadMoreHint}>
+                {t('inventario.showingProducts', { count: products.length })}
+              </Text>
               <StockyButton onPress={loadMoreProducts} loading={loadingMore} variant="ghost">
-                Cargar más productos
+                {t('inventario.loadMore')}
               </StockyButton>
             </View>
           ) : (
@@ -238,7 +247,7 @@ export function InventarioPanel({
           form.closeFormModal();
           setError(null);
         }}
-        onFormChange={(updates) => form.setForm((prev) => ({ ...prev, ...updates }))}
+        onFormChange={handleFormChange}
         onSave={mutations.handleSaveProduct}
         onOpenCategoryPicker={() => form.setShowCategoryModal(true)}
         onOpenUnitPicker={() => {
@@ -276,9 +285,11 @@ export function InventarioPanel({
 
       <StockyDeleteConfirmModal
         visible={mutations.showDeleteModal}
-        title="Eliminar producto"
-        message={`¿Seguro que quieres eliminar ${mutations.productTarget?.name || 'este producto'}?`}
-        warning="Esta acción no se puede deshacer."
+        title={t('inventario.deleteTitle')}
+        message={t('inventario.deleteMessage', {
+          name: mutations.productTarget?.name || 'este producto',
+        })}
+        warning={t('errors.deleteFailed')}
         itemLabel={mutations.productTarget?.name || null}
         loading={mutations.deleting}
         onCancel={mutations.closeDeleteModals}
@@ -292,16 +303,6 @@ export function InventarioPanel({
         deleteCheckResult={mutations.deleteCheckResult}
         onClose={mutations.closeDeleteModals}
         onConfirm={mutations.confirmDeactivateProduct}
-      />
-
-      <StockyToast
-        visible={toast.toast.visible}
-        type={toast.toast.type}
-        title={toast.toast.title}
-        message={toast.toast.message}
-        ctaText={toast.toast.ctaText}
-        durationMs={toast.toast.durationMs}
-        onClose={toast.hideToast}
       />
     </>
   );

@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Linking } from 'react-native';
 import { deleteCurrentAccount } from '../../../services/accountService';
-import { SIIGO_URL, TERMS_URL, PRIVACY_URL, DELETE_ACCOUNT_URL } from '../configuracionUtils';
+import { TERMS_URL, PRIVACY_URL, DELETE_ACCOUNT_URL } from '../configuracionUtils';
 
 interface UseAccountActionsParams {
   onSignOut: () => Promise<void>;
@@ -48,14 +48,6 @@ export function useAccountActions({ onSignOut, setError }: UseAccountActionsPara
     }
   }, [deletingAccount, onSignOut, setError]);
 
-  const handleOpenSiigo = useCallback(async () => {
-    try {
-      await Linking.openURL(SIIGO_URL);
-    } catch {
-      setError('No se pudo abrir el enlace de Siigo.');
-    }
-  }, [setError]);
-
   const handleOpenTerms = useCallback(async () => {
     try {
       await Linking.openURL(TERMS_URL);
@@ -87,7 +79,6 @@ export function useAccountActions({ onSignOut, setError }: UseAccountActionsPara
     deletingAccount,
     handleSignOut,
     handleDeleteAccount,
-    handleOpenSiigo,
     handleOpenTerms,
     handleOpenPrivacy,
     handleOpenDeleteAccountInfo,

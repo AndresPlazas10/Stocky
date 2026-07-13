@@ -1,26 +1,42 @@
+import i18next from 'i18next';
 import type {
   InventoryProductRecord,
   InventorySupplierRecord,
 } from '../../services/inventoryService';
 
-export const INVENTORY_CATEGORY_OPTIONS = [
-  'Platos',
-  'Bebidas Alcohólicas',
-  'Cervezas',
-  'Vinos',
-  'Licores',
-  'Bebidas',
-  'Snacks',
-  'Comida',
-  'Otros',
+export const PRODUCT_CATEGORIES = [
+  { value: 'abarrotes', labelKey: 'categories.abarrotes' },
+  { value: 'aseo', labelKey: 'categories.aseo' },
+  { value: 'bebidas', labelKey: 'categories.bebidas' },
+  { value: 'bebidas_alcoholicas', labelKey: 'categories.bebidas_alcoholicas' },
+  { value: 'cervezas_vinos', labelKey: 'categories.cervezas_vinos' },
+  { value: 'cigarrillos', labelKey: 'categories.cigarrillos' },
+  { value: 'embutidos', labelKey: 'categories.embutidos' },
+  { value: 'granos', labelKey: 'categories.granos' },
+  { value: 'enlatados', labelKey: 'categories.enlatados' },
+  { value: 'lacteos', labelKey: 'categories.lacteos' },
+  { value: 'licores', labelKey: 'categories.licores' },
+  { value: 'platos', labelKey: 'categories.platos' },
+  { value: 'snacks_comida', labelKey: 'categories.snacks_comida' },
+  { value: 'otros', labelKey: 'categories.otros' },
 ];
 
-export const UNIT_OPTIONS: { value: string; label: string }[] = [
-  { value: 'unit', label: 'Unidad' },
-  { value: 'kg', label: 'Kilogramo' },
-  { value: 'l', label: 'Litro' },
-  { value: 'box', label: 'Caja' },
+export function getCategoryLabel(value: string): string {
+  const cat = PRODUCT_CATEGORIES.find((c) => c.value === value);
+  return cat ? i18next.t(cat.labelKey) : value;
+}
+
+export const UNIT_OPTIONS: { value: string; labelKey: string }[] = [
+  { value: 'unit', labelKey: 'units.unit' },
+  { value: 'kg', labelKey: 'units.kg' },
+  { value: 'l', labelKey: 'units.l' },
+  { value: 'box', labelKey: 'units.box' },
 ];
+
+export function getUnitLabel(value: string): string {
+  const unit = UNIT_OPTIONS.find((u) => u.value === value);
+  return unit ? i18next.t(unit.labelKey) : value;
+}
 
 export const INVENTORY_PAGE_SIZE = 40;
 
@@ -80,9 +96,9 @@ export function parseIntegerText(value: string, fallback = 0): number {
 }
 
 export function formatInventoryDateTime(value: string | null): string {
-  if (!value) return 'Sin fecha';
+  if (!value) return i18next.t('form.notSpecified');
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return 'Sin fecha';
+  if (Number.isNaN(parsed.getTime())) return i18next.t('form.notSpecified');
   return new Intl.DateTimeFormat('es-CO', {
     dateStyle: 'short',
     timeStyle: 'short',
@@ -92,8 +108,8 @@ export function formatInventoryDateTime(value: string | null): string {
 export function getSupplierDisplayName(
   supplier: InventorySupplierRecord | null | undefined,
 ): string {
-  if (!supplier) return 'Sin proveedor';
-  return supplier.business_name || supplier.contact_name || 'Proveedor';
+  if (!supplier) return i18next.t('form.noSupplier');
+  return supplier.business_name || supplier.contact_name || i18next.t('form.supplier');
 }
 
 export function hydrateProductsWithSuppliers(

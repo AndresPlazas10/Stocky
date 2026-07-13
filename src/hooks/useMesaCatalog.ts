@@ -1,10 +1,19 @@
 import { useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../utils/offlineSnapshot.js';
 import { getProductsForOrdersByBusiness } from '../data/queries/ordersQueries';
 import { fetchComboCatalog } from '../services/combosService';
 
-export function useMesaCatalog({ businessId, setProducts, setCombos, setError }) {
-  const catalogWarmupPromiseRef = useRef(null);
+interface UseMesaCatalogProps {
+  businessId: string;
+  setProducts: (products: any[]) => void;
+  setCombos: (combos: any[]) => void;
+  setError: (error: string) => void;
+}
+
+export function useMesaCatalog({ businessId, setProducts, setCombos, setError }: UseMesaCatalogProps) {
+  const { t } = useTranslation(['mesas']);
+  const catalogWarmupPromiseRef = useRef<PromiseSettledResult<void>[] | null>(null);
 
   const loadProductos = useCallback(async () => {
     const offline = isOfflineMode();
@@ -39,10 +48,10 @@ export function useMesaCatalog({ businessId, setProducts, setCombos, setError })
       if (offline) {
         setProducts([]);
       } else {
-        setError('No se pudo cargar los productos. Revisa tu conexión e intenta de nuevo.');
+        setError(t('mesas.errors.loadCatalogFailed'));
       }
     }
-  }, [businessId, setProducts, setError]);
+  }, [businessId, setProducts, setError, t]);
 
   const loadCombos = useCallback(async () => {
     const offline = isOfflineMode();
@@ -77,24 +86,22 @@ export function useMesaCatalog({ businessId, setProducts, setCombos, setError })
       if (offline) {
         setCombos([]);
       } else {
-        setError('No se pudo cargar los combos. Revisa tu conexión e intenta de nuevo.');
+        setError(t('mesas.errors.loadCombosFailed'));
       }
     }
-  }, [businessId, setCombos, setError]);
+  }, [businessId, setCombos, setError, t]);
 
-  const ensureCatalogWarmup = useCallback(async () => {
+  const ensureCatalogWarmup = useCallback(async (): Promise<void> => {
     if (catalogWarmupPromiseRef.current) {
-      return catalogWarmupPromiseRef.current;
+      return;
     }
 
-    catalogWarmupPromiseRef.current = Promise.allSettled([
+    catalogWarmupPromiseRef.current = await Promise.allSettled([
       loadProductos(),
       loadCombos(),
     ]).finally(() => {
       catalogWarmupPromiseRef.current = null;
     });
-
-    return catalogWarmupPromiseRef.current;
   }, [loadProductos, loadCombos]);
 
   return { loadProductos, loadCombos, ensureCatalogWarmup };

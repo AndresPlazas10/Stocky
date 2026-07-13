@@ -1,10 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '../../ui/card';
 import { Button } from '../../ui/button';
 import type { DeactivateConfirmModalProps } from '@/types/components';
 
 export function DeactivateConfirmModal({ isOpen, deleteCheckResult, onConfirm, onCancel }: DeactivateConfirmModalProps) {
+  const { t } = useTranslation('common');
   return (
     <AnimatePresence>
       {isOpen && (
@@ -31,7 +33,7 @@ export function DeactivateConfirmModal({ isOpen, deleteCheckResult, onConfirm, o
                     <AlertCircle className="w-8 h-8" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold">No se puede eliminar</h2>
+                    <h2 className="text-2xl font-bold">{t('errors.deleteFailed')}</h2>
                     <p className="text-orange-100 mt-1">Producto con historial</p>
                   </div>
                 </div>
@@ -40,10 +42,10 @@ export function DeactivateConfirmModal({ isOpen, deleteCheckResult, onConfirm, o
               <div className="p-6 space-y-4">
                 <p className="text-gray-700 text-lg">
                   {deleteCheckResult?.has_sales && deleteCheckResult?.has_purchases
-                    ? `Este producto tiene ${deleteCheckResult.sales_count} ventas y ${deleteCheckResult.purchases_count} compras registradas. No se puede eliminar.`
+                    ? `Este producto tiene ${deleteCheckResult.sales_count} ${t('status.completed')} y ${deleteCheckResult.purchases_count} compras registradas. ${t('errors.deleteFailed')}.`
                     : deleteCheckResult?.has_sales
-                      ? `Este producto tiene ${deleteCheckResult.sales_count} ventas registradas. No se puede eliminar.`
-                      : `Este producto tiene ${deleteCheckResult?.purchases_count || 0} compras registradas. No se puede eliminar.`}
+                      ? `Este producto tiene ${deleteCheckResult.sales_count} ${t('status.completed')} registradas. ${t('errors.deleteFailed')}.`
+                      : `Este producto tiene ${deleteCheckResult?.purchases_count || 0} compras registradas. ${t('errors.deleteFailed')}.`}
                 </p>
 
                 <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
@@ -60,14 +62,14 @@ export function DeactivateConfirmModal({ isOpen, deleteCheckResult, onConfirm, o
                     onClick={onCancel}
                     className="flex-1 h-12 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-xl transition-all duration-300"
                   >
-                    Cancelar
+                    {t('buttons.cancel')}
                   </Button>
                   <Button
                     onClick={onConfirm}
                     className="flex-1 h-12 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2"
                   >
                     <CheckCircle2 className="w-5 h-5" />
-                    Desactivar
+                    {t('buttons.deactivate')}
                   </Button>
                 </div>
               </div>

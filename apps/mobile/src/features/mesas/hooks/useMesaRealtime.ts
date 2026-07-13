@@ -500,9 +500,7 @@ export function useMesaRealtime({
             businessId,
             prevCount: prev.length,
             incomingCount: incoming.length,
-            missingIds: missingFromIncoming
-              .map((m) => String(m?.id || '').trim())
-              .filter(Boolean),
+            missingIds: missingFromIncoming.map((m) => String(m?.id || '').trim()).filter(Boolean),
           });
         }
 
@@ -683,7 +681,9 @@ export function useMesaRealtime({
       const hasNextTableNumber = Boolean(
         nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'table_number'),
       );
-      const hasNextTableName = Boolean(nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'table_name'));
+      const hasNextTableName = Boolean(
+        nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'table_name'),
+      );
       const hasNextSyncVersion = Boolean(
         nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'sync_version'),
       );
@@ -807,7 +807,9 @@ export function useMesaRealtime({
           });
         }
         if (normalizedStatus === 'occupied' && tableBusinessId) {
-          const prevStatus = String(prevRow?.status || '').trim().toLowerCase();
+          const prevStatus = String(prevRow?.status || '')
+            .trim()
+            .toLowerCase();
           const statusChangedToOccupied = eventType === 'INSERT' || prevStatus !== 'occupied';
           if (statusChangedToOccupied) {
             const selectedMesaId = String(selectedMesaIdRef.current || '').trim();
@@ -1273,34 +1275,32 @@ export function useMesaRealtime({
 
     traceMesaSync('order_items_subscribe', { orderId });
 
-    const orderChannel = client
-      .channel(`mobile-order-items:${businessId}:${orderId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'order_items',
-          filter: `order_id=eq.${orderId}`,
-        },
-        (payload: any) => {
-          if (cancelled) return;
-          markRealtimeIngress('order_items', payload);
-          applyRealtimeOrderItemDelta(payload);
+    const orderChannel = client.channel(`mobile-order-items:${businessId}:${orderId}`).on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'order_items',
+        filter: `order_id=eq.${orderId}`,
+      },
+      (payload: any) => {
+        if (cancelled) return;
+        markRealtimeIngress('order_items', payload);
+        applyRealtimeOrderItemDelta(payload);
 
-          const newRow = payload?.new as Record<string, unknown> | undefined;
-          const oldRow = payload?.old as Record<string, unknown> | undefined;
-          const nextOrderId = normalizeOrderReference(newRow?.order_id);
-          const previousOrderId = normalizeOrderReference(oldRow?.order_id);
+        const newRow = payload?.new as Record<string, unknown> | undefined;
+        const oldRow = payload?.old as Record<string, unknown> | undefined;
+        const nextOrderId = normalizeOrderReference(newRow?.order_id);
+        const previousOrderId = normalizeOrderReference(oldRow?.order_id);
 
-          if (nextOrderId) {
-            scheduleOrderRealtimeSummaryHydration(nextOrderId);
-          }
-          if (previousOrderId && previousOrderId !== nextOrderId) {
-            scheduleOrderRealtimeSummaryHydration(previousOrderId);
-          }
-        },
-      );
+        if (nextOrderId) {
+          scheduleOrderRealtimeSummaryHydration(nextOrderId);
+        }
+        if (previousOrderId && previousOrderId !== nextOrderId) {
+          scheduleOrderRealtimeSummaryHydration(previousOrderId);
+        }
+      },
+    );
 
     orderChannel.subscribe();
 

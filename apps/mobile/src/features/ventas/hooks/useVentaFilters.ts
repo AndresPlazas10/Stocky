@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   startOfDay,
   startOfMonth,
@@ -14,6 +15,7 @@ import type { VentaRecord } from '../../../services/ventasService';
 const PAGE_SIZE = 20;
 
 export function useVentaFilters(ventas: VentaRecord[], firstVentaDayKey: string | null) {
+  const { t } = useTranslation();
   const [dayFilter, setDayFilter] = useState('all');
   const [sellerFilter, setSellerFilter] = useState('all');
   const [rawPage, setRawPage] = useState(1);
@@ -110,13 +112,13 @@ export function useVentaFilters(ventas: VentaRecord[], firstVentaDayKey: string 
     const unique = Array.from(
       new Set(
         ventas
-          .map((venta) => String(venta.seller_name || 'Administrador').trim())
+          .map((venta) => String(venta.seller_name || t('ventasSection.admin')).trim())
           .filter((value) => Boolean(value)),
       ),
     ).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
 
     return [
-      { value: 'all', label: 'Todos los vendedores' },
+      { value: 'all', label: t('ventasSection.allSellers') },
       ...unique.map((value) => ({ value, label: value })),
     ];
   }, [ventas]);
@@ -127,7 +129,7 @@ export function useVentaFilters(ventas: VentaRecord[], firstVentaDayKey: string 
         return false;
       if (
         sellerFilter !== 'all' &&
-        String(venta.seller_name || 'Administrador').trim() !== sellerFilter
+        String(venta.seller_name || t('ventasSection.admin')).trim() !== sellerFilter
       )
         return false;
       return true;
@@ -163,7 +165,7 @@ export function useVentaFilters(ventas: VentaRecord[], firstVentaDayKey: string 
   const selectedSellerLabel = useMemo(
     () =>
       sellerOptions.find((option) => option.value === sellerFilter)?.label ||
-      'Todos los vendedores',
+      t('ventasSection.allSellers'),
     [sellerFilter, sellerOptions],
   );
 

@@ -1,5 +1,6 @@
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTranslation } from 'react-i18next';
 import {
   buildCatalogLookup,
   calculateCashChange,
@@ -50,6 +51,7 @@ async function writeCatalogToStorage(businessId: string, items: MesaOrderCatalog
 }
 
 export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams) {
+  const { t } = useTranslation('mesas');
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedMesa, setSelectedMesa] = useState<MesaRecord | null>(null);
   const [catalogItems, setCatalogItems] = useState<MesaOrderCatalogItem[]>([]);
@@ -202,8 +204,8 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
   const orderTotal = useMemo(() => calculateOrderTotal(orderItems), [orderItems]);
 
   const orderModalTitle = selectedMesa
-    ? `${mesaDisplayName(selectedMesa)} - Orden`
-    : 'Mesa - Orden';
+    ? `${mesaDisplayName(selectedMesa, t('labels.table'))} - ${t('labels.orderDetails')}`
+    : `${t('labels.table')} - ${t('labels.orderDetails')}`;
 
   const isOrderFlowActive =
     showOrderModal ||

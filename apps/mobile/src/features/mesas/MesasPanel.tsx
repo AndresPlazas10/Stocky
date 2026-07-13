@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Session } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -7,10 +8,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../theme/tokens';
 import { formatCop } from '../../utils/money';
 
-import { useToast } from '../../hooks/useToast';
-import { StockyToast } from '../../ui/StockyToast';
-import { TOAST_MESSAGES } from '../../constants/toastMessages';
-import { PrintReceiptConfirmModal } from '../../ui/PrintReceiptConfirmModal';
+import { useToastContext } from '../../hooks/useToastContext';
+import { useToastMessages } from '../../hooks/useToastMessages';
 import {
   addCatalogItemToOrder,
   getOrderItemName,
@@ -35,7 +34,6 @@ import {
   type MesaEditLock,
   type MesaRecord,
 } from '../../services/mesasService';
-import { type VentaDetailRecord, type VentaRecord } from '../../services/ventasService';
 import { SplitBillModalRN } from './SplitBillModalRN';
 
 import { useMesaOrderState } from './hooks/useMesaOrderState';
@@ -63,6 +61,7 @@ import {
   sumOrderItemsQuantity,
   compareMesaTableIdentifiers,
   buildCashBreakdown,
+  getDenominationsForCountry,
 } from './utils/mesaHelpers';
 
 type Props = {
@@ -110,6 +109,7 @@ async function readCatalogFromStorage(businessId: string): Promise<StoredCatalog
 }
 
 export function MesasPanel({ session, businessContext }: Props) {
+  const { t } = useTranslation('mesas');
   const [context, setContext] = useState<BusinessContext | null>(null);
   const [mesas, setMesas] = useState<MesaRecord[]>([]);
   const mesasLengthRef = useRef(0);
@@ -129,7 +129,8 @@ export function MesasPanel({ session, businessContext }: Props) {
   const sessionDisplayName = useMemo(() => resolveSessionDisplayName(session), [session]);
   const canDeleteMesas = context?.source !== 'employee';
 
-  const toast = useToast();
+  const toast = useToastContext();
+  const toastMessages = useToastMessages();
   const orderState = useMesaOrderState({ listCatalogItems });
   const {
     showOrderModal,
@@ -219,26 +220,15 @@ export function MesasPanel({ session, businessContext }: Props) {
     refreshMesaLocks,
   } = editLock;
 
-  const mesaPrint = useMesaPrint({ setOrderModalError });
-  const {
-    showPrintModal,
-    setShowPrintModal,
-    setPrintSalesData,
-    isPrintingReceipt,
-    printCustomerName,
-    setPrintCustomerName,
-    isPrintInProgress,
-    beginPrintFlow,
-    endPrintFlow,
-    handlePrintConfirm,
-    handlePrintCancel,
-  } = mesaPrint;
+  const { isPrintInProgress, beginPrintFlow, endPrintFlow } = useMesaPrint({ setOrderModalError });
 
   const mesaCreate = useMesaCreate({
     context,
     onCreated: (createdMesa) => {
       setMesas((prev) => [...prev, createdMesa].sort(compareMesaTableIdentifiers));
-      toast.showSuccess(TOAST_MESSAGES.mesas.created(mesaDisplayName(createdMesa)));
+      toast.showSuccess(
+        toastMessages.mesas.created(mesaDisplayName(createdMesa, t('labels.table'))),
+      );
     },
     onError: (msg) => setError(msg),
   });
@@ -362,7 +352,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         setMesas([]);
         setMesaLocksByTableId({});
         orderItemsCacheRef.current.clear();
-        setError('No se encontro un negocio asociado a esta cuenta.');
+        setError(t('mesas.notFound'));
         return;
       }
 
@@ -423,7 +413,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         void loadOpenOrderSnapshot(mesa.current_order_id!, { forceRefresh: false });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudieron cargar las mesas.');
+      setError(err instanceof Error ? err.message : t('mesas.loadFailed'));
     } finally {
       hasLoadedOnceRef.current = true;
       if (shouldShowLoading) {
@@ -766,6 +756,16 @@ export function MesasPanel({ session, businessContext }: Props) {
     [context?.businessId, orderItemsCacheRef, publishMesaStateBroadcast],
   );
 
+  const countryDenominations = useMemo(
+    () => getDenominationsForCountry(context?.country_code || 'CO'),
+    [context?.country_code],
+  );
+
+  const buildCashBreakdownForCountry = useCallback(
+    (change: number) => buildCashBreakdown(change, countryDenominations),
+    [countryDenominations],
+  );
+
   const mutations = useMesaOrderMutations({
     order: orderState,
     businessId: context?.businessId,
@@ -793,17 +793,15 @@ export function MesasPanel({ session, businessContext }: Props) {
     loadData,
     beginPrintFlow,
     endPrintFlow,
-    buildCashBreakdown,
-    setPrintSalesData,
-    setShowPrintModal,
+    buildCashBreakdown: buildCashBreakdownForCountry,
     onOrderSaved: () => {
-      toast.showSuccess(TOAST_MESSAGES.mesas.updated());
+      toast.showSuccess(toastMessages.mesas.updated());
     },
     onOrderClosed: (mesaLabel, total) => {
-      toast.showSuccess(TOAST_MESSAGES.ventas.confirmed(mesaLabel, formatCop(total)));
+      toast.showSuccess(toastMessages.ventas.confirmed(mesaLabel, formatCop(total)));
     },
     onKitchenPrinted: () => {
-      toast.showSuccess(TOAST_MESSAGES.mesas.orderSent());
+      toast.showSuccess(toastMessages.mesas.orderSent());
     },
   });
 
@@ -839,7 +837,7 @@ export function MesasPanel({ session, businessContext }: Props) {
     setMesas,
     closeOrderModal,
     setError,
-    showDeletedToast: (label: string) => toast.showSuccess(TOAST_MESSAGES.mesas.deleted(label)),
+    showDeletedToast: (label: string) => toast.showSuccess(toastMessages.mesas.deleted(label)),
   });
 
   const {
@@ -900,7 +898,7 @@ export function MesasPanel({ session, businessContext }: Props) {
   const handleOpenClose = useCallback(
     async (mesa: MesaRecord, action: 'open' | 'close') => {
       if (!session.access_token) {
-        setError('No hay token de sesión activo para ejecutar la acción.');
+        setError(t('mesas.noSession'));
         return;
       }
 
@@ -911,14 +909,6 @@ export function MesasPanel({ session, businessContext }: Props) {
       setError(null);
       const previousOrderId = String(mesa.current_order_id || '').trim() || null;
       const actionVersion = bumpMesaActionVersion(mesa.id);
-
-      if (action === 'open') {
-        const lockAcquired = await acquireMesaLockForEdition(mesa);
-        if (!lockAcquired) {
-          setActingMesaId(null);
-          return;
-        }
-      }
 
       const optimisticMesa: MesaRecord =
         action === 'open'
@@ -950,47 +940,59 @@ export function MesasPanel({ session, businessContext }: Props) {
         setOrderItems([]);
         setOrderModalError(null);
         setLoadingOrder(true);
-        if (context?.businessId) {
-          void ensureCatalogLoaded(context.businessId, { forceRefresh: true }).catch(() => {
-            // no-op: no bloquear apertura por catalogo
-          });
-        }
+        setShowOrderModal(true);
       }
 
       try {
-        const updatedMesa = await openCloseMesa({
-          accessToken: session.access_token,
-          userId: session.user.id,
-          tableId: mesa.id,
-          action,
-        });
-
-        if (!isMesaActionVersionCurrent(mesa.id, actionVersion)) {
-          return;
-        }
-
-        const mergedMesa: MesaRecord = {
-          ...mesa,
-          ...updatedMesa,
-          table_number: updatedMesa.table_number ?? mesa.table_number,
-          table_name: updatedMesa.table_name ?? mesa.table_name,
-          orders: {
-            ...(mesa.orders || {}),
-            ...(updatedMesa.orders || {}),
-          },
-        };
-
-        setMesas((prev) =>
-          prev
-            .map((row) => (row.id === mergedMesa.id ? mergedMesa : row))
-            .sort(compareMesaTableIdentifiers),
-        );
-        publishMesaStateBroadcast(mergedMesa, {
-          previousOrderId,
-          mode: 'confirmed',
-        });
-
         if (action === 'open') {
+          const [lockAcquired, updatedMesa] = await Promise.all([
+            acquireMesaLockForEdition(mesa),
+            openCloseMesa({
+              accessToken: session.access_token,
+              userId: session.user.id,
+              tableId: mesa.id,
+              action,
+            }),
+            ...(context?.businessId
+              ? [ensureCatalogLoaded(context.businessId, { forceRefresh: true }).catch(() => [])]
+              : []),
+          ]);
+
+          if (!isMesaActionVersionCurrent(mesa.id, actionVersion)) {
+            return;
+          }
+
+          const mergedMesa: MesaRecord = {
+            ...mesa,
+            ...updatedMesa,
+            table_number: updatedMesa.table_number ?? mesa.table_number,
+            table_name: updatedMesa.table_name ?? mesa.table_name,
+            orders: {
+              ...(mesa.orders || {}),
+              ...(updatedMesa.orders || {}),
+            },
+          };
+
+          if (!lockAcquired) {
+            publishMesaStateBroadcast(mesa, {
+              previousOrderId,
+              mode: 'rollback',
+            });
+            closeOrderModal();
+            setActingMesaId(null);
+            return;
+          }
+
+          setMesas((prev) =>
+            prev
+              .map((row) => (row.id === mergedMesa.id ? mergedMesa : row))
+              .sort(compareMesaTableIdentifiers),
+          );
+          publishMesaStateBroadcast(mergedMesa, {
+            previousOrderId,
+            mode: 'confirmed',
+          });
+
           if (mergedMesa.current_order_id) {
             const openedOrderId = String(mergedMesa.current_order_id || '').trim();
             if (openedOrderId) {
@@ -1001,14 +1003,49 @@ export function MesasPanel({ session, businessContext }: Props) {
               void openOrderModal(mergedMesa, {
                 skipOrderItemsFetch: true,
                 initialItems: [],
+                skipLockAcquire: true,
               });
             }
           } else {
             closeOrderModal();
-            setError('La mesa se abrio, pero no se encontro una orden activa.');
+            setError(t('mesas.orderNotFound'));
           }
-        } else if (selectedMesa?.id === mergedMesa.id) {
-          closeOrderModal();
+        } else {
+          const updatedMesa = await openCloseMesa({
+            accessToken: session.access_token,
+            userId: session.user.id,
+            tableId: mesa.id,
+            action,
+          });
+
+          if (!isMesaActionVersionCurrent(mesa.id, actionVersion)) {
+            return;
+          }
+
+          const mergedMesa: MesaRecord = {
+            ...mesa,
+            ...updatedMesa,
+            table_number: updatedMesa.table_number ?? mesa.table_number,
+            table_name: updatedMesa.table_name ?? mesa.table_name,
+            orders: {
+              ...(mesa.orders || {}),
+              ...(updatedMesa.orders || {}),
+            },
+          };
+
+          setMesas((prev) =>
+            prev
+              .map((row) => (row.id === mergedMesa.id ? mergedMesa : row))
+              .sort(compareMesaTableIdentifiers),
+          );
+          publishMesaStateBroadcast(mergedMesa, {
+            previousOrderId,
+            mode: 'confirmed',
+          });
+
+          if (selectedMesa?.id === mergedMesa.id) {
+            closeOrderModal();
+          }
         }
       } catch (err) {
         if (action === 'open') {
@@ -1018,7 +1055,7 @@ export function MesasPanel({ session, businessContext }: Props) {
           previousOrderId,
           mode: 'rollback',
         });
-        setError(err instanceof Error ? err.message : 'No se pudo actualizar la mesa.');
+        setError(err instanceof Error ? err.message : t('mesas.updateFailed'));
       } finally {
         setActingMesaId((current) => (current === mesa.id ? null : current));
       }
@@ -1041,6 +1078,7 @@ export function MesasPanel({ session, businessContext }: Props) {
       setOrderItems,
       setOrderModalError,
       setSelectedMesa,
+      setShowOrderModal,
       setActiveOrderId,
     ],
   );
@@ -1152,10 +1190,7 @@ export function MesasPanel({ session, businessContext }: Props) {
   return (
     <>
       <View style={styles.mesasContainer}>
-        <MesasPanelHeader
-          isCreatingMesa={isCreatingMesa}
-          onOpenAddMesa={handleOpenAddMesa}
-        />
+        <MesasPanelHeader isCreatingMesa={isCreatingMesa} onOpenAddMesa={handleOpenAddMesa} />
 
         <View style={styles.mesasPanelDivider} />
 
@@ -1211,18 +1246,11 @@ export function MesasPanel({ session, businessContext }: Props) {
         onConfirmPayment={processPaymentAndClose}
         showSplitBillModal={showSplitBillModal}
         orderItems={orderItems}
+        resolveItemName={resolveOrderItemDisplayName}
         isClosingSplitBill={isClosingOrder}
         onBackSplitBill={handleBackFromSplitBill}
         onCloseSplitBill={handleCloseSplitBill}
         onConfirmSplitBill={processSplitPaymentAndClose}
-        toast={toast.toast}
-        onHideToast={toast.hideToast}
-        showPrintModal={showPrintModal}
-        isPrintingReceipt={isPrintingReceipt}
-        printCustomerName={printCustomerName}
-        onCustomerNameChange={setPrintCustomerName}
-        onPrintConfirm={handlePrintConfirm}
-        onPrintCancel={handlePrintCancel}
       />
     </>
   );

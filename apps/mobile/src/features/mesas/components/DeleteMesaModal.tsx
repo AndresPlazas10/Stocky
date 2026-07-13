@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { StockyDeleteConfirmModal } from '../../../ui/StockyDeleteConfirmModal';
 import { mesaDisplayName } from '../utils/mesaHelpers';
 import type { MesaRecord } from '../../../services/mesasService';
@@ -18,13 +19,17 @@ export const DeleteMesaModal = React.memo(function DeleteMesaModal({
   onCancel,
   onConfirm,
 }: DeleteMesaModalProps) {
+  const { t } = useTranslation('mesas');
+
   return (
     <StockyDeleteConfirmModal
       visible={visible}
-      title="Eliminar mesa"
-      message="Se eliminará la mesa y sus ordenes asociadas."
-      warning="No se puede deshacer."
-      itemLabel={mesaToDelete ? mesaDisplayName(mesaToDelete) : null}
+      title={t('alerts.confirmDeleteTable', { defaultValue: 'Eliminar mesa' })}
+      message={t('alerts.confirmDeleteTable', {
+        defaultValue: 'Se eliminará la mesa y sus ordenes asociadas.',
+      })}
+      warning={t('alerts.confirmDeleteTableWarning', { defaultValue: 'No se puede deshacer.' })}
+      itemLabel={mesaToDelete ? mesaDisplayName(mesaToDelete, t('labels.table')) : null}
       loading={isDeletingMesa}
       onCancel={onCancel}
       onConfirm={onConfirm}

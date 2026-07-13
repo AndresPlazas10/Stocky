@@ -1,16 +1,17 @@
 import { useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Layers, Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { deleteTableCascadeOrders } from '../../data/commands/ordersCommands';
 import type { SplitBillOrderItem, OrderItem } from '../../types/components';
 import { calcularCambio } from '../../utils/cambio';
 import { Button } from '../ui/button';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
-import { getTotalProductUnits, getOrderItemRenderKey, getOrderItemName } from './mesas/mesaHelpers.js';
+import { getTotalProductUnits, getOrderItemRenderKey, getOrderItemName } from './mesas/mesaHelpers';
 import MesasGrid from './mesas/MesasGrid';
 import { useMesaEditLocks } from './mesas/useMesaEditLocks.js';
 import { useMesaRealtime } from './mesas/useMesaRealtime.js';
-import { useMesaOrderOperations } from './mesas/useMesaOrderOperations.js';
+import { useMesaOrderOperations } from './mesas/useMesaOrderOperations';
 import { useMesaPayment } from './mesas/useMesaPayment.js';
 import { useMesasState } from './mesas/useMesasState.js';
 import { useMesasRefs } from './mesas/useMesasRefs.js';
@@ -19,6 +20,7 @@ import { useMesasCatalog } from './mesas/useMesasCatalog.js';
 import { useMesaCatalog } from '../../hooks/useMesaCatalog.js';
 import { useRafBatchedQueue } from '../../hooks/useRafBatchedQueue.js';
 import { useCloseOrderLocks } from '../../hooks/useCloseOrderLocks.js';
+import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 import { MesasHeader } from './mesas/MesasHeader.jsx';
 import { AddMesaForm } from './mesas/AddMesaForm.jsx';
 import { MesasAlerts } from './mesas/MesasAlerts.jsx';
@@ -29,6 +31,10 @@ import { MesaPaymentModal } from './MesaPaymentModal.jsx';
 import { MesaDeleteModal } from './MesaDeleteModal.jsx';
 
 function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRole?: string }) {
+  const { t } = useTranslation(['mesas', 'common']);
+  const config = useBusinessConfig();
+  const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
+  
   const state = useMesasState(businessId, userRole);
   const refs = useMesasRefs({
     businessId,
@@ -96,6 +102,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     _userRole: userRole,
     _mesas: state.mesas,
     setMesas: state.setMesas,
+    setLoading: state.setLoading,
     selectedMesa: state.selectedMesa,
     setSelectedMesa: state.setSelectedMesa,
     _showOrderDetails: state.showOrderDetails,
@@ -266,6 +273,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     orderTotal: catalog.orderTotal,
     setPendingQuantityUpdatesSafe: refs.setPendingQuantityUpdatesSafe,
     setProducts: state.setProducts,
+    priceConfig,
   });
 
   useEffect(() => {
@@ -328,7 +336,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     try {
       await Promise.all([loadMesas(), state.loadCustomers()]);
     } catch {
-      state.setError('No se pudo cargar la informacion de las mesas. Por favor, intenta recargar la pagina.');
+      state.setError(t('mesas:errors.loadFailed'));
     }
   };
 
@@ -339,8 +347,8 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
       dataCount={state.mesas.length}
       onRetry={handleRetry}
       skeletonType="mesas"
-      emptyTitle="Aun no hay mesas creadas"
-      emptyDescription="Crea tu primera mesa para empezar a registrar ordenes."
+      emptyTitle={t('mesas:empty.noTables')}
+      emptyDescription={t('mesas:empty.noTablesDescription')}
       emptyAction={
         state.canManageTables ? (
           <Button
@@ -348,7 +356,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
             onClick={() => state.setShowAddForm(true)}
             className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
           >
-            Crear Primera Mesa
+            {t('empty.createFirstTable')}
           </Button>
         ) : null
       }
@@ -426,12 +434,12 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
               <div className="w-20 h-20 rounded-full bg-accent-100 flex items-center justify-center mx-auto mb-4">
                 <Layers className="w-10 h-10 text-accent-600" />
               </div>
-              <h3 className="text-xl font-semibold text-primary-900 mb-2">No hay mesas creadas</h3>
-              <p className="text-primary-600 mb-6">Comienza agregando tu primera mesa</p>
+              <h3 className="text-xl font-semibold text-primary-900 mb-2">{t('mesas:empty.noTables')}</h3>
+              <p className="text-primary-600 mb-6">{t('mesas:empty.noTablesDescription')}</p>
               {state.canManageTables && (
                 <Button onClick={() => state.setShowAddForm(true)} className="gradient-primary text-white hover:opacity-90">
                   <Plus className="w-5 h-5 mr-2" />
-                  Agregar Mesa
+                  {t('mesas:buttons.addTable')}
                 </Button>
               )}
             </div>
@@ -457,8 +465,8 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
           totalOrderItems={catalog.totalOrderItems}
           orderItemsSentinelRef={catalog.orderItemsSentinelRef}
           isOrderItemsSyncing={state.isOrderItemsSyncing}
-          getOrderItemRenderKey={getOrderItemRenderKey}
-          getOrderItemName={getOrderItemName}
+          getOrderItemRenderKey={getOrderItemRenderKey as unknown as (item: OrderItem) => string}
+          getOrderItemName={(item) => getOrderItemName(item as unknown as import('./mesas/mesaHelpers').OrderItem, t)}
           onUpdateQuantity={updateItemQuantity}
           onLoadMoreOrderItems={catalog.loadMoreOrderItems}
           orderTotal={catalog.orderTotal}
@@ -539,8 +547,8 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
             try {
               const deleteResult = await deleteTableCascadeOrders(mesaId, { businessId });
               state.setAlertType('success');
-              state.setSuccessTitle('Mesa Eliminada');
-              state.setSuccessDetails([{ label: 'Mesa', value: deletedTableLabel }]);
+              state.setSuccessTitle(t('mesas:alerts.tableDeleted'));
+              state.setSuccessDetails([{ label: t('mesas:labels.table'), value: deletedTableLabel }]);
               state.setSuccess(true);
               setTimeout(() => state.setSuccess(false), 3000);
               if (!deleteResult?.__localOnly) {
@@ -555,7 +563,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
                 .filter(Boolean)
                 .join(' | ');
               state.setError(
-                `No se pudo eliminar la mesa. Revirtiendo estado.${message ? ` ${message}` : ''}${diag ? ` [${diag}]` : ''}`,
+                `${t('mesas:errors.deleteFailed')}${message ? ` ${message}` : ''}${diag ? ` [${diag}]` : ''}`,
               );
               state.setMesas(snapshotMesas);
               setTimeout(() => state.setError(null), 5000);

@@ -2,6 +2,7 @@ import React from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { StockyModal } from '../../../ui/StockyModal';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 
@@ -24,6 +25,8 @@ export const CloseOrderChoiceModal = React.memo(function CloseOrderChoiceModal({
   onPayAllTogether,
   onSplitBill,
 }: CloseOrderChoiceModalProps) {
+  const { t } = useTranslation('mesas');
+
   return (
     <StockyModal
       visible={visible}
@@ -35,10 +38,10 @@ export const CloseOrderChoiceModal = React.memo(function CloseOrderChoiceModal({
         <View style={styles.header}>
           <View style={styles.titleRow}>
             <Ionicons name="card-outline" size={24} color="#111827" />
-            <Text style={styles.title}>¿Cómo cerrar la orden?</Text>
+            <Text style={styles.title}>{t('closeOrder.title')}</Text>
           </View>
           <Text style={styles.totalText}>
-            Total: <StockyMoneyText value={orderTotal} style={styles.totalText} />
+            {t('labels.total')}: <StockyMoneyText value={orderTotal} style={styles.totalText} />
           </Text>
         </View>
       }
@@ -60,7 +63,7 @@ export const CloseOrderChoiceModal = React.memo(function CloseOrderChoiceModal({
           style={styles.primaryGradient}
         >
           <Ionicons name="checkmark-circle-outline" size={24} color="#C4B5FD" />
-          <Text style={styles.primaryText}>Pagar todo junto</Text>
+          <Text style={styles.primaryText}>{t('closeOrder.payAll')}</Text>
         </LinearGradient>
       </Pressable>
 
@@ -70,7 +73,7 @@ export const CloseOrderChoiceModal = React.memo(function CloseOrderChoiceModal({
         disabled={isClosingOrder || releasingEmptyOrder}
       >
         <Ionicons name="layers-outline" size={23} color="#111827" />
-        <Text style={styles.secondaryText}>Dividir cuenta</Text>
+        <Text style={styles.secondaryText}>{t('closeOrder.split')}</Text>
       </Pressable>
 
       <Pressable
@@ -78,7 +81,9 @@ export const CloseOrderChoiceModal = React.memo(function CloseOrderChoiceModal({
         onPress={onClose}
         disabled={isClosingOrder || releasingEmptyOrder}
       >
-        <Text style={styles.cancelText}>Cancelar</Text>
+        <Text style={styles.cancelText}>
+          {t('buttons.closeOrder', { defaultValue: 'Cancelar' })}
+        </Text>
       </Pressable>
     </StockyModal>
   );

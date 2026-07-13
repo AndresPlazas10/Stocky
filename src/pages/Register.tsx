@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { logger } from '@/utils/logger';
 import {
   getAuthenticatedUser,
@@ -24,7 +25,8 @@ import { Label } from '@/components/ui/label';
 import { SaleErrorAlert } from '@/components/ui/SaleErrorAlert';
 import { SaleSuccessAlert } from '@/components/ui/SaleSuccessAlert';
 
-import { Store, Building2, MapPin, Phone, User, Lock, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Store, Building2, MapPin, Phone, User, Lock, ArrowLeft, Loader2, Eye, EyeOff, Globe, Clock } from 'lucide-react';
+import { COUNTRIES } from '../config/countries';
 
 
 interface RegisterForm {
@@ -35,9 +37,12 @@ interface RegisterForm {
   username: string;
   password: string;
   confirmPassword: string;
+  country: string;
+  timezone: string;
 }
 
 function Register() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [formData, setFormData] = useState<RegisterForm>({
     name: '',
@@ -46,7 +51,9 @@ function Register() {
     phone: '',
     username: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    country: '',
+    timezone: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -62,45 +69,49 @@ function Register() {
     setError('');
     
     try {
-      const { name, address, phone, username, password, confirmPassword } = formData;
+      const { name, address, phone, username, password, confirmPassword, country } = formData;
       
-      if (!name || !username || !password) {
-        throw new Error('Por favor completa todos los campos requeridos');
+      if (!name || !username || !password || !country) {
+        throw new Error(t('register.fillAllFields'));
+      }
+
+      if (country === 'US' && !formData.timezone) {
+        throw new Error(t('register.selectTimezone'));
       }
 
       if (/^\d+$/.test(name.trim())) {
-        throw new Error('El nombre del negocio no puede ser solo numeros');
+        throw new Error(t('register.businessNameNotNumbers'));
       }
 
       if (!/[a-zA-Z]/.test(name.trim())) {
-        throw new Error('El nombre del negocio debe contener al menos una letra');
+        throw new Error(t('register.businessNameMustContainLetter'));
       }
 
       if (name.trim().length < 2) {
-        throw new Error('El nombre del negocio debe tener al menos 2 caracteres');
+        throw new Error(t('register.businessNameMinLength'));
       }
 
       if (password !== confirmPassword) {
-        throw new Error('Las contrasenas no coinciden');
+        throw new Error(t('register.passwordsNotMatch'));
       }
 
       if (password.length < 6) {
-        throw new Error('La contrasena debe tener al menos 6 caracteres');
+        throw new Error(t('register.passwordMinLength'));
       }
 
       const cleanUsername = username.trim().toLowerCase();
 
       if (/^\d+$/.test(cleanUsername)) {
-        throw new Error('El nombre de usuario no puede ser solo numeros');
+        throw new Error(t('register.usernameNotNumbers'));
       }
 
       if (!/^[a-z0-9_]{3,20}$/.test(cleanUsername)) {
-        throw new Error('El usuario debe tener entre 3-20 caracteres (solo letras, numeros y guiones bajos)');
+        throw new Error(t('register.usernameFormat'));
       }
 
       const usernameTaken = await isBusinessUsernameTaken(cleanUsername);
       if (usernameTaken) {
-        throw new Error('Este nombre de usuario ya esta en uso');
+        throw new Error(t('register.usernameTaken'));
       }
 
       const { email: cleanEmail } = normalizeUsernameToEmail(cleanUsername);
@@ -118,22 +129,22 @@ function Register() {
         const errorMsg = (authError as Error)?.message || '';
 
         if (errorMsg.includes('already registered') || errorMsg === 'User already registered') {
-          throw new Error('Ya existe una cuenta con este nombre de usuario. Intenta con otro nombre.');
+          throw new Error(t('register.accountExists'));
         }
         if (errorMsg.includes('password')) {
-          throw new Error('La contrasena debe tener al menos 6 caracteres');
+          throw new Error(t('register.passwordMinLength'));
         }
         if (errorMsg.includes('email')) {
-          throw new Error('El formato del correo es invalido');
+          throw new Error(t('register.invalidEmail'));
         }
-        throw new Error(`Error al crear la cuenta: ${errorMsg || 'Error desconocido'}`);
+        throw new Error(t('register.errorCreatingAccount') + ': ' + (errorMsg || t('errors.unknown')));
       }
       
-      if (!authData.user) throw new Error('Error al crear la cuenta');
+      if (!authData.user) throw new Error(t('register.errorCreatingAccount'));
 
       if (!authData.session) {
         await signOutSession();
-        throw new Error('Supabase requiere confirmacion de email. Ve a Dashboard > Authentication > Providers > Email y desactiva "Confirm email"');
+        throw new Error(t('register.emailConfirmationRequired'));
       }
 
       let activeUserId = authData?.session?.user?.id || null;
@@ -152,7 +163,7 @@ function Register() {
       activeUserId = activeUser?.id || activeSession?.user?.id || activeUserId;
 
       if (!activeUserId || !activeSession?.access_token) {
-        throw new Error('No hay sesion activa para crear el negocio. Inicia sesion nuevamente e intenta otra vez.');
+        throw new Error(t('register.noActiveSession'));
       }
 
       let businessData = null;
@@ -164,18 +175,20 @@ function Register() {
           phone: phone.trim() || null,
           email: cleanEmail,
           username: cleanUsername,
-          created_by: activeUserId
+          created_by: activeUserId,
+          country_code: formData.country,
+          timezone: formData.timezone || null
         });
       } catch (businessError) {
         await signOutSession().catch((err) => { logger.warn('register:signout_after_business_create failed', err); });
-        throw new Error(`Error al crear el negocio: ${(businessError as Error)?.message || 'Verifica las politicas RLS en Supabase'}`);
+        throw new Error(t('register.errorCreatingBusinessDetails', { error: (businessError as Error)?.message || '' }));
       }
 
       await createEmployeeRecord({
         user_id: activeUserId,
         business_id: businessData.id,
         role: 'owner',
-        full_name: name.trim() + ' (Propietario)'
+        full_name: name.trim() + ' (' + t('register.ownerLabel') + ')'
       });
 
       sessionStorage.setItem('justCreatedBusiness', businessData.id);
@@ -188,7 +201,7 @@ function Register() {
       }, 1500);
       
     } catch (err) {
-      setError((err as Error).message || 'Error al crear el negocio');
+      setError((err as Error).message || t('register.errorCreatingBusiness'));
     } finally {
       setIsSubmitting(false);
     }
@@ -216,7 +229,7 @@ function Register() {
     checkSession();
   }, [navigate]);
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -252,7 +265,7 @@ function Register() {
           onClick={() => navigate('/')}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Volver
+          {t('buttons.back')}
         </Button>
       </motion.div>
 
@@ -272,10 +285,10 @@ function Register() {
             </div>
             <div>
               <CardTitle className="text-2xl font-bold text-primary-900 mb-1">
-                Registrar Negocio
+                {t('register.registerBusiness')}
               </CardTitle>
               <CardDescription className="text-sm text-muted-foreground">
-                Completa la informacion de tu negocio para comenzar
+                {t('register.completeBusinessInfo')}
               </CardDescription>
             </div>
           </CardHeader>
@@ -284,7 +297,7 @@ function Register() {
             <SaleErrorAlert
               isVisible={!!error}
               onClose={() => setError('')}
-              title="Error de registro"
+              title={t('register.registrationError')}
               message={error}
               duration={5000}
             />
@@ -292,8 +305,8 @@ function Register() {
             <SaleSuccessAlert
               isVisible={success}
               onClose={() => setSuccess(false)}
-              title="Negocio registrado"
-              details={[{ label: 'Estado', value: 'Redirigiendo al dashboard...' }]}
+              title={t('register.businessRegistered')}
+              details={[{ label: t('labels.status'), value: t('register.redirectingToDashboard') }]}
               duration={2000}
             />
 
@@ -301,7 +314,7 @@ function Register() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="space-y-1 lg:col-span-2">
                   <Label htmlFor="name" className="text-sm font-semibold text-primary-800">
-                    Nombre del Negocio <span className="text-destructive">*</span>
+                    {t('register.businessName')} <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
                     <Store className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
@@ -309,7 +322,7 @@ function Register() {
                       id="name"
                       name="name"
                       type="text"
-                      placeholder="Ej: Mi Cafeteria"
+                      placeholder={t('register.businessNameExample')}
                       value={formData.name}
                       onChange={handleChange}
                       className="pl-10 h-10 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
@@ -319,8 +332,71 @@ function Register() {
                 </div>
 
                 <div className="space-y-1 lg:col-span-2">
+                  <Label htmlFor="country" className="text-sm font-semibold text-primary-800">
+                    {t('register.country')} <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
+                    <select
+                      id="country"
+                      name="country"
+                      value={formData.country}
+                      onChange={(e) => {
+                        const newCountry = e.target.value;
+                        setFormData(prev => ({
+                          ...prev,
+                          country: newCountry,
+                          nit: '',
+                          timezone: ''
+                        }));
+                      }}
+                      className="w-full h-10 pl-10 pr-4 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200 rounded-xl appearance-none cursor-pointer"
+                      required
+                    >
+                      <option value="" disabled>{t('register.selectCountry')}</option>
+                      {Object.values(COUNTRIES).map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {formData.country && COUNTRIES[formData.country]?.timezones && (
+                  <div className="space-y-1 lg:col-span-2">
+                    <Label htmlFor="timezone" className="text-sm font-semibold text-primary-800">
+                      {t('register.timezone')} <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
+                      <select
+                        id="timezone"
+                        name="timezone"
+                        value={formData.timezone}
+                        onChange={(e) => {
+                          setFormData(prev => ({
+                            ...prev,
+                            timezone: e.target.value
+                          }));
+                        }}
+                        className="w-full h-10 pl-10 pr-4 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200 rounded-xl appearance-none cursor-pointer"
+                        required
+                      >
+                        <option value="" disabled>{t('register.selectTimezone')}</option>
+                        {COUNTRIES[formData.country].timezones!.map(tz => (
+                          <option key={tz.value} value={tz.value}>
+                            {tz.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1 lg:col-span-2">
                   <Label htmlFor="username" className="text-sm font-semibold text-primary-800">
-                    Nombre de Usuario <span className="text-destructive">*</span>
+                    {t('register.username')} <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
@@ -334,14 +410,14 @@ function Register() {
                       className="pl-10 h-10 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
                       required
                       pattern="[a-z0-9_]{3,20}"
-                      title="Solo letras minusculas, numeros y guiones bajos (3-20 caracteres)"
+                      title={t('register.usernameFormat')}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
                   <Label htmlFor="nit" className="text-sm font-semibold text-primary-800">
-                    NIT <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+                    {formData.country ? COUNTRIES[formData.country].taxId.name : 'NIT'} <span className="text-xs font-normal text-muted-foreground">({t('form.optional')})</span>
                   </Label>
                   <div className="relative">
                     <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
@@ -349,17 +425,18 @@ function Register() {
                       id="nit"
                       name="nit"
                       type="text"
-                      placeholder="900.123.456-7"
+                      placeholder={formData.country ? COUNTRIES[formData.country].taxId.placeholder : t('register.selectCountryFirst')}
                       value={formData.nit}
                       onChange={handleChange}
                       className="pl-10 h-10 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
+                      disabled={!formData.country}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
                   <Label htmlFor="phone" className="text-sm font-semibold text-primary-800">
-                    Telefono
+                    {t('register.phone')}
                   </Label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
@@ -367,17 +444,18 @@ function Register() {
                       id="phone"
                       name="phone"
                       type="tel"
-                      placeholder="+57 300 123 4567"
+                      placeholder={formData.country ? COUNTRIES[formData.country].phonePlaceholder : t('register.selectCountryFirst')}
                       value={formData.phone}
                       onChange={handleChange}
                       className="pl-10 h-10 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
+                      disabled={!formData.country}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1 lg:col-span-2">
                   <Label htmlFor="address" className="text-sm font-semibold text-primary-800">
-                    Direccion
+                    {t('register.address')}
                   </Label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
@@ -395,7 +473,7 @@ function Register() {
 
                 <div className="space-y-1 lg:col-span-2">
                   <Label htmlFor="password" className="text-sm font-semibold text-primary-800">
-                    Contrasena <span className="text-destructive">*</span>
+                    {t('register.password')} <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
@@ -403,7 +481,7 @@ function Register() {
                       id="password"
                       name="password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="Minimo 6 caracteres"
+                      placeholder={t('register.minCharacters')}
                       value={formData.password}
                       onChange={handleChange}
                       className="pl-10 pr-10 h-10 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
@@ -422,7 +500,7 @@ function Register() {
 
                 <div className="space-y-1 lg:col-span-2">
                   <Label htmlFor="confirmPassword" className="text-sm font-semibold text-primary-800">
-                    Confirmar Contrasena <span className="text-destructive">*</span>
+                    {t('register.confirmPassword')} <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
@@ -430,7 +508,7 @@ function Register() {
                       id="confirmPassword"
                       name="confirmPassword"
                       type={showConfirmPassword ? "text" : "password"}
-                      placeholder="Repite la contrasena"
+                      placeholder={t('register.repeatPassword')}
                       value={formData.confirmPassword}
                       onChange={handleChange}
                       className="pl-10 pr-10 h-10 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
@@ -457,12 +535,12 @@ function Register() {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creando negocio...
+                    {t('register.creatingBusiness')}
                   </>
                 ) : success ? (
-                  'Redirigiendo...'
+                  t('register.redirecting')
                 ) : (
-                  'Registrar Negocio'
+                  t('register.registerBusiness')
                 )}
               </Button>
             </form>
@@ -473,7 +551,7 @@ function Register() {
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="px-4 bg-card text-muted-foreground">
-                  Ya tienes cuenta?
+                  {t('register.alreadyHaveAccount')}
                 </span>
               </div>
             </div>
@@ -483,7 +561,7 @@ function Register() {
               className="cursor-pointer w-full h-10 text-sm border border-primary-200 text-primary-700 hover:bg-primary-50 rounded-xl transition-colors duration-200"
               onClick={() => navigate('/login')}
             >
-              Iniciar sesion
+              {t('register.signIn')}
             </Button>
           </CardContent>
         </Card>

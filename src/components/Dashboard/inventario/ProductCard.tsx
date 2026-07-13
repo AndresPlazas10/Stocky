@@ -11,10 +11,12 @@ import {
   Edit,
   Trash2,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { formatPrice } from '../../../utils/formatters';
+import { useBusinessConfig } from '../../../hooks/useBusinessConfig';
 import type { ProductCardProps } from '@/types/components';
 
 function getStockBadgeClass(stock: number, minStock: number): string {
@@ -24,6 +26,12 @@ function getStockBadgeClass(stock: number, minStock: number): string {
 }
 
 export function ProductCard({ product, index, lowMotionMode, hasAdminPrivileges, isEmployee, onEdit, onDelete, onToggleActive }: ProductCardProps) {
+  const { t } = useTranslation('common');
+  const config = useBusinessConfig();
+  const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
+  
+  const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
+  
   return (
     <motion.div
       key={product.id}
@@ -48,7 +56,7 @@ export function ProductCard({ product, index, lowMotionMode, hasAdminPrivileges,
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className="bg-accent-100 text-accent-700 border border-accent-200">
                   <Tag className="w-3 h-3 mr-1" />
-                  {product.code || 'Sin código'}
+                    {product.code || t('form.noCode')}
                 </Badge>
                 {product.category && (
                   <Badge className="bg-gray-100 text-gray-700 border border-gray-200">
@@ -69,7 +77,7 @@ export function ProductCard({ product, index, lowMotionMode, hasAdminPrivileges,
                       : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-none'
                   }`}
                 >
-                  {product.is_active ? '✓ Activo' : '✗ Inactivo'}
+                  {product.is_active ? `✓ ${t('status.active')}` : `✗ ${t('status.inactive')}`}
                 </Button>
               ) : (
                 <Badge
@@ -79,7 +87,7 @@ export function ProductCard({ product, index, lowMotionMode, hasAdminPrivileges,
                       : 'bg-gray-100 text-gray-800 border-gray-200'
                   } border`}
                 >
-                  {product.is_active ? '✓ Activo' : '✗ Inactivo'}
+                  {product.is_active ? `✓ ${t('status.active')}` : `✗ ${t('status.inactive')}`}
                 </Badge>
               )}
             </div>
@@ -89,39 +97,39 @@ export function ProductCard({ product, index, lowMotionMode, hasAdminPrivileges,
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-1">
                 <Building2 className="w-4 h-4 text-accent-600" />
-                <span className="text-xs text-accent-500 uppercase tracking-wide">Proveedor</span>
+                <span className="text-xs text-accent-500 uppercase tracking-wide">{t('labels.supplier')}</span>
               </div>
               <p className="text-sm font-medium text-gray-700 truncate">
                 {product.supplier
-                  ? product.supplier.business_name || product.supplier.contact_name || 'Sin proveedor'
-                  : 'Sin proveedor'}
+                  ? product.supplier.business_name || product.supplier.contact_name || t('form.noSupplier')
+                  : t('form.noSupplier')}
               </p>
             </div>
 
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <TrendingDown className="w-4 h-4 text-orange-600" />
-                <span className="text-xs text-accent-500 uppercase tracking-wide">P. Compra</span>
+                <span className="text-xs text-accent-500 uppercase tracking-wide">{t('labels.purchasePrice')}</span>
               </div>
-              <p className="text-base font-bold text-orange-600">{formatPrice(product.purchase_price)}</p>
+              <p className="text-base font-bold text-orange-600">{fmtPrice(product.purchase_price)}</p>
             </div>
 
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <TrendingUp className="w-4 h-4 text-green-600" />
-                <span className="text-xs text-accent-500 uppercase tracking-wide">P. Venta</span>
+                <span className="text-xs text-accent-500 uppercase tracking-wide">{t('labels.salePrice')}</span>
               </div>
-              <p className="text-base font-bold text-green-600">{formatPrice(product.sale_price)}</p>
+              <p className="text-base font-bold text-green-600">{fmtPrice(product.sale_price)}</p>
             </div>
 
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Package className="w-4 h-4 text-primary-600" />
-                <span className="text-xs text-accent-500 uppercase tracking-wide">Stock</span>
+                <span className="text-xs text-accent-500 uppercase tracking-wide">{t('labels.stock')}</span>
               </div>
               <div className="flex items-center gap-2">
                 {product.manage_stock === false ? (
-                  <Badge className="bg-slate-100 text-slate-700 border border-slate-200">Sin control de stock</Badge>
+                  <Badge className="bg-slate-100 text-slate-700 border border-slate-200">{t('form.stock')}</Badge>
                 ) : (
                   <>
                     <Badge className={getStockBadgeClass(product.stock, product.min_stock)}>
@@ -138,10 +146,10 @@ export function ProductCard({ product, index, lowMotionMode, hasAdminPrivileges,
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <AlertTriangle className="w-4 h-4 text-accent-600" />
-                <span className="text-xs text-accent-500 uppercase tracking-wide">Mínimo</span>
+                <span className="text-xs text-accent-500 uppercase tracking-wide">{t('labels.minimum')}</span>
               </div>
               <p className="text-sm font-medium text-gray-700">
-                {product.manage_stock === false ? 'No aplica' : `${product.min_stock} ${product.unit}`}
+                {product.manage_stock === false ? t('form.notApplicable') : `${product.min_stock} ${product.unit}`}
               </p>
             </div>
           </div>
@@ -153,14 +161,14 @@ export function ProductCard({ product, index, lowMotionMode, hasAdminPrivileges,
                 className="w-full bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg"
               >
                 <Edit className="w-4 h-4" />
-                <span className="text-sm">Editar Producto</span>
+                <span className="text-sm">{t('buttons.edit')}</span>
               </Button>
               <Button
                 onClick={() => onDelete(product.id)}
                 className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg"
               >
                 <Trash2 className="w-4 h-4" />
-                <span className="text-sm">Eliminar Producto</span>
+                <span className="text-sm">{t('buttons.delete')}</span>
               </Button>
             </div>
           )}

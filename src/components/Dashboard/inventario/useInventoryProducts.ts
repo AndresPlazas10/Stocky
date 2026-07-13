@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useRealtimeSubscription } from '../../../hooks/useRealtime.js';
 import { useLowMotionMode } from '../../../hooks/useLowMotionMode.js';
 import { useProgressiveList } from '../../../hooks/useProgressiveList.js';
@@ -23,6 +24,7 @@ import type { ProductWithSupplier } from '../../../types/product';
 import type { Supplier } from '../../../types/supplier';
 
 export function useInventoryProducts(businessId: string, userRole: string = 'admin') {
+  const { t } = useTranslation('common');
   const [products, setProducts] = useState<ProductWithSupplier[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -123,7 +125,7 @@ export function useInventoryProducts(businessId: string, userRole: string = 'adm
           setHasMoreProductsRemote(false);
           setPage(1);
         } else {
-          setError('Error al cargar el inventario');
+          setError(t('inventory.errors.loadFailed'));
         }
       } finally {
         setLoading(false);

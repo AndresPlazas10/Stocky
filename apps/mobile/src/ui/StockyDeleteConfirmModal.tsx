@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../theme/tokens';
 import { StockyModal } from './StockyModal';
 
@@ -30,12 +31,16 @@ export const StockyDeleteConfirmModal = memo(function StockyDeleteConfirmModal({
   loading = false,
   confirmDisabled = false,
   cancelDisabled = false,
-  confirmText = 'Eliminar',
-  loadingText = 'Eliminando...',
-  cancelText = 'Cancelar',
+  confirmText: confirmTextProp,
+  loadingText: loadingTextProp,
+  cancelText: cancelTextProp,
   onConfirm,
   onCancel,
 }: Props) {
+  const { t } = useTranslation();
+  const confirmText = confirmTextProp ?? t('buttons.delete');
+  const loadingText = loadingTextProp ?? t('buttons.deleting');
+  const cancelText = cancelTextProp ?? t('buttons.cancel');
   const disableCancel = loading || cancelDisabled;
   const disableConfirm = loading || confirmDisabled;
 
@@ -45,6 +50,7 @@ export const StockyDeleteConfirmModal = memo(function StockyDeleteConfirmModal({
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={70}
+      hideCloseButton
       onClose={() => {
         if (disableCancel) return;
         onCancel();
@@ -112,7 +118,7 @@ export const StockyDeleteConfirmModal = memo(function StockyDeleteConfirmModal({
             <Ionicons name="cube-outline" size={18} color="#B91C1C" />
           </View>
           <View style={styles.itemTextWrap}>
-            <Text style={styles.itemLabel}>Elemento seleccionado</Text>
+            <Text style={styles.itemLabel}>{t('deleteConfirm.selectedItem')}</Text>
             <Text style={styles.itemValue} numberOfLines={2}>
               {itemLabel}
             </Text>

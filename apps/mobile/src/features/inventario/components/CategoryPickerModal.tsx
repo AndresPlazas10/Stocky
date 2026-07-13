@@ -1,6 +1,7 @@
 import { Pressable, Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { StockyModal } from '../../../ui/StockyModal';
-import { INVENTORY_CATEGORY_OPTIONS } from '../inventoryUtils';
+import { PRODUCT_CATEGORIES } from '../inventoryUtils';
 import { inventarioStyles as styles } from '../inventarioStyles';
 
 type Props = {
@@ -11,10 +12,11 @@ type Props = {
 };
 
 export function CategoryPickerModal({ visible, selectedCategory, onSelect, onClose }: Props) {
+  const { t } = useTranslation();
   return (
     <StockyModal
       visible={visible}
-      title="Seleccionar categoría"
+      title={t('inventarioSection.selectCategory')}
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={26}
@@ -22,18 +24,18 @@ export function CategoryPickerModal({ visible, selectedCategory, onSelect, onClo
       perfTag="inventario.picker_categoria"
       onClose={onClose}
     >
-      {INVENTORY_CATEGORY_OPTIONS.map((category) => {
-        const selected = selectedCategory === category;
+      {PRODUCT_CATEGORIES.map((category) => {
+        const selected = selectedCategory === category.value;
         return (
           <Pressable
-            key={category}
+            key={category.value}
             style={[styles.modalOptionItem, selected && styles.modalOptionItemSelected]}
-            onPress={() => onSelect(category)}
+            onPress={() => onSelect(category.value)}
           >
             <Text
               style={[styles.modalOptionItemText, selected && styles.modalOptionItemTextSelected]}
             >
-              {category}
+              {t(category.labelKey)}
             </Text>
           </Pressable>
         );

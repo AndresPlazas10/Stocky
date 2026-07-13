@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { getSuppliersForManagementPage } from '../../data/queries/suppliersQueries';
@@ -8,6 +9,7 @@ import {
   deleteSupplierById,
   saveSupplierWithTaxFallback
 } from '../../data/commands/suppliersCommands';
+import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 
 import { 
   Trash2, 
@@ -32,6 +34,8 @@ import { INITIAL_SUPPLIER_FORM } from './proveedores/supplierFormConstants';
 const SUPPLIERS_PAGE_SIZE = 50;
 
 function Proveedores({ businessId }: DashboardModuleProps) {
+  const { t } = useTranslation('common');
+  const config = useBusinessConfig();
   const [suppliers, setSuppliers] = useState<Array<{ id: string; business_name: string; contact_name?: string; email?: string; phone?: string; address?: string; nit?: string; notes?: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -103,13 +107,13 @@ function Proveedores({ businessId }: DashboardModuleProps) {
         setHasMoreSuppliers(false);
         setPage(1);
       } else {
-        setError(`❌ Error al cargar los proveedores: ${(err as Error)?.message || 'Error desconocido'}`);
+        setError(`❌ ${t('errors.loadingSuppliers')}: ${(err as Error)?.message || t('errors.unknown')}`);
       }
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [businessId, supplierTaxColumn]);
+  }, [businessId, supplierTaxColumn, t]);
 
   useEffect(() => {
     if (businessId) {
@@ -132,11 +136,11 @@ function Proveedores({ businessId }: DashboardModuleProps) {
     
     try {
       if (!businessId) {
-        throw new Error('No se detectó el negocio actual');
+        throw new Error(t('errors.noBusinessDetected'));
       }
 
       if (!formData.business_name.trim()) {
-        throw new Error('El nombre del negocio es obligatorio');
+        throw new Error(t('errors.businessNameRequired'));
       }
 
       const supplierPayload = {
@@ -158,18 +162,18 @@ function Proveedores({ businessId }: DashboardModuleProps) {
       const { taxColumn } = result;
       if (taxColumn !== supplierTaxColumn) setSupplierTaxColumn(taxColumn);
 
-      setSuccess(editingSupplier ? 'Proveedor actualizado exitosamente' : 'Proveedor creado exitosamente');
+      setSuccess(editingSupplier ? t('success.updated') : t('success.created'));
       resetForm();
       void result;
       await loadProveedores();
       setShowModal(false);
       
     } catch (err) {
-      setError((err as Error).message || 'Error al guardar el proveedor');
+      setError((err as Error).message || t('errors.savingSupplier'));
     } finally {
       setIsSubmitting(false);
     }
-  }, [editingSupplier, formData, businessId, loadProveedores, isSubmitting, supplierTaxColumn]);
+  }, [editingSupplier, formData, businessId, loadProveedores, isSubmitting, supplierTaxColumn, t]);
 
   const handleEdit = useCallback((supplier: typeof editingSupplier) => {
     setEditingSupplier(supplier);
@@ -202,7 +206,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
         loadProveedores();
       } catch (err) {
         if ((err as Record<string, unknown>)?.code === '23503') {
-          setError('❌ No se puede eliminar este proveedor porque tiene compras asociadas');
+          setError(`❌ ${t('errors.cannotDeleteSupplierWithPurchases')}`);
           setShowDeleteModal(false);
           setSupplierToDelete(null);
           return;
@@ -210,15 +214,15 @@ function Proveedores({ businessId }: DashboardModuleProps) {
         throw err;
       }
 
-      setSuccess('✅ Proveedor eliminado exitosamente');
+      setSuccess(`✅ ${t('success.deleted')}`);
       setShowDeleteModal(false);
       setSupplierToDelete(null);
     } catch {
-      setError('❌ Error al eliminar el proveedor');
+      setError(`❌ ${t('errors.deletingSupplier')}`);
       setShowDeleteModal(false);
       setSupplierToDelete(null);
     }
-  }, [supplierToDelete, businessId, loadProveedores]);
+  }, [supplierToDelete, businessId, loadProveedores, t]);
 
   const cancelDelete = useCallback(() => {
     setShowDeleteModal(false);
@@ -279,11 +283,11 @@ function Proveedores({ businessId }: DashboardModuleProps) {
 
   const successTitle = useMemo(() => {
     const normalized = success.toLowerCase();
-    if (normalized.includes('eliminad')) return '✨ Proveedor eliminado';
-    if (normalized.includes('actualizad')) return '✨ Proveedor actualizado';
-    if (normalized.includes('cread')) return '✨ Proveedor creado';
-    return '✨ Proveedor guardado';
-  }, [success]);
+    if (normalized.includes('eliminad')) return `✨ ${t('success.deleted')}`;
+    if (normalized.includes('actualizad')) return `✨ ${t('success.updated')}`;
+    if (normalized.includes('cread')) return `✨ ${t('success.created')}`;
+    return `✨ ${t('success.saved')}`;
+  }, [success, t]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#C4DFE6]/10 p-4 md:p-6">
@@ -301,8 +305,8 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                 <Building2 className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-800">Proveedores</h1>
-                <p className="text-gray-600">Gestiona tu red de proveedores</p>
+                <h1 className="text-3xl font-bold text-gray-800">{t('navigation.suppliers')}</h1>
+                <p className="text-gray-600">{t('messages.manageSuppliersNetwork')}</p>
               </div>
             </div>
             
@@ -314,7 +318,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
               className="flex items-center gap-2 px-6 py-3 gradient-primary text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300"
             >
               <Plus className="w-5 h-5" />
-              Nuevo Proveedor
+              {t('buttons.newSupplier')}
             </button>
           </div>
         </motion.div>
@@ -323,7 +327,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
         <SaleErrorAlert 
           isVisible={!!error}
           onClose={() => setError('')}
-          title="Error"
+          title={t('errors.error')}
           message={error}
           duration={5000}
         />
@@ -332,7 +336,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
           isVisible={!!success}
           onClose={() => setSuccess('')}
           title={successTitle}
-          details={[{ label: 'Acción', value: success }]}
+          details={[{ label: t('labels.action'), value: success }]}
           duration={5000}
         />
 
@@ -348,7 +352,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="Buscar por empresa, contacto, email o NIT..."
+                placeholder={t('form.searchPlaceholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
@@ -358,7 +362,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
             <div className="flex gap-4">
               <div className="px-6 py-3 bg-gradient-to-br from-accent-500/10 to-[#C4DFE6]/10 rounded-xl">
                 <div className="text-2xl font-bold text-accent-600">{suppliers.length}</div>
-                <div className="text-sm text-gray-600">Total Proveedores</div>
+                <div className="text-sm text-gray-600">{t('labels.total')}</div>
               </div>
             </div>
           </div>
@@ -375,7 +379,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
             <div className="flex items-center justify-center py-20">
               <div className="flex flex-col items-center gap-4">
                 <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#C4DFE6] border-t-transparent"></div>
-                <p className="text-gray-600">Cargando proveedores...</p>
+                <p className="text-gray-600">{t('buttons.loading')}</p>
               </div>
             </div>
           ) : suppliers.length === 0 ? (
@@ -383,9 +387,9 @@ function Proveedores({ businessId }: DashboardModuleProps) {
               <div className="p-6 bg-gradient-to-br from-accent-500/10 to-[#C4DFE6]/10 rounded-full mb-6">
                 <Package className="w-16 h-16 text-accent-600" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-800 mb-2">No hay proveedores registrados</h3>
+              <h3 className="text-2xl font-bold text-gray-800 mb-2">{t('empty.noDataToShow')}</h3>
               <p className="text-gray-600 mb-6 text-center max-w-md">
-                Comienza agregando proveedores para gestionar mejor tus compras e inventario
+                {t('empty.noDataAvailable')}
               </p>
               <button
                 onClick={() => {
@@ -395,14 +399,14 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                 className="flex items-center gap-2 px-6 py-3 gradient-primary text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all"
               >
                 <Plus className="w-5 h-5" />
-                Agregar Primer Proveedor
+                {t('empty.createFirst')}
               </button>
             </div>
           ) : filteredSuppliers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 px-6">
               <Search className="w-16 h-16 text-gray-400 mb-4" />
-              <h3 className="text-xl font-bold text-gray-800 mb-2">No se encontraron resultados</h3>
-              <p className="text-gray-600">Intenta con otros términos de búsqueda</p>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">{t('empty.noResults')}</h3>
+              <p className="text-gray-600">{t('empty.noResultsDescription')}</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -461,7 +465,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                             <div className="flex items-center gap-3">
                               <User className="w-4 h-4 text-accent-600 shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs text-accent-500 uppercase tracking-wide">Contacto</p>
+                                <p className="text-xs text-accent-500 uppercase tracking-wide">{t('labels.contact')}</p>
                                 <p className="text-sm font-medium text-gray-700 truncate">
                                   {supplier.contact_name}
                                 </p>
@@ -473,7 +477,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                             <div className="flex items-center gap-3">
                               <Mail className="w-4 h-4 text-accent-600 shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs text-accent-500 uppercase tracking-wide">Email</p>
+                                <p className="text-xs text-accent-500 uppercase tracking-wide">{t('labels.email')}</p>
                                 <a 
                                   href={`mailto:${supplier.email}`} 
                                   className="text-sm font-medium text-gray-600 hover:text-gray-700 transition-colors truncate block"
@@ -488,7 +492,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                             <div className="flex items-center gap-3">
                               <Phone className="w-4 h-4 text-accent-600 shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs text-accent-500 uppercase tracking-wide">Teléfono</p>
+                                <p className="text-xs text-accent-500 uppercase tracking-wide">{t('labels.phone')}</p>
                                 <a 
                                   href={`tel:${supplier.phone}`}
                                   className="text-sm font-medium text-gray-700 hover:text-primary-700 transition-colors"
@@ -503,7 +507,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                             <div className="flex items-start gap-3">
                               <MapPin className="w-4 h-4 text-accent-600 shrink-0 mt-0.5" />
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs text-accent-500 uppercase tracking-wide">Dirección</p>
+                                <p className="text-xs text-accent-500 uppercase tracking-wide">{t('labels.address')}</p>
                                 <p className="text-sm font-medium text-gray-700 break-words">
                                   {supplier.address}
                                 </p>
@@ -515,7 +519,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                             <div className="flex items-start gap-3 pt-3 border-t border-accent-100">
                               <FileText className="w-4 h-4 text-accent-600 shrink-0 mt-0.5" />
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs text-accent-500 uppercase tracking-wide">Notas</p>
+                                <p className="text-xs text-accent-500 uppercase tracking-wide">{t('labels.notes')}</p>
                                 <p className="text-sm text-gray-600 break-words">
                                   {supplier.notes}
                                 </p>
@@ -526,7 +530,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                           {!supplier.contact_name && !supplier.email && !supplier.phone && !supplier.address && !supplier.notes && (
                             <div className="text-center py-4">
                               <p className="text-sm text-gray-400 italic">
-                                No hay información de contacto adicional
+                                {t('empty.noDataAvailable')}
                               </p>
                             </div>
                           )}
@@ -540,7 +544,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
               {(hasMoreProgressive || (hasMoreExternal && canLoadMoreSuppliers)) && (
                 <div className="flex flex-col items-center gap-3 py-2">
                   <p className="text-xs text-gray-500">
-                    Mostrando {visibleSuppliers.length} de {totalFilteredSuppliers} proveedores
+                    {t('messages.showingItems', { visible: visibleSuppliers.length, total: totalFilteredSuppliers })}
                   </p>
                   <div ref={suppliersSentinelRef} className="h-2 w-full" aria-hidden="true" />
                   <button
@@ -549,7 +553,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                     disabled={loadingMore}
                     className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                   >
-                    {loadingMore ? 'Cargando proveedores...' : 'Cargar mas proveedores'}
+                    {loadingMore ? t('buttons.loading') : t('empty.loadMore')}
                   </button>
                 </div>
               )}
@@ -587,10 +591,10 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold">
-                      {editingSupplier ? 'Editar Proveedor' : 'Nuevo Proveedor'}
+                      {editingSupplier ? t('buttons.edit') : t('buttons.newSupplier')}
                     </h2>
                     <p className="text-white/80 mt-1">
-                      {editingSupplier ? 'Actualiza la información del proveedor' : 'Completa los datos del nuevo proveedor'}
+                      {editingSupplier ? t('form.updateSupplierInfo') : t('form.completeNewSupplierData')}
                     </p>
                   </div>
                 </div>
@@ -604,14 +608,14 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                   <div>
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                       <Building2 className="w-4 h-4 text-accent-600" />
-                      Nombre de la Empresa *
+                      {t('form.businessName')}
                     </label>
                     <input
                       type="text"
                       name="business_name"
                       value={formData.business_name}
                       onChange={handleChange}
-                      placeholder="Ej: Distribuidora ABC S.A.S"
+                      placeholder={t('placeholders.supplierExample')}
                       required
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
                     />
@@ -622,14 +626,14 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                         <User className="w-4 h-4 text-accent-600" />
-                        Persona de Contacto
+                        {t('labels.contact')}
                       </label>
                       <input
                         type="text"
                         name="contact_name"
                         value={formData.contact_name}
                         onChange={handleChange}
-                        placeholder="Ej: Juan Pérez"
+                        placeholder={t('placeholders.fullNameExample')}
                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
                       />
                     </div>
@@ -637,14 +641,14 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                         <FileText className="w-4 h-4 text-accent-600" />
-                        NIT
+                        {t('labels.nit')}
                       </label>
                       <input
                         type="text"
                         name="nit"
                         value={formData.nit}
                         onChange={handleChange}
-                        placeholder="123456789-0"
+                        placeholder={config.country.taxId.placeholder}
                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
                       />
                     </div>
@@ -655,7 +659,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                         <Mail className="w-4 h-4 text-accent-600" />
-                        Email
+                        {t('form.email')}
                       </label>
                       <input
                         type="email"
@@ -670,7 +674,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                         <Phone className="w-4 h-4 text-accent-600" />
-                        Teléfono
+                        {t('form.phone')}
                       </label>
                       <input
                         type="tel"
@@ -687,7 +691,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                         <MapPin className="w-4 h-4 text-accent-600" />
-                        Dirección
+                        {t('form.address')}
                       </label>
                       <input
                         type="text"
@@ -702,7 +706,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                         <FileText className="w-4 h-4 text-accent-600" />
-                        Notas
+                        {t('form.notes')}
                       </label>
                       <textarea
                         name="notes"
@@ -727,7 +731,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                     disabled={isSubmitting}
                     className="order-2 sm:order-1 w-full sm:flex-1 h-10 sm:h-10 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium text-sm transition-all duration-300 disabled:opacity-50"
                   >
-                    Cancelar
+                    {t('buttons.cancel')}
                   </button>
                   <button
                     type="submit"
@@ -737,12 +741,12 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                     {isSubmitting ? (
                       <>
                         <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent"></div>
-                        Guardando...
+                        {t('buttons.loading')}
                       </>
                     ) : (
                       <>
                         {editingSupplier ? <Edit2 className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-                        {editingSupplier ? 'Actualizar' : 'Crear Proveedor'}
+                        {editingSupplier ? t('buttons.update') : t('buttons.createSupplier')}
                       </>
                     )}
                   </button>
@@ -777,8 +781,8 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                     <AlertTriangle className="w-8 h-8" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold">Eliminar Proveedor</h2>
-                    <p className="text-red-100 mt-1">Esta acción no se puede deshacer</p>
+                    <h2 className="text-2xl font-bold">{t('buttons.delete')}</h2>
+                    <p className="text-red-100 mt-1">{t('messages.actionCannotBeUndone')}</p>
                   </div>
                 </div>
               </div>
@@ -786,15 +790,15 @@ function Proveedores({ businessId }: DashboardModuleProps) {
               {/* Contenido */}
               <div className="p-6">
                 <p className="text-gray-700 text-lg mb-4">
-                  ¿Estás seguro de que deseas eliminar este proveedor?
+                  {t('messages.confirmDeleteSupplier')}
                 </p>
                 
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
                   <div className="flex gap-3">
                     <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div className="text-sm text-amber-800">
-                      <p className="font-semibold mb-1">Importante:</p>
-                      <p>Si este proveedor tiene compras asociadas, no podrá ser eliminado. En ese caso, considera desactivarlo en su lugar.</p>
+                      <p className="font-semibold mb-1">{t('messages.important')}:</p>
+                      <p>{t('messages.cannotDeleteSupplierWithPurchases')}</p>
                     </div>
                   </div>
                 </div>
@@ -804,14 +808,14 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                     onClick={cancelDelete}
                     className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all duration-300"
                   >
-                    Cancelar
+                    {t('buttons.cancel')}
                   </button>
                   <button
                     onClick={confirmDelete}
                     className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
                   >
                     <Trash2 className="w-5 h-5" />
-                    Eliminar
+                    {t('buttons.delete')}
                   </button>
                 </div>
               </div>

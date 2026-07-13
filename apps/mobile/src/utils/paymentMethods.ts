@@ -5,13 +5,34 @@ type PaymentMethod =
   | 'card'
   | 'transfer'
   | 'mixed'
+  // Colombia
   | 'nequi'
   | 'bancolombia'
   | 'banco_bogota'
   | 'nu'
-  | 'davivienda';
+  | 'davivienda'
+  | 'daviplata'
+  // México
+  | 'spei'
+  | 'oxxo'
+  // Perú
+  | 'yape'
+  | 'plin'
+  // Argentina
+  | 'mercadopago'
+  // USA
+  | 'venmo'
+  | 'cashapp'
+  | 'zelle';
 
-const BANK_METHODS = new Set(['nequi', 'bancolombia', 'banco_bogota', 'nu', 'davivienda']);
+const BANK_METHODS = new Set([
+  'nequi',
+  'bancolombia',
+  'banco_bogota',
+  'nu',
+  'davivienda',
+  'daviplata',
+]);
 
 function normalizeMethod(method: string | null | undefined): string {
   const value = String(method || '')
@@ -24,22 +45,65 @@ function normalizeMethod(method: string | null | undefined): string {
   return value;
 }
 
+/**
+ * @deprecated Use getPaymentMethodLabel with t function instead
+ */
+const LABELS: Record<string, string> = {
+  cash: 'Efectivo',
+  card: 'Tarjeta',
+  transfer: 'Transferencia',
+  mixed: 'Mixto',
+  nequi: 'Nequi',
+  bancolombia: 'Bancolombia',
+  banco_bogota: 'Banco de Bogotá',
+  nu: 'Nu',
+  davivienda: 'Davivienda',
+  daviplata: 'Daviplata',
+  spei: 'SPEI',
+  oxxo: 'OXXO',
+  yape: 'Yape',
+  plin: 'Plin',
+  mercadopago: 'Mercado Pago',
+  venmo: 'Venmo',
+  cashapp: 'Cash App',
+  zelle: 'Zelle',
+};
+
+const EMOJI: Record<string, string> = {
+  cash: '💵',
+  card: '💳',
+  transfer: '🏦',
+  mixed: '🔀',
+  nequi: '📱',
+  bancolombia: '🏦',
+  banco_bogota: '🏦',
+  nu: '💜',
+  davivienda: '🏦',
+  daviplata: '📱',
+  spei: '🏦',
+  oxxo: '🏪',
+  yape: '📱',
+  plin: '📱',
+  mercadopago: '💳',
+  venmo: '💙',
+  cashapp: '💚',
+  zelle: '💎',
+};
+
 export function getPaymentMethodLabel(
   method: string | null | undefined,
-  options?: { emoji?: boolean },
+  options?: { emoji?: boolean; t?: (key: string) => string },
 ): string {
   const normalized = normalizeMethod(method);
-  if (normalized === 'cash') return options?.emoji ? '💵 Efectivo' : 'Efectivo';
-  if (normalized === 'card') return options?.emoji ? '💳 Tarjeta' : 'Tarjeta';
-  if (normalized === 'transfer') return options?.emoji ? '🏦 Transferencia' : 'Transferencia';
-  if (normalized === 'mixed') return options?.emoji ? '🔀 Mixto' : 'Mixto';
-  if (normalized === 'nequi') return options?.emoji ? '🏦 Nequi' : 'Nequi';
-  if (normalized === 'bancolombia') return options?.emoji ? '🏦 Bancolombia' : 'Bancolombia';
-  if (normalized === 'banco_bogota')
-    return options?.emoji ? '🏦 Banco de Bogotá' : 'Banco de Bogotá';
-  if (normalized === 'nu') return options?.emoji ? '🏦 Nu' : 'Nu';
-  if (normalized === 'davivienda') return options?.emoji ? '🏦 Davivienda' : 'Davivienda';
-  return String(method || (options?.emoji ? 'No especificado' : '-'));
+  const label = options?.t
+    ? options.t(`paymentMethods.${normalized}`)
+    : LABELS[normalized] || normalized || '-';
+
+  if (options?.emoji) {
+    return `${EMOJI[normalized] || ''} ${label}`;
+  }
+
+  return label;
 }
 
 export function getPaymentMethodTheme(method: string | null | undefined): {
@@ -73,7 +137,12 @@ export function getPaymentMethodTheme(method: string | null | undefined): {
       iconColor: '#9333EA',
     };
   }
-  if (BANK_METHODS.has(normalized)) {
+  if (
+    BANK_METHODS.has(normalized) ||
+    ['spei', 'oxxo', 'yape', 'plin', 'mercadopago', 'venmo', 'cashapp', 'zelle'].includes(
+      normalized,
+    )
+  ) {
     return {
       icon: 'business-outline',
       backgroundColor: '#F3E8FF',
@@ -96,7 +165,13 @@ export function getPaymentMethodIcon(
   if (normalized === 'card') return 'card-outline';
   if (normalized === 'transfer') return 'swap-horizontal-outline';
   if (normalized === 'mixed') return 'wallet-outline';
-  if (BANK_METHODS.has(normalized)) return 'business-outline';
+  if (
+    BANK_METHODS.has(normalized) ||
+    ['spei', 'oxxo', 'yape', 'plin', 'mercadopago', 'venmo', 'cashapp', 'zelle'].includes(
+      normalized,
+    )
+  )
+    return 'business-outline';
   if (normalized === 'cash') return 'cash-outline';
   return 'help-circle-outline';
 }

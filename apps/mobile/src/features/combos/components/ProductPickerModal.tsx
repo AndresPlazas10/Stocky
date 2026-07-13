@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 import { StockyModal } from '../../../ui/StockyModal';
 import type { ComboProductRecord } from '../../../services/combosService';
@@ -27,6 +28,7 @@ export const ProductPickerModal = React.memo(function ProductPickerModal({
   onSelectProduct,
   onClose,
 }: Props) {
+  const { t } = useTranslation();
   const takenByOtherSet = useMemo(() => {
     const set = new Set<string>();
     for (let i = 0; i < formItems.length; i++) {
@@ -39,7 +41,7 @@ export const ProductPickerModal = React.memo(function ProductPickerModal({
   return (
     <StockyModal
       visible={visible}
-      title="Selecciona un producto"
+      title={t('combos.picker.title')}
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={24}
@@ -51,7 +53,7 @@ export const ProductPickerModal = React.memo(function ProductPickerModal({
         <TextInput
           value={productSearch}
           onChangeText={onProductSearchChange}
-          placeholder="Buscar por nombre o codigo..."
+          placeholder={t('combos.picker.searchPlaceholder')}
           placeholderTextColor={STOCKY_COLORS.textMuted}
           style={styles.input}
           autoCapitalize="none"
@@ -60,7 +62,7 @@ export const ProductPickerModal = React.memo(function ProductPickerModal({
       </View>
 
       {productCatalogFiltered.length === 0 ? (
-        <Text style={styles.emptyText}>No se encontraron productos para seleccionar.</Text>
+        <Text style={styles.emptyText}>{t('combos.picker.noResults')}</Text>
       ) : null}
 
       {productCatalogFiltered.map((product) => {
@@ -87,8 +89,8 @@ export const ProductPickerModal = React.memo(function ProductPickerModal({
             <Text
               style={[styles.comboPickerItemMeta, selected && styles.comboPickerItemMetaSelected]}
             >
-              {product.code || 'Sin código'} · Stock {product.stock}
-              {takenByOther ? ' · Ya agregado' : ''}
+              {product.code || t('combos.form.noCode')} · Stock {product.stock}
+              {takenByOther ? ` · ${t('combos.picker.alreadyAdded')}` : ''}
             </Text>
           </Pressable>
         );

@@ -1,16 +1,18 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../theme/tokens';
 
 export function OfflineScreen() {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <View style={styles.card}>
         <View style={styles.iconWrap}>
           <Ionicons name="cloud-offline-outline" size={40} color={STOCKY_COLORS.primary900} />
         </View>
-        <Text style={styles.title}>Estás sin conexión</Text>
-        <Text style={styles.subtitle}>Intentando reconectar...</Text>
+        <Text style={styles.title}>{t('offline.disconnected')}</Text>
+        <Text style={styles.subtitle}>{t('offline.reconnecting')}</Text>
       </View>
     </View>
   );

@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Platform, Text, View } from 'react-native';
 import { STOCKY_COLORS } from '../../theme/tokens';
 import { StockyButton } from '../../ui/StockyButton';
@@ -11,9 +12,8 @@ import { EmployeeListHeader } from './components/EmployeeListHeader';
 import { useEmpleadoData } from './hooks/useEmpleadoData';
 import { useEmpleadoForm } from './hooks/useEmpleadoForm';
 import { useEmpleadoMutations } from './hooks/useEmpleadoMutations';
-import { useToast } from '../../hooks/useToast';
-import { StockyToast } from '../../ui/StockyToast';
-import { TOAST_MESSAGES } from '../../constants/toastMessages';
+import { useToastContext } from '../../hooks/useToastContext';
+import { useToastMessages } from '../../hooks/useToastMessages';
 
 type Props = {
   businessId: string;
@@ -23,7 +23,9 @@ type Props = {
 };
 
 export function EmpleadosPanel({ businessId, userId, source }: Props) {
-  const toast = useToast();
+  const { t } = useTranslation();
+  const toast = useToastContext();
+  const toastMessages = useToastMessages();
   const data = useEmpleadoData({ businessId, source, userId });
   const form = useEmpleadoForm();
   const mutations = useEmpleadoMutations({
@@ -33,10 +35,10 @@ export function EmpleadosPanel({ businessId, userId, source }: Props) {
     canManageEmployees: data.canManageEmployees,
     onRefresh: data.refreshEmployees,
     onEmployeeCreated: (name) => {
-      toast.showSuccess(TOAST_MESSAGES.empleados.created(name));
+      toast.showSuccess(toastMessages.empleados.created(name));
     },
     onEmployeeDeleted: () => {
-      toast.showSuccess(TOAST_MESSAGES.empleados.deleted());
+      toast.showSuccess(toastMessages.empleados.deleted());
     },
   });
 
@@ -53,7 +55,13 @@ export function EmpleadosPanel({ businessId, userId, source }: Props) {
         onDelete={mutations.askDeleteEmployee}
       />
     ),
-    [userId, data.canManageEmployees, data.checkingPermissions, mutations.deleting, mutations.askDeleteEmployee],
+    [
+      userId,
+      data.canManageEmployees,
+      data.checkingPermissions,
+      mutations.deleting,
+      mutations.askDeleteEmployee,
+    ],
   );
 
   return (
@@ -72,7 +80,7 @@ export function EmpleadosPanel({ businessId, userId, source }: Props) {
         {data.loading ? (
           <View style={s.loadingBlock}>
             <ActivityIndicator color={STOCKY_COLORS.primary900} />
-            <Text style={s.loadingText}>Cargando empleados...</Text>
+            <Text style={s.loadingText}>{t('empleados.loading')}</Text>
           </View>
         ) : (
           <FlatList
@@ -83,17 +91,19 @@ export function EmpleadosPanel({ businessId, userId, source }: Props) {
             onRefresh={data.refreshEmployees}
             onEndReached={data.loadMoreEmployees}
             onEndReachedThreshold={0.3}
-            ListEmptyComponent={<Text style={s.emptyText}>No hay empleados registrados.</Text>}
+            ListEmptyComponent={<Text style={s.emptyText}>{t('empleados.emptyState')}</Text>}
             ListFooterComponent={
               data.hasMoreEmployees ? (
                 <View style={s.loadMoreWrap}>
-                  <Text style={s.loadMoreHint}>Mostrando {data.employees.length} empleados</Text>
+                  <Text style={s.loadMoreHint}>
+                    {t('empleados.showing', { count: data.employees.length })}
+                  </Text>
                   <StockyButton
                     onPress={data.loadMoreEmployees}
                     loading={data.loadingMore}
                     variant="ghost"
                   >
-                    Cargar más empleados
+                    {t('empleados.loadMore')}
                   </StockyButton>
                 </View>
               ) : null
@@ -120,9 +130,11 @@ export function EmpleadosPanel({ businessId, userId, source }: Props) {
 
       <StockyDeleteConfirmModal
         visible={form.showDeleteModal}
-        title="Eliminar empleado"
-        message={`¿Seguro que deseas eliminar a "${form.employeeToDelete?.full_name || 'este empleado'}"?`}
-        warning="Esta acción revoca su acceso al negocio."
+        title={t('empleados.deleteTitle')}
+        message={t('empleados.deleteMessage', {
+          name: form.employeeToDelete?.full_name || t('empleados.deleteMessageFallback'),
+        })}
+        warning={t('empleados.deleteWarning')}
         itemLabel={form.employeeToDelete?.full_name || null}
         loading={mutations.deleting}
         onCancel={() => {
@@ -140,16 +152,6 @@ export function EmpleadosPanel({ businessId, userId, source }: Props) {
           form.setShowCredentialsModal(false);
           form.setGeneratedCredentials(null);
         }}
-      />
-
-      <StockyToast
-        visible={toast.toast.visible}
-        type={toast.toast.type}
-        title={toast.toast.title}
-        message={toast.toast.message}
-        ctaText={toast.toast.ctaText}
-        durationMs={toast.toast.durationMs}
-        onClose={toast.hideToast}
       />
     </>
   );

@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 
 type Props = {
@@ -9,7 +10,12 @@ type Props = {
   onOpenAddMesa: () => void;
 };
 
-export const MesasPanelHeader = React.memo(function MesasPanelHeader({ isCreatingMesa, onOpenAddMesa }: Props) {
+export const MesasPanelHeader = React.memo(function MesasPanelHeader({
+  isCreatingMesa,
+  onOpenAddMesa,
+}: Props) {
+  const { t } = useTranslation('mesas');
+
   return (
     <View style={styles.header}>
       <View style={styles.titleRow}>
@@ -22,15 +28,11 @@ export const MesasPanelHeader = React.memo(function MesasPanelHeader({ isCreatin
           <Ionicons name="layers-outline" size={30} color={STOCKY_COLORS.white} />
         </LinearGradient>
         <Text style={styles.title} numberOfLines={2}>
-          Gestión de Mesas
+          {t('title')}
         </Text>
       </View>
 
-      <Pressable
-        style={styles.addButtonWrap}
-        onPress={onOpenAddMesa}
-        disabled={isCreatingMesa}
-      >
+      <Pressable style={styles.addButtonWrap} onPress={onOpenAddMesa} disabled={isCreatingMesa}>
         <LinearGradient
           colors={isCreatingMesa ? ['#7D8AA7', '#9CA3AF'] : ['#4F46E5', '#7C3AED']}
           start={{ x: 0, y: 0 }}
@@ -38,7 +40,7 @@ export const MesasPanelHeader = React.memo(function MesasPanelHeader({ isCreatin
           style={styles.addButton}
         >
           <Ionicons name="add" size={16} color={STOCKY_COLORS.white} />
-          <Text style={styles.addButtonText}>Agregar Mesa</Text>
+          <Text style={styles.addButtonText}>{t('buttons.addTable')}</Text>
         </LinearGradient>
       </Pressable>
     </View>

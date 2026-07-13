@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { MesaOrderItem } from '../../../../services/mesaOrderService';
 import type { SplitSubAccount } from '../../../../services/mesaCheckoutService';
 
@@ -30,6 +31,7 @@ export function useSplitBillNavigation({
   onBack,
   onConfirm,
 }: UseSplitBillNavigationParams) {
+  const { t } = useTranslation('mesas');
   const [currentStep, setCurrentStep] = useState<1 | 2>(1);
   const [currentAccountIndex, setCurrentAccountIndex] = useState(0);
   const [isPaymentMenuOpen, setIsPaymentMenuOpen] = useState(false);
@@ -112,13 +114,13 @@ export function useSplitBillNavigation({
 
   const primaryButtonLabel =
     currentStep === 1
-      ? 'Iniciar división'
+      ? t('buttons.startSplit')
       : isLastAccountStep
         ? submitting
-          ? 'Procesando...'
-          : 'Terminar venta'
-        : 'Siguiente cuenta';
-  const secondaryButtonLabel = currentStep === 1 ? 'Volver' : 'Atrás';
+          ? t('buttons.processing')
+          : t('buttons.finishSale')
+        : t('buttons.nextAccount');
+  const secondaryButtonLabel = currentStep === 1 ? t('buttons.back') : t('buttons.backShort');
   const isPrimaryDisabled =
     currentStep === 1
       ? false

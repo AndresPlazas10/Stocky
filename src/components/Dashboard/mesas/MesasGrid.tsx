@@ -5,7 +5,9 @@ import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Layers, Trash2 } from 'lucide-react';
 import { formatPrice } from '../../../utils/formatters';
-import { getMesaProductUnits, MESA_IN_USE_MESSAGE } from './mesaHelpers.js';
+import { useBusinessConfig } from '../../../hooks/useBusinessConfig';
+import { useTranslation } from 'react-i18next';
+import { getMesaProductUnits, getMesaInUseMessage } from './mesaHelpers';
 
 interface MesaRecord {
   id: string;
@@ -47,6 +49,12 @@ const MesasGrid = memo(function MesasGrid({
   lowMotionMode = false,
   getMesaLockState = null
 }: MesasGridProps) {
+  const { t } = useTranslation(['mesas', 'common']);
+  const config = useBusinessConfig();
+  const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
+  
+  const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
+  
   return (
     <>
       {/* Grid de mesas */}
@@ -112,7 +120,7 @@ const MesasGrid = memo(function MesasGrid({
 
                   {/* Número de mesa */}
                   <h3 className="text-2xl font-bold text-primary-900 mb-2">
-                    Mesa {mesa.table_number}
+                    {t('mesas:labels.tableNumber', { number: mesa.table_number })}
                   </h3>
 
                   {/* Estado */}
@@ -120,17 +128,17 @@ const MesasGrid = memo(function MesasGrid({
                     variant={lockedByOther ? 'destructive' : (isOccupied ? 'warning' : 'success')}
                     className="mb-3 text-sm font-semibold"
                   >
-                    {lockedByOther ? '🔒 En uso' : (isOccupied ? '🔴 Ocupada' : '🟢 Disponible')}
+                    {lockedByOther ? '🔒 ' + t('mesas:labels.inUse') : (isOccupied ? '🔴 ' + t('mesas:labels.occupied') : '🟢 ' + t('mesas:labels.available'))}
                   </Badge>
 
                   {/* Información de la orden si está ocupada */}
                   {isOccupied && mesa.orders && !lockedByOther && (
                     <div className="mt-4 pt-4 border-t border-accent-200">
                       <p className="text-lg font-bold text-primary-900">
-                        {formatPrice(parseFloat(String(mesa.orders.total || '0')))}
+                        {fmtPrice(parseFloat(String(mesa.orders.total || '0')))}
                       </p>
                       <p className="text-sm text-primary-600">
-                        {units} productos
+                        {units} {t('mesas:labels.products')}
                       </p>
                     </div>
                   )}
@@ -138,7 +146,7 @@ const MesasGrid = memo(function MesasGrid({
                   {lockedByOther ? (
                     <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-white/85 backdrop-blur-sm">
                       <div className="max-w-[85%] rounded-lg border border-red-200 bg-red-100/90 px-3 py-2 text-sm font-semibold text-red-700 shadow-sm">
-                        {MESA_IN_USE_MESSAGE}
+                        {getMesaInUseMessage(t)}
                       </div>
                     </div>
                   ) : null}
@@ -152,7 +160,7 @@ const MesasGrid = memo(function MesasGrid({
       {hasMoreMesas && (
         <div className="flex flex-col items-center gap-3 py-2">
           <p className="text-xs text-gray-500">
-            Mostrando {visibleMesas.length} de {totalMesas} mesas
+            {t('mesas:labels.showing')} {visibleMesas.length} {t('mesas:labels.of')} {totalMesas} {t('mesas:labels.tables')}
           </p>
           <div ref={mesasSentinelRef} className="h-2 w-full" aria-hidden="true" />
           <Button
@@ -160,7 +168,7 @@ const MesasGrid = memo(function MesasGrid({
             variant="outline"
             className="rounded-xl"
           >
-            Cargar mas mesas
+            {t('mesas:buttons.loadMore')}
           </Button>
         </div>
       )}

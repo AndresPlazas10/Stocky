@@ -2,6 +2,7 @@ import React from 'react';
 import type { PropsWithChildren } from 'react';
 import { StyleSheet, Text, View, Pressable, ActivityIndicator, TextInput } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 import { StockyModal } from './StockyModal';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../theme/tokens';
 
@@ -19,9 +20,11 @@ export const PrintReceiptConfirmModal = React.memo(function PrintReceiptConfirmM
   onConfirm,
   onCancel,
   isLoading = false,
-  customerName = 'Venta general',
+  customerName: customerNameProp,
   onCustomerNameChange,
 }: Props) {
+  const { t } = useTranslation();
+  const customerName = customerNameProp ?? t('printReceipt.defaultCustomer');
   const handleConfirm = async () => {
     try {
       await onConfirm();
@@ -34,7 +37,7 @@ export const PrintReceiptConfirmModal = React.memo(function PrintReceiptConfirmM
     <StockyModal
       visible={visible}
       onClose={onCancel}
-      title="Imprimir comprobante"
+      title={t('printReceipt.title')}
       layout="centered"
       centeredOffsetY={-50}
       footer={
@@ -44,7 +47,7 @@ export const PrintReceiptConfirmModal = React.memo(function PrintReceiptConfirmM
             onPress={onCancel}
             disabled={isLoading}
           >
-            <Text style={styles.cancelButtonText}>No, gracias</Text>
+            <Text style={styles.cancelButtonText}>{t('printReceipt.no')}</Text>
           </Pressable>
           <Pressable
             style={[styles.button, styles.confirmButton, isLoading && styles.buttonDisabled]}
@@ -61,7 +64,7 @@ export const PrintReceiptConfirmModal = React.memo(function PrintReceiptConfirmM
                   color={STOCKY_COLORS.white}
                   style={styles.buttonIcon}
                 />
-                <Text style={styles.confirmButtonText}>Sí, imprimir</Text>
+                <Text style={styles.confirmButtonText}>{t('printReceipt.yes')}</Text>
               </>
             )}
           </Pressable>
@@ -75,14 +78,14 @@ export const PrintReceiptConfirmModal = React.memo(function PrintReceiptConfirmM
           </View>
         </View>
       </View>
-      <Text style={styles.title}>¿Imprimir comprobante?</Text>
-      <Text style={styles.description}>Se enviará a la impresora térmica configurada.</Text>
-      <Text style={styles.fieldLabel}>Cliente (opcional)</Text>
+      <Text style={styles.title}>{t('printReceipt.confirmMessage')}</Text>
+      <Text style={styles.description}>{t('printReceipt.printerNote')}</Text>
+      <Text style={styles.fieldLabel}>{t('printReceipt.customerLabel')}</Text>
       <TextInput
         style={styles.customerInput}
         value={customerName}
         onChangeText={onCustomerNameChange}
-        placeholder="Venta general"
+        placeholder={t('printReceipt.defaultCustomer')}
         placeholderTextColor={STOCKY_COLORS.textMuted}
         editable={!isLoading}
       />

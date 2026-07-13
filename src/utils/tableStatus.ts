@@ -32,7 +32,8 @@ export function normalizeTableRecord(table: Table): Table {
   const hasCurrentOrder = Boolean(normalizedCurrentOrderId);
   // Regla de seguridad offline: si la mesa ya está marcada como disponible,
   // nunca preservar punteros/ordenes antiguas del snapshot local.
-  const shouldForceClearByStatus = normalizedRawStatus === 'available';
+  // PERO: si hay un current_order_id válido, confiar en él (estado transitorio de realtime).
+  const shouldForceClearByStatus = normalizedRawStatus === 'available' && !hasCurrentOrder;
   // No limpiar por `order_items` vacío: en producción puede llegar vacío de forma transitoria.
   const shouldClearOrder = shouldForceClearByStatus || !hasCurrentOrder || isClosedOrder;
   const normalizedStatus = shouldClearOrder ? 'available' : 'occupied';

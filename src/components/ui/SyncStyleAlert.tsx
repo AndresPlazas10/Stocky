@@ -112,6 +112,7 @@ interface SyncStyleAlertProps {
   icon?: ElementType | null;
   usePortal?: boolean;
   autoClose?: boolean;
+  duration?: number;
   className?: string;
 }
 
@@ -125,6 +126,7 @@ export function SyncStyleAlert({
   icon: IconOverride = null,
   usePortal = true,
   autoClose = true,
+  duration = ALERT_AUTO_CLOSE_MS,
   className = ''
 }: SyncStyleAlertProps) {
   const [isMounted, setIsMounted] = React.useState(false);
@@ -138,12 +140,12 @@ export function SyncStyleAlert({
 
     const timer = window.setTimeout(() => {
       onClose();
-    }, ALERT_AUTO_CLOSE_MS);
+    }, duration);
 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [autoClose, isVisible, onClose]);
+  }, [autoClose, isVisible, onClose, duration]);
 
   if (!isMounted) return null;
 
@@ -152,6 +154,52 @@ export function SyncStyleAlert({
   const normalizedDetails = normalizeDetails(details);
   const normalizedTitle = String(title || '').trim();
   const normalizedMessage = String(message || '').trim();
+
+  if (!usePortal) {
+    return (
+      <AnimatePresence>
+        {isVisible && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.98 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className={`w-full overflow-hidden rounded-2xl border shadow-lg ${tone.cardClass} ${className}`}
+            role="alert"
+            aria-live="assertive"
+          >
+            <div className="relative overflow-hidden p-4">
+              <div className="flex items-center gap-3">
+                <div className={`flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-full border border-white/15 bg-white/[0.04] ${tone.accentClass}`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  {normalizedTitle && (
+                    <h3 className="text-sm font-semibold tracking-tight text-slate-100">
+                      {normalizedTitle}
+                    </h3>
+                  )}
+                  {normalizedMessage && (
+                    <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                      {normalizedMessage}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="mt-3 h-0.5 w-full overflow-hidden rounded-full bg-white/8">
+                <motion.div
+                  initial={{ scaleX: 1 }}
+                  animate={{ scaleX: 0 }}
+                  transition={{ duration: duration / 1000, ease: 'linear' }}
+                  className={`h-full w-full origin-left ${tone.lineClass}`}
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+  }
 
   const alertNode = (
     <AnimatePresence>
@@ -223,7 +271,7 @@ export function SyncStyleAlert({
                   <motion.div
                     initial={{ scaleX: 1 }}
                     animate={{ scaleX: 0 }}
-                    transition={{ duration: ALERT_AUTO_CLOSE_MS / 1000, ease: 'linear' }}
+                    transition={{ duration: duration / 1000, ease: 'linear' }}
                     className={`h-full w-full origin-left ${tone.lineClass}`}
                   />
                 </div>
@@ -235,12 +283,8 @@ export function SyncStyleAlert({
     </AnimatePresence>
   );
 
-  if (usePortal) {
-    if (typeof document === 'undefined') return null;
-    return createPortal(alertNode, document.body);
-  }
-
-  return alertNode;
+  if (typeof document === 'undefined') return null;
+  return createPortal(alertNode, document.body);
 }
 
 export default SyncStyleAlert;

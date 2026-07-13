@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLowMotionMode } from '../../../hooks/useLowMotionMode.js';
 import { useProgressiveList } from '../../../hooks/useProgressiveList.js';
 import { useDebounce } from '../../../hooks/optimized.js';
@@ -18,13 +19,14 @@ interface ComboItem {
 }
 
 export function useMesasState(businessId: string, userRole: string = 'admin') {
+  const { t } = useTranslation(['mesas']);
   const canManageTables = isAdminRole(userRole);
   const [mesas, setMesas] = useState<MesaRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
   const [successDetails, setSuccessDetails] = useState<AlertDetail[]>([]);
-  const [successTitle, setSuccessTitle] = useState<string>('Accion Completada');
+  const [successTitle, setSuccessTitle] = useState<string>(t('mesas.defaults.actionCompleted'));
   const [alertType, setAlertType] = useState<string>('success');
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [selectedMesa, setSelectedMesa] = useState<MesaRecord | null>(null);

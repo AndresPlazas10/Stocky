@@ -46,27 +46,43 @@ export function capitalizeLabel(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-export function formatDayLabelFromKey(key: string) {
-  if (!key || key === 'all') return 'Todos los días';
+/**
+ * @deprecated Use useFormatDate() hook instead for locale-aware date formatting
+ */
+export function formatDayLabelFromKey(
+  key: string,
+  options?: { locale?: string; t?: (key: string) => string },
+) {
+  if (!key || key === 'all') {
+    return options?.t ? options.t('salesFilters.allDays') : 'Todos los días';
+  }
   const parsed = new Date(`${key}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) return key;
-  return new Intl.DateTimeFormat('es-CO', {
+  return new Intl.DateTimeFormat(options?.locale || 'es-CO', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
   }).format(parsed);
 }
 
-export function formatDateTime(value: string | null) {
-  if (!value) return 'Sin fecha';
+/**
+ * @deprecated Use useFormatDate() hook instead for locale-aware date formatting
+ */
+export function formatDateTime(
+  value: string | null,
+  options?: { locale?: string; timezone?: string },
+) {
+  if (!value) return options?.locale?.startsWith('en') ? 'No date' : 'Sin fecha';
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return 'Sin fecha';
-  return new Intl.DateTimeFormat('es-CO', {
+  if (Number.isNaN(parsed.getTime()))
+    return options?.locale?.startsWith('en') ? 'No date' : 'Sin fecha';
+  return new Intl.DateTimeFormat(options?.locale || 'es-CO', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: options?.timezone || 'America/Bogota',
   }).format(parsed);
 }
 

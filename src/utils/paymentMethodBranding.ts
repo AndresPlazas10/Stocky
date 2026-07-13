@@ -1,15 +1,28 @@
-type PaymentMethodKey = 'cash' | 'card' | 'transfer' | 'mixed' | 'nequi' | 'bancolombia' | 'banco_bogota' | 'nu' | 'davivienda';
+type PaymentMethodKey = 'cash' | 'card' | 'transfer' | 'mixed' | 'nequi' | 'bancolombia' | 'banco_bogota' | 'nu' | 'davivienda' | 'spei' | 'oxxo' | 'yape' | 'plin' | 'mercadopago' | 'venmo' | 'cashapp' | 'zelle';
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethodKey | string, string> = {
   cash: 'Efectivo',
   card: 'Tarjeta',
   transfer: 'Transferencia',
   mixed: 'Mixto',
+  // Colombia
   nequi: 'Nequi',
   bancolombia: 'Bancolombia',
   banco_bogota: 'Banco de Bogotá',
   nu: 'Nu',
-  davivienda: 'Davivienda'
+  davivienda: 'Davivienda',
+  // México
+  spei: 'SPEI',
+  oxxo: 'OXXO',
+  // Perú
+  yape: 'Yape',
+  plin: 'Plin',
+  // Argentina
+  mercadopago: 'Mercado Pago',
+  // USA
+  venmo: 'Venmo',
+  cashapp: 'Cash App',
+  zelle: 'Zelle',
 };
 
 const BANK_LOGO_FILES: Record<string, string[]> = {
@@ -43,7 +56,34 @@ export const getPaymentMethodLogoPath = (method: string | null | undefined): str
   return candidates.length > 0 ? candidates[0] : null;
 };
 
-export const getPaymentMethodLabel = (method: string | null | undefined): string => {
-  const key = String(method || '').trim().toLowerCase();
+export const getPaymentMethodLabel = (
+  method: string | null | undefined,
+  t?: (key: string) => string
+): string => {
+  let key = String(method || '').trim().toLowerCase();
+
+  // Normalize Spanish payment method names to English keys
+  const spanishToEnglish: Record<string, string> = {
+    'efectivo': 'cash',
+    'tarjeta': 'card',
+    'transferencia': 'transfer',
+    'mixto': 'mixed',
+  };
+  if (spanishToEnglish[key]) {
+    key = spanishToEnglish[key];
+  }
+
+  if (t) {
+    // Try with explicit common namespace first
+    const namespacedKey = `common:paymentMethods.${key}`;
+    const translatedNamespaced = t(namespacedKey);
+    if (translatedNamespaced !== namespacedKey) return translatedNamespaced;
+
+    // Fallback to direct key
+    const translationKey = `paymentMethods.${key}`;
+    const translated = t(translationKey);
+    if (translated !== translationKey) return translated;
+  }
+
   return PAYMENT_METHOD_LABELS[key] || method || '-';
 };
