@@ -7,11 +7,12 @@ export async function logSecurityEvent({ businessId, action, metadata = {} }) {
   if (!normalizedBusinessId || !normalizedAction) return;
 
   try {
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData?.user?.id;
-    if (!userId) return;
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData?.session) return;
 
-    await supabase
+    const userId = sessionData.session.user.id;
+
+    const { error } = await supabase
       .from('security_audit_logs')
       .insert({
         business_id: normalizedBusinessId,
@@ -19,6 +20,10 @@ export async function logSecurityEvent({ businessId, action, metadata = {} }) {
         action: normalizedAction,
         metadata
       });
+
+    if (error && error.status !== 403 && error.code !== '42501') {
+      logger.error('services:security_audit:log_event_failed', error);
+    }
   } catch (err) {
     logger.error('services:security_audit:log_event_failed', err);
   }

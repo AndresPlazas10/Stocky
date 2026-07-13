@@ -33,7 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_business_created
   ON public.audit_log(business_id, created_at DESC);
 
 -- ============================================================
--- 2. CREAR FUNCIÓN RPC: handle_table_transaction
+-- 2. CREAR FUNCION RPC: handle_table_transaction
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.handle_table_transaction(
   p_table_id uuid,
@@ -50,6 +50,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   v_id uuid;
@@ -58,27 +59,16 @@ DECLARE
   v_last_updated_by uuid;
   v_updated_at timestamptz;
   v_table_business uuid;
-  v_jwt_business uuid;
 BEGIN
-  -- Business-aware checks: obtener business_id de la mesa
   SELECT business_id INTO v_table_business FROM public.tables WHERE id = p_table_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'table with id % not found', p_table_id;
   END IF;
 
-  -- Obtener business desde los claims JWT de la sesión (Supabase sets jwt.claims)
-  BEGIN
-    v_jwt_business := (current_setting('jwt.claims', true)::json->>'business')::uuid;
-  EXCEPTION WHEN others THEN
-    RAISE EXCEPTION 'missing or invalid jwt.claims business claim';
-  END;
-
-  -- Comprobaciones de seguridad: el caller (JWT) debe pertenecer al mismo business que la mesa
-  IF v_jwt_business IS NULL OR v_jwt_business <> v_table_business THEN
-    RAISE EXCEPTION 'permission denied: caller business does not match table business';
+  IF NOT public.can_access_business(v_table_business) THEN
+    RAISE EXCEPTION 'No autorizado para acceder a mesas de este negocio';
   END IF;
 
-  -- Validar acción
   IF lower(p_action_type) = 'open' THEN
     v_status := 'open';
   ELSIF lower(p_action_type) = 'close' THEN
@@ -87,7 +77,6 @@ BEGIN
     RAISE EXCEPTION 'invalid action_type: %', p_action_type;
   END IF;
 
-  -- Actualizar la mesa y capturar fila actualizada
   UPDATE public.tables
   SET status = v_status,
       updated_at = timezone('utc', now()),
@@ -96,12 +85,10 @@ BEGIN
   RETURNING id, name, status, last_updated_by, updated_at
   INTO v_id, v_name, v_status, v_last_updated_by, v_updated_at;
 
-  -- Insertar registro de auditoría
   INSERT INTO public.audit_log (table_name, record_id, action, user_id, business_id, new_data, created_at)
   VALUES ('tables', p_table_id, upper(p_action_type), p_user_id, v_table_business, 
           jsonb_build_object('status', v_status, 'notes', p_notes), timezone('utc', now()));
 
-  -- Devolver la fila actualizada (single-row result)
   RETURN QUERY SELECT v_id, v_name, v_status, v_last_updated_by, v_updated_at;
 END;
 $$;
@@ -112,27 +99,52 @@ $$;
 CREATE INDEX IF NOT EXISTS idx_tables_id_status ON public.tables (id, status);
 
 -- ============================================================
--- 4. CONFIGURAR RLS Y POLÍTICAS
+-- 4. CONFIGURAR RLS Y POLITICAS
 -- ============================================================
 -- Habilitar RLS
 ALTER TABLE IF EXISTS public.tables ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.audit_log ENABLE ROW LEVEL SECURITY;
 
--- Política para `tables`: permitir SELECT/UPDATE sólo si business_id coincide con el claim JWT
-DROP POLICY IF EXISTS tables_business_policy ON public.tables CASCADE;
-CREATE POLICY tables_business_policy ON public.tables
-  USING (
-    business_id = (current_setting('jwt.claims', true)::json->>'business')::uuid
-  )
-  WITH CHECK (
-    business_id = (current_setting('jwt.claims', true)::json->>'business')::uuid
-  );
+-- Politicas para `tables` (rol authenticated)
+-- Usan can_access_business() para verificar autorizacion.
+-- NOTA: La antigua tables_business_policy usaba jwt.claims->>'business'
+-- que NO existe en JWTs estandar de Supabase Auth. Fue reemplazada.
 
--- Política para `audit_log`: permitir SELECT sólo a usuarios del mismo business
+DROP POLICY IF EXISTS tables_business_policy ON public.tables CASCADE;
+DROP POLICY IF EXISTS tables_select_policy ON public.tables;
+CREATE POLICY tables_select_policy ON public.tables
+  FOR SELECT TO authenticated
+  USING (public.can_access_business(business_id));
+
+DROP POLICY IF EXISTS tables_insert_policy ON public.tables;
+CREATE POLICY tables_insert_policy ON public.tables
+  FOR INSERT TO authenticated
+  WITH CHECK (public.can_access_business(business_id));
+
+DROP POLICY IF EXISTS tables_update_policy ON public.tables;
+CREATE POLICY tables_update_policy ON public.tables
+  FOR UPDATE TO authenticated
+  USING (public.can_access_business(business_id))
+  WITH CHECK (public.can_access_business(business_id));
+
+DROP POLICY IF EXISTS tables_delete_policy ON public.tables;
+CREATE POLICY tables_delete_policy ON public.tables
+  FOR DELETE TO authenticated
+  USING (public.can_access_business(business_id));
+
+-- Politicas para `audit_log` (rol authenticated)
 DROP POLICY IF EXISTS audit_log_business_policy ON public.audit_log CASCADE;
-CREATE POLICY audit_log_business_policy ON public.audit_log
-  USING (
-    business_id = (current_setting('jwt.claims', true)::json->>'business')::uuid
+DROP POLICY IF EXISTS audit_log_select_policy ON public.audit_log;
+CREATE POLICY audit_log_select_policy ON public.audit_log
+  FOR SELECT TO authenticated
+  USING (public.can_access_business(business_id));
+
+DROP POLICY IF EXISTS audit_log_insert_policy ON public.audit_log;
+CREATE POLICY audit_log_insert_policy ON public.audit_log
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    auth.uid() = user_id
+    AND public.can_access_business(business_id)
   );
 
 -- ============================================================
@@ -146,12 +158,12 @@ CREATE POLICY audit_log_business_policy ON public.audit_log
 -- ============================================================
 -- NOTAS DE SEGURIDAD Y USO
 -- ============================================================
--- 1. La función está marcada SECURITY DEFINER para ejecutarse con privilegios elevados.
--- 2. Valida el claim JWT 'business' para asegurar que el caller pertenece al mismo business.
--- 3. Usa índice compuesto (id, status) para acelerar lookups en la tabla tables.
--- 4. Todas las operaciones (UPDATE + INSERT) ocurren en una SOLA transacción = 1 round-trip.
--- 
--- INVOCACIÓN DESDE CLIENTE:
+-- 1. La funcion esta marcada SECURITY DEFINER para ejecutarse con privilegios elevados.
+-- 2. Las politicas RLS usan can_access_business() para verificar autorizacion.
+-- 3. Usa indice compuesto (id, status) para acelerar lookups en la tabla tables.
+-- 4. Todas las operaciones (UPDATE + INSERT) ocurren en una SOLA transaccion = 1 round-trip.
+--
+-- INVOCACION DESDE CLIENTE:
 -- const { data, error } = await supabase.rpc('handle_table_transaction', {
 --   p_table_id: '<uuid>',
 --   p_action_type: 'open' | 'close',

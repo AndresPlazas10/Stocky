@@ -1,27 +1,49 @@
--- Ejemplo de políticas RLS para `tables` y `audit_logs` en Supabase
--- Ajusta nombres de columnas/roles según tu esquema real.
+-- Politicas RLS para `tables` y `audit_log`
+-- Ultima actualizacion: 2026-07-13
 
--- Habilitar RLS
 ALTER TABLE IF EXISTS public.tables ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.audit_log ENABLE ROW LEVEL SECURITY;
 
--- [ELIMINADA 2026-07-03] tables_business_policy
--- Esta policy para rol 'public' usaba jwt.claims->>'business' que NO existe
--- en JWTs estándar de Supabase Auth. Causaba problemas de evaluación RLS
--- en realtime, haciendo que mesas desaparecieran de la UI.
--- Es redundante con las policies de rol 'authenticated' que usan get_user_business_ids().
--- NO recrear esta policy.
--- Ver migración: 20260703_0100_drop_redundant_tables_business_policy.sql
+-- ============================================================
+-- Politicas para `tables` (rol authenticated)
+-- Usan can_access_business() para verificar autorizacion.
+-- ============================================================
 
--- Política para `audit_log`: permitir SELECT sólo a usuarios del mismo business
+DROP POLICY IF EXISTS tables_select_policy ON public.tables;
+CREATE POLICY tables_select_policy ON public.tables
+  FOR SELECT TO authenticated
+  USING (public.can_access_business(business_id));
+
+DROP POLICY IF EXISTS tables_insert_policy ON public.tables;
+CREATE POLICY tables_insert_policy ON public.tables
+  FOR INSERT TO authenticated
+  WITH CHECK (public.can_access_business(business_id));
+
+DROP POLICY IF EXISTS tables_update_policy ON public.tables;
+CREATE POLICY tables_update_policy ON public.tables
+  FOR UPDATE TO authenticated
+  USING (public.can_access_business(business_id))
+  WITH CHECK (public.can_access_business(business_id));
+
+DROP POLICY IF EXISTS tables_delete_policy ON public.tables;
+CREATE POLICY tables_delete_policy ON public.tables
+  FOR DELETE TO authenticated
+  USING (public.can_access_business(business_id));
+
+-- ============================================================
+-- Politicas para `audit_log` (rol authenticated)
+-- ============================================================
+
 DROP POLICY IF EXISTS audit_log_business_policy ON public.audit_log CASCADE;
-CREATE POLICY audit_log_business_policy ON public.audit_log
-  USING (
-    business_id = (current_setting('jwt.claims', true)::json->>'business')::uuid
-  );
+DROP POLICY IF EXISTS audit_log_select_policy ON public.audit_log;
+CREATE POLICY audit_log_select_policy ON public.audit_log
+  FOR SELECT TO authenticated
+  USING (public.can_access_business(business_id));
 
--- Nota: la función `handle_table_transaction` está marcada SECURITY DEFINER y
--- ejecutada por el owner (p. ej. role de servicio). Si el owner tiene permisos
--- suficientes, la función podrá realizar UPDATE/INSERT incluso cuando RLS esté activa.
--- Asegúrate de que la función valida los claims/business (como hace la versión business-aware).
--- Asegúrate de que la función valida los claims/tenant (como hace la versión tenant-aware).
+DROP POLICY IF EXISTS audit_log_insert_policy ON public.audit_log;
+CREATE POLICY audit_log_insert_policy ON public.audit_log
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    auth.uid() = user_id
+    AND public.can_access_business(business_id)
+  );
