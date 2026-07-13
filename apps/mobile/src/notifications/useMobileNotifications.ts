@@ -59,7 +59,10 @@ export function useMobileNotifications(session: Session | null) {
       }
 
       if (__DEV__)
-        console.warn('[notifications] push token registered:', result.token?.substring(0, 30) + '...');
+        console.warn(
+          '[notifications] push token registered:',
+          result.token?.substring(0, 30) + '...',
+        );
 
       void (async () => {
         try {
@@ -67,8 +70,7 @@ export function useMobileNotifications(session: Session | null) {
           if (!businessContext || businessContext.source !== 'owner') return;
           await deactivateOtherPushTokensForUser(session.user.id, result.installationId);
         } catch (error) {
-          if (__DEV__)
-            console.warn('[notifications] cleanup old tokens error:', error);
+          if (__DEV__) console.warn('[notifications] cleanup old tokens error:', error);
         }
       })();
     });
@@ -106,8 +108,7 @@ export function useMobileNotifications(session: Session | null) {
           lastEmployeeLoginNotifyKeyRef.current = notifyKey;
         } catch (error) {
           if (cancelled) return;
-          if (__DEV__)
-            console.warn('[notifications] employee-login notify error:', error);
+          if (__DEV__) console.warn('[notifications] employee-login notify error:', error);
         }
       })();
     }

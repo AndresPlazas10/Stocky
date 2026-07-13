@@ -13,6 +13,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 
 type MenuItem = {
   id: string;
@@ -45,67 +46,69 @@ export function MobileDrawer({
   businessName,
   onSignOut,
 }: MobileDrawerProps) {
+  const { t } = useTranslation('common');
+
   const menuSections: MenuSection[] = [
     {
-      title: "Principal",
+      title: t('navigation.sectionMain'),
       items: [
-        { id: "home", icon: Home, label: "Inicio", color: "text-gray-600" },
+        { id: "home", icon: Home, label: t('navigation.home'), color: "text-gray-600" },
         {
           id: "ventas",
           icon: ShoppingCart,
-          label: "Ventas",
+          label: t('navigation.sales'),
           color: "text-green-600",
         },
         {
           id: "compras",
           icon: ShoppingBag,
-          label: "Compras",
+          label: t('navigation.purchases'),
           color: "text-amber-600",
         },
         {
           id: "inventario",
           icon: Package,
-          label: "Inventario",
+          label: t('navigation.inventory'),
           color: "text-gray-600",
         },
         {
           id: "combos",
           icon: Layers,
-          label: "Combos",
+          label: t('navigation.combos'),
           color: "text-pink-600",
         },
       ],
     },
     {
-      title: "Gestión",
+      title: t('navigation.sectionManagement'),
       items: [
         {
           id: "proveedores",
           icon: Truck,
-          label: "Proveedores",
+          label: t('navigation.suppliers'),
           color: "text-gray-600",
         },
         {
           id: "empleados",
           icon: Users,
-          label: "Empleados",
+          label: t('navigation.employees'),
           color: "text-gray-600",
         },
       ],
     },
     {
-      title: "Sistema",
+      title: t('navigation.sectionSystem'),
       items: [
         {
           id: "reportes",
           icon: BarChart3,
-          label: "Reportes",
+          label: t('navigation.reports'),
           color: "text-teal-600",
         },
         {
           id: "configuracion",
           icon: Settings,
-          label: "Configuración",
+          label: t('navigation.settings'),
           color: "text-gray-600",
         },
       ],
@@ -154,13 +157,13 @@ export function MobileDrawer({
                   {businessName || "Stocky"}
                 </h2>
                 <p className="text-white/80 text-xs">
-                  {userName || "Usuario"}
+                  {userName || t('dashboard.user')}
                 </p>
               </div>
               <button
                 onClick={onClose}
                 className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-                aria-label="Cerrar menú"
+                aria-label={t('buttons.close')}
               >
                 <X size={24} className="text-white" />
               </button>
@@ -221,7 +224,7 @@ export function MobileDrawer({
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
               >
                 <LogOut size={16} />
-                <span className="text-xs font-medium">Cerrar sesión</span>
+                <span className="text-xs font-medium">{t('buttons.signOut')}</span>
               </button>
             </div>
           </motion.div>

@@ -1,10 +1,12 @@
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as Print from 'expo-print';
 import { ensureBluetoothEnabled, BLUETOOTH_PRINT_REQUIRED_MESSAGE } from '../../../utils/bluetooth';
 import { getSavedPrinter, printBytes } from '../../../services/bluetoothPrinterService';
 import { getThermalPaperWidthMm, isAutoCutEnabled } from '../../../utils/printer';
 import { buildKitchenEscPos } from '../../../services/escposService';
 import { buildKitchenOrderHtml } from '../../../utils/printTemplates';
+import { buildReceiptLabels } from '../../../utils/receiptLabels';
 import {
   calculateOrderTotal,
   listOrderItems,
@@ -20,11 +22,6 @@ import {
   openCloseMesa,
   type MesaRecord,
 } from '../../../services/mesasService';
-import {
-  listVentaDetails,
-  type VentaDetailRecord,
-  type VentaRecord,
-} from '../../../services/ventasService';
 
 type UseMesaOrderStateSnapshot = {
   showOrderModal: boolean;
@@ -195,9 +192,6 @@ type UseMesaOrderMutationsParams = {
     count: number;
   }[];
 
-  setPrintSalesData: (v: { saleRecord: VentaRecord; saleDetails: VentaDetailRecord[] }[]) => void;
-  setShowPrintModal: (v: boolean) => void;
-
   onOrderSaved?: () => void;
   onOrderClosed?: (mesaLabel: string, total: number) => void;
   onKitchenPrinted?: () => void;
@@ -231,12 +225,11 @@ export function useMesaOrderMutations({
   beginPrintFlow,
   endPrintFlow,
   buildCashBreakdown,
-  setPrintSalesData,
-  setShowPrintModal,
   onOrderSaved,
   onOrderClosed,
   onKitchenPrinted,
 }: UseMesaOrderMutationsParams) {
+  const { t } = useTranslation('mesas');
   const {
     showOrderModal: _showOrderModal,
     setShowOrderModal,
@@ -1046,70 +1039,6 @@ export function useMesaOrderMutations({
     setShowSplitBillModal,
   ]);
 
-  const askReceiptPrintConfirmation = useCallback(
-    async (saleIds: string[] = []) => {
-      if (!Array.isArray(saleIds) || saleIds.length === 0) return false;
-
-      try {
-        const salesDataList: {
-          saleRecord: VentaRecord;
-          saleDetails: VentaDetailRecord[];
-        }[] = [];
-
-        for (const saleId of saleIds) {
-          try {
-            const normalizedSaleId = String(saleId || '').trim();
-            if (!normalizedSaleId) continue;
-
-            const fetchedDetails = await listVentaDetails(normalizedSaleId);
-            let details =
-              Array.isArray(fetchedDetails) && fetchedDetails.length > 0 ? fetchedDetails : null;
-
-            if (!details) {
-              await new Promise<void>((resolve) => setTimeout(resolve, 1000));
-              const retry = await listVentaDetails(normalizedSaleId);
-              details = Array.isArray(retry) && retry.length > 0 ? retry : [];
-            }
-
-            const computedTotal = details.reduce(
-              (sum, item) => sum + Number(item?.subtotal || 0),
-              0,
-            );
-            const saleForPrint: VentaRecord = {
-              id: normalizedSaleId,
-              business_id: businessId || '',
-              user_id: null,
-              seller_name: source === 'employee' ? 'Empleado' : 'Administrador',
-              payment_method: paymentMethod,
-              total: Number(computedTotal),
-              created_at: new Date().toISOString(),
-              amount_received: null,
-              change_amount: null,
-              change_breakdown: [],
-            };
-
-            salesDataList.push({
-              saleRecord: saleForPrint,
-              saleDetails: details,
-            });
-          } catch {
-            // Continuar con el siguiente
-          }
-        }
-
-        if (salesDataList.length === 0) return false;
-
-        setPrintSalesData(salesDataList);
-        setShowPrintModal(true);
-
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    [businessId, source, paymentMethod, setPrintSalesData, setShowPrintModal],
-  );
-
   const processPaymentAndClose = useCallback(async () => {
     if (!businessId || !selectedMesa?.id || !selectedMesa.current_order_id) {
       setOrderModalError('No se encontro una orden activa para cerrar.');
@@ -1158,9 +1087,6 @@ export function useMesaOrderMutations({
       const mesaLabel = selectedMesa.table_number ?? selectedMesa.table_name ?? '-';
       onOrderClosed?.(String(mesaLabel), Number(orderTotal || 0));
 
-      if (closeResult.saleId) {
-        askReceiptPrintConfirmation([closeResult.saleId]);
-      }
       void loadData();
     } catch (err) {
       setOrderModalError(err instanceof Error ? err.message : 'No se pudo cerrar la orden.');
@@ -1168,7 +1094,6 @@ export function useMesaOrderMutations({
       setIsClosingOrder(false);
     }
   }, [
-    askReceiptPrintConfirmation,
     buildCashBreakdown,
     businessId,
     cashChangeData,
@@ -1215,9 +1140,6 @@ export function useMesaOrderMutations({
         const mesaLabel = selectedMesa.table_number ?? selectedMesa.table_name ?? '-';
         onOrderClosed?.(String(mesaLabel), Number(orderTotal || 0));
 
-        if (Array.isArray(splitResult.saleIds) && splitResult.saleIds.length > 0) {
-          askReceiptPrintConfirmation(splitResult.saleIds);
-        }
         void loadData();
       } catch (err) {
         setOrderModalError(
@@ -1228,14 +1150,13 @@ export function useMesaOrderMutations({
       }
     },
     [
-      askReceiptPrintConfirmation,
       businessId,
       closeOrderAsSplit,
-    closeOrderModal,
-    getStockValidationMessage,
-    loadData,
-    markMesaAsAvailableAfterSale,
-    onOrderClosed,
+      closeOrderModal,
+      getStockValidationMessage,
+      loadData,
+      markMesaAsAvailableAfterSale,
+      onOrderClosed,
       selectedMesa,
       setIsClosingOrder,
       setOrderModalError,
@@ -1340,6 +1261,7 @@ export function useMesaOrderMutations({
 
     try {
       const mesaLabel = selectedMesa.table_number ?? selectedMesa.table_name ?? '-';
+      const receiptLabels = buildReceiptLabels(t);
 
       const savedPrinter = await getSavedPrinter();
       if (savedPrinter) {
@@ -1353,13 +1275,14 @@ export function useMesaOrderMutations({
           })),
           paperWidthMm,
           autoCut,
+          labels: receiptLabels,
         });
         const result = await printBytes(savedPrinter.address, escposData);
         if (result.ok) {
           onKitchenPrinted?.();
           return;
         }
-        setOrderModalError(result.error || 'No se pudo enviar a la impresora. Verifica la conexion Bluetooth.');
+        setOrderModalError(result.error || receiptLabels.printerError);
         return;
       }
 
@@ -1368,6 +1291,7 @@ export function useMesaOrderMutations({
         mesaStatus: selectedMesa.status,
         items: itemsParaCocinaConNombre,
         createdAt: new Date(),
+        labels: receiptLabels,
       });
       if (__DEV__) console.warn('[Print] Kitchen: calling Print.printAsync for mesa ' + mesaLabel);
       await Print.printAsync({ html });
@@ -1379,7 +1303,16 @@ export function useMesaOrderMutations({
     } finally {
       endPrintFlow();
     }
-  }, [beginPrintFlow, catalogItemsRef, endPrintFlow, onKitchenPrinted, orderItems, selectedMesa, setOrderModalError]);
+  }, [
+    beginPrintFlow,
+    catalogItemsRef,
+    endPrintFlow,
+    onKitchenPrinted,
+    orderItems,
+    selectedMesa,
+    setOrderModalError,
+    t,
+  ]);
 
   return {
     closeAuxiliaryOrderModals,
@@ -1394,7 +1327,6 @@ export function useMesaOrderMutations({
     openOrderModal,
     handleCloseOrder,
     handlePayAllTogether,
-    askReceiptPrintConfirmation,
     processPaymentAndClose,
     processSplitPaymentAndClose,
     handlePrintKitchen,

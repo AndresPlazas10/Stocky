@@ -1,13 +1,13 @@
 import { useCallback } from 'react';
 import { FlatList, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
 import { useComboData } from './hooks/useComboData';
 import { useComboForm } from './hooks/useComboForm';
 import { useComboMutations } from './hooks/useComboMutations';
 import { useComboSearch } from './hooks/useComboSearch';
-import { useToast } from '../../hooks/useToast';
-import { StockyToast } from '../../ui/StockyToast';
-import { TOAST_MESSAGES } from '../../constants/toastMessages';
+import { useToastContext } from '../../hooks/useToastContext';
+import { useToastMessages } from '../../hooks/useToastMessages';
 import { CombosListHeader } from './components/CombosListHeader';
 import { ComboCard } from './components/ComboCard';
 import { ComboFormModal } from './components/ComboFormModal';
@@ -24,7 +24,9 @@ type Props = {
 };
 
 export function CombosPanel({ businessId, businessName: _businessName, userId, source }: Props) {
-  const toast = useToast();
+  const { t } = useTranslation();
+  const toast = useToastContext();
+  const toastMessages = useToastMessages();
   const {
     loading,
     refreshing,
@@ -80,10 +82,12 @@ export function CombosPanel({ businessId, businessName: _businessName, userId, s
     setCombos,
     setError,
     onComboSaved: (isEdit, name) => {
-      toast.showSuccess(isEdit ? TOAST_MESSAGES.combos.updated(name) : TOAST_MESSAGES.combos.created(name));
+      toast.showSuccess(
+        isEdit ? toastMessages.combos.updated(name) : toastMessages.combos.created(name),
+      );
     },
     onComboDeleted: (name) => {
-      toast.showSuccess(TOAST_MESSAGES.combos.deleted(name));
+      toast.showSuccess(toastMessages.combos.deleted(name));
     },
   });
 
@@ -140,7 +144,7 @@ export function CombosPanel({ businessId, businessName: _businessName, userId, s
         }
         ListEmptyComponent={
           !suspendBackgroundList && !loading ? (
-            <Text style={styles.emptyText}>No hay combos para los filtros seleccionados.</Text>
+            <Text style={styles.emptyText}>{t('combos.emptyState')}</Text>
           ) : null
         }
         ItemSeparatorComponent={ItemSeparator}
@@ -178,23 +182,13 @@ export function CombosPanel({ businessId, businessName: _businessName, userId, s
 
       <StockyDeleteConfirmModal
         visible={showDeleteModal}
-        title="Eliminar combo"
-        message={`¿Seguro que deseas eliminar el combo "${comboToDelete?.nombre || 'seleccionado'}"?`}
-        warning="Esta acción no se puede deshacer. Si el combo tiene movimientos asociados, desactívalo."
+        title={t('combos.deleteTitle')}
+        message={t('combos.deleteMessage', { name: comboToDelete?.nombre || 'seleccionado' })}
+        warning={t('combos.deleteWarning')}
         itemLabel={comboToDelete?.nombre || null}
         loading={deleting}
         onCancel={closeDeleteModal}
         onConfirm={confirmDeleteCombo}
-      />
-
-      <StockyToast
-        visible={toast.toast.visible}
-        type={toast.toast.type}
-        title={toast.toast.title}
-        message={toast.toast.message}
-        ctaText={toast.toast.ctaText}
-        durationMs={toast.toast.durationMs}
-        onClose={toast.hideToast}
       />
     </>
   );

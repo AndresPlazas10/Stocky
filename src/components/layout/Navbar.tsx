@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { logger } from '@/utils/logger';
 import {
   Bell,
@@ -77,13 +78,16 @@ function saveAvatar(avatar: PredefinedAvatar) {
 export const Navbar = React.memo(function Navbar({
   userName = "Admin",
   userEmail = "admin@stockypos.app",
-  userRole = "Administrador",
+  userRole,
   businessId,
   onSignOut,
   warmupStatus = null
 }: NavbarProps) {
+  const { t } = useTranslation('common');
   const [selectedAvatar, setSelectedAvatar] = useState<PredefinedAvatar>(() => getSavedAvatar() || predefinedAvatars[0]);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+
+  const resolvedRole = userRole || t('roles.admin');
 
   const { notifications, loading: notificationsLoading, markAsRead, markAllAsRead } = useNotifications(businessId);
 
@@ -109,10 +113,10 @@ export const Navbar = React.memo(function Navbar({
         {/* Left Section - Welcome Message */}
         <div className="flex-1 ml-12 lg:ml-0">
           <h2 className="text-base sm:text-lg font-bold truncate" style={{ color: '#000000' }}>
-            Bienvenido, {userName}
+            {t('messages.welcome')}, {userName}
           </h2>
           <p className="text-xs sm:text-sm font-semibold" style={{ color: '#1f2937' }}>
-            {userRole}
+            {resolvedRole}
           </p>
         </div>
 
@@ -138,17 +142,17 @@ export const Navbar = React.memo(function Navbar({
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-80">
               <DropdownMenuLabel className="text-primary font-semibold">
-                Notificaciones
+                {t('notifications.title')}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <div className="max-h-[400px] overflow-y-auto">
                 {notificationsLoading ? (
                   <div className="p-8 text-center text-gray-500 text-sm">
-                    Cargando notificaciones...
+                    {t('buttons.loading')}
                   </div>
                 ) : notifications.length === 0 ? (
                   <div className="p-8 text-center text-gray-500 text-sm">
-                    No hay notificaciones nuevas
+                    {t('notifications.empty')}
                   </div>
                 ) : (
                   notifications.map((notification) => (
@@ -185,7 +189,7 @@ export const Navbar = React.memo(function Navbar({
                     onClick={markAllAsRead}
                     className="cursor-pointer justify-center text-primary font-medium transition-colors duration-200"
                   >
-                    Marcar todas como leídas
+                    {t('notifications.markAllRead')}
                   </DropdownMenuItem>
                 </>
               )}
@@ -219,12 +223,12 @@ export const Navbar = React.memo(function Navbar({
               <DropdownMenuSeparator />
               <DropdownMenuItem className="cursor-pointer" onClick={() => setShowAvatarModal(true)}>
                 <ImageIcon className="mr-2 h-4 w-4 text-primary" />
-                <span>Cambiar Avatar</span>
+                <span>{t('buttons.changeLogo')}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-600" onClick={onSignOut}>
                 <LogOut className="mr-2 h-4 w-4" />
-                <span>Cerrar Sesión</span>
+                <span>{t('buttons.signOut')}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -253,8 +257,8 @@ export const Navbar = React.memo(function Navbar({
               <div className="sticky top-0 bg-white p-6 border-b border-gray-200 rounded-t-2xl">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-2xl font-bold text-primary">Elige tu Avatar</h3>
-                    <p className="text-sm text-gray-500 mt-1">Selecciona un avatar para personalizar tu perfil</p>
+                    <h3 className="text-2xl font-bold text-primary">{t('avatar.title')}</h3>
+                    <p className="text-sm text-gray-500 mt-1">{t('avatar.subtitle')}</p>
                   </div>
                   <button
                     onClick={() => setShowAvatarModal(false)}
@@ -304,13 +308,13 @@ export const Navbar = React.memo(function Navbar({
                     onClick={() => setShowAvatarModal(false)}
                     className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 transition-colors font-medium text-gray-700"
                   >
-                    Cancelar
+                    {t('buttons.cancel')}
                   </button>
                   <button
                     onClick={() => setShowAvatarModal(false)}
                     className="cursor-pointer px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-700 transition-all duration-200 font-medium"
                   >
-                    Guardar
+                    {t('buttons.save')}
                   </button>
                 </div>
               </div>

@@ -1,14 +1,10 @@
 import { useCallback, useState } from 'react';
-import {
-  createVenta,
-  deleteVentaWithDetails,
-  listVentaDetails,
-} from '../../../services/ventasService';
+import { useTranslation } from 'react-i18next';
+import { createVenta, deleteVentaWithDetails } from '../../../services/ventasService';
 import {
   evaluateOrderStockShortages,
   type MesaOrderItem,
 } from '../../../services/mesaOrderService';
-import { isAutoPrintReceiptEnabled } from '../../../utils/printer';
 import { calculateCashChange } from '../../../services/mesaOrderService';
 import { cartReferenceKey } from './useVentaCart';
 import type { PaymentMethod } from '../../../utils/paymentMethods';
@@ -32,7 +28,6 @@ interface UseVentaMutationsParams {
   clearCart: () => void;
   refreshSales: () => Promise<void>;
   setCatalogItems: (items: MesaOrderCatalogItem[]) => void;
-  showPrintModalForSale: (record: VentaRecord, details: VentaDetailRecord[]) => void;
   setShowCreateSaleModal: (show: boolean) => void;
   setShowVentaDetails: (show: boolean) => void;
   setSelectedVenta: (venta: VentaRecord | null) => void;
@@ -56,7 +51,6 @@ export function useVentaMutations({
   clearCart,
   refreshSales,
   setCatalogItems,
-  showPrintModalForSale,
   setShowCreateSaleModal,
   setShowVentaDetails,
   setSelectedVenta,
@@ -66,6 +60,7 @@ export function useVentaMutations({
   onSaleCreated,
   onSaleDeleted,
 }: UseVentaMutationsParams) {
+  const { t } = useTranslation();
   const [submitting, setSubmitting] = useState(false);
   const [ventaToDelete, setVentaToDelete] = useState<VentaRecord | null>(null);
   const [showDeleteVentaModal, setShowDeleteVentaModal] = useState(false);
@@ -83,7 +78,7 @@ export function useVentaMutations({
     setError(null);
 
     if (cart.length === 0) {
-      setError('El carrito está vacío. Agrega productos antes de vender.');
+      setError(t('ventasSection.emptyCartError'));
       return;
     }
 
@@ -106,7 +101,7 @@ export function useVentaMutations({
     if (insufficientItems.length > 0) {
       const first = insufficientItems[0];
       setError(
-        `Stock insuficiente para "${first.product_name}" (disp: ${first.available_stock}, req: ${first.quantity}).`,
+        `${t('ventasSection.insufficientStockError')} "${first.product_name}" (disp: ${first.available_stock}, req: ${first.quantity}).`,
       );
       return;
     }
@@ -114,7 +109,7 @@ export function useVentaMutations({
     if (insufficientComboComponents.length > 0) {
       const first = insufficientComboComponents[0];
       setError(
-        `Stock insuficiente para "${first.product_name}" (disp: ${first.available_stock}, req: ${first.required_quantity}).`,
+        `${t('ventasSection.insufficientStockError')} "${first.product_name}" (disp: ${first.available_stock}, req: ${first.required_quantity}).`,
       );
       return;
     }
@@ -122,8 +117,8 @@ export function useVentaMutations({
     if (paymentMethod === 'cash' && !cashChangeData?.isValid) {
       setError(
         cashChangeData?.reason === 'insufficient'
-          ? 'El monto recibido es menor al total.'
-          : 'Ingresa un monto recibido válido.',
+          ? t('ventasSection.insufficientAmountError')
+          : t('ventasSection.invalidAmountError'),
       );
       return;
     }
@@ -136,8 +131,6 @@ export function useVentaMutations({
         .join('|')}`;
       const amount = paymentMethod === 'cash' ? Number(cashChangeData?.paid || 0) : null;
       const breakdown: { denomination: number; count: number }[] = [];
-      const cartSnapshot = Array.isArray(cart) ? [...cart] : [];
-      const createdAt = new Date().toISOString();
 
       const result = await createVenta({
         businessId,
@@ -147,52 +140,6 @@ export function useVentaMutations({
         changeBreakdown: breakdown,
         idempotencySeed,
       });
-
-      const autoPrintEnabled = await isAutoPrintReceiptEnabled();
-      if (autoPrintEnabled) {
-        try {
-          const detailsFromSale = result.saleId ? await listVentaDetails(result.saleId) : [];
-          const details =
-            Array.isArray(detailsFromSale) && detailsFromSale.length > 0
-              ? detailsFromSale
-              : cartSnapshot.map((item, index) => ({
-                  id: `${result.saleId || 'tmp-sale'}:${index + 1}`,
-                  sale_id: result.saleId || 'tmp-sale',
-                  quantity: Number(item.quantity || 0),
-                  unit_price: Number(item.unit_price || 0),
-                  subtotal: Number(
-                    item.subtotal || Number(item.quantity || 0) * Number(item.unit_price || 0),
-                  ),
-                  product_id: item.product_id || null,
-                  combo_id: item.combo_id || null,
-                  products: item.product_id
-                    ? { name: item.name, code: item.code || undefined }
-                    : null,
-                  combos: item.combo_id ? { nombre: item.name } : null,
-                }));
-
-          const fallbackTotal = details.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
-          const saleForPrint: VentaRecord = {
-            id: result.saleId || `tmp-${Date.now()}`,
-            business_id: businessId,
-            user_id: null,
-            seller_name: source === 'employee' ? 'Empleado' : 'Administrador',
-            payment_method: paymentMethod,
-            total: Number(result.total || fallbackTotal),
-            created_at: createdAt,
-            amount_received: amount,
-            change_amount:
-              paymentMethod === 'cash' && Number.isFinite(amount)
-                ? Math.max(Number(amount) - Number(result.total || fallbackTotal), 0)
-                : null,
-            change_breakdown: [],
-          };
-
-          showPrintModalForSale(saleForPrint, details);
-        } catch {
-          setError('No se pudo preparar la impresión del comprobante.');
-        }
-      }
 
       onSaleCreated?.(cartTotal);
       clearCart();
@@ -204,7 +151,7 @@ export function useVentaMutations({
           .then(setCatalogItems),
       ]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al crear la venta.');
+      setError(err instanceof Error ? err.message : t('ventasSection.createSaleError'));
     } finally {
       setSubmitting(false);
     }
@@ -219,7 +166,6 @@ export function useVentaMutations({
     setCatalogItems,
     setError,
     setShowCreateSaleModal,
-    showPrintModalForSale,
     source,
     submitting,
   ]);
@@ -255,7 +201,7 @@ export function useVentaMutations({
       setShowDeleteVentaModal(false);
       setVentaToDelete(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo eliminar la venta.');
+      setError(err instanceof Error ? err.message : t('ventasSection.deleteSaleError'));
     } finally {
       setDeletingVenta(false);
     }

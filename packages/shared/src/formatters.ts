@@ -1,59 +1,65 @@
+export interface PriceFormatConfig {
+  locale?: string;
+  currency?: string;
+  currencySymbol?: string;
+  decimals?: number;
+}
+
+const DEFAULT_PRICE_CONFIG: Required<PriceFormatConfig> = {
+  locale: 'es-CO',
+  currency: 'COP',
+  currencySymbol: '$',
+  decimals: 0,
+};
+
 /**
- * Formats a number as price in Colombian format
- * Thousands: period (2.000)
- * Millions: apostrophe (1'000.000)
- * Decimals: only if not .00
+ * Formats a number as price using Intl.NumberFormat
+ * Supports multi-currency and multi-locale
+ * Example CO: $1.200.000
+ * Example US: $1,200,000.00
  * @param value - The numeric value to format
- * @param includeCurrency - If true, prepends "$" (default: true)
+ * @param includeCurrency - If true, prepends currency symbol (default: true)
+ * @param config - Optional locale/currency configuration
  * @returns The formatted price string
  */
-export function formatPrice(value: number | null | undefined, includeCurrency = true): string {
+export function formatPrice(
+  value: number | null | undefined,
+  includeCurrency = true,
+  config?: PriceFormatConfig
+): string {
+  const cfg = { ...DEFAULT_PRICE_CONFIG, ...config };
+
   if (value === null || value === undefined || isNaN(value)) {
-    return includeCurrency ? '$0' : '0';
+    return includeCurrency ? `${cfg.currencySymbol}0` : '0';
   }
 
   const numValue = Number(value);
-  
-  // Separate integer and decimal parts
-  const [integerPart, decimalPart] = numValue.toFixed(2).split('.');
-  
-  // Format integer part:
-  // - Period (.) for thousands (every 3 digits)
-  // - Apostrophe (') for millions (every 6 digits from right)
-  let formattedInteger = integerPart;
-  
-  // If more than 6 digits (millions), use apostrophe to separate millions
-  if (integerPart.length > 6) {
-    // Separate millions from the rest
-    const millions = integerPart.slice(0, -6);
-    const remainder = integerPart.slice(-6);
-    
-    // Format the millions part and remainder
-    const formattedMillions = millions.replace(/\B(?=(\d{3})+(?!\d))/g, "'");
-    const formattedRemainder = remainder.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-    
-    formattedInteger = `${formattedMillions}'${formattedRemainder}`;
-  } else {
-    // Only thousands, use period
-    formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+  try {
+    const formatted = new Intl.NumberFormat(cfg.locale, {
+      style: includeCurrency ? 'currency' : 'decimal',
+      currency: cfg.currency,
+      minimumFractionDigits: cfg.decimals,
+      maximumFractionDigits: cfg.decimals,
+    }).format(numValue);
+
+    return formatted;
+  } catch {
+    return `${cfg.currencySymbol}${numValue.toFixed(cfg.decimals)}`;
   }
-  
-  // Only add decimals if not .00
-  let formattedNumber = formattedInteger;
-  if (decimalPart !== '00') {
-    formattedNumber = `${formattedInteger},${decimalPart}`;
-  }
-  
-  return includeCurrency ? `$${formattedNumber}` : formattedNumber;
 }
 
 /**
  * Formats a number without currency symbol
  * @param value - The numeric value to format
+ * @param config - Optional locale configuration
  * @returns The formatted number string
  */
-export function formatNumber(value: number | null | undefined): string {
-  return formatPrice(value, false);
+export function formatNumber(
+  value: number | null | undefined,
+  config?: PriceFormatConfig
+): string {
+  return formatPrice(value, false, config);
 }
 
 /**
@@ -77,8 +83,10 @@ export function parsePriceInput(
   const raw = String(value)
     .trim()
     .replace(/\s/g, '')
-    .replace(/COP/gi, '')
+    .replace(/COP|USD|MXN|PEN|ARS|EUR/gi, '')
     .replace(/\$/g, '')
+    .replace(/S\//g, '')
+    .replace(/€/g, '')
     .replace(/'/g, '');
 
   if (!raw) return fallback;

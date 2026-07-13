@@ -1,9 +1,10 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { withTranslation, WithTranslation } from 'react-i18next';
 import { StockyCard } from './StockyCard';
 import { STOCKY_COLORS } from '../theme/tokens';
 
-type Props = {
+type Props = WithTranslation & {
   children: React.ReactNode;
 };
 
@@ -11,7 +12,7 @@ type State = {
   error: Error | null;
 };
 
-export class StockyErrorBoundary extends React.Component<Props, State> {
+class StockyErrorBoundaryInner extends React.Component<Props, State> {
   state: State = { error: null };
 
   static getDerivedStateFromError(error: Error): State {
@@ -19,17 +20,19 @@ export class StockyErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('[StockyErrorBoundary] error', error);
-    console.error('[StockyErrorBoundary] component stack', info.componentStack);
+    if (__DEV__) {
+      console.error('[StockyErrorBoundary] error', error);
+      console.error('[StockyErrorBoundary] component stack', info.componentStack);
+    }
   }
 
   render() {
-    const { error } = this.state;
+    const { error, t } = { ...this.state, t: this.props.t };
     if (error) {
       return (
         <View style={styles.container}>
-          <StockyCard title="Ocurrió un error">
-            <Text style={styles.message}>Se detectó un error en la pantalla actual.</Text>
+          <StockyCard title={t('errors.errorOccurred')}>
+            <Text style={styles.message}>{t('errors.errorDetected')}</Text>
             <Text style={styles.details}>{error.message}</Text>
           </StockyCard>
         </View>
@@ -39,6 +42,8 @@ export class StockyErrorBoundary extends React.Component<Props, State> {
     return this.props.children;
   }
 }
+
+export const StockyErrorBoundary = withTranslation()(StockyErrorBoundaryInner);
 
 const styles = StyleSheet.create({
   container: {

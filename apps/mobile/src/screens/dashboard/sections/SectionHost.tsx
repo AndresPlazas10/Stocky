@@ -8,16 +8,36 @@ import { isSectionEnabled } from '../../../config/features';
 import { SectionComingSoon } from './SectionComingSoon';
 import { StockyErrorBoundary } from '../../../ui/StockyErrorBoundary';
 
-const HomeSection = React.lazy(() => import('./HomeSection').then((m) => ({ default: m.HomeSection })));
-const VentasSection = React.lazy(() => import('./VentasSection').then((m) => ({ default: m.VentasSection })));
-const ComprasSection = React.lazy(() => import('./ComprasSection').then((m) => ({ default: m.ComprasSection })));
-const InventarioSection = React.lazy(() => import('./InventarioSection').then((m) => ({ default: m.InventarioSection })));
-const CombosSection = React.lazy(() => import('./CombosSection').then((m) => ({ default: m.CombosSection })));
-const ProveedoresSection = React.lazy(() => import('./ProveedoresSection').then((m) => ({ default: m.ProveedoresSection })));
-const EmpleadosSection = React.lazy(() => import('./EmpleadosSection').then((m) => ({ default: m.EmpleadosSection })));
-const ReportesSection = React.lazy(() => import('./ReportesSection').then((m) => ({ default: m.ReportesSection })));
-const ConfiguracionSection = React.lazy(() => import('./ConfiguracionSection').then((m) => ({ default: m.ConfiguracionSection })));
-const ImpresionSection = React.lazy(() => import('./ImpresionSection').then((m) => ({ default: m.ImpresionSection })));
+const HomeSection = React.lazy(() =>
+  import('./HomeSection').then((m) => ({ default: m.HomeSection })),
+);
+const VentasSection = React.lazy(() =>
+  import('./VentasSection').then((m) => ({ default: m.VentasSection })),
+);
+const ComprasSection = React.lazy(() =>
+  import('./ComprasSection').then((m) => ({ default: m.ComprasSection })),
+);
+const InventarioSection = React.lazy(() =>
+  import('./InventarioSection').then((m) => ({ default: m.InventarioSection })),
+);
+const CombosSection = React.lazy(() =>
+  import('./CombosSection').then((m) => ({ default: m.CombosSection })),
+);
+const ProveedoresSection = React.lazy(() =>
+  import('./ProveedoresSection').then((m) => ({ default: m.ProveedoresSection })),
+);
+const EmpleadosSection = React.lazy(() =>
+  import('./EmpleadosSection').then((m) => ({ default: m.EmpleadosSection })),
+);
+const ReportesSection = React.lazy(() =>
+  import('./ReportesSection').then((m) => ({ default: m.ReportesSection })),
+);
+const ConfiguracionSection = React.lazy(() =>
+  import('./ConfiguracionSection').then((m) => ({ default: m.ConfiguracionSection })),
+);
+const ImpresionSection = React.lazy(() =>
+  import('./ImpresionSection').then((m) => ({ default: m.ImpresionSection })),
+);
 
 const SectionFallback = memo(function SectionFallback() {
   return <ActivityIndicator size="large" color="#0AC946" style={fallbackStyles.loader} />;

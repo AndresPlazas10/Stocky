@@ -20,4 +20,10 @@ export interface Business {
   created_at: string;
   updated_at: string;
   config?: BusinessConfig;
+  country_code: string;
+  timezone: string;
+  currency: string;
+  language: string;
+  tax_id_type: string;
+  tax_rate: number;
 }

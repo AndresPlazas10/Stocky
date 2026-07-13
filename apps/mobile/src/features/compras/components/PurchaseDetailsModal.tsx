@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../../theme/tokens';
@@ -27,11 +28,13 @@ export const PurchaseDetailsModal = React.memo(function PurchaseDetailsModal({
   supplierLabel,
   onClose,
 }: PurchaseDetailsModalProps) {
+  const { t } = useTranslation();
   const selectedPurchaseItemsCount = useMemo(
-    () => selectedPurchaseDetails.reduce(
-      (sum, detail) => sum + Math.max(0, Number(detail.quantity || 0)),
-      0,
-    ),
+    () =>
+      selectedPurchaseDetails.reduce(
+        (sum, detail) => sum + Math.max(0, Number(detail.quantity || 0)),
+        0,
+      ),
     [selectedPurchaseDetails],
   );
   const selectedPurchasePaymentTheme = selectedPurchase
@@ -62,11 +65,11 @@ export const PurchaseDetailsModal = React.memo(function PurchaseDetailsModal({
               <Ionicons name="bag-handle-outline" size={19} color="#EDE9FE" />
             </View>
             <View style={s.purchaseDetailsHeaderTextWrap}>
-              <Text style={s.purchaseDetailsHeaderTitle}>Detalle de compra</Text>
+              <Text style={s.purchaseDetailsHeaderTitle}>{t('comprasSection.purchaseDetail')}</Text>
               <Text style={s.purchaseDetailsHeaderSubtitle}>
                 {selectedPurchase
                   ? `ID ${selectedPurchase.id.slice(0, 8).toUpperCase()}`
-                  : 'Sin referencia'}
+                  : t('comprasSection.noReference')}
               </Text>
             </View>
           </View>
@@ -78,7 +81,7 @@ export const PurchaseDetailsModal = React.memo(function PurchaseDetailsModal({
       footer={
         <View style={s.modalFooter}>
           <Pressable style={s.secondaryButton} onPress={onClose}>
-            <Text style={s.secondaryButtonText}>Cerrar</Text>
+            <Text style={s.secondaryButtonText}>{t('buttons.close')}</Text>
           </Pressable>
         </View>
       }
@@ -87,7 +90,7 @@ export const PurchaseDetailsModal = React.memo(function PurchaseDetailsModal({
         <View style={s.purchaseDetailsHeroCard}>
           <View style={s.purchaseDetailsHeroTopRow}>
             <View style={s.purchaseDetailsHeroTotalWrap}>
-              <Text style={s.purchaseDetailsHeroLabel}>Total de la compra</Text>
+              <Text style={s.purchaseDetailsHeroLabel}>{t('comprasSection.totalLabel')}</Text>
               <StockyMoneyText value={selectedPurchase.total} style={s.purchaseDetailsHeroTotal} />
             </View>
             <View
@@ -127,14 +130,16 @@ export const PurchaseDetailsModal = React.memo(function PurchaseDetailsModal({
               <Ionicons name="basket-outline" size={14} color="#64748B" />
               <Text style={s.purchaseDetailsHeroMetaText}>
                 {selectedPurchaseItemsCount}{' '}
-                {selectedPurchaseItemsCount === 1 ? 'unidad' : 'unidades'}
+                {selectedPurchaseItemsCount === 1
+                  ? t('ventasSection.unit')
+                  : t('ventasSection.units')}
               </Text>
             </View>
           </View>
 
           {selectedPurchase.notes ? (
             <View style={s.purchaseDetailsNoteCard}>
-              <Text style={s.purchaseDetailsNoteLabel}>Notas</Text>
+              <Text style={s.purchaseDetailsNoteLabel}>{t('comprasSection.notes')}</Text>
               <Text style={s.purchaseDetailsNoteText}>{selectedPurchase.notes}</Text>
             </View>
           ) : null}
@@ -142,7 +147,9 @@ export const PurchaseDetailsModal = React.memo(function PurchaseDetailsModal({
       ) : null}
 
       <View style={s.purchaseDetailsItemsSectionHeader}>
-        <Text style={s.purchaseDetailsItemsSectionTitle}>Productos comprados</Text>
+        <Text style={s.purchaseDetailsItemsSectionTitle}>
+          {t('comprasSection.productsPurchased')}
+        </Text>
         <View style={s.purchaseDetailsItemsCountBadge}>
           <Text style={s.purchaseDetailsItemsCountText}>
             {selectedPurchaseDetails.length}{' '}
@@ -152,7 +159,7 @@ export const PurchaseDetailsModal = React.memo(function PurchaseDetailsModal({
       </View>
       {loadingPurchaseDetails ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
       {!loadingPurchaseDetails && selectedPurchaseDetails.length === 0 ? (
-        <Text style={s.emptyTextLarge}>No hay detalles para esta compra.</Text>
+        <Text style={s.emptyTextLarge}>{t('comprasSection.noDetails')}</Text>
       ) : null}
       {!loadingPurchaseDetails && selectedPurchaseDetails.length > 0 ? (
         <View style={s.purchaseDetailsListCard}>
@@ -170,11 +177,11 @@ export const PurchaseDetailsModal = React.memo(function PurchaseDetailsModal({
                 </View>
                 <View style={s.purchaseDetailsListMain}>
                   <Text style={s.purchaseDetailsListName}>
-                    {detail.product?.name || 'Producto'}
+                    {detail.product?.name || t('comprasSection.product')}
                   </Text>
                   <Text style={s.purchaseDetailsListMeta}>
                     <StockyMoneyText value={detail.unit_cost} style={s.purchaseDetailsListMeta} />{' '}
-                    por unidad
+                    {t('ventasSection.perUnit')}
                   </Text>
                 </View>
               </View>
@@ -183,7 +190,7 @@ export const PurchaseDetailsModal = React.memo(function PurchaseDetailsModal({
           ))}
 
           <View style={s.purchaseDetailsListFooter}>
-            <Text style={s.purchaseDetailsListFooterLabel}>Total final</Text>
+            <Text style={s.purchaseDetailsListFooterLabel}>{t('comprasSection.finalTotal')}</Text>
             <StockyMoneyText
               value={selectedPurchase?.total || 0}
               style={s.purchaseDetailsListFooterValue}

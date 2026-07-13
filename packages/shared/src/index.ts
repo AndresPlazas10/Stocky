@@ -12,6 +12,7 @@ export {
 } from './paymentMethods.js';
 
 // Formatters
+export type { PriceFormatConfig } from './formatters.js';
 export {
   formatPrice,
   formatNumber,

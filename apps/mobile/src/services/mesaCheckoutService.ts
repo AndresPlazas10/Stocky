@@ -17,7 +17,16 @@ export type PaymentMethod =
   | 'bancolombia'
   | 'banco_bogota'
   | 'nu'
-  | 'davivienda';
+  | 'davivienda'
+  | 'daviplata'
+  | 'spei'
+  | 'oxxo'
+  | 'yape'
+  | 'plin'
+  | 'mercadopago'
+  | 'venmo'
+  | 'cashapp'
+  | 'zelle';
 
 export type CashChangeEntry = {
   denomination: number;
@@ -637,7 +646,8 @@ export async function closeOrderAsSplit({
             saleTotal: totalSold,
           })
             .then((r) => {
-              if (__DEV__) console.warn('[notif] sale_registered (split atomic) result:', JSON.stringify(r));
+              if (__DEV__)
+                console.warn('[notif] sale_registered (split atomic) result:', JSON.stringify(r));
             })
             .catch((e) => {
               if (__DEV__) console.warn('[notif] sale_registered (split atomic) error:', e);
@@ -657,7 +667,8 @@ export async function closeOrderAsSplit({
             productIds: lowStockProductIds as string[],
           })
             .then((r) => {
-              if (__DEV__) console.warn('[notif] low_stock (split atomic) result:', JSON.stringify(r));
+              if (__DEV__)
+                console.warn('[notif] low_stock (split atomic) result:', JSON.stringify(r));
             })
             .catch((e) => {
               if (__DEV__) console.warn('[notif] low_stock (split atomic) error:', e);
@@ -764,7 +775,8 @@ export async function closeOrderAsSplit({
         saleTotal: totalSold,
       })
         .then((r) => {
-          if (__DEV__) console.warn('[notif] sale_registered (split sequential) result:', JSON.stringify(r));
+          if (__DEV__)
+            console.warn('[notif] sale_registered (split sequential) result:', JSON.stringify(r));
         })
         .catch((e) => {
           if (__DEV__) console.warn('[notif] sale_registered (split sequential) error:', e);
@@ -784,7 +796,8 @@ export async function closeOrderAsSplit({
         productIds: lowStockProductIds as string[],
       })
         .then((r) => {
-          if (__DEV__) console.warn('[notif] low_stock (split sequential) result:', JSON.stringify(r));
+          if (__DEV__)
+            console.warn('[notif] low_stock (split sequential) result:', JSON.stringify(r));
         })
         .catch((e) => {
           if (__DEV__) console.warn('[notif] low_stock (split sequential) error:', e);

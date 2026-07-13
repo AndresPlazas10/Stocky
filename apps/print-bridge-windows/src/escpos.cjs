@@ -87,9 +87,9 @@ const serializeSaleReceipt = ({ receipt, paperWidthMm }) => {
     align(receipt.header?.alignment || 'center'),
     bold(true),
     size('large'),
-    line(receipt.header?.title || 'COMPROBANTE'),
+    line(receipt.header?.title || 'SALE RECEIPT'),
     size('normal'),
-    line(receipt.header?.businessName || 'Sistema Stocky'),
+    line(receipt.header?.businessName || 'Stocky System'),
     bold(false),
     line(receipt.header?.dateText || ''),
     align('left'),
@@ -101,24 +101,24 @@ const serializeSaleReceipt = ({ receipt, paperWidthMm }) => {
   });
 
   chunks.push(separator(columns));
-  chunks.push(bold(true), line('Producto'), bold(false));
+  chunks.push(bold(true), line(receipt.itemsHeader || 'PRODUCT'), bold(false));
   (receipt.items || []).forEach((item) => {
     chunks.push(...itemLines(item, columns));
   });
 
   chunks.push(separator(columns));
   if (Number(receipt.totals?.voluntaryTip || 0) > 0) {
-    chunks.push(...twoColumns('Propina voluntaria:', receipt.totals.voluntaryTipText, columns));
+    chunks.push(...twoColumns(`${receipt.tipLabel || 'Tip'}:`, receipt.totals.voluntaryTipText, columns));
   }
 
   chunks.push(bold(true));
-  chunks.push(...twoColumns('TOTAL:', receipt.totals?.totalText || '', columns));
+  chunks.push(...twoColumns(`${receipt.totalLabel || 'TOTAL'}:`, receipt.totals?.totalText || '', columns));
   chunks.push(bold(false));
   chunks.push(separator(columns));
-  chunks.push(...twoColumns('Metodo:', receipt.payment?.methodText || 'No especificado', columns));
+  chunks.push(...twoColumns(`${receipt.methodLabel || 'Method'}:`, receipt.payment?.methodText || receipt.notSpecified || 'Not specified', columns));
   chunks.push(feed(1));
   chunks.push(align(receipt.footer?.alignment || 'center'));
-  chunks.push(line(receipt.footer?.message || 'Gracias por su compra'));
+  chunks.push(line(receipt.footer?.message || 'Thank you for your purchase'));
   chunks.push(align('left'), feed(3), cut());
 
   return Buffer.concat(chunks);

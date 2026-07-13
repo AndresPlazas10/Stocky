@@ -29,11 +29,17 @@ export const TOAST_MESSAGES = {
         'Tu venta se ha guardado con éxito',
       ),
     deleted: () =>
-      success('Venta eliminada', 'La venta fue eliminada correctamente.', 'El inventario fue restaurado'),
+      success(
+        'Venta eliminada',
+        'La venta fue eliminada correctamente.',
+        'El inventario fue restaurado',
+      ),
     confirmed: (mesa?: string, total?: string) =>
       success(
         'Venta confirmada',
-        [mesa ? `Mesa ${mesa}` : null, total ? `Total: ${total}` : null].filter(Boolean).join(' · ') || undefined,
+        [mesa ? `Mesa ${mesa}` : null, total ? `Total: ${total}` : null]
+          .filter(Boolean)
+          .join(' · ') || undefined,
         'La mesa quedó libre',
       ),
   },
@@ -91,7 +97,11 @@ export const TOAST_MESSAGES = {
   },
   compras: {
     registered: () =>
-      success('Compra registrada', 'La compra se registró exitosamente.', 'El stock fue actualizado'),
+      success(
+        'Compra registrada',
+        'La compra se registró exitosamente.',
+        'El stock fue actualizado',
+      ),
     deleted: () =>
       success('Compra eliminada', 'La compra fue eliminada.', 'El stock fue revertido'),
   },
@@ -143,7 +153,11 @@ export const TOAST_MESSAGES = {
   },
   mesas: {
     created: (name?: string) =>
-      success('Mesa creada', name ? `"${name}" fue creada.` : 'La mesa fue creada.', 'Ya está disponible'),
+      success(
+        'Mesa creada',
+        name ? `"${name}" fue creada.` : 'La mesa fue creada.',
+        'Ya está disponible',
+      ),
     updated: (name?: string) =>
       success(
         'Mesa actualizada',
@@ -157,7 +171,11 @@ export const TOAST_MESSAGES = {
         'Se removió del salón',
       ),
     orderSent: () =>
-      success('Orden enviada', 'La orden fue enviada a la impresora.', 'La cocina la recibirá en breve'),
+      success(
+        'Orden enviada',
+        'La orden fue enviada a la impresora.',
+        'La cocina la recibirá en breve',
+      ),
   },
   impresion: {
     testSent: () =>
@@ -175,6 +193,10 @@ export const TOAST_MESSAGES = {
   },
   configuracion: {
     updated: () =>
-      success('Configuración actualizada', 'La información fue actualizada.', 'Los cambios están activos'),
+      success(
+        'Configuración actualizada',
+        'La información fue actualizada.',
+        'Los cambios están activos',
+      ),
   },
 } as const;

@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../../theme/tokens';
@@ -40,6 +41,7 @@ export function ComboFormModal({
   onItemChange,
   onOpenProductPicker,
 }: Props) {
+  const { t } = useTranslation();
   return (
     <StockyModal
       visible={visible}
@@ -67,7 +69,7 @@ export function ComboFormModal({
             />
           </LinearGradient>
           <Text style={styles.comboFormHeaderTitle}>
-            {editingCombo ? 'Editar Combo' : 'Nuevo Combo'}
+            {editingCombo ? t('combos.form.editCombo') : t('combos.form.newCombo')}
           </Text>
           <Pressable
             style={[styles.comboFormHeaderClose, saving && styles.buttonDisabled]}
@@ -86,7 +88,7 @@ export function ComboFormModal({
             onPress={onClose}
             disabled={saving}
           >
-            <Text style={styles.comboFormCancelButtonText}>Cancelar</Text>
+            <Text style={styles.comboFormCancelButtonText}>{t('combos.form.cancel')}</Text>
           </Pressable>
           <Pressable
             style={[styles.comboFormSaveButton, saving && styles.buttonDisabled]}
@@ -95,7 +97,11 @@ export function ComboFormModal({
           >
             {saving ? <ActivityIndicator size="small" color="#F5F3FF" /> : null}
             <Text style={styles.comboFormSaveButtonText}>
-              {saving ? 'Guardando...' : editingCombo ? 'Actualizar' : 'Guardar'}
+              {saving
+                ? t('combos.form.saving')
+                : editingCombo
+                  ? t('combos.form.update')
+                  : t('combos.form.save')}
             </Text>
           </Pressable>
         </View>
@@ -104,22 +110,22 @@ export function ComboFormModal({
       <View style={styles.comboFormFields}>
         <View style={styles.comboFormRow}>
           <View style={[styles.modalSection, styles.comboFormCol]}>
-            <Text style={styles.inputLabel}>Nombre del combo *</Text>
+            <Text style={styles.inputLabel}>{t('combos.form.comboName')}</Text>
             <TextInput
               value={form.nombre}
               onChangeText={(next) => onFormChange({ nombre: next })}
-              placeholder="Ej: Cubetazo"
+              placeholder={t('combos.form.comboNamePlaceholder')}
               placeholderTextColor={STOCKY_COLORS.textMuted}
               style={styles.input}
             />
           </View>
 
           <View style={[styles.modalSection, styles.comboFormCol]}>
-            <Text style={styles.inputLabel}>Precio de venta *</Text>
+            <Text style={styles.inputLabel}>{t('combos.form.salePrice')}</Text>
             <TextInput
               value={form.precioVenta}
               onChangeText={(next) => onFormChange({ precioVenta: next })}
-              placeholder="Ej: 25000"
+              placeholder={t('combos.form.salePricePlaceholder')}
               placeholderTextColor={STOCKY_COLORS.textMuted}
               style={styles.input}
               keyboardType="numeric"
@@ -128,11 +134,11 @@ export function ComboFormModal({
         </View>
 
         <View style={styles.modalSection}>
-          <Text style={styles.inputLabel}>Descripción (opcional)</Text>
+          <Text style={styles.inputLabel}>{t('combos.form.description')}</Text>
           <TextInput
             value={form.descripcion}
             onChangeText={(next) => onFormChange({ descripcion: next })}
-            placeholder="Descripción del combo"
+            placeholder={t('combos.form.descriptionPlaceholder')}
             placeholderTextColor={STOCKY_COLORS.textMuted}
             style={[styles.input, styles.textArea]}
             multiline
@@ -141,10 +147,10 @@ export function ComboFormModal({
 
         <View style={styles.modalSection}>
           <View style={styles.comboItemsHeaderRow}>
-            <Text style={styles.inputLabel}>Productos del combo *</Text>
+            <Text style={styles.inputLabel}>{t('combos.form.comboProducts')}</Text>
             <Pressable style={styles.comboAddItemButton} onPress={onAddItemRow}>
               <Ionicons name="add" size={16} color="#4338CA" />
-              <Text style={styles.comboAddItemButtonText}>Agregar producto</Text>
+              <Text style={styles.comboAddItemButtonText}>{t('combos.form.addProduct')}</Text>
             </Pressable>
           </View>
 
@@ -165,7 +171,7 @@ export function ComboFormModal({
                         ]}
                         numberOfLines={1}
                       >
-                        {selectedProduct?.name || 'Selecciona un producto'}
+                        {selectedProduct?.name || t('combos.form.selectProduct')}
                       </Text>
                       <Ionicons name="chevron-down" size={18} color="#64748B" />
                     </Pressable>
@@ -175,7 +181,7 @@ export function ComboFormModal({
                       onChangeText={(next) => onItemChange(index, 'cantidad', next)}
                       keyboardType="numeric"
                       style={styles.comboItemQtyInput}
-                      placeholder="Cantidad"
+                      placeholder={t('combos.form.quantity')}
                       placeholderTextColor={STOCKY_COLORS.textMuted}
                     />
 
@@ -193,8 +199,8 @@ export function ComboFormModal({
 
                   <Text style={styles.comboItemMeta} numberOfLines={1}>
                     {selectedProduct
-                      ? `${selectedProduct.code || 'Sin código'} · Stock: ${selectedProduct.stock}`
-                      : 'Producto requerido'}
+                      ? `${selectedProduct.code || t('combos.form.noCode')} · Stock: ${selectedProduct.stock}`
+                      : t('combos.form.requiredProduct')}
                   </Text>
                 </View>
               );
@@ -202,22 +208,20 @@ export function ComboFormModal({
           </View>
 
           {hasDuplicateProducts ? (
-            <Text style={styles.comboFieldError}>
-              No se permiten productos repetidos en el combo.
-            </Text>
+            <Text style={styles.comboFieldError}>{t('combos.form.duplicateError')}</Text>
           ) : null}
         </View>
 
         {form.items.length > 0 ? (
           <View style={styles.comboSummaryBox}>
-            <Text style={styles.comboSummaryTitle}>Resumen de composición</Text>
+            <Text style={styles.comboSummaryTitle}>{t('combos.form.compositionSummary')}</Text>
             {form.items.map((item, index) => {
               const product = productsById.get(item.productoId);
               const quantity = Number(String(item.cantidad || '').replace(',', '.'));
               return (
                 <Text key={`combo-summary-${index}`} style={styles.comboSummaryText}>
                   {Number.isFinite(quantity) && quantity > 0 ? quantity : 0} x{' '}
-                  {product?.name || 'Producto sin seleccionar'}
+                  {product?.name || t('combos.form.unselectedProduct')}
                 </Text>
               );
             })}

@@ -1,4 +1,5 @@
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { InfoItem } from './InfoItem';
 import { SectionHeader } from './SectionHeader';
 import { configuracionStyles as styles } from '../configuracionStyles';
@@ -20,21 +21,42 @@ export function BusinessSection({
   businessAddressLabel,
   onEdit,
 }: BusinessSectionProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.sectionCard}>
       <SectionHeader
         icon="business-outline"
-        title="Información del Negocio"
-        subtitle="Datos de tu empresa"
-        actionLabel="Editar"
+        title={t('configuracion.business.title')}
+        subtitle={t('configuracion.business.subtitle')}
+        actionLabel={t('configuracion.business.edit')}
         onAction={onEdit}
       />
       <View style={styles.sectionBody}>
-        <InfoItem icon="business-outline" label="Nombre del Negocio" value={businessNameLabel} />
-        <InfoItem icon="shield-outline" label="NIT" value={businessNitLabel} />
-        <InfoItem icon="mail-outline" label="Email" value={businessEmailLabel} />
-        <InfoItem icon="call-outline" label="Teléfono" value={businessPhoneLabel} />
-        <InfoItem icon="location-outline" label="Dirección" value={businessAddressLabel} />
+        <InfoItem
+          icon="business-outline"
+          label={t('configuracion.business.name')}
+          value={businessNameLabel}
+        />
+        <InfoItem
+          icon="shield-outline"
+          label={t('configuracion.business.nit')}
+          value={businessNitLabel}
+        />
+        <InfoItem
+          icon="mail-outline"
+          label={t('configuracion.business.email')}
+          value={businessEmailLabel}
+        />
+        <InfoItem
+          icon="call-outline"
+          label={t('configuracion.business.phone')}
+          value={businessPhoneLabel}
+        />
+        <InfoItem
+          icon="location-outline"
+          label={t('configuracion.business.address')}
+          value={businessAddressLabel}
+        />
       </View>
     </View>
   );

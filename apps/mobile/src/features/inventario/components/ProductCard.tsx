@@ -1,9 +1,10 @@
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import type { InventoryProductRecord } from '../../../services/inventoryService';
-import { getSupplierDisplayName } from '../inventoryUtils';
+import { getCategoryLabel, getSupplierDisplayName } from '../inventoryUtils';
 import { StatusBadge } from './StatusBadge';
 import { inventarioStyles as styles } from '../inventarioStyles';
 
@@ -24,6 +25,7 @@ export const ProductCard = memo(function ProductCard({
   askDeleteProduct,
   activateProduct,
 }: Props) {
+  const { t } = useTranslation();
   const lowStock =
     product.manage_stock !== false && Number(product.stock || 0) <= Number(product.min_stock || 5);
 
@@ -41,11 +43,13 @@ export const ProductCard = memo(function ProductCard({
       <View style={styles.productTagRow}>
         <View style={styles.metaTag}>
           <Ionicons name="pricetag-outline" size={15} color="#111827" />
-          <Text style={styles.metaTagText}>{product.code || 'Sin código'}</Text>
+          <Text style={styles.metaTagText}>{product.code || t('inventarioSection.noCode')}</Text>
         </View>
         <View style={styles.categoryTag}>
           <Ionicons name="bar-chart-outline" size={15} color="#1D4ED8" />
-          <Text style={styles.categoryTagText}>{product.category || 'General'}</Text>
+          <Text style={styles.categoryTagText}>
+            {product.category ? getCategoryLabel(product.category) : t('inventarioSection.general')}
+          </Text>
         </View>
       </View>
 
@@ -56,7 +60,7 @@ export const ProductCard = memo(function ProductCard({
           <View style={styles.providerBlock}>
             <View style={styles.providerTitleRow}>
               <Ionicons name="business-outline" size={17} color="#111827" />
-              <Text style={styles.providerLabel}>PROVEEDOR</Text>
+              <Text style={styles.providerLabel}>{t('inventarioSection.supplierLabel')}</Text>
             </View>
             <Text style={styles.providerValue}>{getSupplierDisplayName(product.supplier)}</Text>
           </View>
@@ -66,7 +70,7 @@ export const ProductCard = memo(function ProductCard({
           <View style={styles.metricCell}>
             <View style={styles.metricTitleRow}>
               <Ionicons name="checkmark-done-outline" size={16} color="#111827" />
-              <Text style={styles.metricLabel}>ESTADO</Text>
+              <Text style={styles.metricLabel}>{t('inventarioSection.statusLabel')}</Text>
             </View>
             <StatusBadge active={product.is_active} />
           </View>
@@ -76,7 +80,7 @@ export const ProductCard = memo(function ProductCard({
           <View style={styles.metricCell}>
             <View style={styles.metricTitleRow}>
               <Ionicons name="trending-down-outline" size={16} color="#C2410C" />
-              <Text style={styles.metricLabel}>P. COMPRA</Text>
+              <Text style={styles.metricLabel}>{t('inventarioSection.purchasePriceLabel')}</Text>
             </View>
             <StockyMoneyText value={product.purchase_price} style={styles.purchaseValue} />
           </View>
@@ -86,7 +90,7 @@ export const ProductCard = memo(function ProductCard({
           <View style={styles.metricCell}>
             <View style={styles.metricTitleRow}>
               <Ionicons name="trending-up-outline" size={16} color="#059669" />
-              <Text style={styles.metricLabel}>P. VENTA</Text>
+              <Text style={styles.metricLabel}>{t('inventarioSection.salePriceLabel')}</Text>
             </View>
             <StockyMoneyText value={product.sale_price} style={styles.saleValue} />
           </View>
@@ -96,13 +100,13 @@ export const ProductCard = memo(function ProductCard({
           <View style={styles.metricCell}>
             <View style={styles.metricTitleRow}>
               <Ionicons name="cube-outline" size={16} color="#111827" />
-              <Text style={styles.metricLabel}>STOCK</Text>
+              <Text style={styles.metricLabel}>{t('inventarioSection.stockLabel')}</Text>
             </View>
             <View style={styles.stockPill}>
               <Text style={[styles.stockText, lowStock && styles.lowStockText]}>
                 {product.manage_stock !== false
                   ? `${product.stock} ${product.unit}`
-                  : 'Sin control'}
+                  : t('inventarioSection.noControl')}
               </Text>
             </View>
           </View>
@@ -112,12 +116,12 @@ export const ProductCard = memo(function ProductCard({
           <View style={styles.metricCell}>
             <View style={styles.metricTitleRow}>
               <Ionicons name="warning-outline" size={16} color="#111827" />
-              <Text style={styles.metricLabel}>MÍNIMO</Text>
+              <Text style={styles.metricLabel}>{t('inventarioSection.minimumLabel')}</Text>
             </View>
             <Text style={styles.minValue}>
               {product.manage_stock !== false
                 ? `${product.min_stock} ${product.unit}`
-                : 'No aplica'}
+                : t('form.notApplicable')}
             </Text>
           </View>
         </View>
@@ -132,7 +136,7 @@ export const ProductCard = memo(function ProductCard({
               onPress={() => openEditModal(product)}
             >
               <Ionicons name="create-outline" size={18} color="#DDE6FF" />
-              <Text style={styles.editButtonText}>Editar</Text>
+              <Text style={styles.editButtonText}>{t('buttons.edit')}</Text>
             </Pressable>
 
             {product.is_active ? (
@@ -141,7 +145,7 @@ export const ProductCard = memo(function ProductCard({
                 onPress={() => askDeleteProduct(product)}
               >
                 <Ionicons name="trash-outline" size={18} color="#FFE4E6" />
-                <Text style={styles.deleteButtonText}>Eliminar</Text>
+                <Text style={styles.deleteButtonText}>{t('buttons.deactivate')}</Text>
               </Pressable>
             ) : (
               <Pressable
@@ -150,7 +154,7 @@ export const ProductCard = memo(function ProductCard({
                 disabled={deleting}
               >
                 <Ionicons name="checkmark-circle-outline" size={18} color="#DCFCE7" />
-                <Text style={styles.activateButtonText}>Activar</Text>
+                <Text style={styles.activateButtonText}>{t('buttons.activate')}</Text>
               </Pressable>
             )}
           </View>

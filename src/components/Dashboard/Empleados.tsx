@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { logger } from '@/utils/logger';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
@@ -37,6 +38,7 @@ function isOwnerRole(role: string) {
 }
 
 function Empleados({ businessId }: DashboardModuleProps) {
+  const { t } = useTranslation('common');
   const [employees, setEmployees] = useState<Array<{ id: string; full_name?: string; username?: string; role?: string; is_active?: boolean; status?: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -75,12 +77,12 @@ function Empleados({ businessId }: DashboardModuleProps) {
       setPage(nextPage);
       setHasMoreEmployees(Boolean(hasMore));
     } catch {
-      setError('❌ Error al cargar la lista de empleados');
+      setError(t('errors.loadingEmployees'));
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [businessId]);
+  }, [businessId, t]);
 
   const loadMoreEmployees = useCallback(() => {
     if (loadingMore || !hasMoreEmployees || searchTerm.trim()) return;
@@ -170,38 +172,38 @@ function Empleados({ businessId }: DashboardModuleProps) {
     
     try {
       if (!businessId) {
-        throw new Error('❌ Error: No se pudo identificar tu negocio. Recarga la página e intenta de nuevo.');
+        throw new Error(t('errors.businessNotFound'));
       }
 
-      if (!formData.full_name.trim()) throw new Error('El nombre del empleado es requerido');
+      if (!formData.full_name.trim()) throw new Error(t('validation.nameRequired'));
       
       if (/^\d+$/.test(formData.full_name.trim())) {
-        throw new Error('❌ El nombre del empleado no puede ser solo números');
+        throw new Error(t('validation.nameNotOnlyNumbers'));
       }
 
       if (!/[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(formData.full_name.trim())) {
-        throw new Error('❌ El nombre del empleado debe contener al menos una letra');
+        throw new Error(t('validation.nameNeedsLetter'));
       }
 
       if (formData.full_name.trim().length < 2) {
-        throw new Error('❌ El nombre del empleado debe tener al menos 2 caracteres');
+        throw new Error(t('validation.nameMinLength'));
       }
 
-      if (!formData.username.trim()) throw new Error('El nombre de usuario es requerido');
-      if (!formData.password.trim()) throw new Error('La contraseña es requerida');
-      if (formData.password.length < 6) throw new Error('La contraseña debe tener al menos 6 caracteres');
+      if (!formData.username.trim()) throw new Error(t('validation.usernameRequired'));
+      if (!formData.password.trim()) throw new Error(t('validation.passwordRequired'));
+      if (formData.password.length < 6) throw new Error(t('validation.passwordMinLength'));
 
       const cleanUsername = formData.username.toLowerCase().trim();
       const cleanPassword = formData.password.trim();
       const fixedRole = 'employee';
 
       if (/^\d+$/.test(cleanUsername)) {
-        throw new Error('❌ El nombre de usuario no puede ser solo números');
+        throw new Error(t('validation.usernameNotOnlyNumbers'));
       }
 
       const usernameRegex = /^[a-z0-9_]+$/;
       if (!usernameRegex.test(cleanUsername)) {
-        throw new Error('El usuario solo puede contener letras minúsculas, números y guiones bajos');
+        throw new Error(t('validation.usernameInvalidFormat'));
       }
 
       const usernameTaken = await isEmployeeUsernameTaken({
@@ -209,12 +211,12 @@ function Empleados({ businessId }: DashboardModuleProps) {
         username: cleanUsername
       });
       if (usernameTaken) {
-        throw new Error('❌ Ya existe un empleado con este nombre de usuario');
+        throw new Error(t('validation.usernameTaken'));
       }
 
       const businessUsername = await getBusinessUsernameById(businessId);
       if (businessUsername && businessUsername === cleanUsername) {
-        throw new Error('No puedes usar el nombre de usuario del negocio');
+        throw new Error(t('validation.usernameIsBusiness'));
       }
 
       const createdEmployee = await createEmployeeWithRpc({
@@ -255,15 +257,15 @@ function Empleados({ businessId }: DashboardModuleProps) {
       setShowCodeModal(true);
       setFormData(INITIAL_EMPLOYEE_FORM);
       setShowForm(false);
-      setSuccess('✅ Empleado creado exitosamente');
+      setSuccess(t('success.employeeCreated'));
       loadEmployees().catch((err) => { logger.warn('empleados:create_reload failed', err); });
       
     } catch (err) {
-      setError((err as Error).message || 'Error al crear el empleado');
+      setError((err as Error).message || t('errors.creatingEmployee'));
     } finally {
       setIsSubmitting(false);
     }
-  }, [businessId, formData, loadEmployees, isSubmitting]);
+  }, [businessId, formData, loadEmployees, isSubmitting, t]);
 
   const handleDelete = useCallback((employee: { id: string; full_name?: string }) => {
     setEmployeeToDelete(employee);
@@ -279,17 +281,17 @@ function Empleados({ businessId }: DashboardModuleProps) {
         businessId
       });
 
-      setSuccess('✅ Empleado eliminado exitosamente');
+      setSuccess(t('success.employeeDeleted'));
       setEmployees((prev) => prev.filter((employee) => employee.id !== employeeToDelete.id));
       loadEmployees().catch((err) => { logger.warn('empleados:confirm_delete_reload failed', err); });
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
     } catch {
-      setError('❌ Error al eliminar el empleado');
+      setError(t('errors.deletingEmployee'));
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
     }
-  }, [employeeToDelete, businessId, loadEmployees]);
+  }, [employeeToDelete, businessId, loadEmployees, t]);
 
   const cancelDelete = useCallback(() => {
     setShowDeleteModal(false);
@@ -323,12 +325,12 @@ function Empleados({ businessId }: DashboardModuleProps) {
   }), [employees]);
 
   const successTitle = useMemo(() => {
-    if (!success) return '✨ Operación exitosa';
+    if (!success) return t('success.operationSuccess');
     const normalized = success.toLowerCase();
-    if (normalized.includes('eliminad')) return '✨ Empleado eliminado';
-    if (normalized.includes('cread')) return '✨ Empleado registrado';
-    return '✨ Operación exitosa';
-  }, [success]);
+    if (normalized.includes('eliminad')) return t('success.employeeDeleted');
+    if (normalized.includes('cread')) return t('success.employeeRegistered');
+    return t('success.operationSuccess');
+  }, [success, t]);
 
   useEffect(() => {
     let errorTimer: ReturnType<typeof setTimeout>, successTimer: ReturnType<typeof setTimeout>;
@@ -356,8 +358,8 @@ function Empleados({ businessId }: DashboardModuleProps) {
                 <Users className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-800">Empleados</h1>
-                <p className="text-gray-600">Gestiona empleados y accesos</p>
+                <h1 className="text-3xl font-bold text-gray-800">{t('navigation.employees')}</h1>
+                <p className="text-gray-600">{t('employeesHeader.manageEmployees')}</p>
               </div>
             </div>
             
@@ -366,7 +368,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
               className="flex items-center gap-2 px-6 py-3 gradient-primary text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300"
             >
               <UserPlus className="w-5 h-5" />
-              Invitar Empleado
+              {t('buttons.newEmployee')}
             </button>
           </div>
         </motion.div>
@@ -383,7 +385,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
                 <Users className="w-5 h-5 text-gray-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Total</p>
+                <p className="text-sm text-gray-600">{t('labels.total')}</p>
                 <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
               </div>
             </div>
@@ -400,7 +402,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
                 <CheckCircle className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Activos</p>
+                <p className="text-sm text-gray-600">{t('status.active')}</p>
                 <p className="text-2xl font-bold text-gray-800">{stats.active}</p>
               </div>
             </div>
@@ -430,7 +432,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Buscar por nombre, usuario o código..."
+              placeholder={t('placeholders.searchByNameUserOrCode')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
@@ -447,9 +449,9 @@ function Empleados({ businessId }: DashboardModuleProps) {
             onRetry={loadEmployees}
             skeletonType="empleados"
             hasFilters={Boolean(searchTerm.trim())}
-            noResultsTitle="No se encontraron empleados"
-            emptyTitle="Aun no hay empleados"
-            emptyDescription='Haz clic en "Invitar Empleado" para crear el primero.'
+            noResultsTitle={t('messages.noEmployeesFound')}
+            emptyTitle={t('messages.noEmployeesYet')}
+            emptyDescription={t('messages.clickNewEmployeeToCreateFirst')}
             actionProcessing={isSubmitting}
           >
             <div className="overflow-x-auto">
@@ -457,19 +459,19 @@ function Empleados({ businessId }: DashboardModuleProps) {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Empleado
+                      {t('roles.employee')}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Usuario
+                      {t('labels.user')}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Estado
+                      {t('labels.status')}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Rol
+                      {t('labels.role')}
                     </th>
                     <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Acciones
+                      {t('labels.actions')}
                     </th>
                   </tr>
                 </thead>
@@ -500,18 +502,18 @@ function Empleados({ businessId }: DashboardModuleProps) {
                           {employee.is_active ? (
                             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                               <CheckCircle className="w-3 h-3" />
-                              Activo
+                              {t('status.active')}
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                               <XCircle className="w-3 h-3" />
-                              Inactivo
+                              {t('status.inactive')}
                             </span>
                           )}
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-sm text-gray-600 capitalize">
-                            {employee.role === 'admin' ? 'Administrador' : employee.role === 'owner' ? 'Propietario' : 'Empleado'}
+                            {employee.role === 'admin' ? t('roles.admin') : employee.role === 'owner' ? t('roles.owner') : t('roles.employee')}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
@@ -520,7 +522,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
                             className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
                           >
                             <Trash2 className="w-4 h-4" />
-                            Eliminar
+                            {t('buttons.delete')}
                           </button>
                         </td>
                       </tr>
@@ -531,7 +533,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
             </div>
             <div className="border-t border-gray-100 px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-gray-500">
-                Mostrando {filteredEmployees.length} de {employees.length} empleados
+                {t('labels.showing')} {filteredEmployees.length} {t('labels.of')} {employees.length} {t('labels.employees')}
               </p>
               <button
                 type="button"
@@ -542,10 +544,10 @@ function Empleados({ businessId }: DashboardModuleProps) {
                 {loadingMore ? (
                   <>
                     <Clock className="w-4 h-4 animate-spin" />
-                    Cargando...
+                    {t('buttons.loading')}
                   </>
                 ) : (
-                  <>Cargar más empleados</>
+                  <>{t('buttons.loadMoreEmployees')}</>
                 )}
               </button>
             </div>
@@ -573,7 +575,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
               <div className="p-6 border-b border-accent-100 bg-gradient-to-r from-primary-50 to-accent-50 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                   <UserPlus className="w-6 h-6 text-accent-500" />
-                  Nuevo Empleado
+                  {t('buttons.newEmployee')}
                 </h2>
                 <button
                   type="button"
@@ -588,14 +590,14 @@ function Empleados({ businessId }: DashboardModuleProps) {
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nombre Completo
+                    {t('form.name')}
                   </label>
                   <input
                     type="text"
                     name="full_name"
                     value={formData.full_name}
                     onChange={handleChange}
-                    placeholder="Ej: Juan Pérez"
+                    placeholder={t('placeholders.fullNameExample')}
                     className="w-full h-12 px-4 border-2 border-accent-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
                     required
                   />
@@ -603,7 +605,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Usuario
+                    {t('labels.user')}
                   </label>
                   <input
                     type="text"
@@ -615,32 +617,32 @@ function Empleados({ businessId }: DashboardModuleProps) {
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Solo letras minúsculas, números y guiones bajos
+                    {t('validation.usernameFormat')}
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Contraseña
+                    {t('form.password')}
                   </label>
                   <input
                     type="text"
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder={t('placeholders.minCharacters')}
                     className="w-full h-12 px-4 border-2 border-accent-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
                     required
                     minLength={6}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Esta será la contraseña que el empleado usará para acceder
+                    {t('validation.passwordHelp')}
                   </p>
                 </div>
 
                 <div className="p-3 rounded-xl bg-accent-50 border border-accent-200">
                   <p className="text-sm text-primary-700">
-                    Rol asignado: <span className="font-semibold">Empleado</span>
+                    {t('roles.employee')}: <span className="font-semibold">{t('roles.employee')}</span>
                   </p>
                 </div>
 
@@ -652,12 +654,12 @@ function Empleados({ businessId }: DashboardModuleProps) {
                   {isSubmitting ? (
                     <>
                       <Clock className="h-4 w-4 animate-spin" />
-                      Creando employee...
+                      {t('buttons.creatingEmployee')}
                     </>
                   ) : (
                     <>
                       <UserPlus className="h-4 w-4" />
-                      Crear Empleado
+                      {t('buttons.createEmployee')}
                     </>
                   )}
                 </button>
@@ -690,16 +692,16 @@ function Empleados({ businessId }: DashboardModuleProps) {
                 </div>
                 
                 <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                  ¡Empleado Creado!
+                  {t('success.employeeCreated')}
                 </h3>
                 
                 <p className="text-gray-600 mb-6">
-                  Comparte estas credenciales con {generatedCode.fullName}
+                  {t('success.shareCredentials')} {generatedCode.fullName}
                 </p>
 
                 <div className="space-y-4 mb-6">
                   <div className="bg-gray-50 rounded-xl p-4">
-                    <p className="text-sm text-gray-600 mb-1">Usuario</p>
+                    <p className="text-sm text-gray-600 mb-1">{t('labels.user')}</p>
                     <div className="flex items-center justify-center gap-2">
                       <code className="text-lg font-mono font-semibold text-gray-600">
                         {generatedCode.username}
@@ -714,7 +716,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
                   </div>
 
                   <div className="bg-gray-50 rounded-xl p-4">
-                    <p className="text-sm text-gray-600 mb-1">Contraseña</p>
+                    <p className="text-sm text-gray-600 mb-1">{t('form.password')}</p>
                     <div className="flex items-center justify-center gap-2">
                       <code className="text-lg font-mono font-semibold text-gray-600">
                         {generatedCode.password}
@@ -736,16 +738,16 @@ function Empleados({ businessId }: DashboardModuleProps) {
 
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
                   <p className="text-sm text-yellow-800">
-                    El empleado puede iniciar sesión inmediatamente en iniciar sesión con estas credenciales.
+                    {t('messages.employeeCanLoginImmediately')}
                   </p>
                 </div>
 
-                <button
-                  onClick={() => setShowCodeModal(false)}
-                  className="w-full px-6 py-3 gradient-primary text-white rounded-xl font-semibold hover:shadow-lg transition-all"
-                >
-                  Entendido
-                </button>
+                  <button
+                    onClick={() => setShowCodeModal(false)}
+                    className="w-full px-6 py-3 gradient-primary text-white rounded-xl font-semibold hover:shadow-lg transition-all"
+                  >
+                    {t('buttons.understood')}
+                  </button>
               </div>
             </motion.div>
           </motion.div>
@@ -775,11 +777,11 @@ function Empleados({ businessId }: DashboardModuleProps) {
                 </div>
                 
                 <h3 className="text-xl font-bold text-gray-800 mb-2">
-                  ¿Eliminar Invitación?
+                  {t('messages.confirmDelete')}
                 </h3>
                 
                 <p className="text-gray-600 mb-6">
-                  Esta acción no se puede deshacer. Si el empleado ya se registró, también se eliminará su acceso.
+                  {t('messages.actionCannotBeUndone')}
                 </p>
 
                 <div className="flex gap-3">
@@ -787,13 +789,13 @@ function Empleados({ businessId }: DashboardModuleProps) {
                     onClick={cancelDelete}
                     className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                   >
-                    Cancelar
+                    {t('buttons.cancel')}
                   </button>
                   <button
                     onClick={confirmDelete}
                     className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                   >
-                    Eliminar
+                    {t('buttons.delete')}
                   </button>
                 </div>
               </div>

@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type { Session } from '@supabase/supabase-js';
 
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
@@ -58,7 +59,13 @@ const OrderItemSeparator = () => <View style={styles.orderItemSeparator} />;
 
 const orderItemKeyExtractor = (item: MesaOrderItem) => item.id;
 
-export const OrderModal = React.memo(function OrderModal({ visible, orderState, actions, isKeyboardVisible }: OrderModalProps) {
+export const OrderModal = React.memo(function OrderModal({
+  visible,
+  orderState,
+  actions,
+  isKeyboardVisible,
+}: OrderModalProps) {
+  const { t } = useTranslation('mesas');
   const {
     orderModalTitle,
     orderTotal,
@@ -100,7 +107,13 @@ export const OrderModal = React.memo(function OrderModal({ visible, orderState, 
         />
       );
     },
-    [mutatingOrderItemId, resolveOrderItemDisplayName, isClosingOrder, releasingEmptyOrder, onUpdateOrderItemQuantity],
+    [
+      mutatingOrderItemId,
+      resolveOrderItemDisplayName,
+      isClosingOrder,
+      releasingEmptyOrder,
+      onUpdateOrderItemQuantity,
+    ],
   );
 
   return (
@@ -135,7 +148,7 @@ export const OrderModal = React.memo(function OrderModal({ visible, orderState, 
       footer={
         <View style={styles.orderFooterContainer}>
           <View style={styles.orderFooterTotalBlock}>
-            <Text style={styles.orderFooterTotalLabel}>Total a pagar:</Text>
+            <Text style={styles.orderFooterTotalLabel}>{t('labels.totalToPay')}:</Text>
             <StockyMoneyText value={orderTotal} style={styles.orderFooterTotalValue} />
           </View>
 
@@ -151,7 +164,7 @@ export const OrderModal = React.memo(function OrderModal({ visible, orderState, 
           >
             <Ionicons name="save-outline" size={20} color="#111827" />
             <Text style={styles.orderActionButtonText}>
-              {releasingEmptyOrder || isSavingOrder ? 'Guardando...' : 'Guardar'}
+              {releasingEmptyOrder || isSavingOrder ? t('print.saving') : t('buttons.saveOrder')}
             </Text>
           </Pressable>
 
@@ -171,7 +184,7 @@ export const OrderModal = React.memo(function OrderModal({ visible, orderState, 
               color={orderItems.length === 0 ? '#93A5CD' : '#64748B'}
             />
             <Text style={[styles.orderActionButtonText, styles.orderPrintButtonText]}>
-              {isPrintInProgress ? 'Imprimiendo...' : 'Imprimir para cocina'}
+              {isPrintInProgress ? t('print.printing') : t('buttons.printKitchen')}
             </Text>
           </Pressable>
 
@@ -196,7 +209,7 @@ export const OrderModal = React.memo(function OrderModal({ visible, orderState, 
             >
               <Ionicons name="checkmark-circle-outline" size={20} color="#E5E7EB" />
               <Text style={styles.orderCloseButtonText}>
-                {isClosingOrder ? 'Procesando...' : 'Cerrar Orden'}
+                {isClosingOrder ? t('print.processing') : t('buttons.closeOrder')}
               </Text>
             </LinearGradient>
           </Pressable>
@@ -213,11 +226,11 @@ export const OrderModal = React.memo(function OrderModal({ visible, orderState, 
         isKeyboardVisible={isKeyboardVisible}
       />
 
-      <Text style={styles.orderItemsTitle}>Items en la orden</Text>
+      <Text style={styles.orderItemsTitle}>{t('labels.orderItems')}</Text>
       {orderItems.length === 0 ? (
         <View style={styles.orderItemsEmpty}>
           <Ionicons name="cart-outline" size={56} color="#0F172A" />
-          <Text style={styles.orderItemsEmptyText}>No hay items en esta orden</Text>
+          <Text style={styles.orderItemsEmptyText}>{t('labels.noItems')}</Text>
         </View>
       ) : null}
       {orderItems.length > 0 ? (

@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import type { ComboRecord } from '../../../services/combosService';
@@ -19,6 +20,7 @@ export const ComboCard = memo(function ComboCard({
   onEdit,
   onDelete,
 }: Props) {
+  const { t } = useTranslation();
   const status = normalizeStatus(combo.estado);
   const isActive = status === 'active';
 
@@ -48,7 +50,9 @@ export const ComboCard = memo(function ComboCard({
 
         <View style={styles.comboCountTag}>
           <Ionicons name="cube-outline" size={13} color="#1D4ED8" />
-          <Text style={styles.comboCountTagText}>{combo.combo_items.length} productos</Text>
+          <Text style={styles.comboCountTagText}>
+            {combo.combo_items.length} {t('combos.card.products')}
+          </Text>
         </View>
       </View>
 
@@ -64,7 +68,7 @@ export const ComboCard = memo(function ComboCard({
         <View style={styles.comboInfoCell}>
           <View style={styles.comboMetaTitleRow}>
             <Ionicons name="cash-outline" size={16} color="#111827" />
-            <Text style={styles.metaLabel}>PRECIO</Text>
+            <Text style={styles.metaLabel}>{t('combos.card.price')}</Text>
           </View>
           <StockyMoneyText value={combo.precio_venta} style={styles.metaValue} />
         </View>
@@ -72,13 +76,13 @@ export const ComboCard = memo(function ComboCard({
         <View style={styles.comboInfoCell}>
           <View style={styles.comboMetaTitleRow}>
             <Ionicons name="layers-outline" size={16} color="#111827" />
-            <Text style={styles.metaLabel}>PRODUCTOS</Text>
+            <Text style={styles.metaLabel}>{t('combos.card.productsLabel')}</Text>
           </View>
           <Text style={styles.metaValue}>{combo.combo_items.length}</Text>
         </View>
 
         <View style={[styles.comboInfoCell, styles.comboInfoCellFull]}>
-          <Text style={styles.compositionTitle}>Composición</Text>
+          <Text style={styles.compositionTitle}>{t('combos.card.composition')}</Text>
           <Text style={styles.compositionText}>{buildComboCompositionText(combo)}</Text>
         </View>
       </View>
@@ -92,7 +96,7 @@ export const ComboCard = memo(function ComboCard({
               onPress={() => onEdit(combo)}
             >
               <Ionicons name="create-outline" size={18} color="#DDE6FF" />
-              <Text style={styles.comboEditButtonText}>Editar</Text>
+              <Text style={styles.comboEditButtonText}>{t('combos.card.edit')}</Text>
             </Pressable>
 
             <Pressable
@@ -100,7 +104,7 @@ export const ComboCard = memo(function ComboCard({
               onPress={() => onDelete(combo)}
             >
               <Ionicons name="trash-outline" size={18} color="#FFE4E6" />
-              <Text style={styles.comboDeleteButtonText}>Eliminar</Text>
+              <Text style={styles.comboDeleteButtonText}>{t('combos.card.delete')}</Text>
             </Pressable>
           </View>
         </>

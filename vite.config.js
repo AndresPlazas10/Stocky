@@ -109,6 +109,7 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
+        '@stocky/shared/i18n': path.resolve(__dirname, './packages/shared/src/locales/index.ts'),
         '@stocky/shared': path.resolve(__dirname, './packages/shared/src'),
       },
     },

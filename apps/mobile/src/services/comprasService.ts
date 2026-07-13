@@ -819,8 +819,7 @@ export async function createCompraWithRpcFallback({
     purchaseId = normalizeReference(legacy.purchaseId);
   } else {
     const row = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     purchaseId = normalizeReference(row?.purchase_id);
   }
 

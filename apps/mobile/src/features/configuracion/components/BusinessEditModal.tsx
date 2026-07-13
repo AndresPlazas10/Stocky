@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../../theme/tokens';
@@ -27,6 +28,7 @@ export function BusinessEditModal({
   onClose,
   onSave,
 }: BusinessEditModalProps) {
+  const { t } = useTranslation();
   return (
     <StockyModal
       visible={visible}
@@ -49,9 +51,11 @@ export function BusinessEditModal({
               <Ionicons name="create-outline" size={20} color="#FFFFFF" />
             </View>
             <View style={styles.businessEditHeaderTextWrap}>
-              <Text style={styles.businessEditHeaderTitle}>Editar Negocio</Text>
+              <Text style={styles.businessEditHeaderTitle}>
+                {t('configuracion.editBusiness.title')}
+              </Text>
               <Text style={styles.businessEditHeaderSubtitle}>
-                Actualiza NIT, teléfono y dirección
+                {t('configuracion.editBusiness.subtitle')}
               </Text>
             </View>
           </View>
@@ -68,7 +72,9 @@ export function BusinessEditModal({
             onPress={onClose}
             disabled={saving}
           >
-            <Text style={styles.businessEditCancelText}>Cancelar</Text>
+            <Text style={styles.businessEditCancelText}>
+              {t('configuracion.editBusiness.cancel')}
+            </Text>
           </Pressable>
           <Pressable
             style={[styles.businessEditSaveWrap, saving && styles.disabled]}
@@ -87,7 +93,9 @@ export function BusinessEditModal({
                 <Ionicons name="save-outline" size={17} color="#FFFFFF" />
               )}
               <Text style={styles.businessEditSaveText}>
-                {saving ? 'Guardando...' : 'Guardar Cambios'}
+                {saving
+                  ? t('configuracion.editBusiness.saving')
+                  : t('configuracion.editBusiness.save')}
               </Text>
             </LinearGradient>
           </Pressable>
@@ -96,21 +104,25 @@ export function BusinessEditModal({
     >
       <View style={styles.businessEditFields}>
         <View style={styles.businessEditField}>
-          <Text style={styles.businessEditLabel}>Nombre del Negocio (solo lectura)</Text>
+          <Text style={styles.businessEditLabel}>
+            {t('configuracion.editBusiness.nameReadonly')}
+          </Text>
           <View style={styles.businessEditReadOnlyBox}>
             <Text style={styles.businessEditReadOnlyText}>{businessNameLabel}</Text>
           </View>
         </View>
 
         <View style={styles.businessEditField}>
-          <Text style={styles.businessEditLabel}>Email (solo lectura)</Text>
+          <Text style={styles.businessEditLabel}>
+            {t('configuracion.editBusiness.emailReadonly')}
+          </Text>
           <View style={styles.businessEditReadOnlyBox}>
             <Text style={styles.businessEditReadOnlyText}>{businessEmailLabel}</Text>
           </View>
         </View>
 
         <View style={styles.businessEditField}>
-          <Text style={styles.businessEditLabel}>NIT</Text>
+          <Text style={styles.businessEditLabel}>{t('configuracion.editBusiness.nit')}</Text>
           <TextInput
             value={form.nit}
             onChangeText={(next) => onFormChange({ nit: next })}
@@ -123,7 +135,7 @@ export function BusinessEditModal({
         </View>
 
         <View style={styles.businessEditField}>
-          <Text style={styles.businessEditLabel}>Teléfono</Text>
+          <Text style={styles.businessEditLabel}>{t('configuracion.editBusiness.phone')}</Text>
           <TextInput
             value={form.phone}
             onChangeText={(next) => onFormChange({ phone: next })}
@@ -135,7 +147,7 @@ export function BusinessEditModal({
         </View>
 
         <View style={styles.businessEditField}>
-          <Text style={styles.businessEditLabel}>Dirección</Text>
+          <Text style={styles.businessEditLabel}>{t('configuracion.editBusiness.address')}</Text>
           <TextInput
             value={form.address}
             onChangeText={(next) => onFormChange({ address: next })}

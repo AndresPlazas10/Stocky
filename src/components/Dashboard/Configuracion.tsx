@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { logger } from '@/utils/logger';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
@@ -26,19 +27,11 @@ import {
   Info,
   Database,
   Shield,
-  Printer,
   Smartphone,
   Bell,
   Download,
   ExternalLink
 } from 'lucide-react';
-import InvoicingSection from '../Settings/InvoicingSection';
-import {
-  getThermalPaperWidthMm,
-  setThermalPaperWidthMm,
-  isAutoPrintReceiptEnabled,
-  setAutoPrintReceiptEnabled,
-} from '../../utils/printer.js';
 import type { RefObject } from 'react';
 
 interface Business {
@@ -57,6 +50,7 @@ interface ConfiguracionProps {
 }
 
 function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps) {
+  const { t } = useTranslation('common');
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -64,9 +58,6 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
   const [editingBusiness, setEditingBusiness] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
-  const [printerPaperWidth, setPrinterPaperWidth] = useState(() => getThermalPaperWidthMm());
-  const [autoPrintReceipt, setAutoPrintReceipt] = useState(() => isAutoPrintReceiptEnabled());
-
   const [businessData, setBusinessData] = useState({
     name: '',
     nit: '',
@@ -99,7 +90,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
     e.preventDefault();
 
     if (!businessData.name.trim()) {
-      setError('⚠️ El nombre del negocio es obligatorio');
+      setError('⚠️ ' + t('messages.businessNameRequired'));
       return;
     }
 
@@ -119,7 +110,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
         }
       });
 
-      setSuccess('Información actualizada correctamente');
+      setSuccess(t('messages.infoUpdated'));
       setEditingBusiness(false);
 
       if (onBusinessUpdate && data) {
@@ -129,20 +120,20 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
       setTimeout(() => setSuccess(''), 3000);
 
     } catch (err) {
-      setError((err as Error).message || 'Error al actualizar la información');
+      setError((err as Error).message || t('messages.errorUpdating'));
     } finally {
       setLoading(false);
     }
-  }, [businessData, business, onBusinessUpdate]);
+  }, [businessData, business, onBusinessUpdate, t]);
 
   const handleLogout = useCallback(async () => {
     try {
       await signOutSession();
       navigate('/');
     } catch {
-      setError('❌ No se pudo cerrar la sesión correctamente');
+      setError('❌ ' + t('messages.errorSigningOut'));
     }
-  }, [navigate]);
+  }, [navigate, t]);
 
   const handleDeleteAccount = useCallback(async () => {
     if (deletingAccount) return;
@@ -154,7 +145,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
       if (deleteError) throw deleteError;
       deleted = true;
     } catch (err) {
-      setError((err as Error)?.message || '❌ No se pudo eliminar la cuenta.');
+      setError((err as Error)?.message || '❌ ' + t('messages.errorDeletingAccount'));
     }
 
     if (deleted) {
@@ -170,33 +161,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
     if (deleted) {
       setShowDeleteAccountModal(false);
     }
-  }, [deletingAccount, navigate]);
-
-  const handlePrinterWidthChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const nextWidth = Number(e.target.value);
-    const saved = setThermalPaperWidthMm(nextWidth);
-    if (saved) {
-      setPrinterPaperWidth(nextWidth);
-      setSuccess(`Configuración de impresora guardada: ${nextWidth}mm`);
-    } else {
-      setError('❌ No se pudo guardar la configuración de impresora');
-    }
-  }, []);
-
-  const handleAutoPrintReceiptChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const nextValue = Boolean(e?.target?.checked);
-    const saved = setAutoPrintReceiptEnabled(nextValue);
-    if (saved) {
-      setAutoPrintReceipt(nextValue);
-      setSuccess(
-        nextValue
-          ? 'Autoimpresión de recibo activada'
-          : 'Autoimpresión de recibo desactivada'
-      );
-    } else {
-      setError('❌ No se pudo guardar la configuración de autoimpresión');
-    }
-  }, []);
+  }, [deletingAccount, navigate, t]);
 
   useEffect(() => {
     let errorTimer: ReturnType<typeof setTimeout>, successTimer: ReturnType<typeof setTimeout>;
@@ -223,8 +188,8 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
               <Settings className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-800">Configuración</h1>
-              <p className="text-gray-600">Administra tu cuenta y negocio</p>
+              <h1 className="text-3xl font-bold text-gray-800">{t('navigation.settings')}</h1>
+              <p className="text-gray-600">{t('settings.manageAccount')}</p>
             </div>
           </div>
         </motion.div>
@@ -241,8 +206,8 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
         <SaleSuccessAlert
           isVisible={!!success}
           onClose={() => setSuccess('')}
-          title="✨ Configuración Guardada"
-          details={[{ label: 'Acción', value: success }]}
+          title={'✨ ' + t('settings.saved')}
+          details={[{ label: t('labels.action'), value: success }]}
           duration={5000}
         />
 
@@ -259,8 +224,8 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                 <User className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-xl font-bold">Información del Usuario</h2>
-                <p className="text-white/80">Datos de tu cuenta</p>
+                <h2 className="text-xl font-bold">{t('labels.user')}</h2>
+                <p className="text-white/80">{t('settings.accountData')}</p>
               </div>
             </div>
           </div>
@@ -270,7 +235,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
               <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
                 <div className="flex items-center gap-3 mb-2">
                   <Mail className="w-5 h-5 text-accent-600" />
-                  <span className="text-sm text-gray-600 font-medium">Email</span>
+                  <span className="text-sm text-gray-600 font-medium">{t('labels.email')}</span>
                 </div>
                 <p className="text-lg font-semibold text-gray-800 pl-8">{user?.email}</p>
               </div>
@@ -278,7 +243,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
               <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
                 <div className="flex items-center gap-3 mb-2">
                   <Shield className="w-5 h-5 text-accent-600" />
-                  <span className="text-sm text-gray-600 font-medium">ID de Usuario</span>
+                  <span className="text-sm text-gray-600 font-medium">{t('labels.user')}</span>
                 </div>
                 <p className="text-sm font-mono text-gray-600 pl-8 break-all">{user?.id?.substring(0, 30)}...</p>
               </div>
@@ -289,7 +254,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
               className="flex items-center gap-2 px-6 py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-semibold transition-all duration-300 hover:shadow-md"
             >
               <LogOut className="w-5 h-5" />
-              Cerrar Sesión
+              {t('buttons.signOut')}
             </button>
 
             <button
@@ -297,7 +262,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
               className="mt-3 flex items-center gap-2 px-6 py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl font-semibold transition-all duration-300 hover:shadow-md"
             >
               <AlertTriangle className="w-5 h-5" />
-              Eliminar cuenta
+              {t('buttons.delete')}
             </button>
           </div>
         </motion.div>
@@ -316,8 +281,8 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                   <Building2 className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold">Información del Negocio</h2>
-                  <p className="text-white/80">Datos de tu empresa</p>
+                  <h2 className="text-xl font-bold">{t('form.businessName')}</h2>
+                  <p className="text-white/80">{t('settings.businessData')}</p>
                 </div>
               </div>
 
@@ -327,7 +292,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                   className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all backdrop-blur-sm"
                 >
                   <Edit2 className="w-4 h-4" />
-                  Editar
+                  {t('buttons.edit')}
                 </button>
               )}
             </div>
@@ -339,7 +304,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                 <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
                   <div className="flex items-center gap-3 mb-2">
                     <Building2 className="w-5 h-5 text-accent-600" />
-                    <span className="text-sm text-gray-600 font-medium">Nombre del Negocio</span>
+                    <span className="text-sm text-gray-600 font-medium">{t('form.businessName')}</span>
                   </div>
                   <p className="text-lg font-semibold text-gray-800 pl-8">{business?.name}</p>
                 </div>
@@ -347,7 +312,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                 <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
                   <div className="flex items-center gap-3 mb-2">
                     <Shield className="w-5 h-5 text-accent-600" />
-                    <span className="text-sm text-gray-600 font-medium">NIT</span>
+                    <span className="text-sm text-gray-600 font-medium">{t('labels.nit')}</span>
                   </div>
                   <p className="text-lg font-semibold text-gray-800 pl-8">{business?.nit || 'No registrado'}</p>
                 </div>
@@ -355,7 +320,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                 <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
                   <div className="flex items-center gap-3 mb-2">
                     <Mail className="w-5 h-5 text-accent-600" />
-                    <span className="text-sm text-gray-600 font-medium">Email</span>
+                    <span className="text-sm text-gray-600 font-medium">{t('labels.email')}</span>
                   </div>
                   <p className="text-lg font-semibold text-gray-800 pl-8">{business?.email || 'No especificado'}</p>
                 </div>
@@ -363,7 +328,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                 <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
                   <div className="flex items-center gap-3 mb-2">
                     <Phone className="w-5 h-5 text-accent-600" />
-                    <span className="text-sm text-gray-600 font-medium">Teléfono</span>
+                    <span className="text-sm text-gray-600 font-medium">{t('labels.phone')}</span>
                   </div>
                   <p className="text-lg font-semibold text-gray-800 pl-8">{business?.phone || 'No especificado'}</p>
                 </div>
@@ -372,7 +337,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                   <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100 md:col-span-2">
                     <div className="flex items-center gap-3 mb-2">
                       <MapPin className="w-5 h-5 text-accent-600" />
-                      <span className="text-sm text-gray-600 font-medium">Dirección</span>
+                      <span className="text-sm text-gray-600 font-medium">{t('labels.address')}</span>
                     </div>
                     <p className="text-lg font-semibold text-gray-800 pl-8">{business.address}</p>
                   </div>
@@ -384,7 +349,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                   <div>
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                       <Building2 className="w-4 h-4 text-accent-600" />
-                      Nombre del Negocio *
+                      {t('form.businessName')} *
                     </label>
                     <input
                       type="text"
@@ -400,8 +365,8 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                   <div>
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                       <Shield className="w-4 h-4 text-accent-600" />
-                      NIT
-                      <span className="text-xs font-normal text-gray-400">(opcional)</span>
+                      {t('labels.nit')}
+                      <span className="text-xs font-normal text-gray-400">({t('labels.optional')})</span>
                     </label>
                     <input
                       type="text"
@@ -416,7 +381,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                   <div>
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                       <Mail className="w-4 h-4 text-accent-600" />
-                      Email
+                      {t('labels.email')}
                     </label>
                     <input
                       type="email"
@@ -431,7 +396,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                   <div>
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                       <Phone className="w-4 h-4 text-accent-600" />
-                      Teléfono
+                      {t('labels.phone')}
                     </label>
                     <input
                       type="tel"
@@ -446,7 +411,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                   <div className="md:col-span-2">
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                       <MapPin className="w-4 h-4 text-accent-600" />
-                      Dirección
+                      {t('labels.address')}
                     </label>
                     <textarea
                       name="address"
@@ -468,12 +433,12 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                     {loading ? (
                       <>
                         <div className="animate-spin rounded-full h-5 w-5 border-2 border-black border-t-transparent"></div>
-                        Guardando...
+                        {t('buttons.loading')}
                       </>
                     ) : (
                       <>
                         <Save className="w-5 h-5" />
-                        Guardar Cambios
+                        {t('buttons.saveChanges')}
                       </>
                     )}
                   </button>
@@ -493,7 +458,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                     className="flex items-center gap-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50"
                   >
                     <X className="w-5 h-5" />
-                    Cancelar
+                    {t('buttons.cancel')}
                   </button>
                 </div>
               </form>
@@ -514,18 +479,18 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                 <Info className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-xl font-bold">Información del Sistema</h2>
-                <p className="text-white/80">Detalles técnicos</p>
+                <h2 className="text-xl font-bold">{t('labels.version')}</h2>
+                <p className="text-white/80">{t('settings.technicalDetails')}</p>
               </div>
             </div>
           </div>
 
           <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
                 <div className="flex items-center gap-3 mb-2">
                   <Settings className="w-5 h-5 text-gray-600" />
-                  <span className="text-sm text-gray-700 font-medium">Versión</span>
+                  <span className="text-sm text-gray-700 font-medium">{t('labels.version')}</span>
                 </div>
                 <p className="text-lg font-bold text-gray-800 pl-8">Stocky v1.0.0</p>
               </div>
@@ -533,7 +498,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
               <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
                 <div className="flex items-center gap-3 mb-2">
                   <Database className="w-5 h-5 text-gray-600" />
-                  <span className="text-sm text-gray-700 font-medium">Base de Datos</span>
+                  <span className="text-sm text-gray-700 font-medium">{t('labels.database')}</span>
                 </div>
                 <p className="text-lg font-bold text-gray-800 pl-8">Supabase PostgreSQL</p>
               </div>
@@ -541,40 +506,12 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
               <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200">
                 <div className="flex items-center gap-3 mb-2">
                   <CheckCircle className="w-5 h-5 text-green-600" />
-                  <span className="text-sm text-green-700 font-medium">Estado</span>
+                  <span className="text-sm text-green-700 font-medium">{t('labels.status')}</span>
                 </div>
                 <p className="text-lg font-bold text-green-800 pl-8 flex items-center gap-2">
                   <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                  Conectado
+                  {t('status.connected')}
                 </p>
-              </div>
-
-              <div className="p-4 bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl border border-amber-200">
-                <div className="flex items-center gap-3 mb-2">
-                  <Printer className="w-5 h-5 text-amber-700" />
-                  <span className="text-sm text-amber-800 font-medium">Impresora térmica</span>
-                </div>
-                <div className="pl-8">
-                  <label className="block text-xs text-amber-700 mb-1">Ancho de papel</label>
-                  <select
-                    value={printerPaperWidth}
-                    onChange={handlePrinterWidthChange}
-                    className="w-full max-w-[180px] h-10 px-3 border border-amber-300 rounded-lg bg-white text-amber-900 font-semibold focus:ring-2 focus:ring-amber-300 focus:border-transparent"
-                  >
-                    <option value={58}>58mm</option>
-                    <option value={80}>80mm</option>
-                    <option value={104}>104mm</option>
-                  </select>
-                  <label className="mt-3 inline-flex items-center gap-2 text-sm text-amber-900 font-medium">
-                    <input
-                      type="checkbox"
-                      checked={autoPrintReceipt}
-                      onChange={handleAutoPrintReceiptChange}
-                      className="h-4 w-4 rounded border-amber-400 text-amber-700 focus:ring-amber-300"
-                    />
-                    Imprimir recibo automáticamente al cerrar venta
-                  </label>
-                </div>
               </div>
             </div>
           </div>
@@ -593,8 +530,8 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                 <Smartphone className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-xl font-bold">Dispositivos y Notificaciones</h2>
-                <p className="text-white/80">Gestiona tus apps y alertas</p>
+                <h2 className="text-xl font-bold">{t('settings.devicesNotifications')}</h2>
+                <p className="text-white/80">{t('settings.manageApps')}</p>
               </div>
             </div>
           </div>
@@ -607,16 +544,16 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                   <div className="p-2 bg-violet-100 rounded-lg">
                     <Download className="w-5 h-5 text-violet-600" />
                   </div>
-                  <span className="text-sm text-gray-600 font-medium">Descargar App</span>
+                  <span className="text-sm text-gray-600 font-medium">{t('buttons.download')}</span>
                 </div>
                 <p className="text-sm text-gray-600 mb-3 pl-11">
-                  Descarga Stocky para Android, Windows o instala la versión web en tu iPhone.
+                  {t('settings.downloadDescription')}
                 </p>
                 <button
                   onClick={() => window.open('/descargar', '_blank')}
                   className="ml-11 flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium transition-all text-sm"
                 >
-                  Ver descargas
+                  {t('settings.viewDownloads')}
                   <ExternalLink className="w-4 h-4" />
                 </button>
               </div>
@@ -627,35 +564,22 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                   <div className="p-2 bg-gray-100 rounded-lg">
                     <Bell className="w-5 h-5 text-gray-600" />
                   </div>
-                  <span className="text-sm text-gray-600 font-medium">Notificaciones Push</span>
+                  <span className="text-sm text-gray-600 font-medium">{t('settings.pushNotifications')}</span>
                 </div>
                 <p className="text-sm text-gray-600 mb-3 pl-11">
-                  Activa notificaciones para recibir alertas de ventas, stock bajo y más.
+                  {t('settings.notificationsDescription')}
                 </p>
                 <button
                   onClick={() => window.open('/descargar', '_blank')}
                   className="ml-11 flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-all text-sm"
                 >
-                  Configurar notificaciones
+                  {t('settings.configureNotifications')}
                   <ExternalLink className="w-4 h-4" />
                 </button>
               </div>
             </div>
           </div>
         </motion.div>
-
-        {/* Sección de Facturación Electrónica */}
-        {business && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <InvoicingSection
-              {...({ businessId: business.id, businessName: business.name, businessNit: business.nit } as any)}
-            />
-          </motion.div>
-        )}
 
         <AnimatePresence>
           {showDeleteAccountModal && (
@@ -679,16 +603,16 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                       <AlertTriangle className="h-5 w-5 text-rose-700" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-rose-900">Eliminar cuenta</h3>
-                      <p className="text-sm text-rose-800">Esta acción es permanente</p>
+                      <h3 className="text-lg font-bold text-rose-900">{t('buttons.delete')}</h3>
+                      <p className="text-sm text-rose-800">{t('messages.actionCannotBeUndone')}</p>
                     </div>
                   </div>
                 </div>
                 <div className="p-5 space-y-3 text-sm text-rose-900">
                   <p>
-                    Al eliminar tu cuenta se revocará tu acceso y los negocios asociados quedarán suspendidos.
+                    {t('settings.deleteAccountWarning')}
                   </p>
-                  <p>Si estás seguro, confirma para continuar.</p>
+                  <p>{t('settings.confirmToContinue')}</p>
                 </div>
                 <div className="flex gap-3 p-5 pt-0">
                   <button
@@ -696,14 +620,14 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                     onClick={() => setShowDeleteAccountModal(false)}
                     disabled={deletingAccount}
                   >
-                    Cancelar
+                    {t('buttons.cancel')}
                   </button>
                   <button
                     className="flex-1 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
                     onClick={handleDeleteAccount}
                     disabled={deletingAccount}
                   >
-                    {deletingAccount ? 'Eliminando...' : 'Eliminar'}
+                    {deletingAccount ? t('buttons.loading') : t('buttons.delete')}
                   </button>
                 </div>
               </motion.div>

@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { Printer, X } from 'lucide-react';
 import { Button } from './button';
 
@@ -17,9 +18,11 @@ export function PrintReceiptConfirmModal({
   onConfirm,
   onCancel,
   isLoading = false,
-  customerName = 'Venta general',
+  customerName,
   onCustomerNameChange,
 }: PrintReceiptConfirmModalProps) {
+  const { t } = useTranslation('common');
+  const resolvedCustomerName = customerName ?? t('form.generalSale');
   return (
     <AnimatePresence>
       {isOpen && (
@@ -47,7 +50,7 @@ export function PrintReceiptConfirmModal({
                     <Printer className="w-5 h-5 text-primary-600" />
                   </div>
                   <h2 className="text-lg font-bold text-primary-900">
-                    Imprimir comprobante
+                    {t('printReceipt.title')}
                   </h2>
                 </div>
                 <button
@@ -61,20 +64,20 @@ export function PrintReceiptConfirmModal({
 
               <div className="p-6">
                 <p className="text-primary-700 font-medium mb-2">
-                  ¿Deseas imprimir el comprobante de venta?
+                  {t('printReceipt.confirmMessage')}
                 </p>
                 <p className="text-sm text-accent-600 mb-4">
-                  Se enviará el comprobante a la impresora térmica configurada.
+                  {t('printReceipt.printerNote')}
                 </p>
                 <div>
                   <label className="block text-xs font-semibold text-accent-600 mb-1 uppercase tracking-wide">
-                    Cliente (opcional)
+                    {t('printReceipt.customerLabel')}
                   </label>
                   <input
                     type="text"
-                    value={customerName}
+                    value={resolvedCustomerName}
                     onChange={(e) => onCustomerNameChange?.(e.target.value)}
-                    placeholder="Venta general"
+                    placeholder={t('printReceipt.customerPlaceholder')}
                     disabled={isLoading}
                     className="w-full px-4 py-3 border border-accent-200 rounded-xl focus:ring-2 focus:ring-primary-300 focus:border-transparent text-primary-900 placeholder-accent-400 transition-all"
                   />
@@ -88,7 +91,7 @@ export function PrintReceiptConfirmModal({
                   variant="outline"
                   className="flex-1 border-accent-200 text-primary-700 hover:bg-accent-100"
                 >
-                  No
+                  {t('printReceipt.no')}
                 </Button>
                 <Button
                   onClick={onConfirm}
@@ -96,7 +99,7 @@ export function PrintReceiptConfirmModal({
                   className="flex-1 gradient-primary text-white hover:opacity-90 flex items-center justify-center gap-2"
                 >
                   <Printer className="w-4 h-4" />
-                  Sí, imprimir
+                  {t('printReceipt.yes')}
                 </Button>
               </div>
             </motion.div>

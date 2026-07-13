@@ -1,8 +1,7 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Dimensions,
   Easing,
   Modal,
   Platform,
@@ -37,6 +36,7 @@ type Props = PropsWithChildren<{
   perfTag?: string;
   dismissable?: boolean;
   hideCloseButton?: boolean;
+  entryAnimation?: boolean;
 }>;
 
 const MODAL_HEIGHT_REDUCTION_FACTOR = 0.95;
@@ -77,14 +77,12 @@ export function StockyModal({
   bodyFlex,
   dismissable = false,
   hideCloseButton = false,
+  entryAnimation = true,
 }: Props) {
   const isCentered = layout === 'centered';
   const centeredShift = Math.max(0, centeredOffsetY);
   const effectiveBackdrop = backdropVariant === 'blur' ? 'dim' : backdropVariant;
 
-  const screenHeight = useRef(Dimensions.get('window').height).current;
-  const translateY = useRef(new Animated.Value(screenHeight)).current;
-  const scrimOpacity = useRef(new Animated.Value(0)).current;
   const [renderVisible, setRenderVisible] = useState(visible);
   const [contentReady, setContentReady] = useState(!deferContent);
   const shouldUnmountContent = deferContent && deferBehavior === 'unmount';
@@ -97,6 +95,30 @@ export function StockyModal({
       ? styles.centeredSheetFlex
       : styles.sheetFlex
     : undefined;
+
+  const appearAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!entryAnimation || !visible) return;
+    appearAnim.setValue(0);
+    Animated.timing(appearAnim, {
+      toValue: 1,
+      duration: 1000,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [appearAnim, entryAnimation, visible]);
+
+  const sheetAnimatedStyle = entryAnimation
+    ? {
+        opacity: appearAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }),
+        transform: [
+          { translateY: appearAnim.interpolate({ inputRange: [0, 1], outputRange: [15, 0] }) },
+          { scale: appearAnim.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1] }) },
+        ],
+      }
+    : undefined;
+
   const adjustedSheetStyle = useMemo(() => {
     const flattened = StyleSheet.flatten(sheetStyle);
     if (!flattened) return undefined;
@@ -116,57 +138,9 @@ export function StockyModal({
     return adjusted;
   }, [sheetStyle]);
 
-  const animateIn = useCallback(() => {
-    translateY.setValue(screenHeight);
-    scrimOpacity.setValue(0);
-    Animated.parallel([
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 280,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(scrimOpacity, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [translateY, scrimOpacity, screenHeight]);
-
-  const animateOut = useCallback(
-    (onDone: () => void) => {
-      Animated.parallel([
-        Animated.timing(translateY, {
-          toValue: screenHeight,
-          duration: 200,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(scrimOpacity, {
-          toValue: 0,
-          duration: 180,
-          useNativeDriver: true,
-        }),
-      ]).start(onDone);
-    },
-    [translateY, scrimOpacity, screenHeight],
-  );
-
   useEffect(() => {
-    if (visible) {
-      setRenderVisible(true);
-    } else if (renderVisible) {
-      animateOut(() => {
-        setRenderVisible(false);
-      });
-    }
-  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!renderVisible) return;
-    animateIn();
-  }, [renderVisible, animateIn]);
+    setRenderVisible(visible);
+  }, [visible]);
 
   useEffect(() => {
     if (!deferContent) {
@@ -205,60 +179,110 @@ export function StockyModal({
       navigationBarTranslucent={Platform.OS === 'android'}
     >
       <View style={[styles.overlay, isCentered ? styles.overlayCentered : styles.overlaySheet]}>
-        <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: scrimOpacity }]}>
+        <View style={[StyleSheet.absoluteFillObject, styles.scrimVisible]}>
           <Pressable
             style={[styles.scrim, styles.scrimDim]}
             onPress={dismissable ? onClose : undefined}
           />
-        </Animated.View>
-        <Animated.View
-          style={[
-            styles.sheet,
-            isCentered && styles.centeredSheet,
-            Platform.OS === 'android' && styles.sheetAndroid,
-            centeredShift > 0 ? { marginTop: -centeredShift } : undefined,
-            sheetFlexStyle,
-            adjustedSheetStyle,
-            { transform: [{ translateY }] },
-          ]}
-        >
-          <View style={wrapperLayoutStyle} pointerEvents={wrapperPointerEvents}>
-            {headerSlot ? (
-              <View style={styles.customHeader}>
-                {headerSlot}
-                {!hideCloseButton ? (
-                  <Pressable onPress={onClose} style={styles.headerCloseOverlay}>
+        </View>
+        {entryAnimation ? (
+          <Animated.View
+            style={[
+              styles.sheet,
+              isCentered && styles.centeredSheet,
+              Platform.OS === 'android' && styles.sheetAndroid,
+              centeredShift > 0 ? { marginTop: -centeredShift } : undefined,
+              sheetFlexStyle,
+              adjustedSheetStyle,
+              sheetAnimatedStyle,
+            ]}
+          >
+            <View style={wrapperLayoutStyle} pointerEvents={wrapperPointerEvents}>
+              {headerSlot ? (
+                <View style={styles.customHeader}>
+                  {headerSlot}
+                  {!hideCloseButton ? (
+                    <Pressable onPress={onClose} style={styles.headerCloseOverlay}>
+                      <Ionicons name="close" size={22} color={STOCKY_COLORS.textSecondary} />
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : (
+                <View style={styles.header}>
+                  <Text style={styles.title}>{title || 'Detalle'}</Text>
+                  <Pressable onPress={onClose} style={styles.closeButton}>
                     <Ionicons name="close" size={22} color={STOCKY_COLORS.textSecondary} />
                   </Pressable>
-                ) : null}
-              </View>
-            ) : (
-              <View style={styles.header}>
-                <Text style={styles.title}>{title || 'Detalle'}</Text>
-                <Pressable onPress={onClose} style={styles.closeButton}>
-                  <Ionicons name="close" size={22} color={STOCKY_COLORS.textSecondary} />
-                </Pressable>
-              </View>
-            )}
+                </View>
+              )}
 
-            {shouldFlexBody ? (
-              <ScrollView
-                style={[styles.content, contentStyle]}
-                contentContainerStyle={[styles.contentContainer, contentContainerStyle]}
-                keyboardShouldPersistTaps="always"
-                keyboardDismissMode="on-drag"
-              >
-                {shouldUnmountContent && !contentReady ? (deferFallback ?? null) : children}
-              </ScrollView>
-            ) : (
-              <View style={[styles.contentContainer, contentStyle, contentContainerStyle]}>
-                {shouldUnmountContent && !contentReady ? (deferFallback ?? null) : children}
-              </View>
-            )}
+              {shouldFlexBody ? (
+                <ScrollView
+                  style={[styles.content, contentStyle]}
+                  contentContainerStyle={[styles.contentContainer, contentContainerStyle]}
+                  keyboardShouldPersistTaps="always"
+                  keyboardDismissMode="on-drag"
+                >
+                  {shouldUnmountContent && !contentReady ? (deferFallback ?? null) : children}
+                </ScrollView>
+              ) : (
+                <View style={[styles.contentContainer, contentStyle, contentContainerStyle]}>
+                  {shouldUnmountContent && !contentReady ? (deferFallback ?? null) : children}
+                </View>
+              )}
 
-            {footer ? <View style={[styles.footer, footerStyle]}>{footer}</View> : null}
+              {footer ? <View style={[styles.footer, footerStyle]}>{footer}</View> : null}
+            </View>
+          </Animated.View>
+        ) : (
+          <View
+            style={[
+              styles.sheet,
+              isCentered && styles.centeredSheet,
+              Platform.OS === 'android' && styles.sheetAndroid,
+              centeredShift > 0 ? { marginTop: -centeredShift } : undefined,
+              sheetFlexStyle,
+              adjustedSheetStyle,
+            ]}
+          >
+            <View style={wrapperLayoutStyle} pointerEvents={wrapperPointerEvents}>
+              {headerSlot ? (
+                <View style={styles.customHeader}>
+                  {headerSlot}
+                  {!hideCloseButton ? (
+                    <Pressable onPress={onClose} style={styles.headerCloseOverlay}>
+                      <Ionicons name="close" size={22} color={STOCKY_COLORS.textSecondary} />
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : (
+                <View style={styles.header}>
+                  <Text style={styles.title}>{title || 'Detalle'}</Text>
+                  <Pressable onPress={onClose} style={styles.closeButton}>
+                    <Ionicons name="close" size={22} color={STOCKY_COLORS.textSecondary} />
+                  </Pressable>
+                </View>
+              )}
+
+              {shouldFlexBody ? (
+                <ScrollView
+                  style={[styles.content, contentStyle]}
+                  contentContainerStyle={[styles.contentContainer, contentContainerStyle]}
+                  keyboardShouldPersistTaps="always"
+                  keyboardDismissMode="on-drag"
+                >
+                  {shouldUnmountContent && !contentReady ? (deferFallback ?? null) : children}
+                </ScrollView>
+              ) : (
+                <View style={[styles.contentContainer, contentStyle, contentContainerStyle]}>
+                  {shouldUnmountContent && !contentReady ? (deferFallback ?? null) : children}
+                </View>
+              )}
+
+              {footer ? <View style={[styles.footer, footerStyle]}>{footer}</View> : null}
+            </View>
           </View>
-        </Animated.View>
+        )}
       </View>
     </Modal>
   );
@@ -298,6 +322,9 @@ const styles = StyleSheet.create({
   },
   scrimDim: {
     backgroundColor: 'rgba(2, 34, 37, 0.38)',
+  },
+  scrimVisible: {
+    opacity: 1,
   },
   sheet: {
     backgroundColor: STOCKY_COLORS.surface,

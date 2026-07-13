@@ -32,7 +32,12 @@ export function usePaymentFlow({
     setShowPaymentModal(false);
     setShowPaymentMethodMenu(false);
     setShowSplitBillModal(true);
-  }, [setShowCloseOrderChoiceModal, setShowPaymentMethodMenu, setShowPaymentModal, setShowSplitBillModal]);
+  }, [
+    setShowCloseOrderChoiceModal,
+    setShowPaymentMethodMenu,
+    setShowPaymentModal,
+    setShowSplitBillModal,
+  ]);
 
   const handleCloseCloseOrderChoice = useCallback(() => {
     if (isClosingOrder || releasingEmptyOrder) return;

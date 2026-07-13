@@ -1,10 +1,12 @@
 import { type RefObject } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { formatPrice } from '../../utils/formatters';
+import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 
 interface CatalogItem {
   item_type: string;
@@ -40,15 +42,21 @@ export function MesaCatalogSearch({
   onAddItem,
   onLoadMore,
 }: MesaCatalogSearchProps) {
+  const { t } = useTranslation(['mesas', 'common']);
+  const config = useBusinessConfig();
+  const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
+  
+  const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
+  
   return (
     <div className="mb-6">
       <label className="block text-sm font-semibold text-primary-700 mb-3">
         <Search className="w-4 h-4 inline mr-2" />
-        Agregar Producto o Combo
+        {t('mesas:labels.addProduct')}
       </label>
       <Input
         type="text"
-        placeholder="Buscar por nombre..."
+        placeholder={t('mesas:labels.searchProduct')}
         value={searchProduct}
         onChange={(e) => onSearchChange(e.target.value)}
         className="h-12 border-accent-300"
@@ -80,7 +88,7 @@ export function MesaCatalogSearch({
                   )}
                 </div>
                 <span className="text-lg font-bold text-green-600">
-                  {formatPrice(catalogItem.sale_price || 0)}
+                  {fmtPrice(catalogItem.sale_price || 0)}
                 </span>
               </motion.div>
             ))}
@@ -93,7 +101,7 @@ export function MesaCatalogSearch({
                   variant="outline"
                   className="mt-2 w-full h-9 text-xs"
                 >
-                  Cargar mas resultados ({visibleFilteredCatalog.length}/{totalFilteredCatalog})
+                  {t('mesas:buttons.loadMore')} ({visibleFilteredCatalog.length}/{totalFilteredCatalog})
                 </Button>
               </div>
             )}

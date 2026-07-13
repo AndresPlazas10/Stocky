@@ -5,6 +5,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { BrowserRouter, HashRouter } from "react-router-dom";
 import { initSentry } from './sentry.js';
 import { inject } from '@vercel/analytics';
+import "./i18n";
 import "./index.css";
 import "./browser-compat.css"; // Compatibilidad con navegadores antiguos
 

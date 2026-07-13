@@ -1,4 +1,5 @@
 import { Pressable, Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { StockyModal } from '../../../ui/StockyModal';
 import { comprasStyles as s } from '../comprasStyles';
 
@@ -22,10 +23,11 @@ export function SupplierFilterModal({
   onSelect,
   onClose,
 }: SupplierFilterModalProps) {
+  const { t } = useTranslation();
   return (
     <StockyModal
       visible={visible}
-      title="Seleccionar proveedor"
+      title={t('comprasSection.selectSupplier')}
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={30}

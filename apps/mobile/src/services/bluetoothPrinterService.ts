@@ -1,6 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import BluetoothClassic from 'react-native-bluetooth-classic';
 import { Buffer } from 'buffer';
+
+let BluetoothClassic: any = null;
+try {
+  BluetoothClassic = require('react-native-bluetooth-classic').default;
+} catch {
+  // Expo Go o módulo nativo no disponible
+}
 
 const PRINTER_KEY = 'stocky_bt_printer';
 const CHUNK_SIZE = 256; // PT-210 y similares funcionan mejor con chunks pequenos
@@ -143,7 +149,8 @@ export async function connectToPrinter(address: string): Promise<boolean> {
       await delay(CONNECT_DELAY_MS);
       return true;
     } catch (insecureError) {
-      if (__DEV__) console.error('[BT Printer] connectToDevice (insecure fallback) failed:', insecureError);
+      if (__DEV__)
+        console.error('[BT Printer] connectToDevice (insecure fallback) failed:', insecureError);
       return false;
     }
   }
@@ -185,9 +192,10 @@ export async function printBytes(address: string, data: Uint8Array): Promise<Pri
 
       // Algunas librerias de RN prefieren Buffer construido desde el ArrayBuffer subyacente
       const buffer = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
-      if (__DEV__) console.warn(
-        `[BT Printer] Writing ${buffer.length} bytes to ${address} (chunkSize=${CHUNK_SIZE})`,
-      );
+      if (__DEV__)
+        console.warn(
+          `[BT Printer] Writing ${buffer.length} bytes to ${address} (chunkSize=${CHUNK_SIZE})`,
+        );
 
       if (buffer.length <= CHUNK_SIZE) {
         await BluetoothClassic.writeToDevice(address, buffer);
@@ -207,7 +215,8 @@ export async function printBytes(address: string, data: Uint8Array): Promise<Pri
       return { ok: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (__DEV__) console.error(`[BT Printer] printBytes attempt ${attempt + 1} failed:`, message, error);
+      if (__DEV__)
+        console.error(`[BT Printer] printBytes attempt ${attempt + 1} failed:`, message, error);
       if (attempt === MAX_RETRIES) {
         return { ok: false, error: message };
       }

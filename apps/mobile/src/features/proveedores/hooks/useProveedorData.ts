@@ -94,10 +94,11 @@ export function useProveedorData({ businessId, source, userId }: UseProveedorDat
       setHasMoreSuppliers(result.suppliers.length === SUPPLIERS_PAGE_SIZE);
       setPage(1);
     } catch (err) {
-      if (__DEV__) console.error(
-        '[Proveedores] error al refrescar proveedores silenciosamente:',
-        getErrorMessage(err),
-      );
+      if (__DEV__)
+        console.error(
+          '[Proveedores] error al refrescar proveedores silenciosamente:',
+          getErrorMessage(err),
+        );
     }
   }, [businessId, taxColumn]);
 
@@ -119,7 +120,8 @@ export function useProveedorData({ businessId, source, userId }: UseProveedorDat
       setHasMoreSuppliers(result.suppliers.length === SUPPLIERS_PAGE_SIZE);
       setPage(nextPage);
     } catch (err) {
-      if (__DEV__) console.error('[Proveedores] error al cargar más proveedores:', getErrorMessage(err));
+      if (__DEV__)
+        console.error('[Proveedores] error al cargar más proveedores:', getErrorMessage(err));
     } finally {
       setLoadingMore(false);
     }

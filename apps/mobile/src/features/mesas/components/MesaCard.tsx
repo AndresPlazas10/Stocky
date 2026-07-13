@@ -1,6 +1,7 @@
 import React from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { StatusPill } from './StatusPill';
 import { MESA_IN_USE_MESSAGE, mesaDisplayName } from '../utils/mesaHelpers';
@@ -25,6 +26,8 @@ export const MesaCard = React.memo(function MesaCard({
   onPress,
   onDeletePress,
 }: MesaCardProps) {
+  const { t } = useTranslation('mesas');
+
   return (
     <Pressable
       style={[styles.card, occupied && styles.cardOccupied, lockedByOther && styles.cardLocked]}
@@ -49,7 +52,7 @@ export const MesaCard = React.memo(function MesaCard({
         <Ionicons name="layers-outline" size={54} color={occupied ? '#CA8A04' : '#00A63E'} />
       </View>
 
-      <Text style={styles.title}>{mesaDisplayName(mesa)}</Text>
+      <Text style={styles.title}>{mesaDisplayName(mesa, t('labels.table'))}</Text>
 
       {!lockedByOther ? <StatusPill occupied={occupied} lockedByOther={lockedByOther} /> : null}
 

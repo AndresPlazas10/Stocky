@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useWindowDimensions } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { listReportesByBusinessId } from '../../../domain/reportes/queries';
 import type { ReportesPeriod, ReportesSnapshot } from '../../../domain/reportes/contracts';
 import { formatCop } from '../../../utils/money';
@@ -10,6 +11,7 @@ type UseReportesDataParams = {
 };
 
 export function useReportesData({ businessId }: UseReportesDataParams) {
+  const { t } = useTranslation();
   const { width: windowWidth } = useWindowDimensions();
   const [period, setPeriod] = useState<ReportesPeriod>('30d');
   const [snapshot, setSnapshot] = useState<ReportesSnapshot | null>(null);
@@ -27,7 +29,7 @@ export function useReportesData({ businessId }: UseReportesDataParams) {
         const next = await listReportesByBusinessId(businessId, { period });
         setSnapshot(next);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'No se pudieron cargar los reportes.');
+        setError(err instanceof Error ? err.message : t('reportesSection.loadError'));
       } finally {
         if (mode === 'initial') setLoading(false);
         if (mode === 'refresh') setRefreshing(false);
@@ -67,23 +69,25 @@ export function useReportesData({ businessId }: UseReportesDataParams) {
     const items: string[] = [];
 
     if (grossResult >= 0) {
-      items.push(`Resultado positivo de ${formatCop(grossResult)} en ${getPeriodLabel(period)}.`);
+      items.push(`${t('reportesSection.positiveResult')} ${formatCop(grossResult)}.`);
     } else {
-      items.push(
-        `Resultado negativo de ${formatCop(Math.abs(grossResult))} en ${getPeriodLabel(period)}.`,
-      );
+      items.push(`${t('reportesSection.negativeResult')} ${formatCop(Math.abs(grossResult))}.`);
     }
 
     if (dominantPayment) {
-      items.push(`Método dominante: ${dominantPayment.label} (${dominantPayment.count} ventas).`);
+      items.push(
+        `${t('reportesSection.dominantMethod')} ${dominantPayment.label} (${dominantPayment.count} ${t('reportes.sales')}).`,
+      );
     } else {
-      items.push('Sin ventas registradas para construir métodos de pago.');
+      items.push(t('reportesSection.noPaymentMethods'));
     }
 
     if (topSeller) {
-      items.push(`Vendedor líder: ${topSeller.sellerName} con ${formatCop(topSeller.total)}.`);
+      items.push(
+        `${t('reportesSection.topSeller')} ${topSeller.sellerName} ${formatCop(topSeller.total)}.`,
+      );
     } else {
-      items.push('Sin datos de vendedores para el período actual.');
+      items.push(t('reportesSection.noSellerData'));
     }
 
     return items;
@@ -115,7 +119,7 @@ export function useReportesData({ businessId }: UseReportesDataParams) {
 
   const financeBarData = useMemo(
     () => ({
-      labels: ['Ventas', 'Compras'],
+      labels: [t('reportes.sales'), t('reportes.purchases')],
       datasets: [
         {
           data: [ventasTotal, comprasTotal],

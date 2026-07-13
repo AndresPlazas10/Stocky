@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { STOCKY_COLORS } from '../../theme/tokens';
 import { reportesStyles as s } from './reportesStyles';
 import { ReportsHeroCard } from './components/ReportsHeroCard';
@@ -22,6 +23,7 @@ type Props = {
 };
 
 export function ReportesPanel({ businessId, businessName, source }: Props) {
+  const { t } = useTranslation();
   const data = useReportesData({ businessId });
 
   if (data.loading && !data.snapshot) {

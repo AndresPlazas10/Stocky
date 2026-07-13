@@ -1,10 +1,12 @@
 import { motion } from 'framer-motion';
 import { Package, Plus, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '../../ui/card';
 import { Button } from '../../ui/button';
 import type { InventoryHeaderProps } from '@/types/components';
 
 export function InventoryHeader({ hasAdminPrivileges, showForm, onToggleForm }: InventoryHeaderProps) {
+  const { t } = useTranslation('common');
   return (
     <motion.div
       initial={{ opacity: 0, y: -20 }}
@@ -18,9 +20,9 @@ export function InventoryHeader({ hasAdminPrivileges, showForm, onToggleForm }: 
               <Package className="w-8 h-8" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold">Inventario</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold">{t('navigation.inventory')}</h1>
               <p className="text-white/80 mt-1 text-sm sm:text-base">
-                {hasAdminPrivileges ? 'Gestión de productos y stock' : 'Consulta de productos y stock'}
+                {hasAdminPrivileges ? t('inventoryHeader.adminView') : t('inventoryHeader.employeeView')}
               </p>
             </div>
           </div>
@@ -32,12 +34,12 @@ export function InventoryHeader({ hasAdminPrivileges, showForm, onToggleForm }: 
               {showForm ? (
                 <>
                   <X className="w-5 h-5" />
-                  Cancelar
+                  {t('buttons.cancel')}
                 </>
               ) : (
                 <>
                   <Plus className="w-5 h-5" />
-                  Agregar Producto
+                  {t('buttons.add')}
                 </>
               )}
             </Button>

@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { splitBillStyles as styles } from '../splitBillStyles';
 
 interface SplitBillStepperProps {
@@ -6,11 +7,13 @@ interface SplitBillStepperProps {
 }
 
 export function SplitBillStepper({ currentStep }: SplitBillStepperProps) {
+  const { t } = useTranslation('mesas');
+
   return (
     <View style={styles.stepperRow}>
       {[
-        { id: 1 as const, label: 'Cuentas' },
-        { id: 2 as const, label: 'División' },
+        { id: 1 as const, label: t('splitBill.addAccount', { defaultValue: 'Cuentas' }) },
+        { id: 2 as const, label: t('splitBill.assignItems', { defaultValue: 'División' }) },
       ].map((step) => {
         const active = currentStep === step.id;
         const complete = currentStep > step.id;

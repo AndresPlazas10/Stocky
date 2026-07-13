@@ -1,21 +1,43 @@
 const DEFAULT_TIMEZONE = 'America/Bogota';
 const DEFAULT_LOCALE = 'es-CO';
 
+function getFallbacks(locale?: string) {
+  const isEnglish = (locale || '').startsWith('en');
+  return {
+    noDate: isEnglish ? 'No date' : 'Sin fecha',
+    invalidFormat: isEnglish ? 'Invalid format' : 'Formato inválido',
+    invalidDate: isEnglish ? 'Invalid date' : 'Fecha inválida',
+    invalidTime: isEnglish ? 'Invalid time' : 'Hora inválida',
+    formatError: isEnglish ? 'Format error' : 'Error de formato',
+  };
+}
+
+export interface DateConfig {
+  timezone?: string;
+  locale?: string;
+}
+
 /**
  * Formats a timestamp to a readable date/time string
  * @param timestamp - PostgreSQL timestamptz, Date object, or ISO string
  * @param options - Intl.DateTimeFormat options
+ * @param config - Timezone and locale configuration
  * @returns Formatted date string
  */
 export function formatDate(
   timestamp: string | Date | number | null | undefined,
-  options?: Intl.DateTimeFormatOptions
+  options?: Intl.DateTimeFormatOptions,
+  config?: DateConfig
 ): string {
-  if (!timestamp) return 'Sin fecha';
-  
+  const timezone = config?.timezone || DEFAULT_TIMEZONE;
+  const locale = config?.locale || DEFAULT_LOCALE;
+  const fb = getFallbacks(locale);
+
+  if (!timestamp) return fb.noDate;
+
   try {
     let date: Date;
-    
+
     if (timestamp instanceof Date) {
       date = timestamp;
     } else if (typeof timestamp === 'string') {
@@ -23,13 +45,13 @@ export function formatDate(
     } else if (typeof timestamp === 'number') {
       date = new Date(timestamp);
     } else {
-      return 'Formato inválido';
+      return fb.invalidFormat;
     }
-    
+
     if (isNaN(date.getTime())) {
-      return 'Fecha inválida';
+      return fb.invalidDate;
     }
-    
+
     const defaultOptions: Intl.DateTimeFormatOptions = {
       year: 'numeric',
       month: 'short',
@@ -37,202 +59,220 @@ export function formatDate(
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
-      timeZone: DEFAULT_TIMEZONE,
+      timeZone: timezone,
       ...options
     };
-    
-    return date.toLocaleString(DEFAULT_LOCALE, defaultOptions);
+
+    return date.toLocaleString(locale, defaultOptions);
   } catch {
-    return 'Error de formato';
+    return fb.formatError;
   }
 }
 
 /**
  * Formats a timestamp to date only (no time)
- * @param timestamp - PostgreSQL timestamptz, Date object, or ISO string
- * @returns Formatted date string (e.g., "15 dic 2025")
  */
 export function formatDateOnly(
-  timestamp: string | Date | number | null | undefined
+  timestamp: string | Date | number | null | undefined,
+  config?: DateConfig
 ): string {
-  if (!timestamp) return 'Fecha inválida';
-  
+  const timezone = config?.timezone || DEFAULT_TIMEZONE;
+  const locale = config?.locale || DEFAULT_LOCALE;
+  const fb = getFallbacks(locale);
+
+  if (!timestamp) return fb.invalidDate;
+
   try {
     const date = new Date(timestamp);
-    
+
     if (isNaN(date.getTime())) {
-      return 'Fecha inválida';
+      return fb.invalidDate;
     }
-    
-    return date.toLocaleDateString(DEFAULT_LOCALE, {
+
+    return date.toLocaleDateString(locale, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
-      timeZone: DEFAULT_TIMEZONE
+      timeZone: timezone
     });
   } catch {
-    return 'Fecha inválida';
+    return fb.invalidDate;
   }
 }
 
 /**
  * Formats a timestamp to time only (12-hour format with AM/PM)
- * @param timestamp - PostgreSQL timestamptz, Date object, or ISO string
- * @returns Formatted time string (e.g., "02:30 PM")
  */
 export function formatTimeOnly(
-  timestamp: string | Date | number | null | undefined
+  timestamp: string | Date | number | null | undefined,
+  config?: DateConfig
 ): string {
-  if (!timestamp) return 'Hora inválida';
-  
+  const timezone = config?.timezone || DEFAULT_TIMEZONE;
+  const locale = config?.locale || DEFAULT_LOCALE;
+  const fb = getFallbacks(locale);
+
+  if (!timestamp) return fb.invalidTime;
+
   try {
     const date = new Date(timestamp);
-    
+
     if (isNaN(date.getTime())) {
-      return 'Hora inválida';
+      return fb.invalidTime;
     }
-    
-    return date.toLocaleTimeString(DEFAULT_LOCALE, {
+
+    return date.toLocaleTimeString(locale, {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
-      timeZone: DEFAULT_TIMEZONE
+      timeZone: timezone
     });
   } catch {
-    return 'Hora inválida';
+    return fb.invalidTime;
   }
 }
 
 /**
  * Formats a timestamp to long date format with time
- * @param timestamp - PostgreSQL timestamptz, Date object, or ISO string
- * @returns Formatted string (e.g., "15 de diciembre de 2025, 02:30 PM")
  */
 export function formatDateLong(
-  timestamp: string | Date | number | null | undefined
+  timestamp: string | Date | number | null | undefined,
+  config?: DateConfig
 ): string {
-  if (!timestamp) return 'Fecha inválida';
-  
+  const timezone = config?.timezone || DEFAULT_TIMEZONE;
+  const locale = config?.locale || DEFAULT_LOCALE;
+  const fb = getFallbacks(locale);
+
+  if (!timestamp) return fb.invalidDate;
+
   try {
     const date = new Date(timestamp);
-    
+
     if (isNaN(date.getTime())) {
-      return 'Fecha inválida';
+      return fb.invalidDate;
     }
-    
-    return date.toLocaleDateString(DEFAULT_LOCALE, {
+
+    return date.toLocaleDateString(locale, {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
-      timeZone: DEFAULT_TIMEZONE
+      timeZone: timezone
     });
   } catch {
-    return 'Fecha inválida';
+    return fb.invalidDate;
   }
 }
 
 /**
  * Formats a timestamp for POS tickets/receipts
- * @param timestamp - PostgreSQL timestamptz, Date object, or ISO string
- * @returns Formatted string (e.g., "lunes, 15 de diciembre de 2025 - 02:30 PM")
  */
 export function formatDateTimeTicket(
-  timestamp: string | Date | number | null | undefined
+  timestamp: string | Date | number | null | undefined,
+  config?: DateConfig
 ): string {
-  if (!timestamp) return 'Fecha inválida';
-  
+  const timezone = config?.timezone || DEFAULT_TIMEZONE;
+  const locale = config?.locale || DEFAULT_LOCALE;
+  const fb = getFallbacks(locale);
+
+  if (!timestamp) return fb.invalidDate;
+
   try {
     const date = new Date(timestamp);
-    
+
     if (isNaN(date.getTime())) {
-      return 'Fecha inválida';
+      return fb.invalidDate;
     }
-    
+
     const dateOptions: Intl.DateTimeFormatOptions = {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
-      timeZone: DEFAULT_TIMEZONE
+      timeZone: timezone
     };
-    
+
     const timeOptions: Intl.DateTimeFormatOptions = {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
-      timeZone: DEFAULT_TIMEZONE
+      timeZone: timezone
     };
-    
-    const datePart = date.toLocaleDateString(DEFAULT_LOCALE, dateOptions);
-    const timePart = date.toLocaleTimeString(DEFAULT_LOCALE, timeOptions);
-    
+
+    const datePart = date.toLocaleDateString(locale, dateOptions);
+    const timePart = date.toLocaleTimeString(locale, timeOptions);
+
     return `${datePart} - ${timePart}`;
   } catch {
-    return 'Fecha inválida';
+    return fb.invalidDate;
   }
 }
 
 /**
  * Formats a timestamp to compact time for UI
- * @param timestamp - PostgreSQL timestamptz, Date object, or ISO string
- * @returns Formatted time string (e.g., "2:30 PM")
  */
 export function formatTimeCompact(
-  timestamp: string | Date | number | null | undefined
+  timestamp: string | Date | number | null | undefined,
+  config?: DateConfig
 ): string {
-  if (!timestamp) return 'Hora inválida';
-  
+  const timezone = config?.timezone || DEFAULT_TIMEZONE;
+  const locale = config?.locale || DEFAULT_LOCALE;
+  const fb = getFallbacks(locale);
+
+  if (!timestamp) return fb.invalidTime;
+
   try {
     const date = new Date(timestamp);
-    
+
     if (isNaN(date.getTime())) {
-      return 'Hora inválida';
+      return fb.invalidTime;
     }
-    
-    return date.toLocaleTimeString(DEFAULT_LOCALE, {
+
+    return date.toLocaleTimeString(locale, {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
-      timeZone: DEFAULT_TIMEZONE
+      timeZone: timezone
     });
   } catch {
-    return 'Hora inválida';
+    return fb.invalidTime;
   }
 }
 
 /**
  * Formats a timestamp for reports (dd/mm/yyyy hh:mm AM/PM)
- * @param timestamp - PostgreSQL timestamptz, Date object, or ISO string
- * @returns Formatted string (e.g., "15/12/2025 02:30 PM")
  */
 export function formatDateTimeReport(
-  timestamp: string | Date | number | null | undefined
+  timestamp: string | Date | number | null | undefined,
+  config?: DateConfig
 ): string {
-  if (!timestamp) return 'Fecha inválida';
-  
+  const timezone = config?.timezone || DEFAULT_TIMEZONE;
+  const locale = config?.locale || DEFAULT_LOCALE;
+  const fb = getFallbacks(locale);
+
+  if (!timestamp) return fb.invalidDate;
+
   try {
     const date = new Date(timestamp);
-    
+
     if (isNaN(date.getTime())) {
-      return 'Fecha inválida';
+      return fb.invalidDate;
     }
-    
+
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
-    
-    const timeFormatted = date.toLocaleTimeString(DEFAULT_LOCALE, {
+
+    const timeFormatted = date.toLocaleTimeString(locale, {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
-      timeZone: DEFAULT_TIMEZONE
+      timeZone: timezone
     });
-    
+
     return `${day}/${month}/${year} ${timeFormatted}`;
   } catch {
-    return 'Fecha inválida';
+    return fb.invalidDate;
   }
 }

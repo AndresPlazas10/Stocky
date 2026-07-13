@@ -1,16 +1,30 @@
 /**
  * Payment method types for Stocky POS
  */
-export type PaymentMethod = 
-  | 'cash' 
-  | 'card' 
-  | 'transfer' 
-  | 'mixed' 
-  | 'nequi' 
-  | 'bancolombia' 
-  | 'banco_bogota' 
-  | 'nu' 
-  | 'davivienda';
+export type PaymentMethod =
+  | 'cash'
+  | 'card'
+  | 'transfer'
+  | 'mixed'
+  // Colombia
+  | 'nequi'
+  | 'bancolombia'
+  | 'banco_bogota'
+  | 'nu'
+  | 'davivienda'
+  | 'daviplata'
+  // México
+  | 'spei'
+  | 'oxxo'
+  // Perú
+  | 'yape'
+  | 'plin'
+  // Argentina
+  | 'mercadopago'
+  // USA
+  | 'venmo'
+  | 'cashapp'
+  | 'zelle';
 
 /**
  * All valid payment method values
@@ -24,11 +38,20 @@ export const PAYMENT_METHODS: PaymentMethod[] = [
   'bancolombia',
   'banco_bogota',
   'nu',
-  'davivienda'
+  'davivienda',
+  'daviplata',
+  'spei',
+  'oxxo',
+  'yape',
+  'plin',
+  'mercadopago',
+  'venmo',
+  'cashapp',
+  'zelle'
 ];
 
 /**
- * Spanish labels for payment methods
+ * Labels for payment methods (Spanish)
  */
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   cash: 'Efectivo',
@@ -39,7 +62,16 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   bancolombia: 'Bancolombia',
   banco_bogota: 'Banco de Bogotá',
   nu: 'Nu',
-  davivienda: 'Davivienda'
+  davivienda: 'Davivienda',
+  daviplata: 'Daviplata',
+  spei: 'SPEI',
+  oxxo: 'OXXO',
+  yape: 'Yape',
+  plin: 'Plin',
+  mercadopago: 'Mercado Pago',
+  venmo: 'Venmo',
+  cashapp: 'Cash App',
+  zelle: 'Zelle'
 };
 
 /**
@@ -50,7 +82,8 @@ export const BANK_METHODS: PaymentMethod[] = [
   'bancolombia',
   'banco_bogota',
   'nu',
-  'davivienda'
+  'davivienda',
+  'daviplata'
 ];
 
 const BANK_METHODS_SET = new Set(BANK_METHODS);
@@ -89,7 +122,16 @@ export function getPaymentMethodLabel(
       bancolombia: '🏦',
       banco_bogota: '🏦',
       nu: '💜',
-      davivienda: '🏦'
+      davivienda: '🏦',
+      daviplata: '📱',
+      spei: '🏦',
+      oxxo: '🏪',
+      yape: '📱',
+      plin: '📱',
+      mercadopago: '💳',
+      venmo: '💙',
+      cashapp: '💚',
+      zelle: '💎'
     };
     return `${emojis[key] || ''} ${label}`;
   }

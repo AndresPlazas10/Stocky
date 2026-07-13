@@ -41,7 +41,11 @@ export function useCompraCatalog(businessId: string) {
       setProducts(productsResult);
       setSuppliers(suppliersResult);
     } catch (err) {
-      if (__DEV__) console.error('[Compras] error al refrescar catálogo silenciosamente:', getErrorMessage(err));
+      if (__DEV__)
+        console.error(
+          '[Compras] error al refrescar catálogo silenciosamente:',
+          getErrorMessage(err),
+        );
     }
   }, [businessId]);
 
@@ -50,10 +54,11 @@ export function useCompraCatalog(businessId: string) {
       const productsResult = await listPurchaseProducts(businessId, { forceRefresh: true });
       setProducts(productsResult);
     } catch (err) {
-      if (__DEV__) console.error(
-        '[Compras] error al refrescar productos silenciosamente:',
-        getErrorMessage(err),
-      );
+      if (__DEV__)
+        console.error(
+          '[Compras] error al refrescar productos silenciosamente:',
+          getErrorMessage(err),
+        );
     }
   }, [businessId]);
 

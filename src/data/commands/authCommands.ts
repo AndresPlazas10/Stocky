@@ -1,4 +1,5 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
+import { readCacheInvalidatePrefixes } from '../adapters/readCacheStore';
 import type { Business } from '../../types';
 
 interface NormalizeUsernameResult {
@@ -39,7 +40,7 @@ export async function signInWithUsernamePassword({
     password
   });
   if (error) {
-    throw new Error('❌ Usuario o contraseña incorrectos');
+    throw new Error('INVALID_CREDENTIALS');
   }
   return {
     user: (data?.user as unknown as Record<string, unknown>) || null,
@@ -101,6 +102,8 @@ interface BusinessPayload {
   email?: string;
   username?: string;
   created_at?: string;
+  country_code?: string;
+  timezone?: string;
   [key: string]: unknown;
 }
 
@@ -117,11 +120,14 @@ export async function createBusinessRecord(payload: BusinessPayload): Promise<Pa
     p_address: normalizedPayload?.address || null,
     p_phone: normalizedPayload?.phone || null,
     p_email: normalizedPayload?.email || null,
-    p_username: normalizedPayload?.username || null
+    p_username: normalizedPayload?.username || null,
+    p_country_code: normalizedPayload?.country_code || 'CO',
+    p_timezone: normalizedPayload?.timezone || null
   };
 
   const { data: rpcData, error: rpcError } = await supabaseAdapter.createBusinessForCurrentUserRpc(rpcPayload);
   if (!rpcError) {
+    readCacheInvalidatePrefixes(['business']);
     if (rpcData?.id && !rpcData?.created_at) {
       const { data: patchedBusiness, error: patchError } = await supabaseAdapter.updateBusinessById(
         rpcData.id,
@@ -140,6 +146,7 @@ export async function createBusinessRecord(payload: BusinessPayload): Promise<Pa
 
   const { data, error } = await supabaseAdapter.insertBusiness(normalizedPayload);
   if (error) throw error;
+  readCacheInvalidatePrefixes(['business']);
   return data || null;
 }
 

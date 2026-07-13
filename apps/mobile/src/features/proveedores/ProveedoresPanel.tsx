@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { StockyButton } from '../../ui/StockyButton';
 import { StockyDeleteConfirmModal } from '../../ui/StockyDeleteConfirmModal';
@@ -6,9 +7,8 @@ import { STOCKY_COLORS } from '../../theme/tokens';
 import { useProveedorData } from './hooks/useProveedorData';
 import { useProveedorForm } from './hooks/useProveedorForm';
 import { useProveedorMutations } from './hooks/useProveedorMutations';
-import { useToast } from '../../hooks/useToast';
-import { StockyToast } from '../../ui/StockyToast';
-import { TOAST_MESSAGES } from '../../constants/toastMessages';
+import { useToastContext } from '../../hooks/useToastContext';
+import { useToastMessages } from '../../hooks/useToastMessages';
 import { SupplierCard } from './components/SupplierCard';
 import { SupplierListHeader } from './components/SupplierListHeader';
 import { SupplierFormModal } from './components/SupplierFormModal';
@@ -29,7 +29,9 @@ export function ProveedoresPanel({
   userId,
   source,
 }: Props) {
-  const toast = useToast();
+  const { t } = useTranslation();
+  const toast = useToastContext();
+  const toastMessages = useToastMessages();
   const {
     loading,
     refreshing,
@@ -77,10 +79,12 @@ export function ProveedoresPanel({
     refreshSuppliers,
     setError,
     onSupplierSaved: (isEdit, name) => {
-      toast.showSuccess(isEdit ? TOAST_MESSAGES.proveedores.updated(name) : TOAST_MESSAGES.proveedores.created(name));
+      toast.showSuccess(
+        isEdit ? toastMessages.proveedores.updated(name) : toastMessages.proveedores.created(name),
+      );
     },
     onSupplierDeleted: (name) => {
-      toast.showSuccess(TOAST_MESSAGES.proveedores.deleted(name));
+      toast.showSuccess(toastMessages.proveedores.deleted(name));
     },
   });
 
@@ -127,19 +131,21 @@ export function ProveedoresPanel({
           loading ? (
             <View style={styles.loadingBlock}>
               <ActivityIndicator color={STOCKY_COLORS.primary900} />
-              <Text style={styles.loadingText}>Cargando proveedores...</Text>
+              <Text style={styles.loadingText}>{t('proveedores.loading')}</Text>
             </View>
           ) : !suspendBackgroundList ? (
-            <Text style={styles.emptyText}>No hay proveedores registrados.</Text>
+            <Text style={styles.emptyText}>{t('proveedores.emptyState')}</Text>
           ) : null
         }
         ItemSeparatorComponent={ItemSeparator}
         ListFooterComponent={
           !suspendBackgroundList && hasMoreSuppliers ? (
             <View style={styles.loadMoreWrap}>
-              <Text style={styles.loadMoreHint}>Mostrando {suppliers.length} proveedores</Text>
+              <Text style={styles.loadMoreHint}>
+                {t('proveedores.showing', { count: suppliers.length })}
+              </Text>
               <StockyButton onPress={loadMoreSuppliers} loading={loadingMore} variant="ghost">
-                Cargar más proveedores
+                {t('proveedores.loadMore')}
               </StockyButton>
             </View>
           ) : (
@@ -164,23 +170,15 @@ export function ProveedoresPanel({
 
       <StockyDeleteConfirmModal
         visible={showDeleteModal}
-        title="Eliminar proveedor"
-        message={`¿Seguro que deseas eliminar el proveedor "${supplierToDelete?.business_name || 'seleccionado'}"?`}
-        warning="Si tiene compras asociadas no se podrá eliminar. En ese caso, mantenlo para historial."
+        title={t('proveedores.deleteTitle')}
+        message={t('proveedores.deleteMessage', {
+          name: supplierToDelete?.business_name || 'seleccionado',
+        })}
+        warning={t('proveedores.deleteWarning')}
         itemLabel={supplierToDelete?.business_name || null}
         loading={deleting}
         onCancel={closeDeleteModal}
         onConfirm={confirmDeleteSupplier}
-      />
-
-      <StockyToast
-        visible={toast.toast.visible}
-        type={toast.toast.type}
-        title={toast.toast.title}
-        message={toast.toast.message}
-        ctaText={toast.toast.ctaText}
-        durationMs={toast.toast.durationMs}
-        onClose={toast.hideToast}
       />
     </>
   );

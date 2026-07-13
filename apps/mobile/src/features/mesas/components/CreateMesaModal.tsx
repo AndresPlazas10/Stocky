@@ -2,6 +2,7 @@ import React from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { StockyModal } from '../../../ui/StockyModal';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 
@@ -26,10 +27,12 @@ export const CreateMesaModal = React.memo(function CreateMesaModal({
   onSubmit,
   onCancel,
 }: CreateMesaModalProps) {
+  const { t } = useTranslation('mesas');
+
   return (
     <StockyModal
       visible={visible}
-      title="Agregar Mesa"
+      title={t('buttons.addTable')}
       backdropVariant="blur"
       layout="centered"
       centeredOffsetY={106}
@@ -39,7 +42,9 @@ export const CreateMesaModal = React.memo(function CreateMesaModal({
       footer={
         <View style={styles.footerRow}>
           <Pressable style={styles.cancelButton} onPress={onCancel} disabled={isCreatingMesa}>
-            <Text style={styles.cancelText}>Cancelar</Text>
+            <Text style={styles.cancelText}>
+              {t('buttons.closeOrder', { defaultValue: 'Cancelar' })}
+            </Text>
           </Pressable>
 
           <Pressable
@@ -60,7 +65,11 @@ export const CreateMesaModal = React.memo(function CreateMesaModal({
               style={[styles.primaryButton, isCreatingMesa && styles.disabled]}
             >
               <Ionicons name="add" size={16} color={STOCKY_COLORS.white} />
-              <Text style={styles.primaryText}>{isCreatingMesa ? 'Creando...' : 'Agregar'}</Text>
+              <Text style={styles.primaryText}>
+                {isCreatingMesa
+                  ? t('print.printing', { defaultValue: 'Creando...' })
+                  : t('buttons.createTable', { defaultValue: 'Agregar' })}
+              </Text>
             </LinearGradient>
           </Pressable>
         </View>
@@ -77,7 +86,9 @@ export const CreateMesaModal = React.memo(function CreateMesaModal({
             <Ionicons name="layers-outline" size={24} color={STOCKY_COLORS.white} />
           </LinearGradient>
           <View style={styles.heroText}>
-            <Text style={styles.heroTitle}>Nueva mesa</Text>
+            <Text style={styles.heroTitle}>
+              {t('buttons.createTable', { defaultValue: 'Nueva mesa' })}
+            </Text>
           </View>
         </View>
 
@@ -88,18 +99,23 @@ export const CreateMesaModal = React.memo(function CreateMesaModal({
           <Text style={styles.previewTitle}>{mesaPreviewName}</Text>
           <View style={styles.previewStatus}>
             <View style={styles.previewDot} />
-            <Text style={styles.previewStatusText}>Disponible</Text>
+            <Text style={styles.previewStatusText}>
+              {t('labels.available', { defaultValue: 'Disponible' })}
+            </Text>
           </View>
         </View>
 
-        <Text style={styles.label}>Identificador</Text>
+        <Text style={styles.label}>{t('labels.table', { defaultValue: 'Identificador' })}</Text>
       </View>
       <View style={styles.inputShell}>
         <Ionicons name="pricetag-outline" size={18} color="#64748B" />
         <TextInput
           value={newTableNumber}
           onChangeText={onChangeNumber}
-          placeholder="Identificador de mesa"
+          placeholder={t('labels.tableNumber', {
+            number: '',
+            defaultValue: 'Identificador de mesa',
+          })}
           placeholderTextColor={STOCKY_COLORS.textMuted}
           style={styles.inputField}
           autoCapitalize="none"

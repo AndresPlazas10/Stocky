@@ -32,7 +32,11 @@ export function useVentaCatalog(businessId: string) {
       const catalog = await listVentasCatalog(businessId, { forceRefresh: true });
       setCatalogItems(catalog);
     } catch (err) {
-      if (__DEV__) console.error('[Ventas] error al refrescar catálogo silenciosamente:', getErrorMessage(err));
+      if (__DEV__)
+        console.error(
+          '[Ventas] error al refrescar catálogo silenciosamente:',
+          getErrorMessage(err),
+        );
     }
   }, [businessId]);
 

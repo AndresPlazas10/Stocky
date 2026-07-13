@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   startOfDay,
   startOfMonth,
@@ -13,6 +14,7 @@ import type { CompraRecord } from '../../../services/comprasService';
 const PAGE_SIZE = 20;
 
 export function useCompraFilters(purchases: CompraRecord[], supplierNameById: Map<string, string>) {
+  const { t } = useTranslation();
   const [dayFilter, setDayFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
   const [rawPage, setRawPage] = useState(1);
@@ -57,10 +59,10 @@ export function useCompraFilters(purchases: CompraRecord[], supplierNameById: Ma
       ),
     );
     return [
-      { value: 'all', label: 'Todos los proveedores' },
+      { value: 'all', label: t('comprasSection.allSuppliers') },
       ...unique.map((value) => ({
         value,
-        label: supplierNameById.get(value) || 'Sin proveedor',
+        label: supplierNameById.get(value) || t('comprasSection.noSupplier'),
       })),
     ];
   }, [purchases, supplierNameById]);
@@ -106,7 +108,7 @@ export function useCompraFilters(purchases: CompraRecord[], supplierNameById: Ma
   const selectedSupplierLabel = useMemo(
     () =>
       supplierOptions.find((option) => option.value === supplierFilter)?.label ||
-      'Todos los proveedores',
+      t('comprasSection.allSuppliers'),
     [supplierFilter, supplierOptions],
   );
 

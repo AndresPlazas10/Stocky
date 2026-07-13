@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   createCompraWithRpcFallback,
   deleteCompraWithStockFallback,
@@ -50,6 +51,7 @@ export function useCompraMutations({
   onPurchaseCreated,
   onPurchaseDeleted,
 }: UseCompraMutationsParams) {
+  const { t } = useTranslation();
   const [creatingPurchase, setCreatingPurchase] = useState(false);
   const [purchaseToDelete, setPurchaseToDelete] = useState<CompraRecord | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -60,15 +62,15 @@ export function useCompraMutations({
     setError(null);
 
     if (!supplierId) {
-      setError('Selecciona un proveedor.');
+      setError(t('comprasSection.selectSupplierError'));
       return;
     }
     if (cart.length === 0) {
-      setError('Agrega al menos un producto a la compra.');
+      setError(t('comprasSection.addProductError'));
       return;
     }
     if (cart.some((item) => item.manage_stock === false)) {
-      setError('Hay productos sin control de stock en el carrito. Retiralos para continuar.');
+      setError(t('comprasSection.noStockControlError'));
       return;
     }
     if (
@@ -83,11 +85,11 @@ export function useCompraMutations({
         );
       })
     ) {
-      setError('Hay productos con cantidad o precio invalido.');
+      setError(t('comprasSection.invalidProductError'));
       return;
     }
     if (!Number.isFinite(cartTotal) || cartTotal <= 0) {
-      setError('El total de la compra debe ser mayor a 0.');
+      setError(t('comprasSection.zeroTotalError'));
       return;
     }
 
@@ -104,9 +106,10 @@ export function useCompraMutations({
 
       onPurchaseCreated?.();
       clearForm();
+      _setShowCreatePurchaseModal(false);
       await Promise.all([refreshPurchases(), refreshProducts()]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al registrar compra.');
+      setError(err instanceof Error ? err.message : t('comprasSection.createPurchaseError'));
     } finally {
       setCreatingPurchase(false);
     }
@@ -123,6 +126,7 @@ export function useCompraMutations({
     userId,
     setError,
     onPurchaseCreated,
+    _setShowCreatePurchaseModal,
   ]);
 
   const askDeletePurchase = useCallback(
@@ -157,7 +161,7 @@ export function useCompraMutations({
       setPurchaseToDelete(null);
       await refreshProducts();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al eliminar compra.');
+      setError(err instanceof Error ? err.message : t('comprasSection.deletePurchaseError'));
     } finally {
       setDeletingPurchase(false);
     }

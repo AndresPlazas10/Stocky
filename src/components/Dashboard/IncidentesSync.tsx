@@ -1,5 +1,6 @@
 import type { DashboardModuleProps } from '@/types/components';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { logger } from '@/utils/logger';
 import { AlertTriangle, Download, RefreshCw, Trash2 } from 'lucide-react';
 import {
@@ -136,11 +137,11 @@ function writeAlertAuditPreferences(businessId: string, preferences: Record<stri
   }
 }
 
-function formatDate(value) {
+function formatDate(value, locale = 'es-CO') {
   if (!value) return '-';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString('es-CO');
+  return date.toLocaleString(locale);
 }
 
 function toInputDateValue(date) {
@@ -283,6 +284,8 @@ function getHealthMeta(status) {
 }
 
 export default function IncidentesSync({ businessId }: DashboardModuleProps) {
+  const { t, i18n } = useTranslation('common');
+  const currentLocale = i18n.language === 'en' ? 'en-US' : 'es-CO';
   const [incidents, setIncidents] = useState([]);
   const [syncMetric, setSyncMetric] = useState(null);
   const [metricTimeline, setMetricTimeline] = useState([]);
@@ -324,7 +327,7 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
       setAlertAuditRows(Array.isArray(auditRows) ? auditRows : []);
       setError('');
     } catch (loadError) {
-      setError(loadError?.message || 'No se pudieron cargar los incidentes de sincronización.');
+      setError(loadError?.message || t('syncIncidents.loadError'));
     } finally {
       setLoading(false);
     }
@@ -688,7 +691,7 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
             disabled={filtered.length === 0}
           >
             <Download className="mr-2 h-4 w-4" />
-            Exportar CSV
+            {t('syncIncidents.exportCsv')}
           </Button>
           <Button
             type="button"
@@ -698,7 +701,7 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
             className="text-red-600 hover:text-red-700"
           >
             <Trash2 className="mr-2 h-4 w-4" />
-            Limpiar incidentes
+            {t('syncIncidents.clearIncidents')}
           </Button>
           <Button
             type="button"
@@ -708,7 +711,7 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
             className="text-gray-700 hover:text-gray-900"
           >
             <Trash2 className="mr-2 h-4 w-4" />
-            Limpiar histórico
+            {t('syncIncidents.clearHistory')}
           </Button>
           <Button
             type="button"
@@ -718,7 +721,7 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
             className="text-gray-700 hover:text-gray-900"
           >
             <Trash2 className="mr-2 h-4 w-4" />
-            Limpiar auditoría
+            {t('syncIncidents.clearAudit')}
           </Button>
           <Button
             type="button"
@@ -727,7 +730,7 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
             disabled={filteredAlertAuditRows.length === 0}
           >
             <Download className="mr-2 h-4 w-4" />
-            Exportar auditoría CSV
+            {t('syncIncidents.exportAuditCsv')}
           </Button>
         </div>
       </div>
@@ -736,7 +739,7 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Buscar por tipo, reason o mutation_id"
+          placeholder={t('syncIncidents.searchPlaceholder')}
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2"
         />
         <select
@@ -744,7 +747,7 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
           onChange={(event) => setMutationType(event.target.value)}
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
         >
-          <option value="all">Todos los tipos</option>
+          <option value="all">{t('syncIncidents.allTypes')}</option>
           {mutationTypes.map((type) => (
             <option key={type} value={type}>{type}</option>
           ))}
@@ -754,10 +757,10 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
           onChange={(event) => setSeverity(event.target.value)}
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
         >
-          <option value="all">Severidad: todas</option>
-          <option value="high">Alta</option>
-          <option value="medium">Media</option>
-          <option value="low">Baja</option>
+          <option value="all">{t('syncIncidents.severityAll')}</option>
+          <option value="high">{t('syncIncidents.severityHigh')}</option>
+          <option value="medium">{t('syncIncidents.severityMedium')}</option>
+          <option value="low">{t('syncIncidents.severityLow')}</option>
         </select>
         <div className="grid grid-cols-2 gap-2">
           <input
@@ -787,16 +790,16 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
           <div className="flex items-start gap-2 text-sm text-red-800">
             <AlertTriangle className="mt-0.5 h-4 w-4" />
             <div>
-              <p className="font-semibold">Alerta automática: convergencia en estado crítico</p>
+              <p className="font-semibold">{t('syncIncidents.criticalAlertTitle')}</p>
               <p>
-                {criticalAlert.consecutiveCritical} snapshots consecutivos en crítico.
-                Último backlog: {Number(criticalAlert.latest?.snapshot?.outboxPendingCount || 0)} pendientes,
-                conflictos: {Number(criticalAlert.latest?.snapshot?.conflicts || 0)}.
+                {criticalAlert.consecutiveCritical} {t('syncIncidents.consecutiveSnapshots')}
+                {t('syncIncidents.lastBacklog')}: {Number(criticalAlert.latest?.snapshot?.outboxPendingCount || 0)} {t('syncIncidents.pending')},
+                {t('syncIncidents.conflicts')}: {Number(criticalAlert.latest?.snapshot?.conflicts || 0)}.
               </p>
             </div>
           </div>
           <Button type="button" variant="outline" onClick={handleDismissCriticalAlert}>
-            Descartar
+            {t('syncIncidents.dismiss')}
           </Button>
         </div>
       )}
@@ -804,10 +807,10 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
       {!criticalAlert.shouldShow && criticalAlert.cooldownActive && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
           <span>
-            Alerta crítica en cooldown hasta {formatDate(criticalAlert.cooldownUntil)}.
+            {t('syncIncidents.criticalAlertCooldown')} {formatDate(criticalAlert.cooldownUntil, currentLocale)}.
           </span>
           <Button type="button" variant="outline" onClick={handleReactivateCriticalAlert}>
-            Reactivar alerta ahora
+            {t('syncIncidents.reactivateAlert')}
           </Button>
         </div>
       )}
@@ -816,11 +819,11 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
         <div className="space-y-2">
           <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3">
             <div>
-              <p className="text-xs uppercase text-gray-500">Semáforo de convergencia</p>
+              <p className="text-xs uppercase text-gray-500">{t('syncIncidents.convergenceTrafficLight')}</p>
               <p className="text-sm text-gray-700">
                 {Array.isArray(syncMetric.healthReasons) && syncMetric.healthReasons.length > 0
                   ? syncMetric.healthReasons.join(' · ')
-                  : 'Sin alertas activas.'}
+                  : t('syncIncidents.noActiveAlerts')}
               </p>
             </div>
             <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${healthMeta.badgeClass}`}>
@@ -832,7 +835,7 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
             <p className="text-xs uppercase text-gray-500">Runtime</p>
             <p className="text-sm font-semibold text-gray-900">
-              {syncMetric.enabled ? 'Activo' : 'Desactivado'} · {syncMetric.dbMode || 'disabled'}
+              {syncMetric.enabled ? t('syncIncidents.active') : t('syncIncidents.disabled')} · {syncMetric.dbMode || 'disabled'}
             </p>
           </div>
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
@@ -863,33 +866,33 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
 
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs uppercase text-gray-500">Tendencia (últimos {metricTimeline.length} snapshots)</p>
+              <p className="text-xs uppercase text-gray-500">{t('syncIncidents.trend')} ({metricTimeline.length} {t('syncIncidents.snapshots')})</p>
               {trendSummary.hasData && (
                 <span className={`text-xs font-medium ${trendSummary.isImproving ? 'text-emerald-700' : 'text-amber-700'}`}>
-                  {trendSummary.isImproving ? 'Mejorando' : 'Atención'}
+                  {trendSummary.isImproving ? t('syncIncidents.improving') : t('syncIncidents.attention')}
                 </span>
               )}
             </div>
             {metricTimeline.length === 0 ? (
-              <p className="text-xs text-gray-600">Sin historial todavía.</p>
+              <p className="text-xs text-gray-600">{t('syncIncidents.noHistory')}</p>
             ) : (
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2 text-xs text-gray-700 md:grid-cols-4">
                   <div>
-                    <p className="text-gray-500">Δ pendientes</p>
+                    <p className="text-gray-500">{t('syncIncidents.deltaPending')}</p>
                     <p className="font-semibold">{trendSummary.pendingDelta > 0 ? `+${trendSummary.pendingDelta}` : trendSummary.pendingDelta}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500">Δ conflictos</p>
+                    <p className="text-gray-500">{t('syncIncidents.deltaConflicts')}</p>
                     <p className="font-semibold">{trendSummary.conflictDelta > 0 ? `+${trendSummary.conflictDelta}` : trendSummary.conflictDelta}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500">Último estado</p>
+                    <p className="text-gray-500">{t('syncIncidents.lastStatus')}</p>
                     <p className="font-semibold">{getHealthMeta(metricTimeline[0]?.snapshot?.healthStatus || 'ok').label}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500">Actualizado</p>
-                    <p className="font-semibold">{formatDate(metricTimeline[0]?.created_at)}</p>
+                    <p className="text-gray-500">{t('syncIncidents.updated')}</p>
+                    <p className="font-semibold">{formatDate(metricTimeline[0]?.created_at, currentLocale)}</p>
                   </div>
                 </div>
 
@@ -897,11 +900,11 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
                   <table className="min-w-full text-xs">
                     <thead>
                       <tr className="text-left uppercase tracking-wide text-gray-500">
-                        <th className="px-2 py-1">Fecha</th>
-                        <th className="px-2 py-1">Estado</th>
-                        <th className="px-2 py-1">Pendientes</th>
+                        <th className="px-2 py-1">{t('form.date')}</th>
+                        <th className="px-2 py-1">{t('syncIncidents.status')}</th>
+                        <th className="px-2 py-1">{t('syncIncidents.pending')}</th>
                         <th className="px-2 py-1">Oldest(s)</th>
-                        <th className="px-2 py-1">Conflictos</th>
+                        <th className="px-2 py-1">{t('syncIncidents.conflicts')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -910,7 +913,7 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
                         const meta = getHealthMeta(snap.healthStatus || 'ok');
                         return (
                           <tr key={row.id} className="border-t border-gray-200 text-gray-700">
-                            <td className="px-2 py-1">{formatDate(row.created_at)}</td>
+                            <td className="px-2 py-1">{formatDate(row.created_at, currentLocale)}</td>
                             <td className="px-2 py-1">{meta.label}</td>
                             <td className="px-2 py-1">{Number(snap.outboxPendingCount || 0)}</td>
                             <td className="px-2 py-1">{Number(snap.outboxOldestPendingSeconds || 0)}</td>
@@ -927,16 +930,16 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
 
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs uppercase text-gray-500">Auditoría de alertas (operador)</p>
+              <p className="text-xs uppercase text-gray-500">{t('syncIncidents.alertAudit')}</p>
               <span
                 className="text-xs text-gray-500"
-                title="Visibles: filas en la página actual. Filtrados: filas que cumplen filtros. Total: eventos cargados para el negocio."
+                title={t('syncIncidents.auditTooltip')}
               >
-                {paginatedAlertAuditRows.length} visibles · {filteredAlertAuditRows.length} filtrados / {alertAuditRows.length} total
+                {paginatedAlertAuditRows.length} {t('syncIncidents.visible')} · {filteredAlertAuditRows.length} {t('syncIncidents.filtered')} / {alertAuditRows.length} {t('syncIncidents.total')}
               </span>
             </div>
             <p className="mb-2 text-[11px] text-gray-500">
-              Visibles = página actual · Filtrados = coincidencias de filtros · Total = registros cargados del negocio.
+              {t('syncIncidents.auditLegend')}
             </p>
             <div className="mb-2 grid gap-2 md:grid-cols-5">
               <select
@@ -944,7 +947,7 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
                 onChange={(event) => setAuditActionFilter(event.target.value)}
                 className="rounded-lg border border-gray-300 px-3 py-2 text-xs"
               >
-                <option value="all">Acción: todas</option>
+                <option value="all">{t('syncIncidents.actionAll')}</option>
                 {auditActionOptions.map((action) => (
                   <option key={action} value={action}>{action}</option>
                 ))}
@@ -967,7 +970,7 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
                 className="rounded-lg border border-gray-300 px-3 py-2 text-xs"
               >
                 {auditPageSizeOptions.map((size) => (
-                  <option key={size} value={String(size)}>Página: {size}</option>
+                  <option key={size} value={String(size)}>{t('syncIncidents.page')}: {size}</option>
                 ))}
               </select>
               <Button
@@ -975,18 +978,18 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
                 variant="outline"
                 onClick={handleResetAlertAuditFilters}
               >
-                Restablecer filtros
+                {t('syncIncidents.resetFilters')}
               </Button>
             </div>
             <div className="mb-2 flex flex-wrap gap-2">
               <Button type="button" variant="outline" onClick={() => applyAuditDatePreset(1)}>
-                Hoy
+                {t('syncIncidents.today')}
               </Button>
               <Button type="button" variant="outline" onClick={() => applyAuditDatePreset(7)}>
-                7 días
+                {t('syncIncidents.days7')}
               </Button>
               <Button type="button" variant="outline" onClick={() => applyAuditDatePreset(30)}>
-                30 días
+                {t('syncIncidents.days30')}
               </Button>
             </div>
             <div className="mb-2 flex flex-wrap gap-2">
@@ -995,26 +998,26 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
               </span>
               {auditActionFilter !== 'all' && (
                 <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-700">
-                  acción: {auditActionFilter}
+                  {t('syncIncidents.action')}: {auditActionFilter}
                 </span>
               )}
               {auditFromDate && (
                 <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-700">
-                  desde: {auditFromDate}
+                  {t('form.from')}: {auditFromDate}
                 </span>
               )}
               {auditToDate && (
                 <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-700">
-                  hasta: {auditToDate}
+                  {t('form.to')}: {auditToDate}
                 </span>
               )}
               {auditActionFilter === 'all' && !auditFromDate && !auditToDate && (
                 <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
-                  sin filtros activos
+                  {t('syncIncidents.noActiveFilters')}
                 </span>
               )}
               <Button type="button" variant="outline" onClick={() => handleCopyAuditFilterState().catch((err) => { logger.warn('incidentes_sync:copy_audit_filter_state failed', err); })}>
-                Copiar estado filtros
+                {t('syncIncidents.copyFilterState')}
               </Button>
               {copyAuditStatus && (
                 <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-700">
@@ -1023,22 +1026,22 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
               )}
             </div>
             {filteredAlertAuditRows.length === 0 ? (
-              <p className="text-xs text-gray-600">Sin acciones registradas.</p>
+              <p className="text-xs text-gray-600">{t('syncIncidents.noRegisteredActions')}</p>
             ) : (
               <div className="space-y-2">
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-xs">
                     <thead>
                       <tr className="text-left uppercase tracking-wide text-gray-500">
-                        <th className="px-2 py-1">Fecha</th>
-                        <th className="px-2 py-1">Acción</th>
-                        <th className="px-2 py-1">Detalle</th>
+                        <th className="px-2 py-1">{t('form.date')}</th>
+                        <th className="px-2 py-1">{t('syncIncidents.action')}</th>
+                        <th className="px-2 py-1">{t('syncIncidents.detail')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {paginatedAlertAuditRows.map((row) => (
                         <tr key={row.id} className="border-t border-gray-200 text-gray-700">
-                          <td className="px-2 py-1">{formatDate(row.created_at)}</td>
+                          <td className="px-2 py-1">{formatDate(row.created_at, currentLocale)}</td>
                           <td className="px-2 py-1">{row.action || '-'}</td>
                           <td className="max-w-[420px] truncate px-2 py-1" title={row.details ? JSON.stringify(row.details) : ''}>
                             {row.details ? JSON.stringify(row.details) : '-'}
@@ -1055,16 +1058,16 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
                     onClick={() => setAuditPage((prev) => Math.max(1, prev - 1))}
                     disabled={auditPage <= 1}
                   >
-                    Anterior
+                    {t('pagination.previous')}
                   </Button>
-                  <span className="text-gray-600">Página {auditPage} de {auditTotalPages}</span>
+                  <span className="text-gray-600">{t('pagination.pageXOfY', { page: auditPage, total: auditTotalPages })}</span>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setAuditPage((prev) => Math.min(auditTotalPages, prev + 1))}
                     disabled={auditPage >= auditTotalPages}
                   >
-                    Siguiente
+                    {t('pagination.next')}
                   </Button>
                 </div>
               </div>
@@ -1077,9 +1080,9 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50">
             <tr className="text-left text-xs uppercase tracking-wide text-gray-600">
-              <th className="px-3 py-2">Fecha</th>
-              <th className="px-3 py-2">Tipo</th>
-              <th className="px-3 py-2">Severidad</th>
+              <th className="px-3 py-2">{t('form.date')}</th>
+              <th className="px-3 py-2">{t('syncIncidents.type')}</th>
+              <th className="px-3 py-2">{t('syncIncidents.severity')}</th>
               <th className="px-3 py-2">Mutation ID</th>
               <th className="px-3 py-2">Reason</th>
             </tr>
@@ -1088,7 +1091,7 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-3 py-6 text-center text-sm text-gray-500">
-                  No hay incidentes para los filtros actuales.
+                  {t('syncIncidents.noIncidentsForFilters')}
                 </td>
               </tr>
             ) : (
@@ -1096,7 +1099,7 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
                 const itemSeverity = inferSeverity(item.reason);
                 return (
                   <tr key={item.id}>
-                    <td className="whitespace-nowrap px-3 py-2 text-gray-700">{formatDate(item.created_at)}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-gray-700">{formatDate(item.created_at, currentLocale)}</td>
                     <td className="px-3 py-2 font-medium text-gray-900">{item.mutation_type || '-'}</td>
                     <td className="px-3 py-2">
                       <span className={[
@@ -1105,7 +1108,7 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
                         itemSeverity === 'medium' ? 'bg-amber-100 text-amber-700' : '',
                         itemSeverity === 'low' ? 'bg-slate-100 text-slate-700' : ''
                       ].join(' ')}>
-                        {itemSeverity === 'high' ? 'Alta' : itemSeverity === 'medium' ? 'Media' : 'Baja'}
+                        {itemSeverity === 'high' ? t('syncIncidents.severityHigh') : itemSeverity === 'medium' ? t('syncIncidents.severityMedium') : t('syncIncidents.severityLow')}
                       </span>
                     </td>
                     <td className="max-w-[220px] truncate px-3 py-2 text-gray-700" title={item.mutation_id || ''}>

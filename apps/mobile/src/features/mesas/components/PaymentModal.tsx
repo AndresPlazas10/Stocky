@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { StockyModal } from '../../../ui/StockyModal';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { getPaymentMethodLabel, getPaymentMethodIcon } from '../../../utils/paymentMethods';
 import { getBankLogoSource, isBankPaymentMethod } from '../../../utils/paymentMethodBranding';
-import { PAYMENT_METHOD_OPTIONS, buildCashBreakdown } from '../utils/mesaHelpers';
+import { buildCashBreakdown, getDenominationsForCountry } from '../utils/mesaHelpers';
+import { useBusinessConfig } from '../../../contexts/BusinessConfigContext';
 import type { PaymentMethod } from '../../../services/mesaCheckoutService';
 
 interface PaymentModalProps {
@@ -38,7 +40,22 @@ export const PaymentModal = React.memo(function PaymentModal({
   onAmountReceivedChange,
   onConfirm,
 }: PaymentModalProps) {
+  const { t } = useTranslation('mesas');
+  const config = useBusinessConfig();
   const isValid = paymentMethod !== 'cash' || cashChangeData?.isValid;
+
+  const paymentOptions = useMemo(() => {
+    const availableMethods = config.country.paymentMethods;
+    return availableMethods.map((method) => ({
+      value: method as PaymentMethod,
+      label: t(`paymentMethods.${method}`, { defaultValue: method }),
+    }));
+  }, [config.country.paymentMethods, t]);
+
+  const denominations = useMemo(
+    () => getDenominationsForCountry(config.country.code),
+    [config.country.code],
+  );
 
   return (
     <StockyModal
@@ -56,9 +73,11 @@ export const PaymentModal = React.memo(function PaymentModal({
               <Ionicons name="card-outline" size={20} color="#4F46E5" />
             </View>
             <View style={styles.headerTextWrap}>
-              <Text style={styles.headerTitle}>Confirmar pago</Text>
+              <Text style={styles.headerTitle}>{t('labels.confirmPayment')}</Text>
               <Text style={styles.headerSubtitle}>
-                Revisa el cierre antes de confirmar la venta.
+                {t('closeOrder.subtitle', {
+                  defaultValue: 'Revisa el cierre antes de confirmar la venta.',
+                })}
               </Text>
             </View>
           </View>
@@ -70,7 +89,9 @@ export const PaymentModal = React.memo(function PaymentModal({
       footer={
         <View style={styles.footerRow}>
           <Pressable style={styles.cancelButton} onPress={onClose} disabled={isClosing}>
-            <Text style={styles.cancelText}>Cancelar</Text>
+            <Text style={styles.cancelText}>
+              {t('buttons.closeOrder', { defaultValue: 'Cancelar' })}
+            </Text>
           </Pressable>
           <Pressable
             style={[styles.confirmButtonWrap, (isClosing || !isValid) && styles.disabled]}
@@ -85,7 +106,9 @@ export const PaymentModal = React.memo(function PaymentModal({
             >
               <Ionicons name="checkmark-circle-outline" size={22} color="#C4B5FD" />
               <Text style={styles.confirmText}>
-                {isClosing ? 'Procesando...' : 'Confirmar Venta'}
+                {isClosing
+                  ? t('print.printing', { defaultValue: 'Procesando...' })
+                  : t('success.paymentProcessed', { defaultValue: 'Confirmar Venta' })}
               </Text>
             </LinearGradient>
           </Pressable>
@@ -98,15 +121,17 @@ export const PaymentModal = React.memo(function PaymentModal({
         end={{ x: 0, y: 1 }}
         style={styles.summaryCard}
       >
-        <Text style={styles.summaryTitle}>TOTAL A PAGAR</Text>
+        <Text style={styles.summaryTitle}>
+          {t('labels.totalToPay', { defaultValue: 'TOTAL A PAGAR' }).toUpperCase()}
+        </Text>
         <StockyMoneyText value={orderTotal} style={styles.summaryTotal} />
         <View style={styles.summaryMetaRow}>
           <View style={styles.summaryMetaBlock}>
-            <Text style={styles.summaryMetaLabel}>Método</Text>
+            <Text style={styles.summaryMetaLabel}>{t('labels.method')}</Text>
             <Text style={styles.summaryMetaValue}>{getPaymentMethodLabel(paymentMethod)}</Text>
           </View>
           <View style={[styles.summaryMetaBlock, styles.summaryMetaBlockRight]}>
-            <Text style={styles.summaryMetaLabel}>Cambio</Text>
+            <Text style={styles.summaryMetaLabel}>{t('labels.change')}</Text>
             <StockyMoneyText
               value={
                 paymentMethod === 'cash' && cashChangeData?.isValid
@@ -120,7 +145,7 @@ export const PaymentModal = React.memo(function PaymentModal({
       </LinearGradient>
 
       <View style={styles.formCard}>
-        <Text style={styles.fieldLabel}>Método de pago *</Text>
+        <Text style={styles.fieldLabel}>{t('labels.paymentMethod')} *</Text>
         <Pressable style={styles.field} onPress={onToggleMenu} disabled={isClosing}>
           <View style={styles.fieldLeft}>
             {isBankPaymentMethod(paymentMethod) ? (
@@ -139,7 +164,7 @@ export const PaymentModal = React.memo(function PaymentModal({
         {showMenu ? (
           <ScrollView style={styles.methodMenuScroll} nestedScrollEnabled bounces={false}>
             <View style={styles.methodMenu}>
-              {PAYMENT_METHOD_OPTIONS.map((option) => {
+              {paymentOptions.map((option) => {
                 const selected = option.value === paymentMethod;
                 return (
                   <Pressable
@@ -147,6 +172,7 @@ export const PaymentModal = React.memo(function PaymentModal({
                     style={[styles.menuItem, selected && styles.menuItemSelected]}
                     onPress={() => {
                       onPaymentMethodChange(option.value);
+                      onToggleMenu();
                       if (option.value === 'cash' && String(amountReceived || '').trim() === '') {
                         onAmountReceivedChange(String(Math.round(orderTotal || 0)));
                       }
@@ -178,17 +204,19 @@ export const PaymentModal = React.memo(function PaymentModal({
           </ScrollView>
         ) : null}
 
-        <Text style={styles.fieldLabel}>Cliente (opcional)</Text>
+        <Text style={styles.fieldLabel}>{t('labels.customerOptional')}</Text>
         <View style={styles.field}>
           <View style={styles.fieldLeft}>
-            <Text style={styles.fieldValue}>Venta general</Text>
+            <Text style={styles.fieldValue}>
+              {t('labels.customer', { defaultValue: 'Cliente' })}
+            </Text>
           </View>
           <Ionicons name="chevron-down" size={20} color="#6B7280" />
         </View>
 
         {paymentMethod === 'cash' ? (
           <>
-            <Text style={styles.fieldLabel}>Monto recibido</Text>
+            <Text style={styles.fieldLabel}>{t('labels.amountReceived')}</Text>
             <TextInput
               value={amountReceived}
               onChangeText={onAmountReceivedChange}
@@ -202,18 +230,24 @@ export const PaymentModal = React.memo(function PaymentModal({
       </View>
 
       <View style={styles.breakdownCard}>
-        <Text style={styles.breakdownTitle}>DESGLOSE DEL CAMBIO</Text>
+        <Text style={styles.breakdownTitle}>
+          {t('labels.noChange', { defaultValue: 'DESGLOSE DEL CAMBIO' }).toUpperCase()}
+        </Text>
         {paymentMethod !== 'cash' ? (
-          <Text style={styles.breakdownText}>No aplica para este método de pago.</Text>
+          <Text style={styles.breakdownText}>
+            {t('labels.noChange', { defaultValue: 'No aplica para este método de pago.' })}
+          </Text>
         ) : !cashChangeData?.isValid ? (
           <Text style={[styles.breakdownText, styles.breakdownError]}>
-            Monto recibido inválido o insuficiente.
+            {t('errors.invalidAmount', { defaultValue: 'Monto recibido inválido o insuficiente.' })}
           </Text>
         ) : Number(cashChangeData.change || 0) <= 0 ? (
-          <Text style={styles.breakdownText}>Sin cambio para devolver.</Text>
+          <Text style={styles.breakdownText}>
+            {t('labels.noChange', { defaultValue: 'Sin cambio para devolver.' })}
+          </Text>
         ) : (
           <View style={styles.breakdownList}>
-            {buildCashBreakdown(Number(cashChangeData.change || 0)).map((row) => (
+            {buildCashBreakdown(Number(cashChangeData.change || 0), denominations).map((row) => (
               <View key={`${row.denomination}-${row.count}`} style={styles.breakdownRow}>
                 <Text style={styles.breakdownText}>{row.count} x</Text>
                 <StockyMoneyText value={row.denomination} style={styles.breakdownText} />

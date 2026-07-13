@@ -1,5 +1,6 @@
 import type { DashboardModuleProps } from '@/types/components';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Package } from 'lucide-react';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
@@ -16,6 +17,7 @@ import { DeleteConfirmModal } from './inventario/DeleteConfirmModal.jsx';
 import { DeactivateConfirmModal } from './inventario/DeactivateConfirmModal.jsx';
 
 function Inventario({ businessId, userRole = 'admin' }: DashboardModuleProps) {
+  const { t } = useTranslation('common');
   const {
     products,
     suppliers,
@@ -92,39 +94,39 @@ function Inventario({ businessId, userRole = 'admin' }: DashboardModuleProps) {
   const handleDeleteConfirm = async () => {
     try {
       await confirmDelete();
-      setSuccess('Producto eliminado exitosamente');
+      setSuccess(t('success.deleted'));
     } catch (err) {
-      setError(err.message || 'Error al eliminar el producto');
+      setError(err.message || t('errors.deleteFailed'));
     }
   };
 
   const handleDeactivateConfirm = async () => {
     try {
       await confirmDeactivate();
-      setSuccess('Producto desactivado exitosamente');
+      setSuccess(t('success.deleted'));
     } catch (err) {
-      setError(err.message || 'Error al desactivar el producto');
+      setError(err.message || t('errors.deleteFailed'));
     }
   };
 
   const handleToggleActive = async (productId, currentStatus) => {
     try {
       await toggleActive(productId, currentStatus);
-      setSuccess(`Producto ${!currentStatus ? 'activado' : 'desactivado'} exitosamente`);
+      setSuccess(`${t('success.updated')} / ${t('status.inactive')}`);
     } catch (err) {
-      setError(err.message || 'Error al actualizar el estado del producto');
+      setError(err.message || t('errors.deleteFailed'));
     }
   };
 
   const successTitle = useMemo(() => {
     const normalized = String(success || '').toLowerCase();
-    if (normalized.includes('eliminad')) return 'Producto eliminado';
-    if (normalized.includes('desactivad')) return 'Producto desactivado';
-    if (normalized.includes('activad')) return 'Producto activado';
-    if (normalized.includes('actualizad')) return 'Producto actualizado';
-    if (normalized.includes('cread')) return 'Producto creado';
-    return 'Producto guardado';
-  }, [success]);
+    if (normalized.includes('eliminad')) return t('success.deleted');
+    if (normalized.includes('desactivad')) return t('success.deleted');
+    if (normalized.includes('activad')) return t('success.updated');
+    if (normalized.includes('actualizad')) return t('success.updated');
+    if (normalized.includes('cread')) return t('success.created');
+    return t('success.saved');
+  }, [success, t]);
 
   return (
     <AsyncStateWrapper
@@ -133,8 +135,8 @@ function Inventario({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       dataCount={products.length}
       onRetry={loadProducts}
       skeletonType="inventario"
-      emptyTitle="No hay productos en inventario"
-      emptyDescription="Crea el primer producto para habilitar ventas y compras."
+      emptyTitle={t('empty.noDataToShow')}
+      emptyDescription={t('empty.noDataAvailable')}
       emptyAction={
         hasAdminPrivileges ? (
           <Button
@@ -142,7 +144,7 @@ function Inventario({ businessId, userRole = 'admin' }: DashboardModuleProps) {
             onClick={() => setShowForm(true)}
             className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
           >
-            Crear Primer Producto
+            {t('empty.createFirst')}
           </Button>
         ) : null
       }
@@ -153,13 +155,13 @@ function Inventario({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       <div>
         <InventoryHeader hasAdminPrivileges={hasAdminPrivileges} showForm={showForm} onToggleForm={handleToggleForm} />
 
-        <SaleErrorAlert isVisible={!!error} onClose={() => setError('')} title="Error" message={error} duration={5000} />
+        <SaleErrorAlert isVisible={!!error} onClose={() => setError('')} title={t('errors.general')} message={error} duration={5000} />
 
         <SaleSuccessAlert
           isVisible={!!success}
           onClose={() => setSuccess('')}
           title={successTitle}
-          details={[{ label: 'Acción', value: success }]}
+          details={[{ label: t('labels.action'), value: success }]}
           duration={5000}
         />
 
@@ -194,8 +196,8 @@ function Inventario({ businessId, userRole = 'admin' }: DashboardModuleProps) {
           <Card className="shadow-xl rounded-2xl bg-white border-none">
             <div className="p-12 text-center">
               <Package className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-              <p className="text-gray-500 font-medium text-lg mb-2">No hay productos en el inventario</p>
-              <p className="text-gray-400">Haz clic en "Agregar Producto" para comenzar</p>
+              <p className="text-gray-500 font-medium text-lg mb-2">{t('empty.noDataToShow')}</p>
+              <p className="text-gray-400">{t('empty.noDataAvailable')}</p>
             </div>
           </Card>
         )}

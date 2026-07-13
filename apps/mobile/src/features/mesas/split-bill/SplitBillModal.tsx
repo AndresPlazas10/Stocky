@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { StockyModal } from '../../../ui/StockyModal';
 import type { MesaOrderItem } from '../../../services/mesaOrderService';
 import type { SplitSubAccount } from '../../../services/mesaCheckoutService';
@@ -31,6 +32,7 @@ export const SplitBillModalRN = React.memo(function SplitBillModalRN({
   onClose,
   onConfirm,
 }: Props) {
+  const { t } = useTranslation('mesas');
   const {
     accounts,
     itemAssignments,
@@ -81,9 +83,11 @@ export const SplitBillModalRN = React.memo(function SplitBillModalRN({
             <Ionicons name="receipt-outline" size={20} color="#4F46E5" />
           </View>
           <View style={styles.modalHeaderTextWrap}>
-            <Text style={styles.modalHeaderTitle}>Dividir cuenta</Text>
+            <Text style={styles.modalHeaderTitle}>{t('splitBill.title')}</Text>
             <Text style={styles.modalHeaderSubtitle}>
-              Distribuye productos por cuenta y confirma.
+              {t('splitBill.subtitle', {
+                defaultValue: 'Distribuye productos por cuenta y confirma.',
+              })}
             </Text>
           </View>
         </View>

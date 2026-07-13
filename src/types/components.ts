@@ -327,9 +327,12 @@ export interface CatalogItem {
 export interface OrderItem {
   id: string;
   combo_id?: string | null;
+  product_id?: string | null;
   price: string;
   subtotal: string;
   quantity: number;
+  products?: { id?: string; name?: string; code?: string; category?: string };
+  combos?: { id?: string; nombre?: string; descripcion?: string };
 }
 
 export interface OrderDetailsModalProps {
@@ -410,7 +413,7 @@ export interface MesaPaymentModalProps {
   isClosingOrder: boolean;
   onCancel: () => void;
   onConfirm: () => void;
-  calcularCambio: (total: number, received: string) => ChangeInfo;
+  calcularCambio: (total: number, received: string, currencyCode?: string) => ChangeInfo;
 }
 
 export interface MesaDeleteModalProps {

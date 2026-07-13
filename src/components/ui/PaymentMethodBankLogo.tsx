@@ -1,26 +1,18 @@
 import { useState, useEffect } from 'react';
-import { getPaymentMethodLogoCandidates, isBankPaymentMethod } from '../../utils/paymentMethodBranding';
+import { getPaymentMethodLogoCandidates, isBankPaymentMethod, getPaymentMethodLabel as getPaymentMethodLabelBase } from '../../utils/paymentMethodBranding';
 
-const getPaymentMethodLabel = (method: string) => {
-  if (method === 'cash') return 'Efectivo';
-  if (method === 'card') return 'Tarjeta';
-  if (method === 'transfer') return 'Transferencia';
-  if (method === 'mixed') return 'Mixto';
-  if (method === 'nequi') return 'Nequi';
-  if (method === 'bancolombia') return 'Bancolombia';
-  if (method === 'banco_bogota') return 'Banco de Bogotá';
-  if (method === 'nu') return 'Nu';
-  if (method === 'davivienda') return 'Davivienda';
-  return method || '-';
+const getPaymentMethodLabel = (method: string, t?: (key: string) => string) => {
+  return getPaymentMethodLabelBase(method, t);
 };
 
 interface PaymentMethodBankLogoProps {
   method: string;
   sizeClass?: string;
   fallback?: React.ReactNode | null;
+  t?: (key: string) => string;
 }
 
-export function PaymentMethodBankLogo({ method, sizeClass = 'h-4', fallback = null }: PaymentMethodBankLogoProps) {
+export function PaymentMethodBankLogo({ method, sizeClass = 'h-4', fallback = null, t }: PaymentMethodBankLogoProps) {
   const [index, setIndex] = useState(0);
   const normalizedMethod = String(method || '').trim().toLowerCase();
   const candidates = getPaymentMethodLogoCandidates(normalizedMethod);
@@ -40,7 +32,7 @@ export function PaymentMethodBankLogo({ method, sizeClass = 'h-4', fallback = nu
   return (
     <img
       src={candidates[index]}
-      alt={`Logo ${getPaymentMethodLabel(normalizedMethod)}`}
+      alt={`Logo ${getPaymentMethodLabel(normalizedMethod, t)}`}
       className={`${sizeClass} w-auto object-contain`}
       loading="lazy"
       onError={() => {

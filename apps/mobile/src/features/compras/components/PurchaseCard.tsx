@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { formatDateTime } from '../../../utils/dateHelpers';
@@ -23,6 +24,7 @@ export const PurchaseCard = memo(function PurchaseCard({
   onViewDetails,
   onDelete,
 }: PurchaseCardProps) {
+  const { t } = useTranslation();
   return (
     <View style={s.saleCard}>
       <View style={s.saleDateRow}>
@@ -33,10 +35,8 @@ export const PurchaseCard = memo(function PurchaseCard({
       <View style={s.saleInfoGrid}>
         <View style={s.saleInfoColumn}>
           <View style={s.saleMetaBlock}>
-            <Text style={s.saleMetaLabel}>PROVEEDOR</Text>
-            <Text style={s.saleMetaValue} numberOfLines={1}>
-              {supplierLabel}
-            </Text>
+            <Text style={s.saleMetaLabel}>{t('comprasSection.supplierLabel')}</Text>
+            <Text style={s.saleMetaValue}>{supplierLabel}</Text>
           </View>
         </View>
 
@@ -64,7 +64,7 @@ export const PurchaseCard = memo(function PurchaseCard({
             </View>
           </View>
           <View style={s.saleTotalBlock}>
-            <Text style={s.saleCardTotalLabel}>TOTAL</Text>
+            <Text style={s.saleCardTotalLabel}>{t('ventasSection.totalLabel')}</Text>
             <StockyMoneyText value={purchase.total} style={s.saleCardTotalValue} />
           </View>
         </View>
@@ -76,7 +76,7 @@ export const PurchaseCard = memo(function PurchaseCard({
           onPress={() => onViewDetails(purchase)}
         >
           <Ionicons name="eye-outline" size={20} color="#D1D5DB" />
-          <Text style={s.saleDetailsText}>Ver Detalles</Text>
+          <Text style={s.saleDetailsText}>{t('buttons.viewDetails')}</Text>
         </Pressable>
       </View>
 
@@ -86,7 +86,7 @@ export const PurchaseCard = memo(function PurchaseCard({
         disabled={!canDelete}
       >
         <Ionicons name="trash-outline" size={20} color="#FEE2E2" />
-        <Text style={s.saleDeleteText}>Eliminar</Text>
+        <Text style={s.saleDeleteText}>{t('buttons.delete')}</Text>
       </Pressable>
     </View>
   );

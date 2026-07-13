@@ -11,12 +11,11 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import BluetoothClassic from 'react-native-bluetooth-classic';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../../theme/tokens';
-import { useToast } from '../../hooks/useToast';
-import { StockyToast } from '../../ui/StockyToast';
-import { TOAST_MESSAGES } from '../../constants/toastMessages';
+import { useToastContext } from '../../hooks/useToastContext';
+import { useToastMessages } from '../../hooks/useToastMessages';
 import {
   type BluetoothDevice,
   type PrinterConfig,
@@ -38,7 +37,12 @@ import {
   isAutoCutEnabled,
   setAutoCutEnabled,
 } from '../../utils/printer';
-import { ensureBluetoothEnabled, BLUETOOTH_PRINT_REQUIRED_MESSAGE } from '../../utils/bluetooth';
+import {
+  ensureBluetoothEnabled,
+  isBluetoothModuleAvailable,
+  BLUETOOTH_MODULE_UNAVAILABLE_MESSAGE,
+  BLUETOOTH_PRINT_REQUIRED_MESSAGE,
+} from '../../utils/bluetooth';
 
 async function requestBluetoothPermissions(): Promise<boolean> {
   if (Platform.OS !== 'android') return true;
@@ -62,6 +66,7 @@ type Props = {
 };
 
 export function ImpresionPanel({ businessName }: Props) {
+  const { t } = useTranslation();
   const [savedPrinter, setSavedPrinter] = useState<PrinterConfig | null>(null);
   const [devices, setDevices] = useState<BluetoothDevice[]>([]);
   const [isScanning, setIsScanning] = useState(false);
@@ -71,7 +76,9 @@ export function ImpresionPanel({ businessName }: Props) {
   const [autoCut, setAutoCut] = useState(false);
   const [isPrintingTest, setIsPrintingTest] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
-  const toast = useToast();
+  const toast = useToastContext();
+  const toastMessages = useToastMessages();
+  const btAvailable = isBluetoothModuleAvailable();
 
   useEffect(() => {
     (async () => {
@@ -84,7 +91,7 @@ export function ImpresionPanel({ businessName }: Props) {
       if (saved) {
         let ok = await isPrinterConnected(saved.address);
         if (!ok) {
-          console.warn('[Impresion] Printer not connected, attempting reconnect...');
+          if (__DEV__) console.warn('[Impresion] Printer not connected, attempting reconnect...');
           ok = await connectToPrinter(saved.address);
         }
         setConnected(ok);
@@ -101,14 +108,14 @@ export function ImpresionPanel({ businessName }: Props) {
     try {
       const permsOk = await requestBluetoothPermissions();
       if (!permsOk) {
-        setStatusMsg('Permisos Bluetooth denegados. Concedelos en Ajustes.');
+        setStatusMsg(t('impresion.permissionsDenied'));
         return;
       }
 
       const paired = await getPairedDevices();
       if (paired.length > 0) {
         setDevices(paired);
-        setStatusMsg(`${paired.length} dispositivo(s) emparejado(s)`);
+        setStatusMsg(t('impresion.pairedDevices', { count: paired.length }));
         return;
       }
 
@@ -116,12 +123,12 @@ export function ImpresionPanel({ businessName }: Props) {
       setDevices(discovered);
       setStatusMsg(
         discovered.length > 0
-          ? `${discovered.length} dispositivo(s) encontrado(s)`
-          : 'No se encontraron dispositivos. Asegurate de emparejar la impresora en Ajustes > Bluetooth.',
+          ? t('impresion.discoveredDevices', { count: discovered.length })
+          : t('impresion.noDevices'),
       );
     } catch (err) {
-      console.error('[Impresion] Scan error:', err);
-      setStatusMsg('Error: ' + (err instanceof Error ? err.message : 'Fallo al escanear'));
+      if (__DEV__) console.error('[Impresion] Scan error:', err);
+      setStatusMsg('Error: ' + (err instanceof Error ? err.message : t('impresion.scanFailed')));
     } finally {
       setIsScanning(false);
     }
@@ -137,14 +144,17 @@ export function ImpresionPanel({ businessName }: Props) {
         await savePrinter(config);
         setSavedPrinter(config);
         setConnected(true);
-        toast.showSuccess(TOAST_MESSAGES.impresion.connectionSuccess());
+        toast.showSuccess(toastMessages.impresion.connectionSuccess());
         setStatusMsg('');
       } else {
-        toast.showError({ title: 'Error de conexión', message: 'No se pudo conectar a la impresora.' });
+        toast.showError({
+          title: t('impresion.connectionError'),
+          message: t('impresion.connectionErrorMessage'),
+        });
         setStatusMsg('');
       }
     } catch {
-      toast.showError(TOAST_MESSAGES.impresion.connectionError());
+      toast.showError(toastMessages.impresion.connectionError());
     } finally {
       setIsConnecting(false);
     }
@@ -157,7 +167,7 @@ export function ImpresionPanel({ businessName }: Props) {
     await clearPrinter();
     setSavedPrinter(null);
     setConnected(false);
-    setStatusMsg('Desconectado');
+    setStatusMsg(t('impresion.disconnected'));
   }, [savedPrinter]);
 
   const handlePaperChange = useCallback(async (mm: number) => {
@@ -172,12 +182,15 @@ export function ImpresionPanel({ businessName }: Props) {
 
   const handlePrintTest = useCallback(async () => {
     if (!savedPrinter) {
-      Alert.alert('Sin impresora', 'Conecta una impresora primero.');
+      Alert.alert(t('impresion.noPrinter'), t('impresion.connectFirst'));
       return;
     }
     const btReady = await ensureBluetoothEnabled();
     if (!btReady) {
-      toast.showWarning({ title: 'Bluetooth desactivado', message: BLUETOOTH_PRINT_REQUIRED_MESSAGE });
+      toast.showWarning({
+        title: t('impresion.bluetoothDisabled'),
+        message: BLUETOOTH_PRINT_REQUIRED_MESSAGE,
+      });
       return;
     }
     setIsPrintingTest(true);
@@ -186,7 +199,7 @@ export function ImpresionPanel({ businessName }: Props) {
       const receipt = {
         type: 'sale',
         header: {
-          title: 'PRUEBA DE IMPRESION',
+          title: t('impresion.testPrint'),
           businessName: String(businessName || 'Sistema Stocky'),
           dateText: new Date().toLocaleString('es-CO', {
             weekday: 'long',
@@ -200,24 +213,26 @@ export function ImpresionPanel({ businessName }: Props) {
           }),
           alignment: 'center' as const,
         },
-        metadata: [{ label: 'Estado', value: 'Conexion exitosa' }],
-        items: [{ name: 'Impresion de prueba', quantity: 1, subtotal: 0, subtotalText: '$0' }],
+        metadata: [{ label: t('impresion.status'), value: t('impresion.connectionSuccess') }],
+        items: [
+          { name: t('impresion.testPrintSuccess'), quantity: 1, subtotal: 0, subtotalText: '$0' },
+        ],
         totals: { total: 0, totalText: '$0' },
         payment: { method: 'cash', methodText: 'Prueba' },
-        footer: { message: 'Conexion Bluetooth exitosa!', alignment: 'center' as const },
+        footer: { message: t('impresion.bluetoothSuccess'), alignment: 'center' as const },
       };
       const escposData = buildSaleEscPos(receipt, paperWidthMm, autoCut);
       const result = await printBytes(savedPrinter.address, escposData);
       if (result.ok) {
-        toast.showSuccess(TOAST_MESSAGES.impresion.testSent());
+        toast.showSuccess(toastMessages.impresion.testSent());
         setStatusMsg('');
       } else {
-        const errorMsg = result.error || 'No se pudo imprimir. Verifica la conexion Bluetooth.';
-        toast.showError(TOAST_MESSAGES.impresion.printError(errorMsg));
+        const errorMsg = result.error || t('impresion.printFailed');
+        toast.showError(toastMessages.impresion.printError(errorMsg));
         setStatusMsg('');
       }
     } catch {
-      toast.showError(TOAST_MESSAGES.impresion.printError());
+      toast.showError(toastMessages.impresion.printError());
     } finally {
       setIsPrintingTest(false);
     }
@@ -234,11 +249,7 @@ export function ImpresionPanel({ businessName }: Props) {
           onPress={() => handleConnect(item)}
           disabled={isConnecting}
         >
-          <Ionicons
-            name="hardware-chip-outline"
-            size={20}
-            color={STOCKY_COLORS.textSecondary}
-          />
+          <Ionicons name="hardware-chip-outline" size={20} color={STOCKY_COLORS.textSecondary} />
           <View style={styles.deviceTextCol}>
             <Text style={styles.deviceName} numberOfLines={1}>
               {item.name}
@@ -251,7 +262,7 @@ export function ImpresionPanel({ businessName }: Props) {
             <Ionicons name="checkmark-circle" size={20} color={STOCKY_COLORS.successText} />
           ) : (
             <Pressable style={styles.connectBtnSmall} onPress={() => handleConnect(item)}>
-              <Text style={styles.connectTextSmall}>Conectar</Text>
+              <Text style={styles.connectTextSmall}>{t('impresion.connect')}</Text>
             </Pressable>
           )}
         </Pressable>
@@ -262,12 +273,23 @@ export function ImpresionPanel({ businessName }: Props) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Impresion</Text>
+      <Text style={styles.sectionTitle}>{t('impresion.title')}</Text>
+
+      {!btAvailable ? (
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="information-circle-outline" size={20} color={STOCKY_COLORS.accent500} />
+            <Text style={styles.cardTitle}>{t('impresion.bluetoothUnavailable')}</Text>
+          </View>
+          <Text style={styles.statusMsgText}>{BLUETOOTH_MODULE_UNAVAILABLE_MESSAGE}</Text>
+          <Text style={styles.statusMsgSubtext}>{t('impresion.bluetoothMessage')}</Text>
+        </View>
+      ) : null}
 
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Ionicons name="bluetooth" size={20} color={STOCKY_COLORS.primary700} />
-          <Text style={styles.cardTitle}>Impresora</Text>
+          <Text style={styles.cardTitle}>{t('impresion.printer')}</Text>
         </View>
 
         {savedPrinter ? (
@@ -283,7 +305,7 @@ export function ImpresionPanel({ businessName }: Props) {
                 <Text style={styles.printerAddr}>{savedPrinter.address}</Text>
               </View>
               <Pressable style={styles.disconnectBtn} onPress={handleDisconnect}>
-                <Text style={styles.disconnectText}>Desconectar</Text>
+                <Text style={styles.disconnectText}>{t('impresion.disconnect')}</Text>
               </Pressable>
             </View>
           </View>
@@ -298,31 +320,36 @@ export function ImpresionPanel({ businessName }: Props) {
             {isScanning ? (
               <ActivityIndicator size="small" color={STOCKY_COLORS.primary700} />
             ) : (
-              <Text style={styles.btnOutlineText}>Escanear</Text>
+              <Text style={styles.btnOutlineText}>{t('impresion.scan')}</Text>
             )}
           </Pressable>
           <Pressable
             style={[styles.btn, styles.btnOutline]}
             onPress={() => {
-              if (!BluetoothClassic) {
+              if (!isBluetoothModuleAvailable()) {
                 Alert.alert(
-                  'Módulo Bluetooth no disponible',
-                  'Estas usando Expo Go o una build antigua. Usa una dev build de EAS generada despues de instalar react-native-bluetooth-classic.',
+                  t('impresion.bluetoothModuleUnavailable'),
+                  BLUETOOTH_MODULE_UNAVAILABLE_MESSAGE,
                 );
                 return;
               }
-              BluetoothClassic.openBluetoothSettings();
+              try {
+                const BluetoothClassic = require('react-native-bluetooth-classic').default;
+                BluetoothClassic.openBluetoothSettings();
+              } catch {
+                Alert.alert('Error', t('impresion.bluetoothSettingsError'));
+              }
             }}
           >
             <Ionicons name="settings-outline" size={16} color={STOCKY_COLORS.primary700} />
-            <Text style={styles.btnOutlineText}>Ajustes BT</Text>
+            <Text style={styles.btnOutlineText}>{t('impresion.bluetoothSettings')}</Text>
           </Pressable>
         </View>
       </View>
 
       {devices.length > 0 ? (
         <View style={styles.card}>
-          <Text style={styles.listTitle}>Dispositivos encontrados</Text>
+          <Text style={styles.listTitle}>{t('impresion.foundDevices')}</Text>
           <FlatList
             data={devices}
             keyExtractor={deviceKeyExtractor}
@@ -335,9 +362,9 @@ export function ImpresionPanel({ businessName }: Props) {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Ionicons name="document-outline" size={20} color={STOCKY_COLORS.primary700} />
-          <Text style={styles.cardTitle}>Configuracion</Text>
+          <Text style={styles.cardTitle}>{t('impresion.settings')}</Text>
         </View>
-        <Text style={styles.configLabel}>Tamaño de papel</Text>
+        <Text style={styles.configLabel}>{t('impresion.paperSize')}</Text>
         <View style={styles.paperRow}>
           <Pressable
             style={[styles.paperChip, paperWidthMm === 58 && styles.paperChipActive]}
@@ -358,7 +385,7 @@ export function ImpresionPanel({ businessName }: Props) {
         </View>
 
         <View style={styles.cutRow}>
-          <Text style={styles.configLabel}>Cortar papel automaticamente</Text>
+          <Text style={styles.configLabel}>{t('impresion.autoCut')}</Text>
           <Pressable
             style={[styles.toggleTrack, autoCut && styles.toggleTrackActive]}
             onPress={() => handleAutoCutChange(!autoCut)}
@@ -367,9 +394,7 @@ export function ImpresionPanel({ businessName }: Props) {
           </Pressable>
         </View>
         <Text style={styles.cutHint}>
-          {autoCut
-            ? 'La impresora cortara el papel al finalizar. Solo activar si tiene cutter.'
-            : 'Activalo solo si tu impresora tiene cutter automatico. La PT-210 debe dejarlo apagado.'}
+          {autoCut ? t('impresion.autoCutDescription') : t('impresion.autoCutNote')}
         </Text>
       </View>
 
@@ -384,23 +409,13 @@ export function ImpresionPanel({ businessName }: Props) {
           ) : (
             <>
               <Ionicons name="print-outline" size={18} color={STOCKY_COLORS.white} />
-              <Text style={styles.btnPrimaryText}>Imprimir prueba</Text>
+              <Text style={styles.btnPrimaryText}>{t('impresion.printTest')}</Text>
             </>
           )}
         </Pressable>
       ) : null}
 
       {statusMsg ? <Text style={styles.statusText}>{statusMsg}</Text> : null}
-
-      <StockyToast
-        visible={toast.toast.visible}
-        type={toast.toast.type}
-        title={toast.toast.title}
-        message={toast.toast.message}
-        ctaText={toast.toast.ctaText}
-        durationMs={toast.toast.durationMs}
-        onClose={toast.hideToast}
-      />
     </View>
   );
 }
@@ -603,5 +618,15 @@ const styles = StyleSheet.create({
     color: STOCKY_COLORS.textMuted,
     textAlign: 'center',
     paddingVertical: 8,
+  },
+  statusMsgText: {
+    fontSize: 14,
+    color: STOCKY_COLORS.textPrimary,
+    lineHeight: 20,
+  },
+  statusMsgSubtext: {
+    fontSize: 12,
+    color: STOCKY_COLORS.textMuted,
+    lineHeight: 18,
   },
 });

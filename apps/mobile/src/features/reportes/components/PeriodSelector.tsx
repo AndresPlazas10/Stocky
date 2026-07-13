@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type { ReportesPeriod } from '../../../domain/reportes/contracts';
 import { reportesStyles as s } from '../reportesStyles';
 import { PERIOD_OPTIONS } from '../reportesUtils';
@@ -9,9 +10,10 @@ interface PeriodSelectorProps {
 }
 
 export function PeriodSelector({ period, onPeriodChange }: PeriodSelectorProps) {
+  const { t } = useTranslation();
   return (
     <View style={s.periodCard}>
-      <Text style={s.sectionTitle}>Periodo del reporte</Text>
+      <Text style={s.sectionTitle}>{t('reportes.periodSelector')}</Text>
       <View style={s.periodGrid}>
         {PERIOD_OPTIONS.map((option) => {
           const selected = option.value === period;

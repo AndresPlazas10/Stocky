@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import './src/i18n';
 import { EXPO_CONFIG } from './src/config/env';
 import { useAuthSession } from './src/auth/useAuthSession';
 import { useMobileNotifications } from './src/notifications/useMobileNotifications';

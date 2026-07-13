@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import type { ReportesPeriod, ReportesSnapshot } from '../../../domain/reportes/contracts';
 import { reportesStyles as s } from '../reportesStyles';
 import { formatShortDateTime, getPeriodLabel } from '../reportesUtils';
@@ -24,6 +25,7 @@ export function ReportsHeroCard({
   refreshing,
   onRefresh,
 }: ReportsHeroCardProps) {
+  const { t } = useTranslation();
   return (
     <LinearGradient
       colors={['#0F4C81', '#2563EB']}
@@ -36,16 +38,20 @@ export function ReportsHeroCard({
           <Ionicons name="bar-chart-outline" size={34} color="#D1D5DB" />
         </View>
         <View style={s.heroTextWrap}>
-          <Text style={s.heroTitle}>Reportes</Text>
+          <Text style={s.heroTitle}>{t('reportes.title')}</Text>
           <Text style={s.heroSubtitle}>{businessName || businessId}</Text>
-          <Text style={s.heroMeta}>Perfil: {source === 'owner' ? 'Propietario' : 'Empleado'}</Text>
+          <Text style={s.heroMeta}>
+            {source === 'owner' ? t('reportes.ownerProfile') : t('reportes.employeeProfile')}
+          </Text>
         </View>
       </View>
 
       <View style={s.heroBottom}>
-        <Text style={s.heroMeta}>Periodo: {getPeriodLabel(period)}</Text>
         <Text style={s.heroMeta}>
-          Actualizado: {snapshot ? formatShortDateTime(snapshot.generatedAt) : 'n/a'}
+          {t('reportes.period')} {getPeriodLabel(period)}
+        </Text>
+        <Text style={s.heroMeta}>
+          {t('reportes.updated')} {snapshot ? formatShortDateTime(snapshot.generatedAt) : 'n/a'}
         </Text>
         <Pressable
           style={[s.refreshButton, refreshing && s.buttonDisabled]}
@@ -53,7 +59,9 @@ export function ReportsHeroCard({
           disabled={refreshing}
         >
           <Ionicons name="refresh-outline" size={18} color="#D1D5DB" />
-          <Text style={s.refreshButtonText}>{refreshing ? 'Actualizando...' : 'Actualizar'}</Text>
+          <Text style={s.refreshButtonText}>
+            {refreshing ? t('reportes.updating') : t('reportes.refresh')}
+          </Text>
         </Pressable>
       </View>
     </LinearGradient>

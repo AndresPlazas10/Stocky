@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ChangeEvent } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { getOwnedBusinessByUserId } from '../data/queries/authQueries';
 import { signInWithUsernamePassword } from '../data/commands/authCommands';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ interface LoginForm {
 }
 
 function Login() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [formData, setFormData] = useState<LoginForm>({
     username: '',
@@ -45,7 +47,7 @@ function Login() {
       const { username, password } = formData;
       
       if (!username || !password) {
-        throw new Error('Por favor ingresa usuario y contrasena');
+        throw new Error(t('login.enterUsernamePassword'));
       }
 
       const { user } = await signInWithUsernamePassword({
@@ -61,7 +63,8 @@ function Login() {
         navigate('/employee-dashboard', { replace: true });
       }
     } catch (err) {
-      setError((err as Error).message);
+      const msg = (err as Error).message;
+      setError(msg === 'INVALID_CREDENTIALS' ? t('login.invalidCredentials') : msg);
       setLoading(false);
     }
   };
@@ -94,15 +97,28 @@ function Login() {
           onClick={() => navigate('/')}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Volver
+          {t('login.back')}
         </Button>
       </motion.div>
+
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-4 pointer-events-none">
+        <div className="pointer-events-auto">
+          <SaleErrorAlert
+            isVisible={!!error}
+            onClose={() => setError(null)}
+            title={t('login.loginError')}
+            message={error || ''}
+            duration={5000}
+            usePortal={false}
+          />
+        </div>
+      </div>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-md relative z-10 max-h-[calc(100vh-120px)] overflow-auto"
+        className="w-full max-w-md relative z-10 max-h-[calc(100vh-120px)] overflow-visible"
       >
         <Card className="bg-white/95 border border-primary-100 shadow-[0_20px_45px_-22px_rgba(8,145,178,0.15)] rounded-3xl">
           <CardHeader className="space-y-3 pb-6">
@@ -110,26 +126,18 @@ function Login() {
               <img src={logoStocky} alt="Stocky" className="w-12 h-12 object-contain" />
             </div>
             <CardTitle className="text-3xl font-bold text-center text-primary-900">
-              Iniciar Sesion
+              {t('login.signIn')}
             </CardTitle>
             <CardDescription className="text-center text-base text-muted-foreground">
-              Ingresa tu usuario y contrasena para continuar en Stocky
+              {t('login.enterCredentials')}
             </CardDescription>
           </CardHeader>
 
           <CardContent>
-            <SaleErrorAlert
-              isVisible={!!error}
-              onClose={() => setError(null)}
-              title="Error de acceso"
-              message={error || ''}
-              duration={5000}
-            />
-
             <form onSubmit={handleLogin} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="username" className="text-base font-semibold text-primary-800">
-                  Usuario
+                  {t('login.username')}
                 </Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
@@ -137,7 +145,7 @@ function Login() {
                     id="username"
                     name="username"
                     type="text"
-                    placeholder="Tu nombre de usuario"
+                    placeholder={t('login.usernamePlaceholder')}
                     value={formData.username}
                     onChange={handleChange}
                     className="pl-10 h-12 text-base border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
@@ -149,7 +157,7 @@ function Login() {
 
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-base font-semibold text-primary-800">
-                  Contrasena
+                  {t('login.password')}
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
@@ -157,7 +165,7 @@ function Login() {
                     id="password"
                     name="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Tu contrasena"
+                    placeholder={t('login.passwordPlaceholder')}
                     value={formData.password}
                     onChange={handleChange}
                     className="pl-10 pr-10 h-12 text-base border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
@@ -179,18 +187,18 @@ function Login() {
                 className="cursor-pointer w-full h-12 text-base font-semibold bg-white text-black border border-gray-300 hover:bg-gray-50 transition-all duration-200 rounded-xl"
                 disabled={loading}
               >
-                {loading ? 'Iniciando sesion...' : 'Iniciar Sesion'}
+                {loading ? t('login.signingIn') : t('login.signIn')}
               </Button>
             </form>
 
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
-                No tienes cuenta?{' '}
+                {t('login.noAccount')}{' '}
                 <button
                   onClick={() => navigate('/register')}
                   className="cursor-pointer font-semibold text-primary-700 hover:text-primary-800 transition-colors duration-200"
                 >
-                  Registrar negocio
+                  {t('login.registerBusiness')}
                 </button>
               </p>
             </div>

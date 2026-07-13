@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { closeOrderAsSplit, closeOrderSingle } from '../../../services/ordersService.js';
 import { getSalePrintBundle } from '../../../data/queries/ordersQueries';
 import { getBusinessNameById } from '../../../data/queries/salesQueries';
@@ -13,7 +14,7 @@ import {
   calculateOrderItemsTotal,
   buildDiagnosticAlertMessage,
   getPaymentMethodLabel,
-} from './mesaHelpers.js';
+} from './mesaHelpers';
 import {
   readOfflineSnapshot,
   saveOfflineSnapshot,
@@ -21,24 +22,34 @@ import {
 import { invalidateOrderCache } from '../../../data/adapters/cacheInvalidation.js';
 import { normalizeTableRecord } from '../../../utils/tableStatus';
 import { logger } from '@/utils/logger';
+import type { AlertDetail } from '../../../types/components';
+
+type SetState<T> = React.Dispatch<React.SetStateAction<T>>;
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type MesaRecord = Record<string, any>;
+type OrderItem = Record<string, any>;
+type SaleRecord = Record<string, any>;
+type SubAccount = Record<string, any>;
+type PrintBundle = Record<string, any>;
 
 const MODAL_REOPEN_GUARD_MS = 600;
 
-function clearClosedMesaCache({ tableId, orderId = null, businessId }) {
+function clearClosedMesaCache({ tableId, orderId = null, businessId }: { tableId: string; orderId?: string | null; businessId: string }) {
   const normalizedTableId = normalizeEntityId(tableId);
   if (!businessId || !normalizedTableId) return;
 
   const snapshotKey = `mesas.list:${businessId}`;
   const cachedMesas = readOfflineSnapshot(snapshotKey, []);
   if (Array.isArray(cachedMesas) && cachedMesas.length > 0) {
-    const sanitized = cachedMesas.map((mesa) => {
+    const sanitized = cachedMesas.map((mesa: MesaRecord) => {
       if (normalizeEntityId(mesa?.id) !== normalizedTableId) return mesa;
       return normalizeTableRecord({
         ...mesa,
         status: 'available',
         current_order_id: null,
         orders: null
-      });
+      } as any);
     });
     saveOfflineSnapshot(snapshotKey, sanitized);
   }
@@ -47,14 +58,14 @@ function clearClosedMesaCache({ tableId, orderId = null, businessId }) {
     businessId,
     tableId: normalizedTableId,
     orderId: normalizeEntityId(orderId)
-  }).catch((err) => { logger.warn('mesas:payment:invalidate_order_cache failed', err); });
+  }).catch((err: Error) => { logger.warn('mesas:payment:invalidate_order_cache failed', err); });
 }
 
-function buildStockConsumptionFromItems(items = [], comboCatalogByIdRef) {
-  const consumptionByProduct = new Map();
+function buildStockConsumptionFromItems(items: OrderItem[] = [], comboCatalogByIdRef: React.MutableRefObject<Map<string, any>>) {
+  const consumptionByProduct = new Map<string, number>();
   const source = Array.isArray(items) ? items : [];
 
-  source.forEach((item) => {
+  source.forEach((item: OrderItem) => {
     const quantity = Number(item?.quantity || 0);
     if (!Number.isFinite(quantity) || quantity <= 0) return;
 
@@ -71,7 +82,7 @@ function buildStockConsumptionFromItems(items = [], comboCatalogByIdRef) {
     const combo = comboCatalogByIdRef.current.get(comboId);
     if (!combo) return;
 
-    (combo.combo_items || []).forEach((component) => {
+    (combo.combo_items || []).forEach((component: Record<string, any>) => {
       const componentProductId = normalizeEntityId(component?.producto_id);
       if (!componentProductId) return;
 
@@ -86,13 +97,13 @@ function buildStockConsumptionFromItems(items = [], comboCatalogByIdRef) {
   return consumptionByProduct;
 }
 
-function applyLocalStockConsumption(consumptionByProduct, { mode = 'consume', businessId, setProducts }) {
+function applyLocalStockConsumption(consumptionByProduct: Map<string, number>, { mode = 'consume', businessId, setProducts }: { mode?: 'consume' | 'restore'; businessId: string; setProducts: SetState<any[]> }) {
   if (!(consumptionByProduct instanceof Map) || consumptionByProduct.size === 0) return;
   const shouldRestore = mode === 'restore';
 
-  setProducts((prevProducts) => {
+  setProducts((prevProducts: any[]) => {
     const source = Array.isArray(prevProducts) ? prevProducts : [];
-    const nextProducts = source.map((product) => {
+    const nextProducts = source.map((product: Record<string, any>) => {
       if (product?.manage_stock === false) return product;
 
       const productId = normalizeEntityId(product?.id);
@@ -124,7 +135,7 @@ function applyLocalStockConsumption(consumptionByProduct, { mode = 'consume', bu
   });
 }
 
-function appendPendingSalesToVentasSnapshot(pendingSales = [], businessId) {
+function appendPendingSalesToVentasSnapshot(pendingSales: SaleRecord[] = [], businessId: string, t: (key: string) => string) {
   if (!businessId || !Array.isArray(pendingSales) || pendingSales.length === 0) return;
 
   const snapshotKey = `ventas.list:${businessId}`;
@@ -132,7 +143,7 @@ function appendPendingSalesToVentasSnapshot(pendingSales = [], businessId) {
   const currentList = Array.isArray(currentSnapshot) ? currentSnapshot : [];
 
   const normalizedPendingSales = pendingSales
-    .map((sale) => {
+    .map((sale: SaleRecord) => {
       const saleId = String(sale?.id || '').trim();
       if (!saleId) return null;
 
@@ -140,7 +151,7 @@ function appendPendingSalesToVentasSnapshot(pendingSales = [], businessId) {
       const amountReceived = Number(sale?.amount_received);
       const resolvedAmountReceived = Number.isFinite(amountReceived) ? amountReceived : null;
       const changeBreakdown = Array.isArray(sale?.change_breakdown) ? sale.change_breakdown : [];
-      const changeFromBreakdown = changeBreakdown.reduce((sum, entry) => {
+      const changeFromBreakdown = changeBreakdown.reduce((sum: number, entry: Record<string, any>) => {
         const denomination = Number(entry?.denomination || 0);
         const count = Number(entry?.count || 0);
         if (!Number.isFinite(denomination) || !Number.isFinite(count) || count <= 0) return sum;
@@ -154,34 +165,34 @@ function appendPendingSalesToVentasSnapshot(pendingSales = [], businessId) {
         id: saleId,
         business_id: businessId,
         user_id: null,
-        seller_name: 'Venta offline',
+        seller_name: t('mesas:defaults.offlineSale'),
         payment_method: sale?.payment_method || 'cash',
         total,
         created_at: sale?.created_at || new Date().toISOString(),
-        notes: 'Pendiente de sincronización',
+        notes: t('mesas:defaults.pendingSync'),
         pending_sync: true,
         amount_received: resolvedAmountReceived,
         change_amount: changeAmount,
         change_breakdown: changeBreakdown,
-        employees: { full_name: 'Pendiente sync', role: 'employee' }
+        employees: { full_name: t('mesas:defaults.pendingSyncShort'), role: 'employee' }
       };
     })
     .filter(Boolean);
 
   if (normalizedPendingSales.length === 0) return;
 
-  const existingIds = new Set(currentList.map((sale) => String(sale?.id || '').trim()).filter(Boolean));
-  const newItems = normalizedPendingSales.filter((sale) => !existingIds.has(String(sale.id || '').trim()));
+  const existingIds = new Set(currentList.map((sale: SaleRecord) => String(sale?.id || '').trim()).filter(Boolean));
+  const newItems = normalizedPendingSales.filter((sale: SaleRecord) => !existingIds.has(String(sale.id || '').trim()));
   if (newItems.length === 0) return;
 
   saveOfflineSnapshot(snapshotKey, [...newItems, ...currentList]);
 }
 
-function mapOrderItemsToPrintDetails(items = []) {
+function mapOrderItemsToPrintDetails(items: OrderItem[] = []) {
   const source = Array.isArray(items) ? items : [];
 
   return source
-    .map((item) => {
+    .map((item: OrderItem) => {
       const quantity = toFiniteNumber(item?.quantity, 0);
       if (quantity <= 0) return null;
 
@@ -224,7 +235,16 @@ function buildLocalPrintBundle({
   amountReceived,
   changeBreakdown,
   orderItems,
-  sellerName = 'Venta offline'
+  sellerName
+}: {
+  saleId: string;
+  total: number;
+  paymentMethod: string;
+  createdAt: string;
+  amountReceived: number | null;
+  changeBreakdown: Record<string, any>[];
+  orderItems: OrderItem[];
+  sellerName?: string;
 }) {
   const normalizedSaleId = String(saleId || '').trim();
   const saleDetails = mapOrderItemsToPrintDetails(orderItems);
@@ -246,13 +266,13 @@ function buildLocalPrintBundle({
   };
 }
 
-function buildLocalSplitPrintBundles({ saleIds = [], sales = [], subAccounts = [] }) {
+function buildLocalSplitPrintBundles({ saleIds = [], sales = [], subAccounts = [], t }: { saleIds?: string[]; sales?: SaleRecord[]; subAccounts?: SubAccount[]; t: (key: string) => string }) {
   const normalizedSaleIds = Array.isArray(saleIds) ? saleIds : [];
   const normalizedSales = Array.isArray(sales) ? sales : [];
   const normalizedSubAccounts = Array.isArray(subAccounts) ? subAccounts : [];
 
   return normalizedSubAccounts
-    .map((subAccount, index) => {
+    .map((subAccount: SubAccount, index: number) => {
       const items = Array.isArray(subAccount?.items) ? subAccount.items : [];
       if (items.length === 0) return null;
 
@@ -261,7 +281,7 @@ function buildLocalSplitPrintBundles({ saleIds = [], sales = [], subAccounts = [
       const saleTotalFromMeta = Number(saleMeta?.total);
       const saleTotal = Number.isFinite(saleTotalFromMeta)
         ? saleTotalFromMeta
-        : items.reduce((sum, item) => {
+        : items.reduce((sum: number, item: OrderItem) => {
           const quantity = toFiniteNumber(item?.quantity, 0);
           const unitPrice = toFiniteNumber(item?.unit_price ?? item?.price, 0);
           return sum + (quantity * unitPrice);
@@ -275,10 +295,87 @@ function buildLocalSplitPrintBundles({ saleIds = [], sales = [], subAccounts = [
         amountReceived: saleMeta?.amount_received ?? subAccount?.amountReceived ?? subAccount?.amount_received,
         changeBreakdown: saleMeta?.change_breakdown ?? subAccount?.changeBreakdown ?? subAccount?.change_breakdown ?? [],
         orderItems: items,
-        sellerName: 'Venta offline'
+        sellerName: t('mesas:defaults.offlineSale')
       });
     })
     .filter(Boolean);
+}
+
+interface UseMesaPaymentParams {
+  businessId: string;
+  userRole: string;
+  currentUser: { id: string } | null;
+  mesas: MesaRecord[];
+  setMesas: SetState<MesaRecord[]>;
+  selectedMesa: MesaRecord | null;
+  setSelectedMesa: SetState<MesaRecord | null>;
+  orderItems: OrderItem[];
+  setOrderItems: SetState<OrderItem[]>;
+  paymentMethod: string;
+  setPaymentMethod: SetState<string>;
+  amountReceived: string;
+  setAmountReceived: SetState<string>;
+  amountReceivedError: string;
+  setAmountReceivedError: SetState<string>;
+  selectedCustomer: string;
+  setSelectedCustomer: SetState<string>;
+  customers: any[];
+  setCustomers: SetState<any[]>;
+  isClosingOrder: boolean;
+  setIsClosingOrder: SetState<boolean>;
+  setIsGeneratingSplitSales: SetState<boolean>;
+  showPaymentModal: boolean;
+  setShowPaymentModal: SetState<boolean>;
+  showSplitBillModal: boolean;
+  setShowSplitBillModal: SetState<boolean>;
+  showCloseOrderChoiceModal: boolean;
+  setShowCloseOrderChoiceModal: SetState<boolean>;
+  showPrintModal: boolean;
+  setShowPrintModal: SetState<boolean>;
+  printSaleDataList: PrintBundle[];
+  setPrintSaleDataList: SetState<PrintBundle[]>;
+  isPrintingReceipt: boolean;
+  setIsPrintingReceipt: SetState<boolean>;
+  printCustomerName: string;
+  setPrintCustomerName: SetState<string>;
+  setPrintSaleIds: SetState<string[]>;
+  pendingOrderItemOps: number;
+  justCompletedSaleRef: React.MutableRefObject<boolean>;
+  acquireCloseOrderLock: (key: string) => boolean;
+  releaseCloseOrderLock: (key: string) => void;
+  acquireMesaEditLockWeb: (params: { targetBusinessId: string; tableId: string; lockToken: string }) => Promise<{ unsupported?: boolean; ok?: boolean; lockToken?: string }>;
+  releaseMesaEditLockWeb: (params: { targetBusinessId: string; tableId: string; lockToken: string }) => Promise<void>;
+  refreshMesaLocks: () => Promise<void>;
+  applyRealtimeMesaLockRow: (row: Record<string, any>) => void;
+  priceConfig: Record<string, any>;
+  sendMesaSyncBroadcast: (params: { tableId: string; action: string; data?: Record<string, any> }) => void;
+  publishMesaLockBroadcast: (params: { tableId: string; locked: boolean; mode: string; lockToken: string | null }) => void;
+  loadMesas: () => Promise<void>;
+  loadOrderDetails: (mesa: MesaRecord) => Promise<void>;
+  updateOrderTotal: (...args: any[]) => Promise<void>;
+  flushPendingRemoteOrderTotals: () => Promise<void>;
+  waitForPendingOrderItemOps: () => Promise<boolean>;
+  persistPendingQuantityUpdates: (...args: any[]) => Promise<void>;
+  releaseEmptyOrderAndCloseModal: (...args: any[]) => any;
+  setSuccess: SetState<boolean>;
+  setSuccessTitle: SetState<string>;
+  setSuccessDetails: SetState<AlertDetail[]>;
+  setAlertType: SetState<string>;
+  setError: SetState<string | null>;
+  productCatalogByIdRef: React.MutableRefObject<Map<string, any>>;
+  comboCatalogByIdRef: React.MutableRefObject<Map<string, any>>;
+  pendingQuantityUpdatesRef: React.MutableRefObject<Record<string, number>>;
+  orderItemsDirtyRef: React.MutableRefObject<boolean>;
+  orderItemsRef: React.MutableRefObject<OrderItem[]>;
+  setModalOpenIntent: SetState<boolean>;
+  setShowOrderDetails: SetState<boolean>;
+  setCanShowOrderModal: SetState<boolean>;
+  insufficientItems: Record<string, any>[];
+  hasInsufficientComboStock: boolean;
+  insufficientComboComponents: Record<string, any>[];
+  orderTotal: number;
+  setPendingQuantityUpdatesSafe: SetState<Record<string, number>>;
+  setProducts: SetState<any[]>;
 }
 
 export function useMesaPayment({
@@ -327,6 +424,7 @@ export function useMesaPayment({
   releaseMesaEditLockWeb,
   refreshMesaLocks,
   applyRealtimeMesaLockRow,
+  priceConfig,
   sendMesaSyncBroadcast,
   publishMesaLockBroadcast,
   loadMesas,
@@ -355,7 +453,10 @@ export function useMesaPayment({
   orderTotal,
   setPendingQuantityUpdatesSafe,
   setProducts,
-}) {
+}: UseMesaPaymentParams) {
+  const { t } = useTranslation(['mesas', 'common']);
+  const fmtPrice = (value: number, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig || {});
+  
   const handleCloseOrder = () => {
     setShowCloseOrderChoiceModal(true);
   };
@@ -373,27 +474,27 @@ export function useMesaPayment({
     setShowSplitBillModal(true);
   };
 
-  const askReceiptPrintConfirmation = useCallback(async (saleIds = [], localPrintDataList = []) => {
+  const askReceiptPrintConfirmation = useCallback(async (saleIds: string[] = [], localPrintDataList: PrintBundle[] = []) => {
     const normalizedSaleIds = Array.isArray(saleIds)
-      ? saleIds.map((saleId) => String(saleId || '').trim()).filter(Boolean)
+      ? saleIds.map((saleId: string) => String(saleId || '').trim()).filter(Boolean)
       : [];
     const normalizedLocalPrintDataList = Array.isArray(localPrintDataList)
-      ? localPrintDataList.filter((entry) => entry?.saleRow && Array.isArray(entry?.saleDetails) && entry.saleDetails.length > 0)
+      ? localPrintDataList.filter((entry: PrintBundle) => entry?.saleRow && Array.isArray(entry?.saleDetails) && entry.saleDetails.length > 0)
       : [];
 
     if (normalizedSaleIds.length === 0 && normalizedLocalPrintDataList.length === 0) return false;
 
     try {
-      const saleDataList = [];
-      const appendedSaleIds = new Set();
-      const localById = new Map(
-        normalizedLocalPrintDataList.map((entry) => {
+      const saleDataList: PrintBundle[] = [];
+      const appendedSaleIds = new Set<string>();
+      const localById = new Map<string, PrintBundle>(
+        normalizedLocalPrintDataList.map((entry: PrintBundle): [string, PrintBundle] => {
           const entrySaleId = String(entry?.saleId || entry?.saleRow?.id || '').trim();
           return [entrySaleId, entry];
-        }).filter(([entrySaleId]) => Boolean(entrySaleId))
+        }).filter(([entrySaleId]: [string, PrintBundle]) => Boolean(entrySaleId))
       );
 
-      const appendCandidate = (candidate) => {
+      const appendCandidate = (candidate: PrintBundle | undefined) => {
         if (!candidate?.saleRow || !Array.isArray(candidate?.saleDetails) || candidate.saleDetails.length === 0) return;
         const candidateSaleId = String(candidate?.saleId || candidate?.saleRow?.id || '').trim();
         if (!candidateSaleId || appendedSaleIds.has(candidateSaleId)) return;
@@ -429,12 +530,12 @@ export function useMesaPayment({
       }
 
       if (saleDataList.length === 0) {
-        normalizedLocalPrintDataList.forEach((entry) => appendCandidate(entry));
+        normalizedLocalPrintDataList.forEach((entry: PrintBundle) => appendCandidate(entry));
       }
 
       if (saleDataList.length === 0) return false;
 
-      setPrintSaleIds(saleDataList.map((entry) => entry.saleId));
+      setPrintSaleIds(saleDataList.map((entry: PrintBundle) => entry.saleId));
       setPrintSaleDataList(saleDataList);
       setShowPrintModal(true);
 
@@ -452,26 +553,26 @@ export function useMesaPayment({
           const printResult = await printSaleReceipt({
             sale: saleRow,
             saleDetails,
-            sellerName: saleRow?.seller_name || 'Empleado',
+            sellerName: saleRow?.seller_name || t('mesas:defaults.employee'),
             businessName: await getBusinessNameById(businessId),
             customerName: printCustomerName,
           });
 
           if (!printResult.ok) {
-            setError('⚠️ No se pudo imprimir alguno de los comprobantes.');
+            setError(t('mesas:errors.printFailed'));
           }
         } catch {
-          setError('⚠️ No se pudo imprimir alguno de los comprobantes.');
+          setError(t('mesas:errors.printFailed'));
         }
       }
     } catch {
-      setError('⚠️ No se pudo imprimir los comprobantes.');
+      setError(t('mesas:errors.printAllFailed'));
     } finally {
       setIsPrintingReceipt(false);
       setShowPrintModal(false);
       setPrintSaleIds([]);
       setPrintSaleDataList([]);
-      setPrintCustomerName('Venta general');
+      setPrintCustomerName(t('mesas:defaults.generalSale'));
     }
   }, [printSaleDataList, printCustomerName, businessId]);
 
@@ -479,10 +580,10 @@ export function useMesaPayment({
     setShowPrintModal(false);
     setPrintSaleIds([]);
     setPrintSaleDataList([]);
-    setPrintCustomerName('Venta general');
+    setPrintCustomerName(t('mesas:defaults.generalSale'));
   }, []);
 
-  const _tryAutoPrintReceiptBySaleId = useCallback(async (saleId) => {
+  const _tryAutoPrintReceiptBySaleId = useCallback(async (saleId: string) => {
     if (!isAutoPrintReceiptEnabled() || !saleId) return;
 
     try {
@@ -496,29 +597,32 @@ export function useMesaPayment({
       const printResult = await printSaleReceipt({
         sale: saleRow,
         saleDetails,
-        sellerName: saleRow.seller_name || 'Empleado',
+        sellerName: (saleRow as any).seller_name || t('mesas:defaults.employee'),
         businessName: await getBusinessNameById(businessId),
-        customerName: 'Venta general',
+        customerName: t('mesas:defaults.generalSale'),
       });
 
       if (!printResult.ok) {
-        setError('⚠️ La venta se cerró, pero no se pudo imprimir el recibo automáticamente.');
+        setError(t('mesas:errors.printAutoFailed'));
       }
     } catch {
-      setError('⚠️ La venta se cerró, pero no se pudo imprimir el recibo automáticamente.');
+      setError(t('mesas:errors.printAutoFailed'));
     }
   }, [businessId]);
 
-  const processSplitPaymentAndClose = async ({ subAccounts }) => {
+  const processSplitPaymentAndClose = async ({ subAccounts }: { subAccounts: SubAccount[] }) => {
     if (isClosingOrder) return;
 
-    let splitCloseLockKey = null;
+    let splitCloseLockKey: string | null = null;
 
     if (insufficientItems.length > 0) {
       const firstShortage = insufficientItems[0];
       setError(
-        `❌ Stock insuficiente para "${firstShortage.product_name}" ` +
-        `(disp: ${firstShortage.available_stock}, req: ${firstShortage.quantity}).`
+        t('mesas:errors.insufficientStockShortage', {
+          productName: firstShortage.product_name,
+          available: firstShortage.available_stock,
+          required: firstShortage.quantity
+        })
       );
       return;
     }
@@ -526,8 +630,11 @@ export function useMesaPayment({
     if (hasInsufficientComboStock) {
       const firstShortage = insufficientComboComponents[0];
       setError(
-        `❌ Stock insuficiente para "${firstShortage.product_name}" ` +
-        `(disp: ${firstShortage.available_stock}, req: ${firstShortage.required_quantity}).`
+        t('mesas:errors.insufficientStockShortage', {
+          productName: firstShortage.product_name,
+          available: firstShortage.available_stock,
+          required: firstShortage.required_quantity
+        })
       );
       return;
     }
@@ -538,7 +645,7 @@ export function useMesaPayment({
 
     const mesaSnapshot = selectedMesa ? { ...selectedMesa } : null;
     if (!mesaSnapshot?.id || !mesaSnapshot?.current_order_id) {
-      setError('❌ No se encontró una orden activa para cerrar.');
+      setError(t('mesas:errors.noActiveOrder'));
       setIsGeneratingSplitSales(false);
       setIsClosingOrder(false);
       return;
@@ -546,22 +653,22 @@ export function useMesaPayment({
 
     splitCloseLockKey = `split:${businessId}:${mesaSnapshot.id}:${mesaSnapshot.current_order_id}`;
     if (!acquireCloseOrderLock(splitCloseLockKey)) {
-      setError('⏳ Esta orden ya se está cerrando. Espera un momento.');
+      setError(t('mesas:errors.orderClosing'));
       setIsGeneratingSplitSales(false);
       setIsClosingOrder(false);
       return;
     }
 
     const optimisticSplitTotal = (subAccounts || []).reduce(
-      (sum, sub) => sum + Number(sub?.total || 0),
+      (sum: number, sub: SubAccount) => sum + Number(sub?.total || 0),
       0
     );
     const splitItemsSnapshot = (Array.isArray(subAccounts) ? subAccounts : [])
-      .flatMap((sub) => (Array.isArray(sub?.items) ? sub.items : []));
+      .flatMap((sub: SubAccount) => (Array.isArray(sub?.items) ? sub.items : []));
     const splitConsumptionByProduct = buildStockConsumptionFromItems(splitItemsSnapshot, comboCatalogByIdRef);
 
-    setMesas((prevMesas) =>
-      prevMesas.map((mesa) => (
+    setMesas((prevMesas: MesaRecord[]) =>
+      prevMesas.map((mesa: MesaRecord) => (
         mesa.id === mesaSnapshot.id
           ? { ...mesa, status: 'available', current_order_id: null, orders: null }
           : mesa
@@ -588,34 +695,35 @@ export function useMesaPayment({
     setIsGeneratingSplitSales(false);
     setIsClosingOrder(false);
     setSuccessDetails([
-      { label: 'Total', value: formatPrice(optimisticSplitTotal) },
-      { label: 'Mesa', value: `#${mesaSnapshot.table_number}` },
-      { label: 'Cuentas', value: subAccounts.length },
-      { label: 'Sincronización', value: 'Procesando en segundo plano' }
+      { label: t('mesas:labels.total'), value: fmtPrice(optimisticSplitTotal) },
+      { label: t('mesas:labels.table'), value: `#${mesaSnapshot.table_number}` },
+      { label: t('mesas:labels.accounts'), value: String(subAccounts.length) },
+      { label: t('mesas:labels.sync'), value: t('mesas:labels.syncing') }
     ]);
-    setSuccessTitle('✨ Venta Registrada');
+    setSuccessTitle(`✨ ${t('mesas:success.saleRegistered')}`);
     setAlertType('success');
     setSuccess(true);
 
     try {
       const closeResult = await closeOrderAsSplit(businessId, {
-        subAccounts,
+        subAccounts: subAccounts as any,
         orderId: mesaSnapshot.current_order_id,
         tableId: mesaSnapshot.id
-      });
+      }) as any;
       const {
         saleIds = []
       } = closeResult || {};
 
       if (closeResult?.pending_sync && Array.isArray(closeResult?.sales)) {
-        appendPendingSalesToVentasSnapshot(closeResult.sales, businessId);
+        appendPendingSalesToVentasSnapshot(closeResult.sales, businessId, t);
       }
 
       const localSplitPrintBundles = closeResult?.pending_sync
         ? buildLocalSplitPrintBundles({
           saleIds,
           sales: closeResult?.sales || [],
-          subAccounts
+          subAccounts,
+          t
         })
         : [];
 
@@ -627,7 +735,7 @@ export function useMesaPayment({
         // Usuario canceló la impresión o auto-print deshabilitado
       }
 
-      loadMesas().catch((err) => { logger.warn('mesas:payment:load_mesas_after_split failed', err); });
+      loadMesas().catch((err: Error) => { logger.warn('mesas:payment:load_mesas_after_split failed', err); });
 
       setTimeout(() => {
         justCompletedSaleRef.current = false;
@@ -635,7 +743,7 @@ export function useMesaPayment({
       }, MODAL_REOPEN_GUARD_MS);
     } catch (error) {
       applyLocalStockConsumption(splitConsumptionByProduct, { mode: 'restore', businessId, setProducts });
-      setError(buildDiagnosticAlertMessage(error, 'No se pudo cerrar la orden. Revirtiendo estado.'));
+        setError(buildDiagnosticAlertMessage(error, t));
       try { await loadMesas(); } catch (err) { logger.warn('mesas:payment:load_mesas_recovery_split failed', err); }
       try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch (err) { logger.warn('mesas:payment:reset_modal_state_split failed', err); }
     } finally {
@@ -648,13 +756,16 @@ export function useMesaPayment({
   const processPaymentAndClose = async () => {
     if (isClosingOrder) return;
 
-    let closeLockKey = null;
+    let closeLockKey: string | null = null;
 
     if (insufficientItems.length > 0) {
       const firstShortage = insufficientItems[0];
       setError(
-        `❌ Stock insuficiente para "${firstShortage.product_name}" ` +
-        `(disp: ${firstShortage.available_stock}, req: ${firstShortage.quantity}).`
+        t('mesas:errors.insufficientStockShortage', {
+          productName: firstShortage.product_name,
+          available: firstShortage.available_stock,
+          required: firstShortage.quantity
+        })
       );
       return;
     }
@@ -662,8 +773,11 @@ export function useMesaPayment({
     if (hasInsufficientComboStock) {
       const firstShortage = insufficientComboComponents[0];
       setError(
-        `❌ Stock insuficiente para "${firstShortage.product_name}" ` +
-        `(disp: ${firstShortage.available_stock}, req: ${firstShortage.required_quantity}).`
+        t('mesas:errors.insufficientStockShortage', {
+          productName: firstShortage.product_name,
+          available: firstShortage.available_stock,
+          required: firstShortage.required_quantity
+        })
       );
       return;
     }
@@ -672,14 +786,14 @@ export function useMesaPayment({
     const amountReceivedSnapshot = amountReceived;
     const normalizedAmountReceived = parseCopAmount(amountReceivedSnapshot);
     const cashChangeData = paymentSnapshot === 'cash'
-      ? calcularCambio(orderTotal, amountReceivedSnapshot)
+      ? calcularCambio(orderTotal, amountReceivedSnapshot, priceConfig?.currency || 'COP')
       : null;
 
     if (paymentSnapshot === 'cash') {
       if (!cashChangeData?.isValid) {
         setError(cashChangeData?.reason === 'insufficient'
-          ? '❌ El monto recibido es menor al total de la cuenta.'
-          : '❌ Ingresa un monto recibido válido.');
+          ? t('mesas:errors.insufficientAmount')
+          : t('mesas:errors.invalidAmount'));
         return;
       }
     }
@@ -689,14 +803,14 @@ export function useMesaPayment({
 
     const mesaSnapshot = selectedMesa ? { ...selectedMesa } : null;
     if (!mesaSnapshot?.id || !mesaSnapshot?.current_order_id) {
-      setError('❌ No se encontró una orden activa para cerrar.');
+      setError(t('mesas:errors.noActiveOrder'));
       setIsClosingOrder(false);
       return;
     }
 
     closeLockKey = `single:${businessId}:${mesaSnapshot.id}:${mesaSnapshot.current_order_id}`;
     if (!acquireCloseOrderLock(closeLockKey)) {
-      setError('⏳ Esta orden ya se está cerrando. Espera un momento.');
+      setError(t('mesas:errors.orderClosing'));
       setIsClosingOrder(false);
       return;
     }
@@ -706,7 +820,7 @@ export function useMesaPayment({
     const orderConsumptionByProduct = buildStockConsumptionFromItems(orderItemsSnapshot, comboCatalogByIdRef);
 
     if (mesaSnapshot) {
-      setMesas(prevMesas => prevMesas.map(m => (
+      setMesas((prevMesas: MesaRecord[]) => prevMesas.map((m: MesaRecord) => (
         m.id === mesaSnapshot.id
           ? { ...m, status: 'available', current_order_id: null, orders: null }
           : m
@@ -735,12 +849,12 @@ export function useMesaPayment({
     setCanShowOrderModal(false);
     setIsClosingOrder(false);
     setSuccessDetails([
-      { label: 'Total', value: formatPrice(optimisticSaleTotal) },
-      { label: 'Mesa', value: `#${mesaSnapshot?.table_number || '-'}` },
-      { label: 'Método', value: getPaymentMethodLabel(paymentSnapshot) },
-      { label: 'Sincronización', value: 'Procesando en segundo plano' }
+      { label: t('mesas:labels.total'), value: fmtPrice(optimisticSaleTotal) },
+      { label: t('mesas:labels.table'), value: `#${mesaSnapshot?.table_number || '-'}` },
+      { label: t('mesas:labels.method'), value: getPaymentMethodLabel(paymentSnapshot) },
+      { label: t('mesas:labels.sync'), value: t('mesas:labels.syncing') }
     ]);
-    setSuccessTitle('✨ Venta Registrada');
+    setSuccessTitle(`✨ ${t('mesas:success.saleRegistered')}`);
     setAlertType('success');
     setSuccess(true);
 
@@ -753,7 +867,7 @@ export function useMesaPayment({
           amountReceived: paymentSnapshot === 'cash' ? normalizedAmountReceived : null,
           changeBreakdown: paymentSnapshot === 'cash' ? cashChangeData?.breakdown || [] : [],
           orderItems: orderItemsSnapshot
-        });
+        }) as any;
         const { saleId } = closeResult || {};
 
         if (closeResult?.pending_sync && saleId) {
@@ -764,7 +878,7 @@ export function useMesaPayment({
             amount_received: paymentSnapshot === 'cash' ? normalizedAmountReceived : null,
             change_breakdown: paymentSnapshot === 'cash' ? (cashChangeData?.breakdown || []) : [],
             created_at: closeResult?.created_at || new Date().toISOString()
-          }], businessId);
+          }], businessId, t);
         }
 
         const localSinglePrintBundle = closeResult?.pending_sync
@@ -776,7 +890,7 @@ export function useMesaPayment({
             amountReceived: paymentSnapshot === 'cash' ? normalizedAmountReceived : null,
             changeBreakdown: paymentSnapshot === 'cash' ? (cashChangeData?.breakdown || []) : [],
             orderItems: orderItemsSnapshot,
-            sellerName: 'Venta offline'
+            sellerName: t('mesas:defaults.offlineSale')
           })
           : null;
 
@@ -791,7 +905,7 @@ export function useMesaPayment({
           // Usuario canceló la impresión o auto-print deshabilitado
         }
 
-        loadMesas().catch((err) => { logger.warn('mesas:payment:load_mesas_after_single failed', err); });
+        loadMesas().catch((err: Error) => { logger.warn('mesas:payment:load_mesas_after_single failed', err); });
 
         setTimeout(() => {
           justCompletedSaleRef.current = false;
@@ -799,7 +913,7 @@ export function useMesaPayment({
         }, MODAL_REOPEN_GUARD_MS);
       } catch (error) {
         applyLocalStockConsumption(orderConsumptionByProduct, { mode: 'restore', businessId, setProducts });
-        setError(buildDiagnosticAlertMessage(error, 'No se pudo cerrar la orden. Revirtiendo estado.'));
+      setError(buildDiagnosticAlertMessage(error, t));
         try { await loadMesas(); } catch (err) { logger.warn('mesas:payment:load_mesas_recovery_single failed', err); }
         try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch (err) { logger.warn('mesas:payment:reset_modal_state_single failed', err); }
       } finally {
@@ -811,19 +925,19 @@ export function useMesaPayment({
 
   const handlePrintOrder = () => {
     if (!selectedMesa || orderItems.length === 0) {
-      setError('No hay productos en la orden para imprimir');
+      setError(t('mesas:errors.noItemsToPrint'));
       setTimeout(() => setError(null), 3000);
       return;
     }
 
-    const normalizeCategory = (value) => String(value || '')
+    const normalizeCategory = (value: string) => String(value || '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .trim()
       .toLowerCase();
 
     const categoriasParaCocina = new Set(['plato', 'platos', 'cocina', 'comida']);
-    const itemsParaCocina = orderItems.filter((item) => {
+    const itemsParaCocina = orderItems.filter((item: OrderItem) => {
       if (item?.combo_id) return true;
       const category = normalizeCategory(item?.products?.category || item?.category || '');
       return categoriasParaCocina.has(category)
@@ -832,7 +946,7 @@ export function useMesaPayment({
     });
 
     if (itemsParaCocina.length === 0) {
-      setError('No hay productos que requieran preparación en cocina');
+      setError(t('mesas:errors.noKitchenItems'));
       setTimeout(() => setError(null), 3000);
       return;
     }
@@ -842,7 +956,7 @@ export function useMesaPayment({
       tableNumber: selectedMesa.table_number,
       status: selectedMesa.status,
       orderTotal,
-      onError: (msg) => {
+      onError: (msg: string) => {
         setError(msg);
         if (msg) setTimeout(() => setError(null), 3000);
       },

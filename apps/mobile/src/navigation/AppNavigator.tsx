@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   NavigationContainer,
   type NavigationState,
@@ -14,10 +14,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetInfo } from '@react-native-community/netinfo';
+import { useTranslation } from 'react-i18next';
 import {
   getSectionsBySource,
-  SECTION_BY_ID,
-  SECTION_GROUP_LABELS,
+  useSectionMeta,
+  useSectionGroupLabels,
   type SectionGroup,
   type SectionId,
   type SectionMeta,
@@ -46,7 +47,7 @@ function resolveActiveRouteName(
   return String(route.name || 'unknown');
 }
 
-function Header({ navigation, route: _route }: DrawerHeaderProps) {
+const Header = memo(function Header({ navigation, route: _route }: DrawerHeaderProps) {
   const insets = useSafeAreaInsets();
   const { businessContext } = useDashboardContext();
 
@@ -63,9 +64,22 @@ function Header({ navigation, route: _route }: DrawerHeaderProps) {
       </View>
     </View>
   );
+});
+
+function resolveUserLabel(session: {
+  user: { user_metadata?: Record<string, unknown>; email?: string };
+}): string {
+  const meta = session.user.user_metadata;
+  return String(
+    (meta?.full_name as string) ||
+      (meta?.name as string) ||
+      (meta?.username as string) ||
+      session.user.email?.split('@')[0] ||
+      'Usuario',
+  );
 }
 
-function DrawerContent({
+const DrawerContent = memo(function DrawerContent({
   sections,
   source,
   ...props
@@ -75,15 +89,12 @@ function DrawerContent({
 }) {
   const { state, navigation } = props;
   const { session, signOut, businessContext } = useDashboardContext();
+  const { t } = useTranslation();
+  const groupLabels = useSectionGroupLabels();
   const activeRouteName = state.routeNames[state.index];
-  const roleLabel = source === 'employee' ? 'Empleado' : 'Administrador';
-  const userLabel = String(
-    session.user.user_metadata?.full_name ||
-      session.user.user_metadata?.name ||
-      session.user.user_metadata?.username ||
-      session.user.email?.split('@')[0] ||
-      'Usuario',
-  );
+  const roleLabel = source === 'employee' ? t('roles.employee') : t('roles.admin');
+
+  const userLabel = useMemo(() => resolveUserLabel(session), [session]);
 
   const grouped = useMemo(
     () =>
@@ -101,9 +112,12 @@ function DrawerContent({
     [sections],
   );
 
-  const onNavigate = (sectionId: SectionId) => {
-    navigation.navigate(sectionId as never);
-  };
+  const onNavigate = useCallback(
+    (sectionId: SectionId) => {
+      navigation.navigate(sectionId as never);
+    },
+    [navigation],
+  );
 
   return (
     <DrawerContentScrollView
@@ -130,7 +144,7 @@ function DrawerContent({
 
           return (
             <View key={group} style={styles.groupBlock}>
-              <Text style={styles.groupTitle}>{SECTION_GROUP_LABELS[group]}</Text>
+              <Text style={styles.groupTitle}>{groupLabels[group]}</Text>
 
               {grouped[group].map((section) => {
                 const isActive = activeRouteName === section.id;
@@ -167,12 +181,12 @@ function DrawerContent({
           }}
         >
           <Ionicons name="log-out-outline" size={24} color="#991B1B" />
-          <Text style={styles.signOutText}>Cerrar sesión</Text>
+          <Text style={styles.signOutText}>{t('buttons.signOut')}</Text>
         </Pressable>
       </View>
     </DrawerContentScrollView>
   );
-}
+});
 
 function ScreenBySection({ sectionId }: { sectionId: SectionId }) {
   return <DashboardSectionScreen sectionId={sectionId} />;
@@ -180,6 +194,8 @@ function ScreenBySection({ sectionId }: { sectionId: SectionId }) {
 
 export function AppNavigator() {
   const { session, businessContext, loadingBusiness, signOut } = useDashboardContext();
+  const { t } = useTranslation();
+  const sectionMeta = useSectionMeta();
   const netInfo = useNetInfo();
   const source = businessContext?.source || 'owner';
   const allowedSectionIds = useMemo<SectionId[]>(() => {
@@ -187,13 +203,25 @@ export function AppNavigator() {
     return getSectionsBySource(source);
   }, [loadingBusiness, source]);
   const allowedSections = useMemo(
-    () => allowedSectionIds.map((id) => SECTION_BY_ID[id]).filter(Boolean),
-    [allowedSectionIds],
+    () =>
+      allowedSectionIds
+        .map((id) => sectionMeta.find((s) => s.id === id))
+        .filter(Boolean) as SectionMeta[],
+    [allowedSectionIds, sectionMeta],
   );
   const isOffline = netInfo.isInternetReachable === false || netInfo.isConnected === false;
   const isBusinessInactive = businessContext?.isActive === false;
   const lastBlockedBusinessIdRef = useRef<string | null>(null);
   const activeRouteRef = useRef<string | null>(null);
+
+  const renderDrawerContent = useCallback(
+    (props: DrawerContentComponentProps) => (
+      <DrawerContent {...props} sections={allowedSections} source={source} />
+    ),
+    [allowedSections, source],
+  );
+
+  const renderHeader = useCallback((props: DrawerHeaderProps) => <Header {...props} />, []);
 
   useEffect(() => {
     if (!isBusinessInactive) {
@@ -238,14 +266,12 @@ export function AppNavigator() {
       >
         <Drawer.Navigator
           key={`${source}:${loadingBusiness ? 'loading' : 'ready'}`}
-          drawerContent={(props) => (
-            <DrawerContent {...props} sections={allowedSections} source={source} />
-          )}
+          drawerContent={renderDrawerContent}
           screenOptions={{
             drawerType: 'front',
             drawerStyle: styles.drawer,
             overlayColor: 'rgba(234, 241, 247, 0.72)',
-            header: (props) => <Header {...props} />,
+            header: renderHeader,
             sceneStyle: { backgroundColor: 'transparent' },
             swipeEdgeWidth: 24,
           }}

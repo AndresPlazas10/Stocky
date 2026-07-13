@@ -1,3 +1,5 @@
+import type { ReceiptLabels } from '../utils/receiptLabels';
+
 export function cleanText(value: string | null | undefined): string {
   if (!value) return '';
   const normalized = value.normalize('NFD');
@@ -56,7 +58,7 @@ export function buildSaleEscPos(
 
   bold(out, true);
   align(out, 0);
-  writeLine(out, 'PRODUCTO       CANT.      TOTAL');
+  writeLine(out, cleanText(receipt.itemsHeader || 'PRODUCTO       CANT.      TOTAL'));
   bold(out, false);
   feed(out, 2);
 
@@ -78,7 +80,7 @@ export function buildSaleEscPos(
     if (totals.voluntaryTip && totals.voluntaryTip > 0) {
       twoColumns(
         out,
-        'Propina:',
+        cleanText(receipt.tipLabel || 'Propina') + ':',
         cleanText(totals.voluntaryTipText || String(totals.voluntaryTip)),
         columns,
       );
@@ -87,7 +89,12 @@ export function buildSaleEscPos(
 
     bold(out, true);
     size(out, true);
-    twoColumns(out, 'TOTAL:', cleanText(totals.totalText || ''), columns);
+    twoColumns(
+      out,
+      (receipt.totalLabel || 'TOTAL') + ':',
+      cleanText(totals.totalText || ''),
+      columns,
+    );
     size(out, false);
     bold(out, false);
   }
@@ -97,8 +104,8 @@ export function buildSaleEscPos(
   feed(out, 2);
 
   const payment = receipt.payment;
-  const methodText = cleanText(payment?.methodText || 'No especificado');
-  twoColumns(out, 'Metodo:', methodText, columns);
+  const methodText = cleanText(payment?.methodText || receipt.notSpecified || 'No especificado');
+  twoColumns(out, (receipt.methodLabel || 'Metodo') + ':', methodText, columns);
 
   feed(out, 3);
 
@@ -111,8 +118,6 @@ export function buildSaleEscPos(
 
   align(out, 0);
   feed(out, 4);
-  // La PT-210 y muchas termicas portatiles de 58 mm no tienen cutter automatico.
-  // El comando GS V puede hacer que ignoren el trabajo o se queden esperando.
   if (autoCut) {
     cmd(out, 0x1d, 0x56, 0x42, 0x00);
   }
@@ -257,6 +262,11 @@ export interface SaleReceipt {
     message?: string;
     alignment?: 'left' | 'center' | 'right';
   };
+  itemsHeader?: string;
+  tipLabel?: string;
+  totalLabel?: string;
+  methodLabel?: string;
+  notSpecified?: string;
 }
 
 export function buildKitchenEscPos(opts: {
@@ -266,9 +276,11 @@ export function buildKitchenEscPos(opts: {
   businessName?: string;
   paperWidthMm: number;
   autoCut?: boolean;
+  labels: ReceiptLabels;
 }): Uint8Array {
   const columns = opts.paperWidthMm <= 58 ? 32 : opts.paperWidthMm <= 80 ? 48 : 64;
   const out = new ByteStream();
+  const { labels } = opts;
 
   cmd(out, 0x1b, 0x40);
   cmd(out, 0x1b, 0x74, 0x10);
@@ -278,13 +290,13 @@ export function buildKitchenEscPos(opts: {
   align(out, 1);
   bold(out, true);
   size(out, true);
-  writeLine(out, 'ORDEN DE COCINA');
+  writeLine(out, cleanText(labels.kitchenTitle));
   size(out, false);
   bold(out, false);
   feed(out, 1);
 
   bold(out, true);
-  writeLine(out, 'Mesa #' + String(opts.mesaNumber));
+  writeLine(out, cleanText(labels.kitchenTable) + String(opts.mesaNumber));
   bold(out, false);
   feed(out, 1);
 
@@ -304,7 +316,7 @@ export function buildKitchenEscPos(opts: {
   feed(out, 1);
 
   const totalUnits = opts.items.reduce((sum, i) => sum + (i.quantity || 0), 0);
-  writeLine(out, 'Items: ' + totalUnits);
+  writeLine(out, cleanText(labels.itemsLabel) + ': ' + totalUnits);
   feed(out, 1);
   thinSeparator(out, columns);
   feed(out, 1);
@@ -322,7 +334,7 @@ export function buildKitchenEscPos(opts: {
 
   align(out, 1);
   bold(out, true);
-  writeLine(out, '*** ORDEN PARA COCINA ***');
+  writeLine(out, cleanText(labels.kitchenFooter));
   bold(out, false);
 
   align(out, 0);

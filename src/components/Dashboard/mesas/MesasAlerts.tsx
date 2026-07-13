@@ -2,6 +2,7 @@ import { SaleSuccessAlert } from '../../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../../ui/SaleErrorAlert';
 import { SaleUpdateAlert } from '../../ui/SaleUpdateAlert';
 import { PrintReceiptConfirmModal } from '../../ui/PrintReceiptConfirmModal';
+import { useTranslation } from 'react-i18next';
 import type { MesasAlertsProps } from '@/types/components';
 
 export function MesasAlerts({
@@ -21,13 +22,14 @@ export function MesasAlerts({
   onSuccessClose,
   onErrorClose,
 }: MesasAlertsProps) {
+  const { t } = useTranslation(['mesas', 'common']);
   return (
     <>
       <SaleUpdateAlert
         key="split-sales-loading"
         isVisible={isGeneratingSplitSales}
         onClose={() => {}}
-        title="Generando ventas..."
+        title={t('status.processing', { ns: 'common' })}
         details={[]}
         duration={600000}
       />
@@ -35,7 +37,7 @@ export function MesasAlerts({
         key="order-close-loading"
         isVisible={isClosingOrder && !isGeneratingSplitSales}
         onClose={() => {}}
-        title="Generando venta..."
+        title={t('status.processing', { ns: 'common' })}
         details={[]}
         duration={600000}
       />
@@ -59,7 +61,7 @@ export function MesasAlerts({
         key="sale-error"
         isVisible={!!error}
         onClose={onErrorClose}
-        title="Error"
+        title={t('status.error', { ns: 'common' })}
         message={error || ''}
         details={[]}
         duration={7000}

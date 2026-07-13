@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { formatPrice } from '../../utils/formatters';
+import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 import { getReportsSnapshot } from '../../data/queries/reportsQueries';
 import {
   TrendingUp,
@@ -25,6 +27,12 @@ import { PaymentMethodBankLogo, getPaymentMethodLabel } from '../ui/PaymentMetho
 import type { DashboardModuleProps } from '@/types/components';
 
 function Reports({ businessId }: DashboardModuleProps) {
+  const { t } = useTranslation(['reports', 'common']);
+  const config = useBusinessConfig();
+  const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
+  
+  const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('month');
@@ -158,7 +166,7 @@ function Reports({ businessId }: DashboardModuleProps) {
       });
 
       saleDetails?.forEach((item: Record<string, unknown>) => {
-        const productName = ((item?.products as Record<string, unknown>)?.name as string) || 'Producto sin nombre';
+        const productName = ((item?.products as Record<string, unknown>)?.name as string) || t('labels.product');
         const purchasePrice = ((item?.products as Record<string, unknown>)?.purchase_price as number) || 0;
         const quantity = (item.quantity as number) || 0;
 
@@ -245,12 +253,12 @@ function Reports({ businessId }: DashboardModuleProps) {
         if (Array.isArray(cached?.topProducts)) setTopProducts(cached.topProducts as Array<{ name: string; quantity: number }>);
         if (Array.isArray(cached?.salesByMethod)) setSalesByMethod(cached.salesByMethod as Array<{ method: string; total: number }>);
       } else {
-        setError('❌ Error al cargar los reportes');
+        setError('❌ ' + t('reports:errors.loadFailed'));
       }
     } finally {
       setLoading(false);
     }
-  }, [businessId, getDateRange, normalizePaymentMethodKey, selectedPeriod]);
+  }, [businessId, getDateRange, normalizePaymentMethodKey, selectedPeriod, t]);
 
   useEffect(() => {
     if (businessId) {
@@ -260,10 +268,10 @@ function Reports({ businessId }: DashboardModuleProps) {
 
   const getPeriodLabel = () => {
     switch (selectedPeriod) {
-      case 'today': return 'Hoy';
-      case 'week': return 'Última Semana';
-      case 'month': return 'Último Mes';
-      default: return 'Último Mes';
+      case 'today': return t('reports:labels.today');
+      case 'week': return t('reports:labels.week');
+      case 'month': return t('reports:labels.month');
+      default: return t('reports:labels.month');
     }
   };
 
@@ -321,8 +329,8 @@ function Reports({ businessId }: DashboardModuleProps) {
                 <BarChart3 className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-800">Reportes y Estadísticas</h1>
-                <p className="text-gray-600">Análisis del desempeño de tu negocio</p>
+                <h1 className="text-3xl font-bold text-gray-800">{t('title')}</h1>
+                <p className="text-gray-600">{t('subtitle')}</p>
               </div>
             </div>
             
@@ -333,9 +341,9 @@ function Reports({ businessId }: DashboardModuleProps) {
                 onChange={(e) => setSelectedPeriod(e.target.value)}
                 className="px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all bg-white font-medium"
               >
-                <option value="today">Hoy</option>
-                <option value="week">Última Semana</option>
-                <option value="month">Último Mes</option>
+                <option value="today">{t('reports:labels.today')}</option>
+                <option value="week">{t('reports:labels.week')}</option>
+                <option value="month">{t('reports:labels.month')}</option>
               </select>
             </div>
           </div>
@@ -382,13 +390,13 @@ function Reports({ businessId }: DashboardModuleProps) {
                   </div>
                   <div className="flex items-center gap-1 text-xs sm:text-sm bg-white/20 px-2 py-1 rounded-lg">
                     <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
-                    Ventas
+                    {t('reports:labels.totalSales')}
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs sm:text-sm opacity-90">Total Ventas</p>
-                  <p className="text-2xl sm:text-3xl font-bold truncate">{formatPrice(metrics.totalSales)}</p>
-                  <p className="text-xs sm:text-sm opacity-80">{metrics.salesCount} transacciones</p>
+                  <p className="text-xs sm:text-sm opacity-90">{t('labels.totalSales')}</p>
+                  <p className="text-2xl sm:text-3xl font-bold truncate">{fmtPrice(metrics.totalSales)}</p>
+                  <p className="text-xs sm:text-sm opacity-80">{metrics.salesCount} {t('reports:labels.transactions')}</p>
                 </div>
               </motion.div>
 
@@ -403,13 +411,13 @@ function Reports({ businessId }: DashboardModuleProps) {
                   </div>
                   <div className="flex items-center gap-1 text-xs sm:text-sm bg-white/20 px-2 py-1 rounded-lg">
                     <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4" />
-                    Compras
+                    {t('reports:labels.totalPurchases')}
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs sm:text-sm opacity-90">Total Compras</p>
-                  <p className="text-2xl sm:text-3xl font-bold truncate">{formatPrice(metrics.totalPurchases)}</p>
-                  <p className="text-xs sm:text-sm opacity-80">{metrics.purchasesCount} compras</p>
+                  <p className="text-xs sm:text-sm opacity-90">{t('labels.totalPurchases')}</p>
+                  <p className="text-2xl sm:text-3xl font-bold truncate">{fmtPrice(metrics.totalPurchases)}</p>
+                  <p className="text-xs sm:text-sm opacity-80">{metrics.purchasesCount} {t('reports:labels.totalPurchases')}</p>
                 </div>
               </motion.div>
 
@@ -428,14 +436,14 @@ function Reports({ businessId }: DashboardModuleProps) {
                   </div>
                   <div className="flex items-center gap-1 text-xs sm:text-sm bg-white/20 px-2 py-1 rounded-lg">
                     {metrics.grossProfit >= 0 ? <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" /> : <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4" />}
-                    {metrics.grossProfit >= 0 ? 'Ganancia' : 'Pérdida'}
+                    {metrics.grossProfit >= 0 ? t('reports:labels.profit') : t('reports:labels.loss')}
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs sm:text-sm opacity-90">Ganancia Bruta</p>
-                  <p className="text-2xl sm:text-3xl font-bold truncate">{formatPrice(metrics.grossProfit)}</p>
+                  <p className="text-xs sm:text-sm opacity-90">{t('labels.grossProfit')}</p>
+                  <p className="text-2xl sm:text-3xl font-bold truncate">{fmtPrice(metrics.grossProfit)}</p>
                   <p className="text-xs sm:text-sm opacity-80">
-                    {metrics.grossProfit >= 0 ? 'Positivo ✓' : 'Negativo ⚠'}
+                    {metrics.grossProfit >= 0 ? t('metrics.positive') + ' ✓' : t('metrics.negative') + ' ⚠'}
                   </p>
                 </div>
               </motion.div>
@@ -455,9 +463,9 @@ function Reports({ businessId }: DashboardModuleProps) {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs sm:text-sm opacity-90">Facturas Generadas</p>
+                  <p className="text-xs sm:text-sm opacity-90">{t('reports:labels.invoicesGenerated')}</p>
                   <p className="text-2xl sm:text-3xl font-bold">{metrics.totalInvoices}</p>
-                  <p className="text-xs sm:text-sm opacity-80">En este período</p>
+                  <p className="text-xs sm:text-sm opacity-80">{t('reports:labels.inThisPeriod')}</p>
                 </div>
               </motion.div>
             </motion.div>
@@ -479,7 +487,7 @@ function Reports({ businessId }: DashboardModuleProps) {
                     <p className="text-3xl font-bold text-gray-800">{metrics.productsInStock}</p>
                   </div>
                 </div>
-                <p className="text-gray-600 font-medium">Productos Activos</p>
+                <p className="text-gray-600 font-medium">{t('reports:labels.activeProducts')}</p>
                 <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-accent-500 to-[#C4DFE6]" style={{ width: '100%' }}></div>
                 </div>
@@ -507,7 +515,7 @@ function Reports({ businessId }: DashboardModuleProps) {
                     }`}>{metrics.lowStockProducts}</p>
                   </div>
                 </div>
-                <p className="text-gray-600 font-medium">Stock Bajo</p>
+                <p className="text-gray-600 font-medium">{t('reports:labels.lowStock')}</p>
                 <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div 
                     className={`h-full ${
@@ -530,7 +538,7 @@ function Reports({ businessId }: DashboardModuleProps) {
                     <p className="text-3xl font-bold text-gray-800">{metrics.totalSuppliers}</p>
                   </div>
                 </div>
-                <p className="text-gray-600 font-medium">Proveedores Activos</p>
+                <p className="text-gray-600 font-medium">{t('reports:labels.activeSuppliers')}</p>
                 <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-gray-500 to-gray-600" style={{ width: '100%' }}></div>
                 </div>
@@ -552,8 +560,8 @@ function Reports({ businessId }: DashboardModuleProps) {
                       <Award className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold">Top 5 Productos</h3>
-                      <p className="text-white/80">Más vendidos del período</p>
+                      <h3 className="text-xl font-bold">{t('reports:labels.top5Products')}</h3>
+                      <p className="text-white/80">{t('reports:labels.bestSellers')}</p>
                     </div>
                   </div>
                 </div>
@@ -562,7 +570,7 @@ function Reports({ businessId }: DashboardModuleProps) {
                   {topProducts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12">
                       <PieChart className="w-16 h-16 text-gray-300 mb-4" />
-                      <p className="text-gray-500">No hay datos disponibles</p>
+                      <p className="text-gray-500">{t('reports:labels.noDataAvailable')}</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -586,7 +594,7 @@ function Reports({ businessId }: DashboardModuleProps) {
                             <span className="font-semibold text-gray-800">{producto.name}</span>
                           </div>
                           <span className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-bold text-sm">
-                            {producto.quantity} vendidos
+                            {producto.quantity} {t('reports:labels.sold')}
                           </span>
                         </motion.div>
                       ))}
@@ -603,8 +611,8 @@ function Reports({ businessId }: DashboardModuleProps) {
                       <CreditCard className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold">Métodos de Pago</h3>
-                      <p className="text-white/80">Desglose de ventas</p>
+                      <h3 className="text-xl font-bold">{t('reports:labels.paymentMethods')}</h3>
+                      <p className="text-white/80">{t('reports:labels.salesBreakdown')}</p>
                     </div>
                   </div>
                 </div>
@@ -613,7 +621,7 @@ function Reports({ businessId }: DashboardModuleProps) {
                   {salesByMethod.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12">
                       <CreditCard className="w-16 h-16 text-gray-300 mb-4" />
-                      <p className="text-gray-500">No hay datos disponibles</p>
+                      <p className="text-gray-500">{t('reports:labels.noDataAvailable')}</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -639,10 +647,10 @@ function Reports({ businessId }: DashboardModuleProps) {
                                 {getPaymentMethodIcon(metodo.method)}
                               </div>
                             )}
-                            <span className="font-semibold text-gray-800">{getPaymentMethodLabel(metodo.method)}</span>
+                            <span className="font-semibold text-gray-800">{getPaymentMethodLabel(metodo.method, t)}</span>
                           </div>
                           <span className="text-lg font-bold text-green-600">
-                            {formatPrice(metodo.total)}
+                            {fmtPrice(metodo.total)}
                           </span>
                         </motion.div>
                       ))}

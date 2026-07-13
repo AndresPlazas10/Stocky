@@ -312,9 +312,7 @@ export function getOrderItemName(item: MesaOrderItem): string {
 
 export function calculateOrderTotal(items: MesaOrderItem[]): number {
   return (Array.isArray(items) ? items : []).reduce(
-    (sum, item) =>
-      sum +
-      normalizeNumber(item.quantity, 0) * normalizeNumber(item.price, 0),
+    (sum, item) => sum + normalizeNumber(item.quantity, 0) * normalizeNumber(item.price, 0),
     0,
   );
 }
@@ -834,10 +832,7 @@ async function updateOrderItemSubtotal({
   price: number;
 }) {
   const client = getSupabaseClient();
-  const { error } = await client
-    .from('order_items')
-    .update({ quantity, price })
-    .eq('id', itemId);
+  const { error } = await client.from('order_items').update({ quantity, price }).eq('id', itemId);
 
   if (error) throw error;
 }

@@ -1,4 +1,5 @@
 import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { DASHBOARD_WARMUP_PHASE } from "../services/dashboardWarmupService";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 
@@ -13,14 +14,15 @@ type WarmupStatusBadgeProps = {
 
 function resolveBadgePresentation(
   status: WarmupStatusBadgeProps["status"],
-  isOnline: boolean
+  isOnline: boolean,
+  t: (key: string) => string
 ) {
   const phase = status?.phase || DASHBOARD_WARMUP_PHASE.IDLE;
   const reason = String(status?.reason || "").trim().toLowerCase();
 
   if (phase === DASHBOARD_WARMUP_PHASE.RUNNING) {
     return {
-      label: "Preparando offline",
+      label: t('connectivity.preparing'),
       className: "bg-gray-100 text-gray-800 border-gray-200",
       Icon: Loader2,
       spinning: true,
@@ -30,8 +32,8 @@ function resolveBadgePresentation(
   if (phase === DASHBOARD_WARMUP_PHASE.READY) {
     return {
       label: isOnline
-        ? "Con internet"
-        : "Sin internet (Modo offline)",
+        ? t('connectivity.online')
+        : t('connectivity.offline'),
       className: isOnline
         ? "bg-green-100 text-green-800 border-green-200"
         : "bg-red-100 text-red-800 border-red-200",
@@ -42,7 +44,7 @@ function resolveBadgePresentation(
 
   if (phase === DASHBOARD_WARMUP_PHASE.ERROR) {
     return {
-      label: "Offline parcial",
+      label: t('connectivity.partialOffline'),
       className: "bg-amber-100 text-amber-800 border-amber-200",
       Icon: AlertCircle,
       spinning: false,
@@ -51,7 +53,7 @@ function resolveBadgePresentation(
 
   if (!isOnline || reason === "offline") {
     return {
-      label: "Sin internet (Modo offline)",
+      label: t('connectivity.offline'),
       className: "bg-red-100 text-red-800 border-red-200",
       Icon: AlertCircle,
       spinning: false,
@@ -60,7 +62,7 @@ function resolveBadgePresentation(
 
   if (reason === "local_sync_disabled") {
     return {
-      label: "Con internet",
+      label: t('connectivity.online'),
       className: "bg-green-100 text-green-800 border-green-200",
       Icon: CheckCircle2,
       spinning: false,
@@ -68,7 +70,7 @@ function resolveBadgePresentation(
   }
 
   return {
-    label: "Con internet",
+    label: t('connectivity.online'),
     className: "bg-green-100 text-green-800 border-green-200",
     Icon: CheckCircle2,
     spinning: false,
@@ -80,8 +82,9 @@ export function WarmupStatusBadge({
   compact = false,
   className = "",
 }: WarmupStatusBadgeProps) {
+  const { t } = useTranslation('common');
   const isOnline = useOnlineStatus();
-  const presentation = resolveBadgePresentation(status, isOnline);
+  const presentation = resolveBadgePresentation(status, isOnline, t);
   const Icon = presentation.Icon;
 
   return (

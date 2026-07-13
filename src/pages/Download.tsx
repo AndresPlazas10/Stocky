@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Download, ShieldCheck, Smartphone, Monitor, BellRing, Share, PlusSquare, AppWindow, Printer, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getApkDownloadUrl } from '../utils/apkDownload.js';
@@ -27,19 +28,6 @@ const sectionTransition = { duration: 0.35 };
 const collapseTransition = { duration: 0.3 };
 const viewportOnce = { once: true, amount: 0.3 };
 const viewportOnceSm = { once: true, amount: 0.2 };
-
-const iosSteps = [
-  { num: 1, title: 'Abre en Safari', desc: 'Usa Safari, no Chrome ni otros navegadores.' },
-  { num: 2, title: 'Toca el botón Compartir', desc: 'Busca el ícono de compartir en la barra inferior.', icon: Share },
-  { num: 3, title: 'Selecciona "Añadir a pantalla de inicio"', desc: 'Desplázate y elige esta opción.', icon: PlusSquare },
-  { num: 4, title: 'Toca "Añadir"', desc: 'Stocky aparecerá en tu pantalla de inicio como una app.' },
-];
-
-const quickStepsData = [
-  { step: '1', title: 'Descarga', desc: 'Elige Android, Windows o iPhone y descarga la app.' },
-  { step: '2', title: 'Instala', desc: 'Sigue los pasos según tu dispositivo.' },
-  { step: '3', title: 'Listo', desc: 'Abre Stocky, inicia sesión y empieza a vender.' },
-];
 
 const KEYFRAMES_CSS = `
 @keyframes drift {
@@ -69,6 +57,7 @@ function injectKeyframes() {
 
 function DownloadPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const mountedRef = useRef(true);
 
   const apkUrl = getApkDownloadUrl();
@@ -85,6 +74,19 @@ function DownloadPage() {
   const userIsOnIOs = useMemo(() => isIOs(), []);
   const userIsAndroid = useMemo(() => isAndroid(), []);
   const userInStandalone = useMemo(() => isStandalone(), []);
+
+  const iosSteps = useMemo(() => [
+    { num: 1, title: t('download.openInSafari'), desc: t('download.useSafariNotChrome') },
+    { num: 2, title: t('download.tapShareButton'), desc: t('download.findShareIcon'), icon: Share },
+    { num: 3, title: t('download.selectAddToHomeScreen'), desc: t('download.scrollAndSelect'), icon: PlusSquare },
+    { num: 4, title: t('download.tapAdd'), desc: t('download.stockyWillAppear') },
+  ], [t]);
+
+  const quickStepsData = useMemo(() => [
+    { step: '1', title: t('download.download'), desc: t('download.choosePlatformAndDownload') },
+    { step: '2', title: t('download.install'), desc: t('download.followSteps') },
+    { step: '3', title: t('download.ready'), desc: t('download.openStockyAndStart') },
+  ], [t]);
 
   useEffect(() => { injectKeyframes(); }, []);
 
@@ -108,20 +110,20 @@ function DownloadPage() {
       const result = await registerPwaPushSubscription({ askPermission: true });
       if (!mountedRef.current) return;
       if (result.ok) {
-        setPushFeedback('✅ Notificaciones activadas correctamente.');
+        setPushFeedback(`✅ ${t('download.notificationsActivated')}`);
         return;
       }
       if (result.reason === 'missing_access_token') {
-        setPushFeedback('⚠️ Inicia sesión primero para vincular notificaciones a tu cuenta.');
+        setPushFeedback(`⚠️ ${t('download.loginFirst')}`);
         return;
       }
       if (result.reason === 'missing_vapid_public_key') {
-        setPushFeedback('❌ Error de configuración: VAPID key no configurada. Contacta soporte.');
+        setPushFeedback(`❌ ${t('download.vapidError')}`);
         return;
       }
-      setPushFeedback(`❌ Error: ${result.message || result.reason || 'Desconocido'}`);
+      setPushFeedback(`❌ ${t('download.errorWithMessage', { message: result.message || result.reason || t('download.unknown') })}`);
     } catch (err) {
-      if (mountedRef.current) setPushFeedback(`❌ Error inesperado: ${(err as Error)?.message || String(err)}`);
+      if (mountedRef.current) setPushFeedback(`❌ ${t('download.unexpectedError', { message: (err as Error)?.message || String(err) })}`);
     } finally {
       if (mountedRef.current) setEnablingPush(false);
     }
@@ -136,15 +138,15 @@ function DownloadPage() {
       if (result.ok) {
         const sent = Number(result?.data?.sent || 0);
         if (sent > 0) {
-          setPushFeedback('Notificación de prueba enviada. Revisa tu iPhone.');
+          setPushFeedback(t('download.testNotificationSent'));
         } else {
-          setPushFeedback('No hay suscripción activa. Activa notificaciones primero.');
+          setPushFeedback(t('download.noActiveSubscription'));
         }
         return;
       }
-      setPushFeedback(result.message || 'No se pudo enviar la notificación de prueba.');
+      setPushFeedback(result.message || t('download.couldNotSendTest'));
     } catch {
-      if (mountedRef.current) setPushFeedback('Error de red enviando notificación de prueba.');
+      if (mountedRef.current) setPushFeedback(t('download.networkErrorTest'));
     } finally {
       if (mountedRef.current) setTestingPush(false);
     }
@@ -154,33 +156,33 @@ function DownloadPage() {
     {
       icon: Smartphone,
       title: 'Android',
-      subtitle: apkVersion ? `v${apkVersion}` : 'Última versión',
-      description: 'Compatible con Android 7.0 o superior.',
+      subtitle: apkVersion ? `v${apkVersion}` : t('download.latestVersion'),
+      description: t('download.androidCompatible'),
       href: apkUrl,
-      label: 'Descargar',
+      label: t('download.downloadButton'),
       apkOnly: true,
     },
     {
       icon: Monitor,
       title: 'Windows',
-      subtitle: windowsVersion ? `v${windowsVersion}` : 'Última versión',
-      description: 'Instalador para Windows 10 y 11.',
+      subtitle: windowsVersion ? `v${windowsVersion}` : t('download.latestVersion'),
+      description: t('download.windowsInstaller'),
       href: windowsUrl,
-      label: 'Descargar',
-      note: 'SmartScreen puede mostrar un aviso. Usa "Más información" → "Ejecutar de todas formas".',
+      label: t('download.downloadButton'),
+      note: t('download.smartScreenWarning'),
     },
     {
       icon: Printer,
       title: 'Print Bridge',
       subtitle: 'APK',
-      description: 'Conecta impresoras térmicas Bluetooth. Compatible con papel 58mm y 80mm.',
+      description: t('download.printBridgeDescription'),
       href: '/apk/stocky-print-bridge.apk',
       download: 'stocky-print-bridge.apk',
-      label: 'Descargar',
-      note: 'Después de instalar actívalo en Ajustes → Impresión → Stocky print.',
+      label: t('download.downloadButton'),
+      note: t('download.printBridgeInstallNote'),
       apkOnly: true,
     },
-  ], [apkVersion, windowsVersion, apkUrl, windowsUrl]);
+  ], [apkVersion, windowsVersion, apkUrl, windowsUrl, t]);
 
   const toggleIOsSteps = useCallback(() => setShowIOsSteps((v) => !v), []);
 
@@ -201,7 +203,7 @@ function DownloadPage() {
             className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
           >
             <ArrowLeft className="h-4 w-4" />
-            Volver
+            {t('download.back')}
           </button>
         </div>
       </header>
@@ -211,19 +213,19 @@ function DownloadPage() {
           <div className="mx-auto flex max-w-7xl flex-col items-center text-center">
             <motion.div {...fadeInUp} transition={heroTransition} className="inline-flex items-center gap-2 rounded-full border border-neutral-200/70 bg-neutral-100/70 px-3 py-1 text-xs font-semibold tracking-wide text-neutral-700">
               <Download className="h-3 w-3" />
-              Descargas oficiales
+              {t('download.officialDownloads')}
             </motion.div>
 
             <motion.h1 {...fadeInUpMore} transition={heroTransitionH1} className="mt-6 max-w-3xl text-2xl font-bold tracking-tight text-neutral-900 sm:text-4xl lg:text-5xl">
-              Lleva Stocky a todos tus dispositivos
+              {t('download.takeStockyEverywhere')}
             </motion.h1>
 
             <motion.p {...fadeInUpMore} transition={heroTransitionP} className="mt-3 max-w-xl text-sm text-neutral-500 sm:text-lg">
               {userIsOnIOs
-                ? 'Estás en iPhone. Instala Stocky como PWA o descarga para tus otros dispositivos.'
+                ? t('download.onIphoneMessage')
                 : userIsAndroid
-                  ? 'Estás en Android. Descarga el APK o usa la versión web.'
-                  : 'Android, Windows y iPhone. Elige tu plataforma y empieza en minutos.'}
+                  ? t('download.onAndroidMessage')
+                  : t('download.allPlatformsMessage')}
             </motion.p>
           </div>
         </section>
@@ -245,7 +247,7 @@ function DownloadPage() {
                 >
                   {isBlockedOnIOs && (
                     <span className="absolute top-3 right-3 rounded-full bg-neutral-100 border border-neutral-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
-                      Solo Android
+                      {t('download.androidOnly')}
                     </span>
                   )}
 
@@ -314,9 +316,9 @@ function DownloadPage() {
         <section className="border-t border-neutral-200/80 px-4 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-20">
           <div className="mx-auto max-w-3xl">
             <motion.div initial={fadeInUpMore.initial} whileInView={fadeInUpMore.animate} viewport={viewportOnce} transition={sectionTransition} className="mb-6 sm:mb-8">
-              <p className="mb-2 sm:mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">iPhone</p>
-              <h2 className="text-xl font-bold tracking-tight text-neutral-900 sm:text-2xl lg:text-3xl">Instala Stocky como una app</h2>
-              <p className="mt-2 text-sm text-neutral-500">Añade Stocky a tu pantalla de inicio y recibe notificaciones push.</p>
+              <p className="mb-2 sm:mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">{t('download.iphone')}</p>
+              <h2 className="text-xl font-bold tracking-tight text-neutral-900 sm:text-2xl lg:text-3xl">{t('download.installAsApp')}</h2>
+              <p className="mt-2 text-sm text-neutral-500">{t('download.addToHomeScreen')}</p>
             </motion.div>
 
             <div className="rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-sm sm:p-7">
@@ -326,15 +328,15 @@ function DownloadPage() {
                     <AppWindow className="h-5 w-5 text-green-700" />
                   </div>
                   <div>
-                    <p className="font-semibold text-green-900">¡Stocky está instalada!</p>
-                    <p className="text-xs text-green-700">Activa las notificaciones para recibir alertas.</p>
+                    <p className="font-semibold text-green-900">{t('download.stockyInstalled')}</p>
+                    <p className="text-xs text-green-700">{t('download.enableNotificationsForAlerts')}</p>
                   </div>
                 </motion.div>
               )}
 
               {userIsOnIOs && !userInStandalone && (
                 <motion.div {...scaleIn} className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                  <p className="text-xs font-medium text-amber-800">Estás en iPhone. Sigue los pasos de abajo para instalar Stocky.</p>
+                  <p className="text-xs font-medium text-amber-800">{t('download.followStepsBelow')}</p>
                 </motion.div>
               )}
 
@@ -344,7 +346,7 @@ function DownloadPage() {
               >
                 <span className="flex items-center gap-2">
                   <BellRing className="h-4 w-4 text-neutral-400" />
-                  {showIOsSteps ? 'Ocultar pasos' : <><span className="sm:hidden">Ver pasos</span><span className="hidden sm:inline">Ver pasos de instalación</span></>}
+                  {showIOsSteps ? t('download.hideSteps') : <><span className="sm:hidden">{t('download.viewSteps')}</span><span className="hidden sm:inline">{t('download.viewInstallSteps')}</span></>}
                 </span>
                 <motion.span animate={{ rotate: showIOsSteps ? 180 : 0 }} transition={{ duration: 0.2 }} className="text-neutral-400">▼</motion.span>
               </button>
@@ -363,13 +365,13 @@ function DownloadPage() {
                         </motion.div>
                       ))}
                     </div>
-                    <p className="mb-4 text-xs text-neutral-400">Después de instalar, abre la app desde tu pantalla de inicio y activa las notificaciones.</p>
+                    <p className="mb-4 text-xs text-neutral-400">{t('download.afterInstallOpenApp')}</p>
                   </motion.div>
                 )}
               </AnimatePresence>
 
               <div className="space-y-3">
-                <p className="text-sm font-semibold text-neutral-700">Notificaciones push</p>
+                <p className="text-sm font-semibold text-neutral-700">{t('download.pushNotifications')}</p>
                 <div className="grid gap-2 grid-cols-1 xs:grid-cols-2">
                   <Button
                     size="sm"
@@ -377,7 +379,7 @@ function DownloadPage() {
                     disabled={enablingPush || !support.supported}
                     className="h-10 rounded-xl bg-neutral-900 px-3 text-sm font-semibold text-white transition-colors sm:hover:bg-neutral-800 touch-manipulation"
                   >
-                    {enablingPush ? 'Activando...' : 'Activar notificaciones'}
+                    {enablingPush ? t('download.activating') : t('download.activateNotifications')}
                   </Button>
                   <Button
                     size="sm"
@@ -386,12 +388,12 @@ function DownloadPage() {
                     disabled={testingPush || !support.supported}
                     className="h-10 rounded-xl border-neutral-200 bg-white text-sm text-neutral-700 transition-colors sm:hover:bg-neutral-50 touch-manipulation"
                   >
-                    {testingPush ? 'Enviando...' : 'Enviar prueba'}
+                    {testingPush ? t('download.sending') : t('download.sendTest')}
                   </Button>
                 </div>
 
                 {!support.supported && (
-                  <p className="text-xs text-neutral-400">Este navegador no soporta notificaciones. Usa Safari en iPhone con la app instalada.</p>
+                  <p className="text-xs text-neutral-400">{t('download.browserNotSupported')}</p>
                 )}
                 {pushFeedback && (
                   <p className={`text-xs font-medium ${pushFeedback.startsWith('✅') ? 'text-green-700' : pushFeedback.startsWith('⚠️') ? 'text-amber-700' : 'text-red-600'}`}>
@@ -406,8 +408,8 @@ function DownloadPage() {
         <section className="border-t border-neutral-200/80 px-4 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-20">
           <div className="mx-auto max-w-5xl">
             <motion.div initial={fadeInUpMore.initial} whileInView={fadeInUpMore.animate} viewport={viewportOnce} transition={sectionTransition} className="mb-6 sm:mb-8 text-center">
-              <p className="mb-2 sm:mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">Instalación</p>
-              <h2 className="text-xl font-bold tracking-tight text-neutral-900 sm:text-2xl lg:text-3xl">Así de simple</h2>
+              <p className="mb-2 sm:mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">{t('download.installation')}</p>
+              <h2 className="text-xl font-bold tracking-tight text-neutral-900 sm:text-2xl lg:text-3xl">{t('download.soSimple')}</h2>
             </motion.div>
 
             <div className="grid gap-2 sm:gap-3 sm:grid-cols-3">
@@ -434,7 +436,7 @@ function DownloadPage() {
         <section className="px-4 pb-10 sm:px-6 sm:pb-16 lg:px-8">
           <div className="mx-auto flex max-w-3xl items-center justify-center gap-2 text-xs text-neutral-400">
             <ShieldCheck className="h-3.5 w-3.5" />
-            Descargas oficiales desde nuestros repositorios verificados
+            {t('download.officialFromVerified')}
           </div>
         </section>
       </main>

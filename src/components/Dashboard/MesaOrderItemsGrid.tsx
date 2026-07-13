@@ -1,9 +1,11 @@
 import { type RefObject } from 'react';
 import { motion } from 'framer-motion';
 import { ShoppingCart } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { formatPrice, toFiniteNumber } from '../../utils/formatters';
+import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 
 interface OrderItem {
   id: string;
@@ -40,15 +42,21 @@ export function MesaOrderItemsGrid({
   onUpdateQuantity,
   onLoadMore,
 }: MesaOrderItemsGridProps) {
+  const { t } = useTranslation(['mesas', 'common']);
+  const config = useBusinessConfig();
+  const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
+  
+  const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
+  
   return (
     <div className="mb-6">
-      <h3 className="text-lg font-bold text-primary-900 mb-4">Items en la orden</h3>
+      <h3 className="text-lg font-bold text-primary-900 mb-4">{t('mesas:labels.orderItems')}</h3>
       {orderItems.length === 0 ? (
         <div className="text-center py-12">
           <div className="w-16 h-16 rounded-full bg-accent-100 flex items-center justify-center mx-auto mb-3">
             <ShoppingCart className="w-8 h-8 text-accent-600" />
           </div>
-          <p className="text-accent-600">No hay items en esta orden</p>
+          <p className="text-accent-600">{t('mesas:labels.noItems')}</p>
         </div>
       ) : (
         <>
@@ -75,15 +83,15 @@ export function MesaOrderItemsGrid({
                               </span>
                             )}
                             <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium">
-                              {formatPrice(parseFloat(item.price))} por unidad
+                              {fmtPrice(parseFloat(item.price))} {t('labels.perUnit', { ns: 'common' })}
                             </span>
                           </div>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-lg font-bold text-primary-900">
-                            {formatPrice(parseFloat(item.subtotal))}
+                            {fmtPrice(parseFloat(item.subtotal))}
                           </p>
-                          <p className="text-[11px] text-accent-600">Subtotal</p>
+                          <p className="text-[11px] text-accent-600">{t('labels.subtotal', { ns: 'common' })}</p>
                         </div>
                       </div>
 
@@ -121,7 +129,7 @@ export function MesaOrderItemsGrid({
           {hasMoreOrderItems && (
             <div className="mt-3 flex flex-col items-center gap-2">
               <p className="text-xs text-accent-600">
-                Mostrando {visibleOrderItems.length} de {totalOrderItems} items
+                {t('mesas:labels.showing')} {visibleOrderItems.length} {t('mesas:labels.of')} {totalOrderItems} {t('mesas:labels.products')}
               </p>
               <div ref={orderItemsSentinelRef} className="h-2 w-full" aria-hidden="true" />
               <Button
@@ -130,7 +138,7 @@ export function MesaOrderItemsGrid({
                 variant="outline"
                 className="rounded-xl"
               >
-                Cargar mas items
+                {t('mesas:buttons.loadMore')}
               </Button>
             </div>
           )}

@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { STOCKY_COLORS } from '../../../theme/tokens';
@@ -31,6 +32,7 @@ const CartItemRow = memo(function CartItemRow({
   isKeyboardVisible: boolean;
   onUpdateQuantity: (item: VentaCartItem, qty: number) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={s.orderItemCard}>
       <View style={s.orderItemTopRow}>
@@ -43,10 +45,10 @@ const CartItemRow = memo(function CartItemRow({
         <View style={s.orderItemUnitChip}>
           <Text style={s.orderItemUnitChipText}>
             <StockyMoneyText value={Number(item.unit_price || 0)} style={s.orderItemUnitChipText} />{' '}
-            por unidad
+            {t('ventasSection.perUnit')}
           </Text>
         </View>
-        <Text style={s.orderItemSubtotalLabel}>Subtotal</Text>
+        <Text style={s.orderItemSubtotalLabel}>{t('ventasSection.subtotal')}</Text>
       </View>
       <View style={s.orderItemDivider} />
       <View style={s.orderItemControlsRow}>
@@ -82,7 +84,7 @@ const CartItemRow = memo(function CartItemRow({
           onPress={() => onUpdateQuantity(item, 0)}
         >
           <Ionicons name="trash-outline" size={20} color="#2563EB" />
-          <Text style={s.saleDeleteText}>Eliminar</Text>
+          <Text style={s.saleDeleteText}>{t('ventasSection.delete')}</Text>
         </Pressable>
       </View>
     </View>
@@ -139,6 +141,7 @@ export const CreateSaleModal = memo(function CreateSaleModal({
   onClearCart,
   onSubmit,
 }: CreateSaleModalProps) {
+  const { t } = useTranslation();
   const canSubmit =
     !submitting && cart.length > 0 && (paymentMethod !== 'cash' || cashChangeData?.isValid);
 
@@ -177,7 +180,7 @@ export const CreateSaleModal = memo(function CreateSaleModal({
           >
             <Ionicons name="cart-outline" size={30} color="#D1D5DB" />
           </LinearGradient>
-          <Text style={s.saleOrderModalHeaderTitle}>Nueva Venta</Text>
+          <Text style={s.saleOrderModalHeaderTitle}>{t('ventasSection.newSale')}</Text>
           <Pressable
             style={[s.saleOrderModalHeaderClose, submitting && s.buttonDisabled]}
             onPress={handleCloseButton}
@@ -192,7 +195,7 @@ export const CreateSaleModal = memo(function CreateSaleModal({
       footer={
         <View style={s.saleOrderFooterContainer}>
           <View style={s.saleOrderFooterTotalBlock}>
-            <Text style={s.saleOrderFooterTotalLabel}>Total a cobrar:</Text>
+            <Text style={s.saleOrderFooterTotalLabel}>{t('ventasSection.totalToCollect')}</Text>
             <StockyMoneyText value={cartTotal} style={s.saleOrderFooterTotalValue} />
           </View>
 
@@ -208,7 +211,7 @@ export const CreateSaleModal = memo(function CreateSaleModal({
               }}
               disabled={submitting || cart.length === 0}
             >
-              <Text style={s.saleOrderSecondaryButtonText}>Limpiar</Text>
+              <Text style={s.saleOrderSecondaryButtonText}>{t('ventasSection.clear')}</Text>
             </Pressable>
             <Pressable
               style={[s.saleOrderPrimaryButton, !canSubmit && s.buttonDisabled]}
@@ -222,7 +225,7 @@ export const CreateSaleModal = memo(function CreateSaleModal({
               disabled={!canSubmit}
             >
               <Text style={s.saleOrderPrimaryButtonText}>
-                {submitting ? 'Procesando...' : 'Confirmar venta'}
+                {submitting ? t('ventasSection.processing') : t('ventasSection.confirmSale')}
               </Text>
             </Pressable>
           </View>
@@ -231,13 +234,13 @@ export const CreateSaleModal = memo(function CreateSaleModal({
     >
       <View style={s.catalogSearchHeader}>
         <Ionicons name="search-outline" size={24} color="#111827" />
-        <Text style={s.catalogSearchHeaderText}>Agregar Producto o Combo</Text>
+        <Text style={s.catalogSearchHeaderText}>{t('ventasSection.addProductOrCombo')}</Text>
       </View>
 
       <TextInput
         value={searchCatalog}
         onChangeText={onSearchChange}
-        placeholder="Buscar por nombre..."
+        placeholder={t('ventasSection.searchByName')}
         placeholderTextColor={STOCKY_COLORS.textMuted}
         style={[s.searchInput, isSaleSearchFocused && s.searchInputFocused]}
         autoCapitalize="none"
@@ -250,11 +253,9 @@ export const CreateSaleModal = memo(function CreateSaleModal({
         <ActivityIndicator color={STOCKY_COLORS.primary900} />
       ) : null}
 
-      {!hasCatalogQuery ? (
-        <Text style={s.emptyText}>Escribe para buscar productos o combos.</Text>
-      ) : null}
+      {!hasCatalogQuery ? <Text style={s.emptyText}>{t('ventasSection.searchHint')}</Text> : null}
       {!loadingCatalog && hasCatalogQuery && catalogFiltered.length === 0 ? (
-        <Text style={s.emptyText}>No hay resultados para esa búsqueda.</Text>
+        <Text style={s.emptyText}>{t('ventasSection.noSearchResults')}</Text>
       ) : null}
 
       {hasCatalogQuery ? (
@@ -288,7 +289,7 @@ export const CreateSaleModal = memo(function CreateSaleModal({
                   </Text>
                   {item.item_type === 'combo' ? (
                     <View style={s.comboPill}>
-                      <Text style={s.comboPillText}>Combo</Text>
+                      <Text style={s.comboPillText}>{t('ventasSection.combo')}</Text>
                     </View>
                   ) : null}
                 </View>
@@ -304,11 +305,11 @@ export const CreateSaleModal = memo(function CreateSaleModal({
         </View>
       ) : null}
 
-      <Text style={s.orderItemsTitle}>Items en la venta</Text>
+      <Text style={s.orderItemsTitle}>{t('ventasSection.itemsInSale')}</Text>
       {cart.length === 0 ? (
         <View style={s.orderItemsEmpty}>
           <Ionicons name="cart-outline" size={56} color="#0F172A" />
-          <Text style={s.orderItemsEmptyText}>No hay items en esta venta</Text>
+          <Text style={s.orderItemsEmptyText}>{t('ventasSection.noItems')}</Text>
         </View>
       ) : null}
       {cart.length > 0
@@ -324,7 +325,7 @@ export const CreateSaleModal = memo(function CreateSaleModal({
 
       <View style={s.salePaymentBlock}>
         <View style={s.salePaymentHeader}>
-          <Text style={s.salePaymentTitle}>Pago</Text>
+          <Text style={s.salePaymentTitle}>{t('ventasSection.payment')}</Text>
           <Text style={s.salePaymentHint}>{getPaymentMethodLabel(paymentMethod)}</Text>
         </View>
         <PaymentMethodSelector
@@ -338,15 +339,15 @@ export const CreateSaleModal = memo(function CreateSaleModal({
             <TextInput
               value={amountReceived}
               onChangeText={onAmountReceivedChange}
-              placeholder="Monto recibido"
+              placeholder={t('ventasSection.amountReceived')}
               placeholderTextColor={STOCKY_COLORS.textMuted}
               keyboardType="numeric"
               style={s.saleComposerCashInput}
             />
             <Text style={[s.cashInfo, cashChangeData?.isValid ? s.cashInfoOk : s.cashInfoError]}>
               {cashChangeData?.isValid
-                ? `Cambio: ${formatCop(cashChangeData.change)}`
-                : 'Monto recibido inválido o insuficiente.'}
+                ? `${t('ventasSection.change')} ${formatCop(cashChangeData.change)}`
+                : t('ventasSection.invalidAmount')}
             </Text>
           </>
         ) : null}

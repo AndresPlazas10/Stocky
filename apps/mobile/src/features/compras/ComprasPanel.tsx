@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getSupabaseClient } from '../../lib/supabase';
@@ -21,9 +22,8 @@ import { useCompraCatalog } from './hooks/useCompraCatalog';
 import { useCompraFilters } from './hooks/useCompraFilters';
 import { useCompraDetails } from './hooks/useCompraDetails';
 import { useCompraMutations } from './hooks/useCompraMutations';
-import { useToast } from '../../hooks/useToast';
-import { StockyToast } from '../../ui/StockyToast';
-import { TOAST_MESSAGES } from '../../constants/toastMessages';
+import { useToastContext } from '../../hooks/useToastContext';
+import { useToastMessages } from '../../hooks/useToastMessages';
 import { PurchaseCard } from './components/PurchaseCard';
 import { PurchaseDetailsModal } from './components/PurchaseDetailsModal';
 import { CreatePurchaseModal } from './components/CreatePurchaseModal';
@@ -81,6 +81,7 @@ const ComprasListHeader = memo(function ComprasListHeader({
   paginatedPurchases,
   openCreatePurchaseModal,
 }: ComprasListHeaderProps) {
+  const { t } = useTranslation();
   return (
     <>
       <LinearGradient
@@ -94,44 +95,51 @@ const ComprasListHeader = memo(function ComprasListHeader({
             <Ionicons name="bag-handle-outline" size={28} color={STOCKY_COLORS.white} />
           </View>
           <View style={s.heroTitleWrap}>
-            <Text style={s.heroTitle}>Compras</Text>
+            <Text style={s.heroTitle}>{t('compras.title')}</Text>
             <Text style={s.heroSubtitle}>{businessName || businessId}</Text>
           </View>
         </View>
 
         <Pressable style={s.heroCreateButton} onPress={openCreatePurchaseModal}>
           <Ionicons name="add" size={20} color="rgba(255,255,255,0.9)" />
-          <Text style={s.heroCreateButtonText}>Nueva Compra</Text>
+          <Text style={s.heroCreateButtonText}>{t('buttons.newPurchase')}</Text>
         </Pressable>
       </LinearGradient>
 
       {loading ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
       {loadingPurchases ? <ActivityIndicator color={STOCKY_COLORS.primary900} /> : null}
-      <RecordFilterCard
-        title="Filtros de Compras"
-        subtitle="Filtra por un día específico."
-        expanded={showFiltersExpanded}
-        onToggle={() => setShowFiltersExpanded((prev) => !prev)}
-        dayField={{
-          icon: 'calendar-clear-outline',
-          label: 'Día',
-          selectedLabel: selectedDayLabel,
-          isActive: dayFilter !== 'all',
-          onOpen: openDayFilterCalendar,
-        }}
-        secondField={{
-          icon: 'storefront-outline',
-          label: 'Proveedor',
-          selectedLabel: selectedSupplierLabel,
-          isActive: supplierFilter !== 'all',
-          onOpen: () => setShowSupplierFilterModal(true),
-        }}
-        onClearFilters={clearFilters}
-      />
 
-      <View style={s.paginationCard}>
+      <View style={{ marginTop: 8 }}>
+        <RecordFilterCard
+          title={t('compras.filters')}
+          subtitle={t('compras.filtersDescription')}
+          expanded={showFiltersExpanded}
+          onToggle={() => setShowFiltersExpanded((prev) => !prev)}
+          dayField={{
+            icon: 'calendar-clear-outline',
+            label: t('ventasSection.day'),
+            selectedLabel: selectedDayLabel,
+            isActive: dayFilter !== 'all',
+            onOpen: openDayFilterCalendar,
+          }}
+          secondField={{
+            icon: 'storefront-outline',
+            label: t('comprasSection.supplier'),
+            selectedLabel: selectedSupplierLabel,
+            isActive: supplierFilter !== 'all',
+            onOpen: () => setShowSupplierFilterModal(true),
+          }}
+          onClearFilters={clearFilters}
+        />
+      </View>
+
+      <View style={[s.paginationCard, { marginTop: 4 }]}>
         <Text style={s.paginationText}>
-          Mostrando {pageRange.from} a {pageRange.to} de {filteredPurchases.length} registros
+          {t('compras.showingRecords', {
+            from: pageRange.from,
+            to: pageRange.to,
+            total: filteredPurchases.length,
+          })}
         </Text>
         <View style={s.paginationControls}>
           <Pressable
@@ -147,7 +155,7 @@ const ComprasListHeader = memo(function ComprasListHeader({
           </Pressable>
           <View style={s.paginationPageBadge}>
             <Text style={s.paginationPageText}>
-              Pagina {currentPage} de {totalPages}
+              {t('compras.page', { current: currentPage, total: totalPages })}
             </Text>
           </View>
           <Pressable
@@ -169,7 +177,7 @@ const ComprasListHeader = memo(function ComprasListHeader({
       </View>
 
       {!loading && paginatedPurchases.length === 0 ? (
-        <Text style={s.emptyTextLarge}>No hay compras para esos filtros.</Text>
+        <Text style={s.emptyTextLarge}>{t('compras.emptyState')}</Text>
       ) : null}
     </>
   );
@@ -183,7 +191,9 @@ type Props = {
 };
 
 export function ComprasPanel({ businessId, businessName, userId, source }: Props) {
-  const toast = useToast();
+  const { t } = useTranslation();
+  const toast = useToastContext();
+  const toastMessages = useToastMessages();
   const [loading, setLoading] = useState(true);
   const [loadingPurchases, setLoadingPurchases] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(false);
@@ -272,9 +282,7 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
       const purchasesResult = await listRecentCompras(businessId, 50, { forceRefresh: true });
       setPurchases(purchasesResult);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'No se pudo refrescar el historial de compras.',
-      );
+      setError(err instanceof Error ? err.message : t('errors.refreshFailed'));
     } finally {
       setLoadingPurchases(false);
     }
@@ -285,7 +293,11 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
       const purchasesResult = await listRecentCompras(businessId, 50, { forceRefresh: true });
       setPurchases(purchasesResult);
     } catch (err) {
-      if (__DEV__) console.error('[Compras] error al refrescar compras silenciosamente:', getErrorMessage(err));
+      if (__DEV__)
+        console.error(
+          '[Compras] error al refrescar compras silenciosamente:',
+          getErrorMessage(err),
+        );
     }
   }, [businessId]);
 
@@ -318,10 +330,10 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
     setPurchases,
     setError,
     onPurchaseCreated: () => {
-      toast.showSuccess(TOAST_MESSAGES.compras.registered());
+      toast.showSuccess(toastMessages.compras.registered());
     },
     onPurchaseDeleted: () => {
-      toast.showSuccess(TOAST_MESSAGES.compras.deleted());
+      toast.showSuccess(toastMessages.compras.deleted());
     },
   });
 
@@ -332,14 +344,14 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
       const purchasesResult = await listRecentCompras(businessId, 50, { ttlMs: 45_000 });
       setPurchases(purchasesResult);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudieron cargar las compras.');
+      setError(err instanceof Error ? err.message : t('errors.loadFailed'));
     } finally {
       setLoading(false);
     }
     try {
       await loadCatalogData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar el catalogo de compras.');
+      setError(err instanceof Error ? err.message : t('comprasSection.catalogLoadError'));
     }
   }, [businessId, loadCatalogData]);
 
@@ -451,9 +463,7 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
       setError(null);
       listRecentCompras(businessId, 50, { forceRefresh: true })
         .then(setPurchases)
-        .catch((err) =>
-          setError(err instanceof Error ? err.message : 'No se pudo refrescar el historial.'),
-        )
+        .catch((err) => setError(err instanceof Error ? err.message : t('errors.refreshFailed')))
         .finally(() => setLoadingPurchases(false));
     }, [businessId]),
   );
@@ -468,8 +478,8 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
       const embedded = purchase.supplier?.business_name || purchase.supplier?.contact_name;
       if (embedded) return embedded;
       const sid = String(purchase.supplier_id || '').trim();
-      if (!sid) return 'Sin proveedor';
-      return supplierNameById.get(sid) || 'Sin proveedor';
+      if (!sid) return t('compras.noSupplier');
+      return supplierNameById.get(sid) || t('compras.noSupplier');
     },
     [supplierNameById],
   );
@@ -597,10 +607,14 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
 
       <StockyDeleteConfirmModal
         visible={showDeleteModal}
-        title="Eliminar compra"
-        message="Al eliminar esta compra, el stock de productos se revertirá automáticamente."
-        warning="No se puede deshacer."
-        itemLabel={purchaseToDelete ? `Total: ${formatCop(purchaseToDelete.total)}` : null}
+        title={t('compras.deleteTitle')}
+        message={t('compras.deleteMessage')}
+        warning={t('errors.deleteFailed')}
+        itemLabel={
+          purchaseToDelete
+            ? `${t('ventasSection.total')} ${formatCop(purchaseToDelete.total)}`
+            : null
+        }
         loading={deletingPurchase || checkingAdmin}
         onCancel={() => {
           if (deletingPurchase) return;
@@ -608,16 +622,6 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
           setPurchaseToDelete(null);
         }}
         onConfirm={confirmDeletePurchase}
-      />
-
-      <StockyToast
-        visible={toast.toast.visible}
-        type={toast.toast.type}
-        title={toast.toast.title}
-        message={toast.toast.message}
-        ctaText={toast.toast.ctaText}
-        durationMs={toast.toast.durationMs}
-        onClose={toast.hideToast}
       />
     </>
   );

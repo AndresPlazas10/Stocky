@@ -1,4 +1,5 @@
 import { Pressable, Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { StockyModal } from '../../../ui/StockyModal';
 import { ventasStyles as s } from '../ventasStyles';
 
@@ -22,10 +23,11 @@ export function SellerFilterModal({
   onSelect,
   onClose,
 }: SellerFilterModalProps) {
+  const { t } = useTranslation();
   return (
     <StockyModal
       visible={visible}
-      title="Seleccionar vendedor"
+      title={t('ventasSection.selectSeller')}
       layout="centered"
       backdropVariant="blur"
       centeredOffsetY={30}

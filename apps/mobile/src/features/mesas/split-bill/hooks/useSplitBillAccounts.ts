@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { MesaOrderItem } from '../../../../services/mesaOrderService';
+import { useBusinessConfig } from '../../../../contexts/BusinessConfigContext';
 import {
   createInitialAccount,
   createSubAccounts,
@@ -15,6 +17,8 @@ interface UseSplitBillAccountsParams {
 }
 
 export function useSplitBillAccounts({ visible, orderItems }: UseSplitBillAccountsParams) {
+  const { t } = useTranslation('mesas');
+  const config = useBusinessConfig();
   const [accounts, setAccounts] = useState<AccountState[]>([createInitialAccount()]);
   const [itemAssignments, setItemAssignments] = useState<ItemAssignments>(
     getInitialAssignments(orderItems),
@@ -31,7 +35,11 @@ export function useSplitBillAccounts({ visible, orderItems }: UseSplitBillAccoun
     const nextId = Math.max(...accounts.map((account) => account.id), 0) + 1;
     setAccounts((prev) => [
       ...prev,
-      { ...createInitialAccount(), id: nextId, name: `Cuenta ${nextId}` },
+      {
+        ...createInitialAccount(),
+        id: nextId,
+        name: `${t('splitBill.accountName', { number: nextId, defaultValue: `Cuenta ${nextId}` })}`,
+      },
     ]);
   };
 
@@ -91,8 +99,8 @@ export function useSplitBillAccounts({ visible, orderItems }: UseSplitBillAccoun
   };
 
   const subAccounts = useMemo(() => {
-    return createSubAccounts(accounts, orderItems, itemAssignments);
-  }, [accounts, itemAssignments, orderItems]);
+    return createSubAccounts(accounts, orderItems, itemAssignments, config.country.code);
+  }, [accounts, itemAssignments, orderItems, config.country.code]);
 
   const validationErrors = useMemo(() => {
     return orderItems

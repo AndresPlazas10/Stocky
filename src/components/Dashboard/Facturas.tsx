@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatDate } from '../../utils/formatters';
+import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 import { AnimatePresence, motion } from 'framer-motion';
 import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
 import { SaleErrorAlert } from '../ui/SaleErrorAlert';
@@ -56,6 +58,14 @@ const PRODUCT_INVOICE_COLUMNS = 'id, code, name, sale_price, stock, business_id,
 
 export default function Facturas({ userRole = 'admin', businessId: businessIdProp = null }: { userRole?: string; businessId?: string | null }) {
   const navigate = useNavigate();
+  const { t } = useTranslation(['facturas', 'common']);
+  const config = useBusinessConfig();
+  const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
+  const dateConfig = { timezone: config.timezone, locale: config.locale };
+  
+  const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
+  const fmtDate = (timestamp, options = {}) => formatDate(timestamp, options, dateConfig);
+  
   const [invoices, setInvoices] = useState([]);
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -110,14 +120,14 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
     const user = await getAuthenticatedUser();
 
     if (!user) {
-      const sessionError = new Error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+      const sessionError = new Error(t('facturas:errors.sessionRequired'));
       (sessionError as Error & { code: string }).code = 'SESSION_EXPIRED';
       throw sessionError;
     }
 
     const { businessId, employeeId } = await getBusinessContextByUserId(user.id);
     if (!businessId) {
-      throw new Error('No se encontró información del negocio');
+      throw new Error(t('facturas:errors.loadFailed'));
     }
 
     return {
@@ -125,7 +135,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
       businessId,
       employeeId
     };
-  }, [businessIdProp]);
+  }, [businessIdProp, t]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -185,12 +195,12 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
 
   const handleAddProduct = useCallback((producto) => {
     if (!producto.stock || producto.stock <= 0) {
-      setError(`El producto "${producto.name}" no tiene stock disponible`);
+      setError(t('facturas:errors.noStock', { name: producto.name }));
       return;
     }
 
     if (!producto.sale_price || producto.sale_price <= 0) {
-      setError(`El producto "${producto.name}" no tiene precio de venta configurado`);
+      setError(t('facturas:errors.noPrice', { name: producto.name }));
       return;
     }
 
@@ -199,7 +209,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
       
       if (existingItem) {
         if (existingItem.quantity >= producto.stock) {
-          setError(`Stock insuficiente. Solo hay ${producto.stock} unidades de "${producto.name}"`);
+          setError(t('facturas:errors.insufficientStock', { stock: producto.stock, name: producto.name }));
           return prevItems;
         }
 
@@ -227,7 +237,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
     
     setSearchProduct('');
     setShowProductSearch(false);
-  }, []);
+  }, [t]);
 
   const handleRemoveItem = useCallback((productId) => {
     setItems(prevItems => prevItems.filter(item => item.product_id !== productId));
@@ -268,16 +278,16 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
     try {
       // Validaciones
       if (items.length === 0) {
-        throw new Error('Debes agregar al menos un producto');
+        throw new Error(t('facturas:errors.noItems'));
       }
 
       const invalidItems = items.filter(item => item.quantity <= 0 || item.unit_price <= 0);
       if (invalidItems.length > 0) {
-        throw new Error('Hay productos con cantidad o precio inválido');
+        throw new Error(t('facturas:errors.invalidItems'));
       }
 
       if (totalFactura <= 0) {
-        throw new Error('El total de la factura debe ser mayor a 0');
+        throw new Error(t('facturas:errors.invalidTotal'));
       }
 
       const { businessId, employeeId } = await resolveBusinessContext();
@@ -291,13 +301,13 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
         const product = stockById.get(item.product_id);
         if (!product || Number(product.stock || 0) < Number(item.quantity || 0)) {
           throw new Error(
-            `Stock insuficiente de "${item.product_name}". Disponible: ${product?.stock || 0}, Solicitado: ${item.quantity}`
+            t('facturas:errors.stockCheckFailed', { name: item.product_name, available: product?.stock || 0, requested: item.quantity })
           );
         }
       }
 
       const customerData = {
-        customer_name: 'Consumidor Final',
+        customer_name: t('form.consumerFinal', { ns: 'common' }),
         customer_email: null,
         customer_id_number: null
       };
@@ -317,16 +327,16 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
       });
 
       // Enviar factura por email si está habilitado
-      let successMessage = `✅ Factura ${invoiceNumber} creada exitosamente`;
+      let successMessage = `✅ ${t('facturas:alerts.invoiceCreated', { number: invoiceNumber })}`;
 
       if (localOnly) {
-        successMessage = `✅ Factura ${invoiceNumber} guardada localmente (pendiente sincronización)`;
+        successMessage = `✅ ${t('facturas:alerts.invoiceSavedLocal', { number: invoiceNumber })}`;
       } else if (sendEmailOnCreate && customerData.customer_email) {
         try {
           const emailResult = await sendInvoiceEmail({
             email: customerData.customer_email,
             invoiceNumber: invoiceNumber,
-            customerName: customerData.customer_name || 'Cliente',
+            customerName: customerData.customer_name || t('facturas:labels.customer'),
             total: totalFactura,
             items: invoiceItems,
             businessId
@@ -337,15 +347,15 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
               invoiceId: invoice.id,
               businessId
             });
-            successMessage = `✅ Factura ${invoiceNumber} creada y enviada a ${customerData.customer_email}`;
+            successMessage = `✅ ${t('facturas:alerts.invoiceCreatedAndSent', { number: invoiceNumber, email: customerData.customer_email })}`;
           } else {
-            successMessage = `✅ Factura ${invoiceNumber} creada. ⚠️ Email NO enviado (configura EmailJS en Configuración)`;
+            successMessage = `✅ ${t('facturas:alerts.invoiceCreatedNoEmail', { number: invoiceNumber })}`;
           }
         } catch (emailError) {
-          successMessage = `✅ Factura ${invoiceNumber} creada (⚠️ error al enviar email: ${emailError.message})`;
+          successMessage = `✅ ${t('facturas:alerts.invoiceCreatedEmailError', { number: invoiceNumber, error: emailError.message })}`;
         }
       } else if (!customerData.customer_email) {
-        successMessage = `✅ Factura ${invoiceNumber} creada exitosamente (sin email del cliente)`;
+        successMessage = `✅ ${t('facturas:alerts.invoiceCreatedNoCustomerEmail', { number: invoiceNumber })}`;
       }
 
       setSuccess(successMessage);
@@ -372,7 +382,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
           navigate('/login');
         }, 2000);
       }
-      setError(error.message || 'Error desconocido al crear factura');
+      setError(error.message || t('facturas:errors.processFailed'));
       setTimeout(() => setError(''), 8000);
     } finally {
       setIsCreatingInvoice(false);
@@ -396,11 +406,11 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
     try {
       // Obtener los datos completos de la factura
       const invoice = await getInvoiceWithItemsById(facturaId, INVOICE_ITEM_LIST_COLUMNS);
-      if (!invoice) throw new Error('Factura no encontrada');
+      if (!invoice) throw new Error(t('facturas:errors.invoiceNotFound'));
 
       // Validar que la factura tenga email del cliente
       if (!invoice.customer_email) {
-        setError('⚠️ Esta factura no tiene email del cliente. No se puede enviar.');
+        setError('⚠️ ' + t('facturas:errors.noCustomerEmail'));
         setTimeout(() => setError(''), 5000);
         setLoading(false);
         return;
@@ -411,7 +421,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
         const emailResult = await sendInvoiceEmail({
           email: invoice.customer_email,
           invoiceNumber: invoice.invoice_number,
-          customerName: invoice.customer_name || 'Cliente',
+            customerName: invoice.customer_name || t('facturas:labels.customer'),
           total: invoice.total,
           items: invoice.invoice_items || [],
           businessId: invoice.business_id
@@ -430,15 +440,15 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
               ? { ...item, status: 'sent', sent_at: new Date().toISOString() }
               : item
           )));
-          setSuccess(`✅ Factura ${invoice.invoice_number} marcada como enviada localmente (pendiente sincronización)`);
+          setSuccess(`✅ ${t('facturas:alerts.invoiceSentLocal', { number: invoice.invoice_number })}`);
         } else if (emailResult.demo) {
-          setSuccess(`✅ Factura ${invoice.invoice_number} marcada como enviada. ⚠️ Email NO enviado (modo demo - configura EmailJS)`);
+          setSuccess(`✅ ${t('facturas:alerts.invoiceSentDemo', { number: invoice.invoice_number })}`);
         } else {
-          setSuccess(`✅ Factura ${invoice.invoice_number} enviada exitosamente a ${invoice.customer_email}`);
+          setSuccess(`✅ ${t('facturas:alerts.emailSent', { number: invoice.invoice_number, email: invoice.customer_email })}`);
         }
       } catch (emailError) {
         // Error al enviar email
-        throw new Error('Error al enviar email: ' + emailError.message);
+        throw new Error(t('facturas:errors.emailFailed') + ': ' + emailError.message);
       }
       
       setTimeout(() => setSuccess(''), 8000);
@@ -457,7 +467,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
         }, 2000);
       }
       // Error al enviar factura
-      setError(error.message || 'Error desconocido al enviar factura');
+      setError(error.message || t('facturas:errors.sendFailed'));
       setTimeout(() => setError(''), 8000);
     } finally {
       setLoading(false);
@@ -488,10 +498,10 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
 
       setSuccess(
         localOnly
-          ? '✅ Factura cancelada localmente (pendiente sync)'
+          ? '✅ ' + t('facturas:alerts.invoiceCancelledLocal')
           : restoreError
-          ? '✅ Factura cancelada (⚠️ revisar restauración automática de stock)'
-          : '✅ Factura cancelada y stock restaurado'
+          ? '✅ ' + t('facturas:alerts.invoiceCancelledStockWarning')
+          : '✅ ' + t('facturas:alerts.invoiceCancelled')
       );
       setTimeout(() => setSuccess(''), 5000);
       
@@ -516,7 +526,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
         }, 2000);
       }
       // Error al cancelar factura
-      setError(error.message || 'Error desconocido al cancelar factura');
+      setError(error.message || t('facturas:errors.cancelFailed'));
       setTimeout(() => setError(''), 8000);
       setShowCancelModal(false);
       setInvoiceToCancel(null);
@@ -546,8 +556,8 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
 
       setSuccess(
         deleteResult?.localOnly
-          ? '✅ Factura eliminada localmente (pendiente sync)'
-          : '✅ Factura eliminada exitosamente'
+          ? '✅ ' + t('facturas:alerts.invoiceDeletedLocal')
+          : '✅ ' + t('facturas:alerts.invoiceDeleted')
       );
       setTimeout(() => setSuccess(''), 4000);
 
@@ -567,7 +577,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
         }, 2000);
       }
       // Error al eliminar factura
-      setError(error.message || 'Error desconocido al eliminar factura');
+      setError(error.message || t('facturas:errors.deleteFailed'));
       setTimeout(() => setError(''), 8000);
       setShowDeleteModal(false);
       setInvoiceToDelete(null);
@@ -588,10 +598,10 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
 
   const getStatusBadge = (status) => {
     const badges = {
-      pending: '📝 Guardado',
-      sent: '🟢 Enviada',
-      validated: '✅ Validada',
-      cancelled: '🔴 Cancelada'
+      pending: '📝 ' + t('facturas:status.pending'),
+      sent: '🟢 ' + t('facturas:status.sent'),
+      validated: '✅ ' + t('facturas:status.validated'),
+      cancelled: '🔴 ' + t('facturas:status.cancelled')
     };
     return badges[status] || status;
   };
@@ -620,12 +630,12 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-xl sm:text-2xl font-bold">📄 Facturación Electrónica</h2>
+        <h2 className="text-xl sm:text-2xl font-bold">📄 {t('title')}</h2>
         <button
           onClick={() => setShowForm(!showForm)}
           className="bg-accent-600 text-white px-4 py-2 rounded-lg hover:bg-accent-500 w-full sm:w-auto whitespace-nowrap transition-colors"
         >
-          {showForm ? '❌ Cancelar' : '➕ Nueva Factura'}
+          {showForm ? '❌ ' + t('buttons.cancel') : '➕ ' + t('buttons.newInvoice')}
         </button>
       </div>
 
@@ -633,7 +643,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
       <SaleErrorAlert 
         isVisible={!!error}
         onClose={() => setError('')}
-        title="Error"
+        title={t('common:status.error')}
         message={error}
         duration={5000}
       />
@@ -641,55 +651,55 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
       <SaleSuccessAlert 
         isVisible={!!success}
         onClose={() => setSuccess('')}
-        title="✨ Factura Creada"
-        details={[{ label: 'Acción', value: success }]}
+        title={'✨ ' + t('facturas:alerts.invoiceCreated')}
+        details={[{ label: t('facturas:labels.action'), value: success }]}
         duration={5000}
       />
 
       {showForm && (
         <div ref={formRef} className="mb-6 bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-xl font-semibold mb-4">Nueva Factura</h3>
+          <h3 className="text-xl font-semibold mb-4">{t('form.createTitle')}</h3>
           
           <form onSubmit={handleCreateInvoice}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Cliente</label>
+                <label className="block text-sm font-medium mb-2">{t('facturas:labels.customer')}</label>
                 <select
                   value={selectedCustomer}
                   onChange={(e) => setSelectedCliente(e.target.value)}
                   className="w-full p-2 border rounded-lg"
                 >
-                  <option value="">Consumidor Final</option>
+                  <option value="">{t('form.consumerFinal', { ns: 'common' })}</option>
                   {customers.map(customer => (
                     <option key={customer.id} value={customer.id}>
-                      {customer.full_name} - {customer.id_number || 'Sin ID'}
+                      {customer.full_name} - {customer.id_number || t('facturas:labels.noId')}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Método de Pago</label>
+                <label className="block text-sm font-medium mb-2">{t('facturas:labels.paymentMethod')}</label>
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
                   className="w-full p-2 border rounded-lg"
                   required
                 >
-                  <option value="cash">💵 Efectivo</option>
-                  <option value="card">💳 Tarjeta</option>
-                  <option value="transfer">🏦 Transferencia</option>
-                  <option value="credit">📝 Crédito</option>
+                  <option value="cash">💵 {t('paymentMethods.cash', { ns: 'common' })}</option>
+                  <option value="card">💳 {t('paymentMethods.card', { ns: 'common' })}</option>
+                  <option value="transfer">🏦 {t('paymentMethods.transfer', { ns: 'common' })}</option>
+                  <option value="credit">📝 {t('paymentMethods.mixed', { ns: 'common' })}</option>
                 </select>
               </div>
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">Productos</label>
+              <label className="block text-sm font-medium mb-2">{t('facturas:labels.items')}</label>
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Buscar producto por nombre o código..."
+                  placeholder={t('facturas:labels.searchProduct')}
                   value={searchProduct}
                   onChange={(e) => {
                     setSearchProduct(e.target.value);
@@ -709,7 +719,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                       >
                         <div className="font-medium">{producto.name}</div>
                         <div className="text-sm text-gray-600">
-                          Código: {producto.code} | Precio: {formatPrice(producto.sale_price)} | Stock: {producto.stock}
+                          {t('facturas:labels.code')}: {producto.code} | {t('facturas:labels.price')}: {fmtPrice(producto.sale_price)} | {t('facturas:labels.stock')}: {producto.stock}
                         </div>
                       </div>
                     ))}
@@ -724,11 +734,11 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                   <table className="w-full">
                     <thead className="bg-gray-100">
                       <tr>
-                        <th className="p-2 text-left">Producto</th>
-                        <th className="p-2 text-center">Cantidad</th>
-                        <th className="p-2 text-right">Precio Unit.</th>
-                        <th className="p-2 text-right">Total</th>
-                        <th className="p-2 text-center">Acciones</th>
+                        <th className="p-2 text-left">{t('facturas:labels.product')}</th>
+                        <th className="p-2 text-center">{t('facturas:form.quantity')}</th>
+                        <th className="p-2 text-right">{t('facturas:form.unitPrice')}</th>
+                        <th className="p-2 text-right">{t('facturas:labels.total')}</th>
+                        <th className="p-2 text-center">{t('facturas:labels.actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -737,7 +747,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                           <td className="p-2">
                             <div className="font-medium">{item.product_name}</div>
                             {item.max_stock && (
-                              <div className="text-xs text-gray-500">Stock disponible: {item.max_stock}</div>
+                              <div className="text-xs text-gray-500">{t('facturas:labels.stockAvailable')}: {item.max_stock}</div>
                             )}
                           </td>
                           <td className="p-2 text-center">
@@ -746,7 +756,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                                 type="button"
                                 onClick={() => updateQuantity(item.product_id, Math.max(0, Number(item.quantity || 0) - 1))}
                                 className="bg-gray-200 px-2 py-1 rounded hover:bg-gray-300 text-sm"
-                                title="Disminuir cantidad"
+                                title={t('facturas:labels.decreaseQuantity')}
                               >
                                 -
                               </button>
@@ -763,20 +773,20 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                                 type="button"
                                 onClick={() => updateQuantity(item.product_id, Number(item.quantity || 0) + 1)}
                                 className="bg-gray-200 px-2 py-1 rounded hover:bg-gray-300 text-sm"
-                                title="Aumentar cantidad"
+                                title={t('facturas:labels.increaseQuantity')}
                               >
                                 +
                               </button>
                             </div>
                           </td>
-                          <td className="p-2 text-right">{formatPrice(item.unit_price)}</td>
-                          <td className="p-2 text-right font-semibold text-gray-600">{formatPrice(item.total)}</td>
+                          <td className="p-2 text-right">{fmtPrice(item.unit_price)}</td>
+                          <td className="p-2 text-right font-semibold text-gray-600">{fmtPrice(item.total)}</td>
                           <td className="p-2 text-center">
                             <button
                               type="button"
                               onClick={() => handleRemoveItem(item.product_id)}
                               className="text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50"
-                              title="Eliminar producto"
+                              title={t('facturas:labels.removeProduct')}
                             >
                               🗑️
                             </button>
@@ -786,8 +796,8 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                     </tbody>
                     <tfoot className="bg-gray-50 font-semibold">
                       <tr className="border-t-2">
-                        <td colSpan={3} className="p-3 text-right text-lg">Total a pagar:</td>
-                        <td className="p-3 text-right text-xl text-gray-600">{formatPrice(totalFactura)}</td>
+                        <td colSpan={3} className="p-3 text-right text-lg">{t('facturas:labels.totalToPay')}:</td>
+                        <td className="p-3 text-right text-xl text-gray-600">{fmtPrice(totalFactura)}</td>
                         <td></td>
                       </tr>
                     </tfoot>
@@ -797,13 +807,13 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
             )}
 
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">Notas (Opcional)</label>
+              <label className="block text-sm font-medium mb-2">{t('facturas:form.notesOptional')}</label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="w-full p-2 border rounded-lg"
                 rows={3}
-                placeholder="Observaciones adicionales..."
+                placeholder={t('facturas:form.notesPlaceholder')}
               ></textarea>
             </div>
 
@@ -818,11 +828,11 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                     className="w-4 h-4"
                   />
                   <span className="text-sm font-medium">
-                    📧 Enviar factura por email al crear ({customers.find(c => c.id === selectedCustomer)?.email})
+                    📧 {t('facturas:form.sendEmailOnCreate')} ({customers.find(c => c.id === selectedCustomer)?.email})
                   </span>
                 </label>
                 <p className="text-xs text-gray-600 mt-1 ml-6">
-                  Si no está marcado, podrás enviarla manualmente después desde la lista de facturas
+                  {t('facturas:form.sendEmailHint')}
                 </p>
               </div>
             )}
@@ -835,10 +845,10 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
               {isCreatingInvoice ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Creando invoice...
+                  {t('facturas:buttons.processing')}
                 </>
               ) : (
-                '✅ Crear Factura'
+                '✅ ' + t('facturas:buttons.createInvoice')
               )}
             </button>
           </form>
@@ -849,10 +859,10 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
       <div className="mb-4 bg-white p-4 rounded-lg shadow-md">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Buscar</label>
+            <label className="block text-sm font-medium mb-2">{t('facturas:labels.search')}</label>
             <input
               type="text"
-              placeholder="Número de factura o cliente..."
+              placeholder={t('facturas:labels.searchInvoices')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full p-2 border rounded-lg"
@@ -870,9 +880,9 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
           onRetry={loadData}
           skeletonType="facturas"
           hasFilters={Boolean(searchTerm.trim())}
-          noResultsTitle="No hay facturas para esos filtros"
-          emptyTitle="No hay facturas para mostrar"
-          emptyDescription="Cuando generes una factura, aparecera en esta lista."
+          noResultsTitle={t('facturas:empty.noResults')}
+          emptyTitle={t('facturas:empty.noInvoices')}
+          emptyDescription={t('facturas:empty.noInvoicesDescription')}
         >
           <div>
             {/* Vista móvil - Cards */}
@@ -898,12 +908,12 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                   </div>
                   
                   <div className="text-xs text-gray-600 mb-2">
-                    {formatDate(invoice.issued_at)}
+                    {fmtDate(invoice.issued_at)}
                   </div>
                   
                   <div className="flex justify-between items-center mb-3">
-                    <div className="text-sm">{getPaymentMethodLabel(invoice.payment_method)}</div>
-                    <div className="text-base font-semibold">{formatPrice(invoice.total)}</div>
+                    <div className="text-sm">{getPaymentMethodLabel(invoice.payment_method, t)}</div>
+                    <div className="text-base font-semibold">{fmtPrice(invoice.total)}</div>
                   </div>
                   
                   <div className="flex flex-wrap gap-2">
@@ -914,14 +924,14 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                           disabled={loading}
                           className="flex-1 px-3 py-1.5 bg-accent-600 text-white rounded hover:bg-accent-500 disabled:bg-gray-400 text-xs transition-colors"
                         >
-                          📧 Enviar
+                            📧 {t('buttons.send', { ns: 'common' })}
                         </button>
                         <button
                           onClick={() => handleCancelInvoice(invoice.id)}
                           disabled={loading}
                           className="flex-1 px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 text-xs"
                         >
-                          ❌ Cancelar
+                            ❌ {t('buttons.cancel', { ns: 'common' })}
                         </button>
                         {userRole === 'admin' && (
                           <button
@@ -940,7 +950,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                         disabled={loading}
                         className="flex-1 px-3 py-1.5 bg-accent-600 text-white rounded hover:bg-accent-500 disabled:bg-gray-400 text-xs transition-colors"
                       >
-                        📧 Reenviar
+                        📧 {t('buttons.send', { ns: 'common' })}
                       </button>
                     )}
                   </div>
@@ -952,13 +962,13 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
             <table className="w-full hidden sm:table">
               <thead className="bg-gray-100">
                 <tr>
-                  <th className="p-3 text-left">N° Factura</th>
-                  <th className="p-3 text-left">Cliente</th>
-                  <th className="p-3 text-left">Fecha</th>
-                  <th className="p-3 text-right">Total</th>
-                  <th className="p-3 text-left">Pago</th>
-                  <th className="p-3 text-left">Estado</th>
-                  <th className="p-3 text-center">Acciones</th>
+                  <th className="p-3 text-left">{t('facturas:labels.invoiceNumberShort')}</th>
+                  <th className="p-3 text-left">{t('facturas:labels.customer')}</th>
+                  <th className="p-3 text-left">{t('facturas:labels.invoiceDate')}</th>
+                  <th className="p-3 text-right">{t('facturas:labels.total')}</th>
+                  <th className="p-3 text-left">{t('facturas:labels.payment')}</th>
+                  <th className="p-3 text-left">{t('facturas:labels.status')}</th>
+                  <th className="p-3 text-center">{t('facturas:labels.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -972,12 +982,12 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                     )}
                   </td>
                   <td className="p-3">
-                    {formatDate(invoice.issued_at)}
+                    {fmtDate(invoice.issued_at)}
                   </td>
                   <td className="p-3 text-right font-semibold">
-                    {formatPrice(invoice.total)}
+                    {fmtPrice(invoice.total)}
                   </td>
-                  <td className="p-3">{getPaymentMethodLabel(invoice.payment_method)}</td>
+                  <td className="p-3">{getPaymentMethodLabel(invoice.payment_method, t)}</td>
                   <td className="p-3">
                     <span className={`px-2 py-1 rounded text-sm ${
                       invoice.status === 'validated' ? 'bg-green-100' :
@@ -996,24 +1006,24 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                             onClick={() => handleSendToClient(invoice.id)}
                             disabled={loading}
                             className="px-3 py-1 bg-accent-600 text-white rounded hover:bg-accent-500 disabled:bg-gray-400 text-sm transition-colors"
-                            title="Enviar factura al cliente por email"
+                            title={t('facturas:titles.sendInvoice')}
                           >
-                            📧 Enviar
+                          📧 {t('buttons.send', { ns: 'common' })}
                           </button>
                           <button
                             onClick={() => handleCancelInvoice(invoice.id)}
                             disabled={loading}
                             className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 text-sm"
-                            title="Cancelar factura"
+                            title={t('facturas:titles.cancelInvoice')}
                           >
-                            ❌ Cancelar
+                          ❌ {t('buttons.cancel', { ns: 'common' })}
                           </button>
                           {userRole === 'admin' && (
                             <button
                               onClick={() => handleDeleteInvoice(invoice.id)}
                               disabled={loading}
                               className="px-2 py-1 bg-gray-700 text-white rounded hover:bg-gray-800 disabled:bg-gray-400 text-sm flex items-center gap-1"
-                              title="Eliminar factura permanentemente"
+                              title={t('facturas:titles.deleteInvoicePermanent')}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1022,15 +1032,15 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                       )}
                       {invoice.status === 'sent' && (
                         <div className="flex flex-col items-center gap-1">
-                          <span className="text-sm text-green-600 font-medium">✓ Enviada</span>
+                          <span className="text-sm text-green-600 font-medium">✓ {t('facturas:status.sent')}</span>
                           {invoice.customer_email && (
                             <button
                               onClick={() => handleSendToClient(invoice.id)}
                               disabled={loading}
                               className="text-xs text-[#d89b6f] hover:underline transition-colors"
-                              title="Reenviar factura"
+                              title={t('facturas:titles.resendInvoice')}
                             >
-                              Reenviar
+                              {t('buttons.send', { ns: 'common' })}
                             </button>
                           )}
                           {userRole === 'admin' && (
@@ -1038,7 +1048,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                               onClick={() => handleDeleteInvoice(invoice.id)}
                               disabled={loading}
                               className="mt-1 px-2 py-1 bg-gray-700 text-white rounded hover:bg-gray-800 disabled:bg-gray-400 text-xs flex items-center gap-1"
-                              title="Eliminar factura"
+                              title={t('facturas:titles.deleteInvoice')}
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
@@ -1047,13 +1057,13 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                       )}
                       {invoice.status === 'validated' && (
                         <div className="flex flex-col items-center gap-1">
-                          <span className="text-sm text-gray-500">✓ Validada</span>
+                          <span className="text-sm text-gray-500">✓ {t('facturas:status.validated')}</span>
                           {userRole === 'admin' && (
                             <button
                               onClick={() => handleDeleteInvoice(invoice.id)}
                               disabled={loading}
                               className="mt-1 px-2 py-1 bg-gray-700 text-white rounded hover:bg-gray-800 disabled:bg-gray-400 text-xs flex items-center gap-1"
-                              title="Eliminar factura"
+                              title={t('facturas:titles.deleteInvoice')}
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
@@ -1062,13 +1072,13 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                       )}
                       {invoice.status === 'cancelled' && (
                         <div className="flex flex-col items-center gap-1">
-                          <span className="text-sm text-gray-500">Cancelada</span>
+                          <span className="text-sm text-gray-500">{t('facturas:status.cancelled')}</span>
                           {userRole === 'admin' && (
                             <button
                               onClick={() => handleDeleteInvoice(invoice.id)}
                               disabled={loading}
                               className="mt-1 px-2 py-1 bg-gray-700 text-white rounded hover:bg-gray-800 disabled:bg-gray-400 text-xs flex items-center gap-1"
-                              title="Eliminar factura"
+                              title={t('facturas:titles.deleteInvoice')}
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
@@ -1105,18 +1115,18 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
               <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-4 rounded-t-xl">
                 <div className="flex items-center gap-3 text-white">
                   <AlertTriangle className="w-6 h-6" />
-                  <h3 className="text-xl font-bold">Confirmar Cancelación</h3>
+                  <h3 className="text-xl font-bold">{t('facturas:alerts.confirmCancelTitle')}</h3>
                 </div>
               </div>
               
               <div className="p-6 space-y-4">
                 <p className="text-gray-700">
-                  ¿Estás seguro de cancelar esta factura? El stock se restaurará automáticamente.
+                  {t('facturas:alerts.confirmCancelMessage')}
                 </p>
                 
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                   <p className="text-sm text-gray-800">
-                    ℹ️ Esta acción cancelará la factura y devolverá todos los productos al inventario.
+                    ℹ️ {t('facturas:alerts.cancelActionDescription')}
                   </p>
                 </div>
                 
@@ -1125,7 +1135,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                     onClick={cancelCancelInvoice}
                     className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
                   >
-                    Volver
+                    {t('buttons.close', { ns: 'common' })}
                   </button>
                   <button
                     onClick={confirmCancelInvoice}
@@ -1133,7 +1143,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                     className="flex-1 px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <XCircle className="w-4 h-4" />
-                    {loading ? 'Cancelando...' : 'Cancelar Factura'}
+                    {loading ? t('facturas:buttons.cancelling') : t('facturas:buttons.cancelInvoice')}
                   </button>
                 </div>
               </div>
@@ -1162,18 +1172,18 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
               <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4 rounded-t-xl">
                 <div className="flex items-center gap-3 text-white">
                   <Trash2 className="w-6 h-6" />
-                  <h3 className="text-xl font-bold">Eliminar Factura</h3>
+                  <h3 className="text-xl font-bold">{t('facturas:buttons.deleteInvoice')}</h3>
                 </div>
               </div>
               
               <div className="p-6 space-y-4">
                 <p className="text-gray-700 font-semibold">
-                  ⚠️ ¿Estás seguro de eliminar esta factura permanentemente?
+                  ⚠️ {t('facturas:alerts.confirmDeleteMessage')}
                 </p>
                 
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                   <p className="text-sm text-red-800">
-                    <strong>Esta acción no se puede deshacer.</strong> La factura será eliminada del sistema de forma permanente.
+                    <strong>{t('facturas:alerts.confirmDeleteWarning')}</strong> {t('facturas:alerts.deletePermanentDescription')}
                   </p>
                 </div>
                 
@@ -1182,7 +1192,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                     onClick={cancelDelete}
                     className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
                   >
-                    Cancelar
+                    {t('buttons.cancel', { ns: 'common' })}
                   </button>
                   <button
                     onClick={confirmDeleteInvoice}
@@ -1190,7 +1200,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
                     className="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Trash2 className="w-4 h-4" />
-                    {loading ? 'Eliminando...' : 'Eliminar Definitivamente'}
+                    {loading ? t('facturas:buttons.deleting') : t('buttons.delete', { ns: 'common' })}
                   </button>
                 </div>
               </div>

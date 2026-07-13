@@ -64,9 +64,7 @@ export const MesasGrid = React.memo(function MesasGrid({
       const lockToken = String(mesaLock?.lock_token || '').trim();
       const isLocalHeldLock = isHeldLockRelevant && normalizedHeldTableId === mesa.id;
       const heldLockToken = isLocalHeldLock ? normalizedHeldToken : '';
-      const isOwnedByCurrentUser = Boolean(
-        lockOwnerId && lockOwnerId === normalizedSessionUserId,
-      );
+      const isOwnedByCurrentUser = Boolean(lockOwnerId && lockOwnerId === normalizedSessionUserId);
       const isSameClientLock = Boolean(lockToken && heldLockToken && lockToken === heldLockToken);
       const lockedByOther = Boolean(
         mesaLock && (lockOwnerId ? !isOwnedByCurrentUser : lockToken ? !isSameClientLock : true),

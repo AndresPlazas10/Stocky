@@ -1,3 +1,4 @@
+import i18next from 'i18next';
 import { COMBO_STATUS, type ComboRecord, type ComboStatus } from '../../services/combosService';
 
 export type ComboStatusFilter = 'all' | ComboStatus;
@@ -59,15 +60,17 @@ export function parseComboMoneyText(value: string): number {
 }
 
 export function formatComboStatusLabel(status: ComboStatus): string {
-  return status === COMBO_STATUS.ACTIVE ? 'Activo' : 'Inactivo';
+  return status === COMBO_STATUS.ACTIVE
+    ? i18next.t('combos.status.active')
+    : i18next.t('combos.status.inactive');
 }
 
 export function buildComboCompositionText(combo: ComboRecord): string {
   const items = Array.isArray(combo.combo_items) ? combo.combo_items : [];
-  if (items.length === 0) return 'Sin productos';
+  if (items.length === 0) return i18next.t('combos.card.noProducts');
 
   const text = items
-    .map((item) => `${item.cantidad} x ${item.product?.name || 'Producto'}`)
+    .map((item) => `${item.cantidad} x ${item.product?.name || i18next.t('form.product')}`)
     .join(', ');
 
   if (text.length <= 120) return text;

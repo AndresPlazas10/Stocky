@@ -1,9 +1,8 @@
 import { motion } from 'framer-motion';
-
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AlertCircle, Home, ArrowLeft, RefreshCw } from 'lucide-react';
 import { Button } from './button';
-
 
 interface ErrorMessageProps {
   title?: string;
@@ -12,10 +11,12 @@ interface ErrorMessageProps {
 }
 
 export const ErrorMessage = ({
-  title = 'Error',
-  message = 'Ha ocurrido un error',
+  title,
+  message,
   onRetry
 }: ErrorMessageProps) => {
+  const { t } = useTranslation('common');
+
   return (
     <motion.div
       initial={{ opacity: 0, y: -10 }}
@@ -25,8 +26,8 @@ export const ErrorMessage = ({
     >
       <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
       <div className="flex-1">
-        <p className="font-semibold text-destructive mb-1">{title}</p>
-        <p className="text-sm text-primary-600">{message}</p>
+        <p className="font-semibold text-destructive mb-1">{title || t('status.error')}</p>
+        <p className="text-sm text-primary-600">{message || t('errors.unknown')}</p>
         {onRetry && (
           <Button
             size="sm"
@@ -35,7 +36,7 @@ export const ErrorMessage = ({
             className="mt-3 border-destructive text-destructive hover:bg-destructive/10"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
-            Reintentar
+            {t('buttons.retry')}
           </Button>
         )}
       </div>
@@ -53,12 +54,13 @@ interface ErrorPageProps {
 
 export const ErrorPage = ({
   code = '500',
-  title = 'Error del Servidor',
-  message = 'Ha ocurrido un error inesperado. Por favor, intenta nuevamente.',
+  title,
+  message,
   showHome = true,
   showBack = true
 }: ErrorPageProps) => {
   const navigate = useNavigate();
+  const { t } = useTranslation('common');
 
   return (
     <div className="h-screen flex items-center justify-center bg-gradient-to-br from-background-50 via-background-100 to-accent-100 p-4 overflow-hidden">
@@ -78,8 +80,12 @@ export const ErrorPage = ({
             <AlertCircle className="w-12 h-12 text-destructive" />
           </div>
           <h1 className="text-6xl font-bold text-primary-900 mb-2">{code}</h1>
-          <h2 className="text-2xl font-semibold text-primary-800 mb-4">{title}</h2>
-          <p className="text-primary-600 mb-8">{message}</p>
+          <h2 className="text-2xl font-semibold text-primary-800 mb-4">
+            {title || (code === '500' ? t('errors.serverError') : t('status.error'))}
+          </h2>
+          <p className="text-primary-600 mb-8">
+            {message || t('errors.serverErrorDescription')}
+          </p>
         </motion.div>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -90,7 +96,7 @@ export const ErrorPage = ({
               className="border-2 border-accent-300 text-accent-700 hover:bg-accent-50"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Volver
+              {t('buttons.back')}
             </Button>
           )}
           {showHome && (
@@ -99,7 +105,7 @@ export const ErrorPage = ({
               className="gradient-primary text-white hover:opacity-90"
             >
               <Home className="w-4 h-4 mr-2" />
-              Ir al Inicio
+              {t('navigation.home')}
             </Button>
           )}
         </div>
@@ -109,11 +115,13 @@ export const ErrorPage = ({
 };
 
 export const NotFoundPage = () => {
+  const { t } = useTranslation('common');
+
   return (
     <ErrorPage
       code="404"
-      title="Página No Encontrada"
-      message="La página que buscas no existe o ha sido movida."
+      title={t('errors.pageNotFound')}
+      message={t('errors.pageNotFoundDescription')}
       showHome={true}
       showBack={true}
     />

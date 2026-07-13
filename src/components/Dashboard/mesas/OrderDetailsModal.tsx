@@ -5,6 +5,7 @@ import { Button } from '../../ui/button';
 import { MesaCatalogSearch } from '../MesaCatalogSearch';
 import { MesaOrderItemsGrid } from '../MesaOrderItemsGrid';
 import { MesaOrderFooter } from '../MesaOrderFooter';
+import { useTranslation } from 'react-i18next';
 import type { OrderDetailsModalProps } from '@/types/components';
 
 export function OrderDetailsModal({
@@ -36,6 +37,7 @@ export function OrderDetailsModal({
   onCloseOrder,
   onClose,
 }: OrderDetailsModalProps) {
+  const { t } = useTranslation(['mesas', 'common']);
   return (
     <AnimatePresence>
       {isOpen && selectedMesa && (
@@ -58,7 +60,7 @@ export function OrderDetailsModal({
                     <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
                       <ShoppingCart className="w-6 h-6 text-white" />
                     </div>
-                    Mesa {selectedMesa.table_number} - Orden
+                    {t('mesas:labels.tableNumber', { number: selectedMesa.table_number })} - {t('mesas:labels.orderDetails')}
                   </CardTitle>
                   <Button
                     variant="ghost"

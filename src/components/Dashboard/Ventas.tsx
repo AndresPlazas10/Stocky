@@ -1,6 +1,7 @@
 import type { DashboardModuleProps } from '@/types/components';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { logger } from '@/utils/logger';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getFilteredSales } from '../../services/salesService';
@@ -32,6 +33,7 @@ import { isAdminRole } from '../../utils/roles.js';
 import SalesFilters from '../Filters/SalesFilters';
 import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatDate, formatDateOnly } from '../../utils/formatters';
+import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import { isAutoPrintReceiptEnabled } from '../../utils/printer.js';
 import { printSaleReceipt } from '../../utils/saleReceiptPrint.js';
@@ -79,21 +81,18 @@ import { isConnectivityError, formatLoadError } from '../../utils/connectivity';
 
 
 // Función helper pura fuera del componente (no se recrea en renders)
-const getVendedorName = (sale) => {
-  // Prioridad 1: rol resuelto por joins (evita mostrar "Empleado" si el user es admin/owner)
+const getVendedorName = (sale, t) => {
   if (sale?.employees?.role === 'owner' || sale?.employees?.role === 'admin') {
-    return 'Administrador';
+    return t('roles.admin', { ns: 'common' });
   }
 
-  // Prioridad 1: seller_name guardado en la venta (ventas nuevas)
   if (sale?.seller_name && typeof sale.seller_name === 'string' && sale.seller_name.trim() !== '') {
     return sale.seller_name;
   }
   
-  // Prioridad 2: Fallback a employees join (ventas antiguas)
-  if (!sale.employees) return 'Empleado';
-  if (sale.employees.role === 'owner' || sale.employees.role === 'admin') return 'Administrador';
-  return sale.employees.full_name || 'Empleado';
+  if (!sale.employees) return t('roles.employee', { ns: 'common' });
+  if (sale.employees.role === 'owner' || sale.employees.role === 'admin') return t('roles.admin', { ns: 'common' });
+  return sale.employees.full_name || t('roles.employee', { ns: 'common' });
 };
 
 
@@ -115,27 +114,27 @@ const buildDiagnosticAlertMessage = (errorLike, fallback = 'Error desconocido') 
   return `❌ ${message} [diag: ${diagnosticParts.join(' | ')}]`;
 };
 
-const getActionableSyncErrorMessage = (errorLike) => {
+const getActionableSyncErrorMessage = (errorLike, t) => {
   const message = String(errorLike || '').trim();
   const normalized = message.toLowerCase();
 
   if (normalized.includes('idx_sales_prevent_duplicates')) {
-    return 'Esta venta ya se había registrado previamente. Se recomienda recargar el historial para validar el estado final.';
+    return t('ventas:errors.alreadySynced');
   }
 
   if (normalized.includes('sesión no válida') || normalized.includes('sesion no valida') || normalized.includes('unauthorized')) {
-    return 'La sesión no es válida para sincronizar. Inicia sesión nuevamente y luego reintenta.';
+    return t('ventas:errors.invalidSession');
   }
 
   if (normalized.includes('permission denied') || normalized.includes('row-level security') || normalized.includes('forbidden')) {
-    return 'No tienes permisos para sincronizar esta venta. Verifica el rol del usuario en este negocio.';
+    return t('ventas:errors.noPermission');
   }
 
   if (normalized.includes('datos de venta inválidos') || normalized.includes('datos de venta invalidos') || normalized.includes('item inválido') || normalized.includes('item invalido')) {
-    return 'La venta quedó con datos inválidos para sincronizar. Revísala y vuelve a crearla si es necesario.';
+    return t('ventas:errors.invalidData');
   }
 
-  return message || 'No se pudo sincronizar esta venta.';
+  return message || t('ventas:errors.syncFailed');
 };
 
 const toNumberOrNull = (value) => {
@@ -151,16 +150,25 @@ const SALE_ITEM_TYPE = {
 
 const buildCartItemKey = (itemType, id) => `${itemType}:${id}`;
 
-const getSaleDetailDisplayName = (detail) => (
+const getSaleDetailDisplayName = (detail, t) => (
   detail?.products?.name
   || detail?.combos?.nombre
   || detail?.combos?.name
   || detail?.product_name
-  || 'Item'
+  || t('ventas:labels.item')
 );
 
 function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation(['ventas', 'common']);
+  const config = useBusinessConfig();
+  const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
+  const dateConfig = { timezone: config.timezone, locale: config.locale };
+  
+  const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
+  const fmtDate = (timestamp, options = {}) => formatDate(timestamp, options, dateConfig);
+  const fmtDateOnly = (timestamp) => formatDateOnly(timestamp, dateConfig);
+  
   const [sales, setSales] = useState([]);
   const [page, setPage] = useState(1);
   const [limit] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 768 ? 20 : 30));
@@ -174,7 +182,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [successDetails, setSuccessDetails] = useState([]);
-  const [successTitle, setSuccessTitle] = useState('✨ Venta Registrada');
+  const [successTitle, setSuccessTitle] = useState(t('alerts.saleCreated'));
   const [alertType, setAlertType] = useState('success'); // 'success' o 'error'
   const [sessionChecked, setSessionChecked] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false); // Verificar si es empleado
@@ -214,7 +222,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
   const [printSaleData, setPrintSaleData] = useState(null);
   const [printSaleDetails, setPrintSaleDetails] = useState([]);
   const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
-  const [printCustomerName, setPrintCustomerName] = useState('Venta general');
+  const [printCustomerName, setPrintCustomerName] = useState(t('ventas:print.defaultCustomer'));
 
   const closeSaleModal = useCallback(() => {
     setShowSaleModal(false);
@@ -228,7 +236,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
   // Callbacks para modal de impresión
   const handlePrintConfirm = useCallback(async () => {
     if (!printSaleData) {
-      setError('⚠️ No hay datos de venta para imprimir.');
+      setError('⚠️ ' + t('ventas:errors.noPrintData'));
       return;
     }
 
@@ -237,32 +245,31 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       const printResult = await printSaleReceipt({
         sale: printSaleData,
         saleDetails: printSaleDetails,
-        sellerName: printSaleData.seller_name || getVendedorName(printSaleData),
+        sellerName: printSaleData.seller_name || getVendedorName(printSaleData, t),
         businessName: await getBusinessNameById(businessId),
         customerName: printCustomerName,
       });
 
       if (!printResult.ok) {
-        setError('⚠️ No se pudo imprimir el recibo. Intenta nuevamente.');
+        setError('⚠️ ' + t('ventas:errors.printFailed'));
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Error al imprimir:', err);
-      setError('⚠️ No se pudo imprimir el recibo. Intenta nuevamente.');
+      logger.error('print_receipt_failed', err);
+      setError('⚠️ ' + t('ventas:errors.printFailed'));
     } finally {
       setIsPrintingReceipt(false);
       setShowPrintModal(false);
       setPrintSaleData(null);
       setPrintSaleDetails([]);
     }
-  }, [printSaleData, printSaleDetails, printCustomerName, businessId]);
+  }, [printSaleData, printSaleDetails, printCustomerName, businessId, t]);
 
   const handlePrintCancel = useCallback(() => {
     setShowPrintModal(false);
     setPrintSaleData(null);
     setPrintSaleDetails([]);
-    setPrintCustomerName('Venta general');
-  }, []);
+    setPrintCustomerName(t('ventas:print.defaultCustomer'));
+  }, [t]);
 
   // Funciones de carga memoizadas SIN cache para evitar problemas de actualización
   const loadVentas = useCallback(async (filters = currentFilters, pagination: any = {}) => {
@@ -321,10 +328,10 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       } else {
         setSales([]);
         setTotalCount(0);
-        setError(formatLoadError('las ventas', err));
+        setError(formatLoadError(t('ventas:labels.sales'), err));
       }
     }
-  }, [businessId, page, limit, currentFilters]);
+  }, [businessId, page, limit, currentFilters, t]);
 
   const loadProductos = useCallback(async () => {
     const offline = isOfflineMode();
@@ -353,10 +360,10 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
         const cached = readOfflineSnapshot(offlineSnapshotKey, []);
         setProducts(Array.isArray(cached) ? cached : []);
       } else {
-        throw new Error('No se pudo cargar productos para ventas');
+        throw new Error(t('ventas:errors.loadProductsFailed'));
       }
     }
-  }, [businessId]);
+  }, [businessId, t]);
 
   const loadCombos = useCallback(async () => {
     const offline = isOfflineMode();
@@ -386,10 +393,10 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
         const cached = readOfflineSnapshot(offlineSnapshotKey, []);
         setCombos(Array.isArray(cached) ? cached : []);
       } else {
-        throw new Error('No se pudo cargar combos para ventas');
+        throw new Error(t('ventas:errors.loadCombosFailed'));
       }
     }
-  }, [businessId]);
+  }, [businessId, t]);
 
   // Verificar si el usuario autenticado es empleado
   const checkIfEmployee = useCallback(async () => {
@@ -432,9 +439,9 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       if (authError || !user?.id) {
         if (offlineMode) {
           setSessionChecked(true);
-          setError('⚠️ Sin internet (modo offline). Algunas acciones pueden requerir reconexión.');
+          setError('⚠️ ' + t('ventas:errors.offlineMode'));
         } else {
-          setError('⚠️ Tu sesión ha expirado. Redirigiendo al login...');
+          setError('⚠️ ' + t('ventas:errors.sessionExpired'));
           setLoading(false);
           setTimeout(() => {
             navigate('/login');
@@ -452,11 +459,11 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
         checkIfEmployee()
       ]);
     } catch {
-      setError('⚠️ No se pudo cargar la información. Por favor, intenta recargar la página.');
+      setError('⚠️ ' + t('ventas:errors.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [loadVentas, loadProductos, loadCombos, checkIfEmployee, navigate]);
+  }, [loadVentas, loadProductos, loadCombos, checkIfEmployee, navigate, t]);
 
   useEffect(() => {
     if (businessId) {
@@ -552,13 +559,13 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
     onInsert: (newSale) => {
       enqueueRealtimeUpdate(() => {
         const sellerName = typeof newSale?.seller_name === 'string' ? newSale.seller_name.trim() : '';
-        const isAdminSeller = sellerName.toLowerCase() === 'administrador';
+        const isAdminSeller = sellerName.toLowerCase() === t('roles.admin', { ns: 'common' }).toLowerCase();
 
         const saleWithDetails = {
           ...newSale,
           employees: isAdminSeller
-            ? { full_name: 'Administrador', role: 'owner' }
-            : { full_name: sellerName || 'Vendedor desconocido', role: 'employee' }
+            ? { full_name: t('roles.admin', { ns: 'common' }), role: 'owner' }
+            : { full_name: sellerName || t('ventas:labels.unknownSeller'), role: 'employee' }
         };
 
         // Verificar si la venta ya existe antes de agregarla
@@ -573,7 +580,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
         // Incrementar el contador total
         setTotalCount(prev => prev + 1);
 
-        setSuccess('✨ Nueva venta registrada');
+        setSuccess(t('ventas:alerts.saleCreated'));
         setTimeout(() => setSuccess(null), 3000);
       });
     },
@@ -794,27 +801,27 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
     
     try {
       if (cart.length === 0) {
-        throw new Error('⚠️ El carrito está vacío. Agrega productos antes de procesar la venta.');
+        throw new Error('⚠️ ' + t('errors.emptyCart'));
       }
 
       // Verificar sesión antes de procesar
       if (!sessionChecked) {
-        throw new Error('⚠️ Verificando sesión...');
+        throw new Error('⚠️ ' + t('ventas:errors.sessionRequired'));
       }
 
       if (comboStockShortages.length > 0) {
         const firstShortage = comboStockShortages[0];
         throw new Error(
-          `Stock insuficiente para "${firstShortage.product_name}". ` +
-          `Disponibles: ${firstShortage.available_stock}. Requeridos: ${firstShortage.required_quantity}.`
+          t('ventas:labels.insufficientComboStock') + ` "${firstShortage.product_name}". ` +
+          t('ventas:labels.availableRequired', { available: firstShortage.available_stock, required: firstShortage.required_quantity })
         );
       }
 
       if (simpleStockShortages.length > 0) {
         const firstShortage = simpleStockShortages[0];
         throw new Error(
-          `Stock insuficiente para "${firstShortage.product_name}". ` +
-          `Disponibles: ${firstShortage.available_stock}. Requeridos: ${firstShortage.required_quantity}.`
+          t('ventas:labels.insufficientProductStock') + ` "${firstShortage.product_name}". ` +
+          t('ventas:labels.availableRequired', { available: firstShortage.available_stock, required: firstShortage.required_quantity })
         );
       }
 
@@ -839,20 +846,20 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       const elapsedMs = performance.now() - startTime;
       
       if (!(result as any).success) {
-        throw new Error((result as any).error || 'Error al procesar la venta');
+        throw new Error((result as any).error || t('ventas:errors.processFailed'));
       }
 
       // Registrar latencia para debugging
       recordSaleCreationTime(elapsedMs);
 
       // Mostrar alerta con detalles de la venta
-      setSuccessTitle('✨ Venta Registrada');
+      setSuccessTitle(t('alerts.saleCreated'));
       setSuccessDetails([
-        { label: 'Total', value: formatPrice(saleTotal) },
-        { label: 'Método', value: getPaymentMethodLabel(paymentMethod) },
-        { label: 'Tiempo', value: `${elapsedMs.toFixed(0)}ms` },
-        { label: 'Artículos', value: cart.length },
-        ...(result?.data?.pending_sync ? [{ label: 'Estado', value: 'Pendiente de sincronización' }] : [])
+        { label: t('labels.total', { ns: 'common' }), value: fmtPrice(saleTotal) },
+        { label: t('ventas:labels.paymentMethodLabel'), value: getPaymentMethodLabel(paymentMethod, t) },
+        { label: t('ventas:labels.time'), value: `${elapsedMs.toFixed(0)}ms` },
+        { label: t('ventas:labels.articles'), value: cart.length },
+        ...(result?.data?.pending_sync ? [{ label: t('ventas:labels.status'), value: t('ventas:labels.pendingSync') }] : [])
       ]);
       setAlertType('success');
       setSuccess(true);
@@ -862,13 +869,13 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
           id: result?.data?.id,
           business_id: businessId,
           user_id: null,
-          seller_name: 'Venta offline',
+          seller_name: t('ventas:labels.offlineSale'),
           payment_method: paymentMethod,
           total: Number(saleTotal || 0),
           created_at: result?.data?.created_at || new Date().toISOString(),
-          notes: 'Pendiente de sincronización',
+          notes: t('ventas:labels.pendingSync'),
           pending_sync: true,
-          employees: { full_name: 'Pendiente sync', role: 'employee' }
+          employees: { full_name: t('status.pendingSync', { ns: 'common' }), role: 'employee' }
         };
 
         setSales((prev) => {
@@ -905,13 +912,13 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
             total: saleTotal,
             payment_method: paymentMethod,
             created_at: result?.data?.created_at || new Date().toISOString(),
-            seller_name: 'Venta offline'
+            seller_name: t('ventas:labels.offlineSale')
           };
           detailsForPrint = cart.map((item) => ({
             quantity: Number(item.quantity || 0),
             unit_price: Number(item.unit_price || 0),
             subtotal: Number(item.subtotal || (Number(item.quantity || 0) * Number(item.unit_price || 0))),
-            product_name: item.name || 'Item'
+            product_name: item.name || t('ventas:labels.item')
           }));
         } else {
           try {
@@ -925,7 +932,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
               total: saleTotal,
               payment_method: paymentMethod,
               created_at: new Date().toISOString(),
-              seller_name: 'Empleado'
+              seller_name: t('roles.employee', { ns: 'common' })
             };
 
             detailsForPrint = Array.isArray(saleDetails) ? saleDetails : [];
@@ -935,7 +942,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
               total: saleTotal,
               payment_method: paymentMethod,
               created_at: new Date().toISOString(),
-              seller_name: 'Empleado'
+              seller_name: t('roles.employee', { ns: 'common' })
             };
             detailsForPrint = [];
           }
@@ -971,11 +978,11 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
           navigate('/login');
         }, 2000);
       }
-      setError(buildDiagnosticAlertMessage(error, 'No se pudo procesar la venta. Por favor, intenta de nuevo.'));
+      setError(buildDiagnosticAlertMessage(error, t('ventas:errors.processFailed')));
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear
     }
-  }, [cart, sessionChecked, comboStockShortages, simpleStockShortages, comboById, businessId, paymentMethod, loadVentas, isSubmitting, currentFilters, limit, page, saleIntentSignature, navigate]);
+  }, [cart, sessionChecked, comboStockShortages, simpleStockShortages, comboById, businessId, paymentMethod, loadVentas, isSubmitting, currentFilters, limit, page, saleIntentSignature, navigate, fmtPrice, t]);
 
   // Funciones de eliminación de venta (solo admin)
   const handleDeleteSale = (saleId) => {
@@ -992,9 +999,9 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
     try {
       await deleteSaleWithDetails(saleToDelete, businessId);
 
-      setSuccessTitle('🗑️ Venta Eliminada');
+      setSuccessTitle(t('ventas:alerts.saleDeleted'));
       setSuccessDetails([
-        { label: 'Acción', value: 'Venta eliminada correctamente' }
+        { label: t('ventas:labels.action'), value: t('ventas:alerts.saleDeletedCorrectly') }
       ]);
       setAlertType('error');
       setSuccess(true);
@@ -1007,7 +1014,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       setSaleToDelete(null);
 
     } catch (error) {
-      setError('❌ ' + (error.message || 'Error al eliminar la venta'));
+      setError('❌ ' + (error.message || t('ventas:errors.deleteFailed')));
       setTimeout(() => setError(null), 8000);
       setShowDeleteModal(false);
       setSaleToDelete(null);
@@ -1047,11 +1054,11 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
         sale_details: details
       });
     } catch (err) {
-      setSaleDetailsError(err?.message || 'No se pudieron cargar los detalles de la venta');
+      setSaleDetailsError(err?.message || t('ventas:errors.detailsFailed'));
     } finally {
       setSaleDetailsLoading(false);
     }
-  }, [fetchSaleDetails]);
+  }, [fetchSaleDetails, t]);
 
   // Función para imprimir factura física
   const handlePrintInvoice = useCallback(async (sale) => {
@@ -1059,13 +1066,13 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
     try {
       saleDetails = await fetchSaleDetails(sale.id);
     } catch {
-      setError('No se pudieron cargar los detalles de la venta');
+      setError(t('ventas:errors.detailsFailed'));
       setTimeout(() => setError(null), 3000);
       return;
     }
 
     if (!saleDetails || saleDetails.length === 0) {
-      setError('No se pudieron cargar los detalles de la venta');
+      setError(t('ventas:errors.detailsFailed'));
       setTimeout(() => setError(null), 3000);
       return;
     }
@@ -1073,15 +1080,15 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
     const printResult = await printSaleReceipt({
       sale: sale,
       saleDetails,
-      sellerName: getVendedorName(sale),
+      sellerName: getVendedorName(sale, t),
       businessName: await getBusinessNameById(businessId),
     });
 
     if (!printResult.ok) {
-      setError('No se pudo abrir la ventana de impresión. Verifica los permisos del navegador.');
+      setError(t('ventas:errors.printWindowFailed'));
       setTimeout(() => setError(null), 3000);
     }
-  }, [fetchSaleDetails, businessId]);
+  }, [fetchSaleDetails, businessId, t]);
 
   const cancelDelete = () => {
     setShowDeleteModal(false);
@@ -1142,11 +1149,11 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
   // Generar factura desde una venta existente (memoizado)
   const generateInvoiceFromSale = useCallback(async () => {
     if (!invoiceCustomerEmail || !invoiceCustomerEmail.includes('@')) {
-      setError('⚠️ Debes ingresar un email válido para enviar el comprobante');
+      setError('⚠️ ' + t('ventas:errors.emailRequired'));
       return;
     }
     if (!invoiceCustomerName) {
-      setError('⚠️ Debes ingresar el nombre del cliente para enviar el comprobante');
+      setError('⚠️ ' + t('ventas:errors.nameRequired'));
       return;
     }
 
@@ -1164,7 +1171,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
 
       // Preparar items para el email
       const emailItems = saleDetails.map(detail => ({
-        product_name: getSaleDetailDisplayName(detail),
+        product_name: getSaleDetailDisplayName(detail, t),
         quantity: detail.quantity,
         unit_price: detail.unit_price
       }));
@@ -1185,9 +1192,9 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       });
 
       if (emailResult.success) {
-        setSuccess(`✅ Comprobante enviado exitosamente a ${invoiceCustomerEmail}`);
+        setSuccess(`✅ ${t('ventas:email.sentSuccessfully')} ${invoiceCustomerEmail}`);
       } else {
-        throw new Error(emailResult.error || 'Error al enviar el comprobante');
+        throw new Error(emailResult.error || t('ventas:errors.sendFailed'));
       }
 
       // Cerrar modal y limpiar
@@ -1198,11 +1205,11 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       setSelectedSale(null);
 
     } catch (error) {
-      setError('❌ ' + (error.message || 'No se pudo enviar el comprobante. Por favor, intenta de nuevo.'));
+      setError('❌ ' + (error.message || t('ventas:errors.sendFailedRetry')));
     } finally {
       setGeneratingInvoice(false);
     }
-  }, [businessId, selectedSale, invoiceCustomerName, invoiceCustomerEmail, fetchSaleDetails]);
+  }, [businessId, selectedSale, invoiceCustomerName, invoiceCustomerEmail, fetchSaleDetails, t]);
 
   const selectedSaleAmountReceived = toNumberOrNull(selectedSale?.amount_received);
   const selectedSaleChangeAmount = toNumberOrNull(selectedSale?.change_amount);
@@ -1231,8 +1238,8 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
     && (hasAmountReceivedValue || hasChangeAmountValue || hasChangeBreakdown);
   const shouldBlockWithError = Boolean(sales.length === 0 && error && !isConnectivityError(error));
   const lastSuccessfulSyncText = salesOutboxState?.lastSuccessfulSyncAt
-    ? formatDate(salesOutboxState.lastSuccessfulSyncAt)
-    : 'Sin sincronizaciones aún';
+    ? fmtDate(salesOutboxState.lastSuccessfulSyncAt)
+    : t('ventas:sync.noSyncYet');
 
   return (
     <AsyncStateWrapper
@@ -1242,8 +1249,8 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       onRetry={loadData}
       skeletonType="ventas"
       hasFilters={Boolean(currentFilters && Object.keys(currentFilters).length > 0)}
-      noResultsTitle="No hay ventas para esos filtros"
-      noResultsDescription="Ajusta los filtros o registra una nueva venta."
+      noResultsTitle={t('ventas:empty.noResultsTitle')}
+      noResultsDescription={t('ventas:empty.noResultsDescription')}
       noResultsAction={
         <div className="flex justify-center">
           <Button
@@ -1255,19 +1262,19 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
             }}
             className="bg-white text-gray-700 border-2 border-gray-300 hover:bg-gray-100 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
           >
-            Limpiar Filtros
+            {t('ventas:buttons.clearFilters')}
           </Button>
         </div>
       }
-      emptyTitle="Aun no hay ventas registradas"
-      emptyDescription="Las ventas apareceran aqui en tiempo real cuando registres la primera."
+      emptyTitle={t('ventas:empty.noSales')}
+      emptyDescription={t('ventas:empty.noSalesDescription')}
       emptyAction={
         <Button
           type="button"
           onClick={() => setShowSaleModal(true)}
           className="gradient-primary text-white hover:opacity-90 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
         >
-          Crear Primera Venta
+          {t('ventas:empty.createFirstSale')}
         </Button>
       }
       bypassStateRendering={showSaleModal}
@@ -1288,8 +1295,8 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                 <ShoppingCart className="w-6 h-6 sm:w-8 sm:h-8" />
               </div>
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold">Ventas</h1>
-                <p className="text-white/80 mt-1 text-sm sm:text-base">Sistema de punto de venta</p>
+                <h1 className="text-2xl sm:text-3xl font-bold">{t('ventas:title')}</h1>
+                <p className="text-white/80 mt-1 text-sm sm:text-base">{t('ventas:subtitle')}</p>
               </div>
             </div>
             <Button
@@ -1299,12 +1306,12 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
               {showSaleModal ? (
                 <>
                   <Receipt className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span className="whitespace-nowrap">Ver Historial</span>
+                  <span className="whitespace-nowrap">{t('ventas:buttons.viewHistory')}</span>
                 </>
               ) : (
                 <>
                   <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span className="whitespace-nowrap">Nueva Venta</span>
+                  <span className="whitespace-nowrap">{t('buttons.newSale')}</span>
                 </>
               )}
             </Button>
@@ -1318,7 +1325,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
           key="sale-submit-loading"
           isVisible={isSubmitting}
           onClose={() => {}}
-          title="Generando venta..."
+          title={t('ventas:labels.generating')}
           details={[]}
           duration={600000}
         />
@@ -1369,15 +1376,15 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
         <Card className="mb-6 rounded-2xl border border-accent-200 bg-white shadow-sm">
           <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-accent-700">Estado de sincronización de ventas</p>
-              <p className="text-xs text-gray-500 mt-0.5">Monitorea ventas pendientes o con error mientras trabajas offline.</p>
-              <p className="text-xs text-gray-500 mt-0.5">Último sync exitoso: {lastSuccessfulSyncText}</p>
+              <p className="text-sm font-semibold text-accent-700">{t('ventas:sync.title')}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{t('ventas:sync.description')}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{t('ventas:sync.lastSync')} {lastSuccessfulSyncText}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge className="bg-slate-100 text-slate-800 border border-slate-200">Cola: {salesOutboxState.total}</Badge>
-              <Badge className="bg-amber-100 text-amber-800 border border-amber-200">Pendientes: {salesOutboxState.pending}</Badge>
-              <Badge className="bg-gray-100 text-gray-800 border border-gray-200">Procesando: {salesOutboxState.processing}</Badge>
-              <Badge className="bg-red-100 text-red-800 border border-red-200">Errores: {salesOutboxState.error}</Badge>
+              <Badge className="bg-slate-100 text-slate-800 border border-slate-200">{t('ventas:sync.queue')} {salesOutboxState.total}</Badge>
+              <Badge className="bg-amber-100 text-amber-800 border border-amber-200">{t('ventas:sync.pending')} {salesOutboxState.pending}</Badge>
+              <Badge className="bg-gray-100 text-gray-800 border border-gray-200">{t('ventas:sync.processing')} {salesOutboxState.processing}</Badge>
+              <Badge className="bg-red-100 text-red-800 border border-red-200">{t('ventas:sync.errors')} {salesOutboxState.error}</Badge>
               <Button
                 type="button"
                 size="sm"
@@ -1387,19 +1394,19 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                 onClick={() => {
                   const retried = retryAllSalesOutboxErrorEvents();
                   if (retried <= 0) {
-                    setError('⚠️ No hay ventas con error para reintentar en este momento.');
+                    setError('⚠️ ' + t('ventas:sync.noErrors'));
                     return;
                   }
-                  setSuccessTitle('🔄 Reintento de sincronización iniciado');
+                  setSuccessTitle(t('ventas:sync.retryStarted'));
                   setSuccessDetails([
-                    { label: 'Ventas', value: retried },
-                    { label: 'Estado', value: 'Reintentando errores de sincronización' }
+                    { label: t('ventas:title'), value: retried },
+                    { label: t('ventas:labels.status'), value: t('ventas:sync.retrying') }
                   ]);
                   setAlertType('update');
                   setSuccess(true);
                 }}
               >
-                Reintentar errores
+                {t('ventas:buttons.retryErrors')}
               </Button>
             </div>
           </CardContent>
@@ -1432,8 +1439,8 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                     <ShoppingCart className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-bold leading-tight">Nueva Venta</h2>
-                    <p className="text-xs sm:text-sm text-white/80">Catálogo y carrito en una sola vista</p>
+                    <h2 className="text-xl sm:text-2xl font-bold leading-tight">{t('buttons.newSale')}</h2>
+                    <p className="text-xs sm:text-sm text-white/80">{t('labels.products')}</p>
                   </div>
                 </div>
                 <button
@@ -1455,7 +1462,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                         : 'bg-accent-50 text-accent-600'
                     }`}
                   >
-                    Catálogo
+                    {t('ventas:labels.products')}
                   </button>
                   <button
                     type="button"
@@ -1466,7 +1473,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                         : 'bg-accent-50 text-accent-600'
                     }`}
                   >
-                    Carrito ({cart.length})
+                    {t('ventas:labels.cartTab')} ({cart.length})
                   </button>
                 </div>
               </div>
@@ -1479,8 +1486,8 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                     <CardHeader className="pb-4 border-b border-accent-100">
                       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
                         <div>
-                          <CardTitle className="text-xl text-accent-600">Productos y Combos</CardTitle>
-                          <p className="text-sm text-gray-500 mt-1">Explora y agrega items al carrito</p>
+                          <CardTitle className="text-xl text-accent-600">{t('ventas:labels.productsAndCombos')}</CardTitle>
+                          <p className="text-sm text-gray-500 mt-1">{t('ventas:labels.exploreAndAdd')}</p>
                         </div>
                         <Badge className="w-fit bg-accent-100 text-accent-700 border border-accent-200">
                           {totalFilteredCatalog} resultados
@@ -1491,7 +1498,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                         <Input
                           type="text"
                           className="pl-9 h-11 rounded-xl border-gray-300 focus:border-[#66A5AD] focus:ring-[#66A5AD]"
-                          placeholder="Buscar producto o combo..."
+                          placeholder={t('labels.searchProduct')}
                           value={searchProduct}
                           onChange={(e) => setSearchProduct(e.target.value)}
                         />
@@ -1501,7 +1508,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                       {totalFilteredCatalog === 0 ? (
                         <div className="text-center py-16 text-gray-500 border border-dashed border-gray-300 rounded-xl bg-gray-50">
                           <AlertCircle className="w-10 h-10 mx-auto mb-3 text-gray-300" />
-                          <p className="font-medium">No hay items disponibles</p>
+                          <p className="font-medium">{t('ventas:labels.noItemsAvailable')}</p>
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3 xl:max-h-[56vh] xl:overflow-y-auto xl:pr-1 custom-scrollbar">
@@ -1519,15 +1526,15 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                                   {catalogItem.name}
                                 </p>
                                 <p className="text-xs text-gray-500 mt-1 truncate" title={catalogItem.code}>
-                                  Código: {catalogItem.code || 'N/A'}
+                                  {t('ventas:labels.code')} {catalogItem.code || 'N/A'}
                                 </p>
                                 {catalogItem.item_type === SALE_ITEM_TYPE.COMBO ? (
                                   <Badge className="mt-2 bg-gray-100 text-gray-800 border border-gray-200">
-                                    Combo ({catalogItem.combo_items?.length || 0} productos)
+                                    {t('ventas:labels.combo')} ({catalogItem.combo_items?.length || 0} {t('ventas:labels.productsSuffix')})
                                   </Badge>
                                 ) : catalogItem.manage_stock === false ? (
                                   <Badge className="mt-2 bg-slate-100 text-slate-700 border border-slate-200">
-                                    Sin control de stock
+                                    {t('ventas:labels.noStockControl')}
                                   </Badge>
                                 ) : (
                                   <Badge
@@ -1539,13 +1546,13 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                                         : 'bg-red-100 text-red-800 border-red-200'
                                     }`}
                                   >
-                                    Stock: {catalogItem.stock}
+                                    {t('ventas:labels.stock')} {catalogItem.stock}
                                   </Badge>
                                 )}
                               </div>
                               <div className="mt-4 flex items-center justify-between gap-2">
                                 <p className="text-lg font-bold text-secondary-600">
-                                  {formatPrice(catalogItem.sale_price)}
+                                  {fmtPrice(catalogItem.sale_price)}
                                 </p>
                                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-accent-100 text-accent-700">
                                   <Plus className="w-4 h-4" />
@@ -1556,7 +1563,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                           {hasMoreFilteredCatalog && (
                             <div className="sm:col-span-2 2xl:col-span-3 mt-1 flex flex-col items-center gap-2">
                               <p className="text-xs text-gray-500">
-                                Mostrando {visibleFilteredCatalog.length} de {totalFilteredCatalog}
+                                {t('ventas:labels.showing')} {visibleFilteredCatalog.length} {t('ventas:labels.of')} {totalFilteredCatalog}
                               </p>
                               <div ref={filteredCatalogSentinelRef} className="h-2 w-full" aria-hidden="true" />
                               <Button
@@ -1565,7 +1572,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                                 variant="outline"
                                 className="w-full sm:w-auto rounded-xl"
                               >
-                                Cargar mas del catalogo
+                                {t('ventas:labels.loadMoreCatalog')}
                               </Button>
                             </div>
                           )}
@@ -1579,11 +1586,11 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                     <CardHeader className="pb-4 border-b border-accent-100">
                       <div className="flex items-center justify-between gap-2">
                         <div>
-                          <CardTitle className="text-xl text-accent-600">Carrito de Venta</CardTitle>
-                          <p className="text-sm text-gray-500 mt-1">{cart.length} items cargados</p>
+                          <CardTitle className="text-xl text-accent-600">{t('labels.cart')}</CardTitle>
+                          <p className="text-sm text-gray-500 mt-1">{cart.length} {t('labels.items')}</p>
                         </div>
                         <Badge className="bg-accent-50 text-accent-700 border border-accent-200">
-                          {formatPrice(total)}
+                          {fmtPrice(total)}
                         </Badge>
                       </div>
                     </CardHeader>
@@ -1592,14 +1599,14 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                             <User className="w-4 h-4" />
-                            Cliente (opcional)
+                            {t('ventas:labels.customer')} ({t('ventas:labels.optional')})
                           </label>
                           <select
                             value={selectedCustomer}
                             onChange={(e) => setSelectedCustomer(e.target.value)}
                             className="w-full h-11 px-4 border border-gray-300 rounded-xl focus:border-[#66A5AD] focus:ring-[#66A5AD] transition-all duration-300"
                           >
-                            <option value="">Venta general</option>
+                            <option value="">{t('form.generalSale', { ns: 'common' })}</option>
                              {customers.map((customer) => (
                                <option key={customer.id} value={customer.id}>
                                  {customer.full_name}
@@ -1611,24 +1618,25 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                             <CreditCard className="w-4 h-4" />
-                            Método de pago
+                            {t('labels.paymentMethod')}
                           </label>
                           <PaymentMethodSelect
                             value={paymentMethod}
                             onChange={setPaymentMethod}
+                            allowedMethods={config.country.paymentMethods}
                             className="w-full"
                           />
                         </div>
                       </div>
 
                       <div className="border-t border-gray-200 pt-4 mb-4">
-                        <p className="text-sm font-medium text-gray-700 mb-3">Items en el carrito:</p>
+                        <p className="text-sm font-medium text-gray-700 mb-3">{t('ventas:labels.itemsInCart')}</p>
                         <div className="space-y-2 xl:max-h-[30vh] xl:overflow-y-auto xl:pr-1 custom-scrollbar">
                           {cart.length === 0 ? (
                             <div className="text-center py-8 text-gray-400 border border-dashed border-gray-300 rounded-xl bg-gray-50">
                               <ShoppingCart className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-                              <p className="font-medium">El carrito está vacío</p>
-                              <p className="text-sm mt-1">Selecciona productos para agregar</p>
+                              <p className="font-medium">{t('labels.noItems')}</p>
+                              <p className="text-sm mt-1">{t('labels.selectProducts')}</p>
                             </div>
                           ) : (
                             visibleCartItems.map((item) => (
@@ -1682,7 +1690,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                                         </button>
                                       </div>
                                       <p className="text-lg font-bold text-secondary-600">
-                                        {formatPrice(item.subtotal)}
+                                        {fmtPrice(item.subtotal)}
                                       </p>
                                     </div>
                                     {(() => {
@@ -1695,7 +1703,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                                         <div className="flex items-center gap-2">
                                           <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
                                           <p className="text-xs text-red-700">
-                                            Disponibles: {item.available_stock} - Pedido: {item.quantity}
+                                            {t('ventas:labels.available')}: {item.available_stock} - {t('ventas:labels.ordered')}: {item.quantity}
                                           </p>
                                         </div>
                                       </div>
@@ -1708,7 +1716,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                           {hasMoreCartItems && (
                             <div className="mt-2 flex flex-col items-center gap-2">
                               <p className="text-xs text-gray-500">
-                                Mostrando {visibleCartItems.length} de {totalCartItems}
+                                {t('ventas:labels.showing')} {visibleCartItems.length} {t('ventas:labels.of')} {totalCartItems}
                               </p>
                               <div ref={cartSentinelRef} className="h-2 w-full" aria-hidden="true" />
                               <Button
@@ -1717,7 +1725,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                                 variant="outline"
                                 className="w-full rounded-xl"
                               >
-                                Cargar mas items del carrito
+                                {t('ventas:labels.loadMoreCart')}
                               </Button>
                             </div>
                           )}
@@ -1728,12 +1736,12 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3">
                           <div className="flex items-center gap-2 mb-2">
                             <AlertCircle className="w-4 h-4 text-red-600" />
-                            <p className="text-sm font-semibold text-red-800">Stock insuficiente en combos</p>
+                            <p className="text-sm font-semibold text-red-800">{t('ventas:labels.insufficientComboStock')}</p>
                           </div>
                           <div className="space-y-1 text-xs text-red-700">
                             {comboStockShortages.map((item) => (
                               <p key={item.product_id}>
-                                {item.product_name}: disponibles {item.available_stock} / requeridos {item.required_quantity}
+                                {item.product_name}: {t('ventas:labels.available')} {item.available_stock} / {t('ventas:labels.required')} {item.required_quantity}
                               </p>
                             ))}
                           </div>
@@ -1744,12 +1752,12 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3">
                           <div className="flex items-center gap-2 mb-2">
                             <AlertCircle className="w-4 h-4 text-red-600" />
-                            <p className="text-sm font-semibold text-red-800">Stock insuficiente en productos</p>
+                            <p className="text-sm font-semibold text-red-800">{t('ventas:labels.insufficientProductStock')}</p>
                           </div>
                           <div className="space-y-1 text-xs text-red-700">
                             {simpleStockShortages.map((item) => (
                               <p key={`simple-shortage-${item.product_id}`}>
-                                {item.product_name}: disponibles {item.available_stock} / requeridos {item.required_quantity}
+                                {item.product_name}: {t('ventas:labels.available')} {item.available_stock} / {t('ventas:labels.required')} {item.required_quantity}
                               </p>
                             ))}
                           </div>
@@ -1760,9 +1768,9 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                         <div className="p-4 flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <DollarSign className="w-5 h-5" />
-                            <span className="text-sm sm:text-base font-semibold">Total:</span>
+                            <span className="text-sm sm:text-base font-semibold">{t('ventas:labels.totalLabel')}</span>
                           </div>
-                          <span className="text-2xl sm:text-3xl font-bold">{formatPrice(total)}</span>
+                          <span className="text-2xl sm:text-3xl font-bold">{fmtPrice(total)}</span>
                         </div>
                       </Card>
 
@@ -1774,12 +1782,12 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                         {isSubmitting ? (
                           <>
                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                            Procesando venta...
+                            {t('ventas:labels.processing')}
                           </>
                         ) : (
                           <>
                             <CheckCircle2 className="w-5 h-5" />
-                            Completar Venta
+                            {t('ventas:buttons.completeSale')}
                           </>
                         )}
                       </Button>
@@ -1803,8 +1811,8 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
             <Card className="shadow-xl rounded-2xl bg-white border-none">
               <div className="p-12 text-center">
                 <Receipt className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                <p className="text-gray-500 font-medium text-lg mb-2">No hay ventas registradas</p>
-                <p className="text-gray-400">Haz clic en "Nueva Venta" para comenzar</p>
+                <p className="text-gray-500 font-medium text-lg mb-2">{t('empty.noSales')}</p>
+                <p className="text-gray-400">{t('empty.noSalesDescription')}</p>
               </div>
             </Card>
               ) : (
@@ -1850,7 +1858,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                             <div className="flex items-center gap-2 text-accent-600">
                               <Calendar className="w-4 h-4 shrink-0" />
                               <span className="text-sm font-medium">
-                                {sale.created_at ? formatDate(sale.created_at) : 'Fecha no disponible'}
+                                {sale.created_at ? fmtDate(sale.created_at) : t('ventas:labels.dateNotAvailable')}
                               </span>
                             </div>
 
@@ -1859,18 +1867,18 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                               <div className="flex items-center gap-2">
                                 <User className="w-4 h-4 text-primary-600 shrink-0" />
                                 <div className="min-w-0">
-                                  <p className="text-xs text-accent-500 uppercase tracking-wide">Cliente</p>
+                                  <p className="text-xs text-accent-500 uppercase tracking-wide">{t('ventas:labels.customer')}</p>
                                   <p className="text-sm font-semibold text-primary-900 truncate">
-                                    Venta general
+                                    {t('form.generalSale', { ns: 'common' })}
                                   </p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
                                 <User className="w-4 h-4 text-accent-600 shrink-0" />
                                 <div className="min-w-0">
-                                  <p className="text-xs text-accent-500 uppercase tracking-wide">Vendedor</p>
+                                  <p className="text-xs text-accent-500 uppercase tracking-wide">{t('ventas:labels.seller')}</p>
                                   <p className="text-sm font-medium text-gray-700 truncate">
-                                    {getVendedorName(sale)}
+                                    {getVendedorName(sale, t)}
                                   </p>
                                 </div>
                               </div>
@@ -1893,52 +1901,52 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                                 {sale.payment_method === 'cash' && (
                                   <>
                                     <span>💵</span>
-                                    <span>Efectivo</span>
+                                    <span>{t('ventas:paymentMethods.cash')}</span>
                                   </>
                                 )}
                                 {sale.payment_method === 'card' && (
                                   <>
                                     <span>💳</span>
-                                    <span>Tarjeta</span>
+                                    <span>{t('ventas:paymentMethods.card')}</span>
                                   </>
                                 )}
                                 {sale.payment_method === 'transfer' && (
                                   <>
                                     <span>🏦</span>
-                                    <span>Transferencia</span>
+                                    <span>{t('ventas:paymentMethods.transfer')}</span>
                                   </>
                                 )}
                                 {sale.payment_method === 'mixed' && (
                                   <>
                                     <span>🔀</span>
-                                    <span>Mixto</span>
+                                    <span>{t('ventas:paymentMethods.mixed')}</span>
                                   </>
                                 )}
                                 {![ 'cash', 'card', 'transfer', 'mixed' ].includes(sale.payment_method) && (
                                   <>
                                     <PaymentMethodBankLogo method={sale.payment_method} sizeClass="h-4" />
-                                    <span>{getPaymentMethodLabel(sale.payment_method)}</span>
+                                    <span>{getPaymentMethodLabel(sale.payment_method, t)}</span>
                                   </>
                                 )}
                               </Badge>
 
                               {saleSyncStatus === 'pending' && (
-                                <Badge className="bg-amber-100 text-amber-800 border border-amber-200">Pendiente sync</Badge>
+                                <Badge className="bg-amber-100 text-amber-800 border border-amber-200">{t('status.pendingSync', { ns: 'common' })}</Badge>
                               )}
                               {saleSyncStatus === 'processing' && (
-                                <Badge className="bg-gray-100 text-gray-800 border border-gray-200">Sincronizando...</Badge>
+                                <Badge className="bg-gray-100 text-gray-800 border border-gray-200">{t('status.syncing', { ns: 'common' })}</Badge>
                               )}
                               {saleSyncStatus === 'error' && (
-                                <Badge className="bg-red-100 text-red-800 border border-red-200">Error sync</Badge>
+                                <Badge className="bg-red-100 text-red-800 border border-red-200">{t('status.errorSync', { ns: 'common' })}</Badge>
                               )}
                               {saleSyncStatus === 'synced' && (
-                                <Badge className="bg-emerald-100 text-emerald-800 border border-emerald-200">Sincronizada</Badge>
+                                <Badge className="bg-emerald-100 text-emerald-800 border border-emerald-200">{t('status.synced', { ns: 'common' })}</Badge>
                               )}
                             </div>
 
                             {saleSyncStatus === 'error' && saleSyncError && (
                               <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-2 py-1">
-                                {getActionableSyncErrorMessage(saleSyncError)}
+                                {getActionableSyncErrorMessage(saleSyncError, t)}
                               </p>
                             )}
 
@@ -1952,13 +1960,13 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                                   onClick={() => {
                                     const retried = retrySalesOutboxEventByTempSaleId(sale.id);
                                     if (!retried) {
-                                      setError('⚠️ No se encontró la venta pendiente para reintentar sincronización.');
+                                      setError('⚠️ ' + t('ventas:errors.retryNotFound'));
                                       return;
                                     }
                                     void flushSalesOutbox();
                                   }}
                                 >
-                                  Reintentar sync
+                                  {t('ventas:details.retrySync')}
                                 </Button>
                               </div>
                             )}
@@ -1968,9 +1976,9 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                           <div className="flex flex-col sm:items-end gap-3 sm:border-l sm:border-accent-200 sm:pl-6">
                             {/* Total */}
                             <div className="text-left sm:text-right">
-                              <p className="text-xs text-accent-500 uppercase tracking-wide mb-1">Total</p>
+                              <p className="text-xs text-accent-500 uppercase tracking-wide mb-1">{t('labels.total', { ns: 'common' })}</p>
                               <p className="text-2xl sm:text-3xl font-bold text-primary-900">
-                                {formatPrice(sale.total)}
+                                {fmtPrice(sale.total)}
                               </p>
                             </div>
 
@@ -1992,7 +2000,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                                 className="bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
                               >
                                 <Mail className="w-4 h-4" />
-                                <span className="text-sm">Enviar por correo</span>
+                                <span className="text-sm">{t('ventas:buttons.sendEmail')}</span>
                               </Button>
                               <Button
                                 onClick={() => openSaleDetailsModal(sale)}
@@ -2000,20 +2008,20 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                                 className="bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto disabled:opacity-60"
                               >
                                 <Eye className="w-4 h-4" />
-                                <span className="text-sm">Ver Detalles</span>
+                                <span className="text-sm">{t('buttons.viewDetails', { ns: 'common' })}</span>
                               </Button>
                               <Button
                                 onClick={() => handlePrintInvoice(sale)}
                                 className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
                               >
                                 <Printer className="w-4 h-4" />
-                                <span className="text-sm">Imprimir</span>
+                                <span className="text-sm">{t('buttons.print', { ns: 'common' })}</span>
                               </Button>
                               {userRole === 'admin' && !isEmployee && (
                                 <Button
                                   onClick={() => handleDeleteSale(sale.id)}
                                   className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-xl px-4 py-2.5 flex items-center justify-center transition-all duration-300 shadow-md hover:shadow-lg w-full sm:w-auto"
-                                  title="Eliminar venta"
+                                  title={t('ventas:buttons.deleteSale')}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
@@ -2060,9 +2068,9 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                       <FileText className="w-8 h-8" />
                     </div>
                     <div>
-                      <h2 className="text-2xl font-bold">Enviar Comprobante de Pago</h2>
+                      <h2 className="text-2xl font-bold">{t('ventas:email.title')}</h2>
                       <p className="text-gray-100 mt-1">
-                        Venta del {selectedSale?.created_at ? formatDateOnly(selectedSale.created_at) : 'fecha no disponible'} por {formatPrice(selectedSale.total)}
+                        {t('ventas:email.description', { date: selectedSale?.created_at ? fmtDateOnly(selectedSale.created_at) : t('ventas:labels.dateNotAvailable'), total: fmtPrice(selectedSale.total) })}
                       </p>
                     </div>
                   </div>
@@ -2072,13 +2080,13 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       <User className="w-4 h-4" />
-                      Nombre del Cliente *
+                      {t('ventas:email.customerName')} *
                     </label>
                     <Input
                       type="text"
                       value={invoiceCustomerName}
                       onChange={(e) => setInvoiceCustomerName(e.target.value)}
-                      placeholder="Nombre completo del cliente"
+                      placeholder={t('ventas:email.customerNamePlaceholder')}
                       required
                       className="h-11 rounded-xl border-gray-300 focus:border-gray-500 focus:ring-gray-500"
                     />
@@ -2087,25 +2095,25 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       <Mail className="w-4 h-4" />
-                      Email del Cliente *
+                      {t('ventas:email.customerEmail')} *
                     </label>
                     <Input
                       type="email"
                       value={invoiceCustomerEmail}
                       onChange={(e) => setInvoiceCustomerEmail(e.target.value)}
-                      placeholder="correo@ejemplo.com"
+                      placeholder={t('ventas:email.emailPlaceholder')}
                       required
                       className="h-11 rounded-xl border-gray-300 focus:border-gray-500 focus:ring-gray-500"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      El comprobante de pago se enviará a este correo electrónico
+                      {t('ventas:email.emailHelp')}
                     </p>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       <FileText className="w-4 h-4" />
-                      NIT/Cédula (opcional)
+                      {t('ventas:email.nitOptional')}
                     </label>
                     <Input
                       type="text"
@@ -2120,7 +2128,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                     <div className="mt-6">
                       <p className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                         <ShoppingCart className="w-5 h-5" />
-                        Productos:
+                        {t('ventas:email.products')}
                       </p>
                       <div className="overflow-x-auto rounded-xl border border-gray-200">
                         <table className="w-full text-sm">
@@ -2135,11 +2143,11 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                           <tbody>
                             {selectedSale.sale_details.map((detail, index) => (
                               <tr key={index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                                <td className="px-4 py-3 text-gray-800">{getSaleDetailDisplayName(detail)}</td>
+                                <td className="px-4 py-3 text-gray-800">{getSaleDetailDisplayName(detail, t)}</td>
                                 <td className="px-4 py-3 text-center text-gray-700">{detail.quantity}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{formatPrice(detail.unit_price)}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{fmtPrice(detail.unit_price)}</td>
                                 <td className="px-4 py-3 text-right font-semibold text-gray-800">
-                                  {formatPrice(detail.quantity * detail.unit_price)}
+                                  {fmtPrice(detail.quantity * detail.unit_price)}
                                 </td>
                               </tr>
                             ))}
@@ -2151,10 +2159,10 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
 
                   <Card className="bg-gradient-to-r from-gray-50 to-gray-100 border-gray-200 shadow-md rounded-xl mt-6">
                     <div className="p-4">
-                      <p className="text-sm font-medium text-gray-800 mb-2">Resumen:</p>
+                      <p className="text-sm font-medium text-gray-800 mb-2">{t('ventas:email.summary')}</p>
                       <div className="flex items-center justify-between">
-                        <span className="text-lg font-semibold text-gray-900">Total:</span>
-                        <span className="text-2xl font-bold text-gray-900">{formatPrice(selectedSale.total)}</span>
+                        <span className="text-lg font-semibold text-gray-900">{t('ventas:labels.totalLabel')}</span>
+                        <span className="text-2xl font-bold text-gray-900">{fmtPrice(selectedSale.total)}</span>
                       </div>
                     </div>
                   </Card>
@@ -2165,7 +2173,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                       disabled={generatingInvoice}
                       className="flex-1 h-12 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-xl transition-all duration-300"
                     >
-                      Cancelar
+                      {t('buttons.cancel', { ns: 'common' })}
                     </Button>
                     <Button
                       onClick={generateInvoiceFromSale}
@@ -2175,12 +2183,12 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                       {generatingInvoice ? (
                         <>
                           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                          Enviando...
+                          {t('ventas:email.sending')}
                         </>
                       ) : (
                         <>
                           <CheckCircle2 className="w-5 h-5" />
-                          Enviar Comprobante
+                          {t('ventas:email.sendReceipt')}
                         </>
                       )}
                     </Button>
@@ -2188,7 +2196,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                   
                   {/* Nota informativa */}
                   <p className="text-gray-500 text-xs text-center mt-4 italic">
-                    El presente comprobante es informativo. La responsabilidad tributaria recae exclusivamente en el establecimiento emisor.
+                    {t('ventas:email.disclaimer')}
                   </p>
                 </div>
               </Card>
@@ -2223,38 +2231,38 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                 <CardHeader className="bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-t-2xl">
                   <CardTitle className="flex items-center gap-2 text-xl">
                     <Eye className="w-5 h-5" />
-                    Detalle de Venta
+                    {t('ventas:details.title')}
                   </CardTitle>
                   <p className="text-sm text-slate-100">
-                    {selectedSale?.created_at ? formatDate(selectedSale.created_at) : 'Fecha no disponible'} • {getPaymentMethodLabel(selectedSale?.payment_method)}
+                    {selectedSale?.created_at ? fmtDate(selectedSale.created_at) : t('ventas:labels.dateNotAvailable')} • {getPaymentMethodLabel(selectedSale?.payment_method, t)}
                   </p>
                 </CardHeader>
 
                 <CardContent className="p-6">
                   <div className={`grid grid-cols-1 sm:grid-cols-3 ${showCashPaymentDetails ? 'lg:grid-cols-5' : ''} gap-3 mb-6`}>
                     <div className="rounded-xl border border-slate-200 p-3">
-                      <p className="text-xs text-slate-500 uppercase">Vendedor</p>
-                      <p className="font-semibold text-slate-900">{getVendedorName(selectedSale)}</p>
+                      <p className="text-xs text-slate-500 uppercase">{t('ventas:labels.seller')}</p>
+                      <p className="font-semibold text-slate-900">{getVendedorName(selectedSale, t)}</p>
                     </div>
                     <div className="rounded-xl border border-slate-200 p-3">
-                      <p className="text-xs text-slate-500 uppercase">Items</p>
+                      <p className="text-xs text-slate-500 uppercase">{t('ventas:details.items')}</p>
                       <p className="font-semibold text-slate-900">{selectedSale?.sale_details?.length || 0}</p>
                     </div>
                     <div className="rounded-xl border border-slate-200 p-3">
-                      <p className="text-xs text-slate-500 uppercase">Total</p>
-                      <p className="font-semibold text-slate-900">{formatPrice(selectedSale?.total || 0)}</p>
+                      <p className="text-xs text-slate-500 uppercase">{t('labels.total', { ns: 'common' })}</p>
+                      <p className="font-semibold text-slate-900">{fmtPrice(selectedSale?.total || 0)}</p>
                     </div>
                     {showCashPaymentDetails && (
                       <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                        <p className="text-xs text-emerald-700 uppercase">Recibido</p>
-                        <p className="font-semibold text-emerald-900">{formatPrice(selectedSaleAmountReceived)}</p>
+                        <p className="text-xs text-emerald-700 uppercase">{t('ventas:details.received')}</p>
+                        <p className="font-semibold text-emerald-900">{fmtPrice(selectedSaleAmountReceived)}</p>
                       </div>
                     )}
                     {showCashPaymentDetails && (
                       <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
-                        <p className="text-xs text-gray-700 uppercase">Cambio</p>
+                        <p className="text-xs text-gray-700 uppercase">{t('ventas:details.change')}</p>
                         <p className="font-semibold text-gray-900">
-                          {resolvedChangeAmount !== null ? formatPrice(resolvedChangeAmount) : 'No registrado'}
+                          {resolvedChangeAmount !== null ? fmtPrice(resolvedChangeAmount) : t('ventas:details.notRegistered')}
                         </p>
                       </div>
                     )}
@@ -2262,7 +2270,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
 
                   {showCashPaymentDetails && selectedSaleChangeBreakdown.length > 0 && (
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 mb-6">
-                      <p className="text-xs text-slate-500 uppercase mb-2">Desglose del cambio</p>
+                      <p className="text-xs text-slate-500 uppercase mb-2">{t('ventas:details.breakdown')}</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {selectedSaleChangeBreakdown.map((entry, idx) => {
                           const denomination = Number(entry?.denomination || 0);
@@ -2270,7 +2278,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                           if (!Number.isFinite(denomination) || !Number.isFinite(count) || count <= 0) return null;
                           return (
                             <p key={`change-${idx}`} className="text-sm text-slate-700">
-                              {count} x {formatPrice(denomination)}
+                              {count} x {fmtPrice(denomination)}
                             </p>
                           );
                         })}
@@ -2280,7 +2288,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
 
                   {saleDetailsLoading ? (
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-700 text-sm">
-                      Cargando detalle de venta...
+                      {t('ventas:details.loading')}
                     </div>
                   ) : saleDetailsError ? (
                     <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800 text-sm">
@@ -2288,29 +2296,29 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                     </div>
                   ) : !selectedSale.sale_details || selectedSale.sale_details.length === 0 ? (
                     <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 text-sm">
-                      Esta venta no tiene items de detalle disponibles.
+                      {t('ventas:details.noItems')}
                     </div>
                   ) : (
                     <div className="overflow-x-auto rounded-xl border border-slate-200">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-slate-50 border-b border-slate-200">
-                            <th className="px-4 py-3 text-left font-semibold text-slate-700">Producto</th>
-                            <th className="px-4 py-3 text-left font-semibold text-slate-700">Código</th>
-                            <th className="px-4 py-3 text-center font-semibold text-slate-700">Cantidad</th>
-                            <th className="px-4 py-3 text-right font-semibold text-slate-700">Unitario</th>
-                            <th className="px-4 py-3 text-right font-semibold text-slate-700">Subtotal</th>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-700">{t('labels.product', { ns: 'common' })}</th>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-700">{t('labels.code', { ns: 'common' })}</th>
+                            <th className="px-4 py-3 text-center font-semibold text-slate-700">{t('form.quantity', { ns: 'common' })}</th>
+                            <th className="px-4 py-3 text-right font-semibold text-slate-700">{t('labels.unitPrice', { ns: 'common' })}</th>
+                            <th className="px-4 py-3 text-right font-semibold text-slate-700">{t('labels.subtotal', { ns: 'common' })}</th>
                           </tr>
                         </thead>
                         <tbody>
                           {selectedSale.sale_details.map((item, idx) => (
                             <tr key={`${selectedSale.id}-${idx}`} className="border-b border-slate-100 last:border-b-0">
-                              <td className="px-4 py-3 text-slate-800">{getSaleDetailDisplayName(item)}</td>
+                              <td className="px-4 py-3 text-slate-800">{getSaleDetailDisplayName(item, t)}</td>
                               <td className="px-4 py-3 text-slate-600">{item.products?.code || (item.combo_id ? 'COMBO' : '-')}</td>
                               <td className="px-4 py-3 text-center text-slate-700">{item.quantity}</td>
-                              <td className="px-4 py-3 text-right text-slate-700">{formatPrice(item.unit_price)}</td>
+                              <td className="px-4 py-3 text-right text-slate-700">{fmtPrice(item.unit_price)}</td>
                               <td className="px-4 py-3 text-right font-semibold text-slate-900">
-                                {formatPrice(item.subtotal ?? (Number(item.quantity || 0) * Number(item.unit_price || 0)))}
+                                {fmtPrice(item.subtotal ?? (Number(item.quantity || 0) * Number(item.unit_price || 0)))}
                               </td>
                             </tr>
                           ))}
@@ -2328,7 +2336,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                       }}
                       className="bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl px-5 py-2"
                     >
-                      Cerrar
+                      {t('buttons.close', { ns: 'common' })}
                     </Button>
                   </div>
                 </CardContent>
@@ -2358,18 +2366,18 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
               <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4 rounded-t-2xl">
                 <div className="flex items-center gap-3 text-white">
                   <Trash2 className="w-6 h-6" />
-                  <h3 className="text-xl font-bold">Eliminar Venta</h3>
+                  <h3 className="text-xl font-bold">{t('ventas:buttons.deleteSale')}</h3>
                 </div>
               </div>
               
               <div className="p-6 space-y-4">
                 <p className="text-gray-700 font-semibold">
-                  ⚠️ ¿Estás seguro de eliminar esta venta permanentemente?
+                  ⚠️ {t('alerts.confirmDeleteMessage')}
                 </p>
                 
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                   <p className="text-sm text-red-800">
-                    <strong>Esta acción no se puede deshacer.</strong> La venta y todos sus detalles serán eliminados del sistema de forma permanente.
+                    <strong>{t('alerts.confirmDeleteWarning')}</strong> {t('alerts.saleDeletedStockReverted')}
                   </p>
                 </div>
                 
@@ -2378,7 +2386,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                     onClick={cancelDelete}
                     className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
                   >
-                    Cancelar
+                    {t('buttons.cancel')}
                   </button>
                   <button
                     onClick={confirmDeleteSale}
@@ -2386,7 +2394,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                     className="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Trash2 className="w-4 h-4" />
-                    {loading ? 'Eliminando...' : 'Eliminar Definitivamente'}
+                    {loading ? t('buttons.loading') : t('buttons.delete')}
                   </button>
                 </div>
               </div>

@@ -1,12 +1,17 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 interface StatusPillProps {
   occupied: boolean;
   lockedByOther: boolean;
 }
 
-export const StatusPill = React.memo(function StatusPill({ occupied, lockedByOther }: StatusPillProps) {
+export const StatusPill = React.memo(function StatusPill({
+  occupied,
+  lockedByOther,
+}: StatusPillProps) {
+  const { t } = useTranslation('mesas');
   const locked = lockedByOther;
   return (
     <View
@@ -24,7 +29,7 @@ export const StatusPill = React.memo(function StatusPill({ occupied, lockedByOth
           locked ? styles.textLocked : occupied ? styles.textOccupied : styles.textAvailable,
         ]}
       >
-        {locked ? 'En uso' : occupied ? 'Ocupada' : 'Disponible'}
+        {locked ? t('labels.inUse') : occupied ? t('labels.occupied') : t('labels.available')}
       </Text>
     </View>
   );

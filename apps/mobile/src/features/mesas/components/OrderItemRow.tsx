@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import type { MesaOrderItem } from '../../../services/mesaOrderService';
 
@@ -18,6 +19,8 @@ export const OrderItemRow = memo(function OrderItemRow({
   disabled,
   onChangeQuantity,
 }: OrderItemRowProps) {
+  const { t } = useTranslation('mesas');
+
   return (
     <View style={styles.orderItemCard}>
       <View style={styles.orderItemTopRow}>
@@ -31,10 +34,12 @@ export const OrderItemRow = memo(function OrderItemRow({
         <View style={styles.orderItemUnitChip}>
           <Text style={styles.orderItemUnitChipText}>
             <StockyMoneyText value={Number(item.price || 0)} style={styles.orderItemUnitChipText} />{' '}
-            por unidad
+            {t('labels.perUnit', { defaultValue: 'por unidad' })}
           </Text>
         </View>
-        <Text style={styles.orderItemSubtotalLabel}>Subtotal</Text>
+        <Text style={styles.orderItemSubtotalLabel}>
+          {t('labels.subtotal', { defaultValue: 'Subtotal' })}
+        </Text>
       </View>
 
       <View style={styles.orderItemDivider} />

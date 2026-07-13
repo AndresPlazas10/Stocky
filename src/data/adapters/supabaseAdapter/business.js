@@ -78,7 +78,9 @@ export const businessAdapter = {
     p_address = null,
     p_phone = null,
     p_email = null,
-    p_username = null
+    p_username = null,
+    p_country_code = 'CO',
+    p_timezone = null
   }) {
     return supabase.rpc('create_business_for_current_user', {
       p_name,
@@ -86,7 +88,9 @@ export const businessAdapter = {
       p_address,
       p_phone,
       p_email,
-      p_username
+      p_username,
+      p_country_code,
+      p_timezone
     });
   },
 

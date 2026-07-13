@@ -1,7 +1,10 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useMemo } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 import { getPaymentMethodTheme, isBankPaymentMethod } from '../utils/paymentMethods';
 import { getBankLogoSource } from '../utils/paymentMethodBranding';
+import { useBusinessConfig } from '../contexts/BusinessConfigContext';
 
 type PaymentMethodValue = string;
 
@@ -12,27 +15,26 @@ type Props = {
   onBlockedInteraction?: () => void;
 };
 
-const OPTIONS: { value: PaymentMethodValue; label: string }[] = [
-  { value: 'cash', label: 'Efectivo' },
-  { value: 'card', label: 'Tarjeta' },
-  { value: 'transfer', label: 'Transferencia' },
-  { value: 'mixed', label: 'Mixto' },
-  { value: 'nequi', label: 'Nequi' },
-  { value: 'bancolombia', label: 'Bancolombia' },
-  { value: 'banco_bogota', label: 'Banco de Bogotá' },
-  { value: 'nu', label: 'Nu' },
-  { value: 'davivienda', label: 'Davivienda' },
-];
-
 export function PaymentMethodSelector({
   value,
   onChange,
   blockInteractions,
   onBlockedInteraction,
 }: Props) {
+  const { t } = useTranslation();
+  const config = useBusinessConfig();
+
+  const options = useMemo(() => {
+    const availableMethods = config.country.paymentMethods;
+    return availableMethods.map((method) => ({
+      value: method,
+      label: t(`paymentMethods.${method}`),
+    }));
+  }, [config.country.paymentMethods, t]);
+
   return (
     <View style={styles.grid}>
-      {OPTIONS.map((option) => {
+      {options.map((option) => {
         const selected = String(value || '').toLowerCase() === option.value;
         return (
           <Pressable

@@ -1,22 +1,8 @@
 import type { MesaOrderItem } from '../../../services/mesaOrderService';
 import type { PaymentMethod, SplitSubAccount } from '../../../services/mesaCheckoutService';
+import { getDenominationsForCountry } from '../utils/mesaHelpers';
 
 export const MAX_SUB_ACCOUNTS = 10;
-export const COLOMBIAN_DENOMINATIONS = [
-  100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50,
-];
-
-export const PAYMENT_OPTIONS: { value: PaymentMethod; label: string }[] = [
-  { value: 'cash', label: 'Efectivo' },
-  { value: 'card', label: 'Tarjeta' },
-  { value: 'transfer', label: 'Transferencia' },
-  { value: 'mixed', label: 'Mixto' },
-  { value: 'nequi', label: 'Nequi' },
-  { value: 'bancolombia', label: 'Bancolombia' },
-  { value: 'banco_bogota', label: 'Banco de Bogotá' },
-  { value: 'nu', label: 'Nu' },
-  { value: 'davivienda', label: 'Davivienda' },
-];
 
 export type AccountState = {
   id: number;
@@ -32,13 +18,20 @@ export function getPaymentOptionIcon(method: PaymentMethod): string {
   if (method === 'card') return 'card-outline';
   if (method === 'transfer') return 'swap-horizontal-outline';
   if (method === 'mixed') return 'wallet-outline';
-  if (['nequi', 'bancolombia', 'banco_bogota', 'nu', 'davivienda'].includes(method))
-    return 'business-outline';
-  return 'help-circle-outline';
+  return 'business-outline';
 }
 
-export function getPaymentOptionLabel(method: PaymentMethod): string {
-  return PAYMENT_OPTIONS.find((option) => option.value === method)?.label || 'Seleccionar';
+export function getPaymentOptionLabel(method: PaymentMethod, t?: (key: string) => string): string {
+  if (t) {
+    return t(`paymentMethods.${method}`);
+  }
+  const labels: Record<string, string> = {
+    cash: 'Efectivo',
+    card: 'Tarjeta',
+    transfer: 'Transferencia',
+    mixed: 'Mixto',
+  };
+  return labels[method] || method;
 }
 
 export function parseCopAmount(value: string | number | null | undefined): number {
@@ -67,7 +60,11 @@ export function parseCopAmount(value: string | number | null | undefined): numbe
   return Number.isFinite(digitsParsed) ? Math.round(digitsParsed) : NaN;
 }
 
-export function calculateCashChange(total: number, paidValue: string | number | null | undefined) {
+export function calculateCashChange(
+  total: number,
+  paidValue: string | number | null | undefined,
+  countryCode?: string,
+) {
   const normalizedTotal = Math.round(Number(total) || 0);
   const normalizedPaid = parseCopAmount(paidValue);
 
@@ -79,9 +76,10 @@ export function calculateCashChange(total: number, paidValue: string | number | 
     return { isValid: false, change: 0, breakdown: [], paid: null as number | null };
   }
 
+  const denominations = getDenominationsForCountry(countryCode || 'CO');
   let remaining = normalizedPaid - normalizedTotal;
   const breakdown: { denomination: number; count: number }[] = [];
-  for (const denomination of COLOMBIAN_DENOMINATIONS) {
+  for (const denomination of denominations) {
     const count = Math.floor(remaining / denomination);
     if (count > 0) {
       breakdown.push({ denomination, count });
@@ -113,6 +111,7 @@ export function createSubAccounts(
   accounts: AccountState[],
   orderItems: MesaOrderItem[],
   itemAssignments: ItemAssignments,
+  countryCode?: string,
 ): (AccountState & {
   items: SplitSubAccount['items'];
   total: number;
@@ -141,7 +140,7 @@ export function createSubAccounts(
     const cashInput = account.amountReceived === '' ? String(roundedTotal) : account.amountReceived;
     const cashInfo =
       account.paymentMethod === 'cash'
-        ? calculateCashChange(roundedTotal, cashInput)
+        ? calculateCashChange(roundedTotal, cashInput, countryCode)
         : { isValid: true, change: 0, breakdown: [], paid: null as number | null };
 
     return {

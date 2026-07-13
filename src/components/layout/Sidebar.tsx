@@ -18,6 +18,7 @@ import {
   Camera,
   type LucideIcon,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import logoStocky from '../../assets/logoStocky.png';
 
@@ -35,21 +36,22 @@ interface SidebarProps {
   onLogoChange?: (logo: string | null) => void;
 }
 
-const menuItems: MenuItem[] = [
-  { icon: LayoutDashboard, label: 'Inicio', section: 'home' },
-  { icon: ShoppingCart, label: 'Ventas', section: 'ventas' },
-  { icon: ShoppingBag, label: 'Compras', section: 'compras' },
-  { icon: Package, label: 'Inventario', section: 'inventario' },
-  { icon: Layers, label: 'Combos', section: 'combos' },
-  { icon: Truck, label: 'Proveedores', section: 'proveedores' },
-  { icon: Users, label: 'Empleados', section: 'empleados' },
-  { icon: BarChart3, label: 'Reportes', section: 'reportes' },
-  { icon: Settings, label: 'Configuración', section: 'configuracion' },
-];
-
 export const Sidebar = React.memo(function Sidebar({ activeSection, onSectionChange, businessName, businessLogo, onLogoChange }: SidebarProps) {
+  const { t } = useTranslation('common');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  const menuItems: MenuItem[] = [
+    { icon: LayoutDashboard, label: t('navigation.home'), section: 'home' },
+    { icon: ShoppingCart, label: t('navigation.sales'), section: 'ventas' },
+    { icon: ShoppingBag, label: t('navigation.purchases'), section: 'compras' },
+    { icon: Package, label: t('navigation.inventory'), section: 'inventario' },
+    { icon: Layers, label: t('navigation.combos'), section: 'combos' },
+    { icon: Truck, label: t('navigation.suppliers'), section: 'proveedores' },
+    { icon: Users, label: t('navigation.employees'), section: 'empleados' },
+    { icon: BarChart3, label: t('navigation.reports'), section: 'reportes' },
+    { icon: Settings, label: t('navigation.settings'), section: 'configuracion' },
+  ];
 
   const toggleCollapse = () => setIsCollapsed(!isCollapsed);
   const toggleMobile = () => setIsMobileOpen(!isMobileOpen);
@@ -130,7 +132,7 @@ export const Sidebar = React.memo(function Sidebar({ activeSection, onSectionCha
               <div className="mt-3 flex flex-col gap-1.5">
                 <label className="cursor-pointer text-xs text-primary hover:text-primary-700 font-medium transition-colors duration-200 hover:underline inline-flex items-center gap-1">
                   <Camera className="h-3 w-3" />
-                  Cambiar logo
+                  {t('buttons.changeLogo')}
                   <input
                     type="file"
                     accept="image/*"
@@ -144,7 +146,7 @@ export const Sidebar = React.memo(function Sidebar({ activeSection, onSectionCha
                     className="cursor-pointer text-xs text-destructive hover:text-destructive/80 font-medium transition-colors duration-200 hover:underline inline-flex items-center gap-1"
                   >
                     <X className="h-3 w-3" />
-                    Quitar logo
+                    {t('buttons.removeLogo')}
                   </button>
                 )}
               </div>
@@ -221,7 +223,7 @@ export const Sidebar = React.memo(function Sidebar({ activeSection, onSectionCha
           ) : (
             <>
               <ChevronLeft className="w-5 h-5" />
-              <span className="text-sm font-medium">Colapsar</span>
+              <span className="text-sm font-medium">{t('buttons.collapse')}</span>
             </>
           )}
         </button>
