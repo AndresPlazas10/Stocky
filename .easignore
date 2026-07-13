@@ -1,0 +1,3 @@
+# EAS Build ignore file
+# Allow shared/dist to be included in the build
+!packages/shared/dist/
