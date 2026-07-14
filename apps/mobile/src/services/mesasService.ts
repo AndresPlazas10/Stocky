@@ -6,6 +6,44 @@ import { dedupedRequest } from '../utils/requestDedup';
 
 import type { SupabaseErrorLike } from '../types/errors';
 
+const RATE_LIMIT_CACHE = new Map<string, { allowed: boolean; expiresAt: number }>();
+const RATE_LIMIT_CACHE_TTL_MS = 5000;
+
+export async function checkRateLimit(
+  rpcName: string,
+  maxRequests: number = 30,
+  windowSeconds: number = 60,
+): Promise<boolean> {
+  const cacheKey = `${rpcName}:${maxRequests}:${windowSeconds}`;
+  const cached = RATE_LIMIT_CACHE.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.allowed;
+  }
+
+  try {
+    const client = getSupabaseClient();
+    const { data, error } = await client.rpc('check_rate_limit', {
+      p_rpc_name: rpcName,
+      p_max_requests: maxRequests,
+      p_window_seconds: windowSeconds,
+    });
+
+    if (error) {
+      console.warn('[rate-limit] check failed, allowing request:', error.message);
+      return true;
+    }
+
+    const allowed = data === true;
+    RATE_LIMIT_CACHE.set(cacheKey, {
+      allowed,
+      expiresAt: Date.now() + RATE_LIMIT_CACHE_TTL_MS,
+    });
+    return allowed;
+  } catch {
+    return true;
+  }
+}
+
 export type MesaStatus = 'available' | 'occupied' | string;
 
 export type MesaRecord = {
@@ -1661,6 +1699,12 @@ export async function createMesa({
   businessId: string;
   tableNumber: string | number;
 }): Promise<MesaRecord> {
+  // Rate limiting check
+  const allowed = await checkRateLimit('create_mesa', 10, 60);
+  if (!allowed) {
+    throw new Error('Demasiadas solicitudes. Intenta de nuevo en un minuto.');
+  }
+
   const normalizedIdentifier = normalizeTableIdentifier(tableNumber);
   if (!normalizedIdentifier) {
     throw new Error('Ingresa un identificador de mesa valido.');
@@ -1690,6 +1734,12 @@ export async function deleteMesaCascade({
   businessId: string;
   tableId: string;
 }): Promise<void> {
+  // Rate limiting check
+  const allowed = await checkRateLimit('delete_mesa', 10, 60);
+  if (!allowed) {
+    throw new Error('Demasiadas solicitudes. Intenta de nuevo en un minuto.');
+  }
+
   const client = getSupabaseClient();
 
   const release = await client
@@ -1733,6 +1783,12 @@ export async function openCloseMesa({
   tableId: string;
   action: 'open' | 'close';
 }): Promise<MesaRecord> {
+  // Rate limiting check
+  const allowed = await checkRateLimit('open_close_table', 30, 60);
+  if (!allowed) {
+    throw new Error('Demasiadas solicitudes. Intenta de nuevo en un minuto.');
+  }
+
   const requestBody = JSON.stringify({
     table_id: tableId,
     action,

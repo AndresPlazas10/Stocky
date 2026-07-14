@@ -644,7 +644,7 @@ export function useMesaRealtime({
       timers[normalizedOrderId] = setTimeout(() => {
         delete timers[normalizedOrderId];
         void hydrateOrderRealtimeSummary(normalizedOrderId);
-      }, 40);
+      }, 10);
     },
     [hydrateOrderRealtimeSummary],
   );
@@ -1104,6 +1104,10 @@ export function useMesaRealtime({
 
     let cancelled = false;
     let fallbackTimer: ReturnType<typeof setInterval> | null = null;
+    let realtimeConnected = false;
+    let backoffMs = 0;
+    const BACKOFF_BASE_MS = 5000;
+    const BACKOFF_MAX_MS = 30000;
 
     let client;
     try {
@@ -1121,6 +1125,25 @@ export function useMesaRealtime({
       if (cancelled) return;
       scheduleMesaLocksRefresh(businessId);
     };
+
+    function startFallbackPolling() {
+      if (fallbackTimer || cancelled || !isFocused) return;
+      const intervalMs = Math.max(BACKOFF_BASE_MS, backoffMs);
+      fallbackTimer = setInterval(() => {
+        if (cancelled) return;
+        scheduleRefresh();
+        scheduleLocks();
+        backoffMs = Math.min(backoffMs * 2 || BACKOFF_BASE_MS, BACKOFF_MAX_MS);
+      }, intervalMs);
+    }
+
+    function stopFallbackPolling() {
+      backoffMs = 0;
+      if (fallbackTimer) {
+        clearInterval(fallbackTimer);
+        fallbackTimer = null;
+      }
+    }
 
     const channel = client
       .channel(`mobile-mesas:${businessId}:${userId}`)
@@ -1192,18 +1215,19 @@ export function useMesaRealtime({
             : null,
         });
         applyRealtimeMesaBroadcast(payload);
-        const mode = String(payload?.sync_mode || 'confirmed')
-          .trim()
-          .toLowerCase();
-        if (mode !== 'optimistic') {
-          scheduleRefresh();
-        }
+        scheduleRefresh();
       });
 
     channel.subscribe((status: string) => {
+      if (cancelled) return;
       if (status === 'SUBSCRIBED') {
+        realtimeConnected = true;
+        stopFallbackPolling();
         scheduleRefresh();
         scheduleLocks();
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        realtimeConnected = false;
+        startFallbackPolling();
       }
     });
     mesasSyncBroadcastReadyRef.current = false;
@@ -1212,16 +1236,13 @@ export function useMesaRealtime({
     });
     mesasSyncBroadcastChannelRef.current = syncChannel;
 
-    if (isFocused) {
-      fallbackTimer = setInterval(() => {
-        scheduleRefresh();
-        scheduleLocks();
-      }, 15000);
+    if (!realtimeConnected && isFocused) {
+      startFallbackPolling();
     }
 
     return () => {
       cancelled = true;
-      if (fallbackTimer) clearInterval(fallbackTimer);
+      stopFallbackPolling();
       if (mesasRealtimeRefreshTimerRef.current) {
         clearTimeout(mesasRealtimeRefreshTimerRef.current);
         mesasRealtimeRefreshTimerRef.current = null;
@@ -1286,7 +1307,11 @@ export function useMesaRealtime({
       (payload: any) => {
         if (cancelled) return;
         markRealtimeIngress('order_items', payload);
-        applyRealtimeOrderItemDelta(payload);
+        // Don't apply delta-based updates - they can be incorrect when local state
+        // is ahead of server state due to rapid quantity changes.
+        // Instead, rely on broadcast (publishRealtimeOrderSummary) for immediate updates
+        // and hydration (scheduleOrderRealtimeSummaryHydration) for server-confirmed data.
+        // applyRealtimeOrderItemDelta(payload);
 
         const newRow = payload?.new as Record<string, unknown> | undefined;
         const oldRow = payload?.old as Record<string, unknown> | undefined;

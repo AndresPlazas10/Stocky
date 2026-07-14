@@ -41,6 +41,18 @@
     "./i18n": {
       "import": "./dist/locales/index.js",
       "types": "./dist/locales/index.d.ts"
+    },
+    "./mesa-utils": {
+      "import": "./dist/mesaUtils.js",
+      "types": "./dist/mesaUtils.d.ts"
+    },
+    "./order-normalization": {
+      "import": "./dist/orderNormalization.js",
+      "types": "./dist/orderNormalization.d.ts"
+    },
+    "./order-reconciliation": {
+      "import": "./dist/orderReconciliation.js",
+      "types": "./dist/orderReconciliation.d.ts"
     }
   },
   "scripts": {

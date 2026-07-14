@@ -13,6 +13,11 @@ export const supabase = hasConfig
         detectSessionInUrl: false,
         storageKey: 'supabase.auth.token',
       },
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        },
+      },
     })
   : null;
 

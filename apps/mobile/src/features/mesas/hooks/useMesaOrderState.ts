@@ -72,6 +72,7 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
   const [isClosingOrder, setIsClosingOrder] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [amountReceived, setAmountReceived] = useState('');
+  const [hasPendingChanges, setHasPendingChanges] = useState(false);
 
   const addCatalogQueueRef = useRef<Promise<void>>(Promise.resolve());
   const latestOrderItemsRef = useRef<MesaOrderItem[]>([]);
@@ -266,6 +267,8 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
     setPaymentMethod,
     amountReceived,
     setAmountReceived,
+    hasPendingChanges,
+    setHasPendingChanges,
 
     addCatalogQueueRef,
     latestOrderItemsRef,

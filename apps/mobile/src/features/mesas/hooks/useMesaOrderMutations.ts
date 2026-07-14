@@ -1,11 +1,9 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import * as Print from 'expo-print';
 import { ensureBluetoothEnabled, BLUETOOTH_PRINT_REQUIRED_MESSAGE } from '../../../utils/bluetooth';
-import { getSavedPrinter, printBytes } from '../../../services/bluetoothPrinterService';
+import { getSavedPrinter, connectPrintDisconnect } from '../../../services/bluetoothPrinterService';
 import { getThermalPaperWidthMm, isAutoCutEnabled } from '../../../utils/printer';
 import { buildKitchenEscPos } from '../../../services/escposService';
-import { buildKitchenOrderHtml } from '../../../utils/printTemplates';
 import { buildReceiptLabels } from '../../../utils/receiptLabels';
 import {
   calculateOrderTotal,
@@ -58,6 +56,8 @@ type UseMesaOrderStateSnapshot = {
   setPaymentMethod: (v: PaymentMethod) => void;
   amountReceived: string;
   setAmountReceived: (v: string) => void;
+  hasPendingChanges: boolean;
+  setHasPendingChanges: (v: boolean) => void;
 
   addCatalogQueueRef: React.MutableRefObject<Promise<void>>;
   latestOrderItemsRef: React.MutableRefObject<MesaOrderItem[]>;
@@ -195,6 +195,9 @@ type UseMesaOrderMutationsParams = {
   onOrderSaved?: () => void;
   onOrderClosed?: (mesaLabel: string, total: number) => void;
   onKitchenPrinted?: () => void;
+  onNoKitchenItems?: () => void;
+  onNoPrinterConnected?: () => void;
+  onPrintError?: (error: string) => void;
 };
 
 export function useMesaOrderMutations({
@@ -228,6 +231,9 @@ export function useMesaOrderMutations({
   onOrderSaved,
   onOrderClosed,
   onKitchenPrinted,
+  onNoKitchenItems,
+  onNoPrinterConnected,
+  onPrintError,
 }: UseMesaOrderMutationsParams) {
   const { t } = useTranslation('mesas');
   const {
@@ -265,6 +271,8 @@ export function useMesaOrderMutations({
     setPaymentMethod,
     amountReceived: _amountReceived,
     setAmountReceived,
+    hasPendingChanges: _hasPendingChanges,
+    setHasPendingChanges,
 
     addCatalogQueueRef,
     latestOrderItemsRef,
@@ -431,17 +439,17 @@ export function useMesaOrderMutations({
     orderItemsCacheRef,
   ]);
 
-  const flushPendingQuantityUpdates = useCallback(() => {
+  const flushPendingQuantityUpdates = useCallback((): Promise<void> => {
     if (quantitySyncTimerRef.current) {
       clearTimeout(quantitySyncTimerRef.current);
       quantitySyncTimerRef.current = null;
     }
 
     const pendingUpdates = Array.from(pendingQuantityUpdatesRef.current.values());
-    if (pendingUpdates.length === 0) return;
+    if (pendingUpdates.length === 0) return Promise.resolve();
     pendingQuantityUpdatesRef.current.clear();
 
-    addCatalogQueueRef.current = addCatalogQueueRef.current
+    const flushPromise = addCatalogQueueRef.current
       .then(async () => {
         for (const update of pendingUpdates) {
           await syncOrderItemQuantity(update);
@@ -465,6 +473,9 @@ export function useMesaOrderMutations({
           // no-op
         }
       });
+
+    addCatalogQueueRef.current = flushPromise;
+    return flushPromise;
   }, [
     addCatalogQueueRef,
     pendingQuantityUpdatesRef,
@@ -491,7 +502,7 @@ export function useMesaOrderMutations({
       quantitySyncTimerRef.current = setTimeout(() => {
         quantitySyncTimerRef.current = null;
         flushPendingQuantityUpdates();
-      }, 110);
+      }, 50);
     },
     [flushPendingQuantityUpdates, pendingQuantityUpdatesRef, quantitySyncTimerRef],
   );
@@ -573,6 +584,7 @@ export function useMesaOrderMutations({
         'optimistic',
       );
       setOrderModalError(null);
+      setHasPendingChanges(true);
       addCatalogQueueRef.current = addCatalogQueueRef.current
         .then(async () => {
           const result = await addCatalogItemToOrder({
@@ -649,6 +661,7 @@ export function useMesaOrderMutations({
       setOrderItems,
       setOrderModalError,
       setSearchCatalog,
+      setHasPendingChanges,
     ],
   );
 
@@ -706,6 +719,7 @@ export function useMesaOrderMutations({
         'optimistic',
       );
       setOrderModalError(null);
+      setHasPendingChanges(true);
 
       scheduleQuantitySync({
         orderId,
@@ -722,6 +736,7 @@ export function useMesaOrderMutations({
       selectedMesa,
       setOrderItems,
       setOrderModalError,
+      setHasPendingChanges,
     ],
   );
 
@@ -790,6 +805,8 @@ export function useMesaOrderMutations({
         clearTimeout(quantitySyncTimerRef.current);
         quantitySyncTimerRef.current = null;
       }
+      // Flush pending quantity updates to server before saving
+      await flushPendingQuantityUpdates();
       pendingQuantityUpdatesRef.current.clear();
 
       // Esperar a que terminen las mutaciones de catálogo pendientes antes de
@@ -826,6 +843,7 @@ export function useMesaOrderMutations({
       );
       closeOrderModal();
       onOrderSaved?.();
+      setHasPendingChanges(false);
     } catch (err) {
       const fallbackMessage = 'No se pudo guardar la orden.';
       const message =
@@ -845,6 +863,7 @@ export function useMesaOrderMutations({
     closeOrderModal,
     isClosingOrder,
     isSavingOrder,
+    flushPendingQuantityUpdates,
     latestOrderItemsRef,
     loadingOrder,
     onOrderSaved,
@@ -860,6 +879,7 @@ export function useMesaOrderMutations({
     setIsSavingOrder,
     setOrderItems,
     setOrderModalError,
+    setHasPendingChanges,
   ]);
 
   const openOrderModal = useCallback(
@@ -1244,13 +1264,22 @@ export function useMesaOrderMutations({
     });
 
     if (itemsParaCocinaConNombre.length === 0) {
-      setOrderModalError('No hay productos que requieran preparación en cocina.');
+      onNoKitchenItems?.();
+      closeOrderModal();
       return;
     }
 
     const btReady = await ensureBluetoothEnabled();
     if (!btReady) {
       setOrderModalError(BLUETOOTH_PRINT_REQUIRED_MESSAGE);
+      closeOrderModal();
+      return;
+    }
+
+    const savedPrinter = await getSavedPrinter();
+    if (!savedPrinter) {
+      onNoPrinterConnected?.();
+      closeOrderModal();
       return;
     }
 
@@ -1263,51 +1292,42 @@ export function useMesaOrderMutations({
       const mesaLabel = selectedMesa.table_number ?? selectedMesa.table_name ?? '-';
       const receiptLabels = buildReceiptLabels(t);
 
-      const savedPrinter = await getSavedPrinter();
-      if (savedPrinter) {
-        const paperWidthMm = await getThermalPaperWidthMm();
-        const autoCut = await isAutoCutEnabled();
-        const escposData = buildKitchenEscPos({
-          mesaNumber: mesaLabel,
-          items: itemsParaCocinaConNombre.map((item) => ({
-            name: item?.products?.name || item?.combos?.nombre || 'Item',
-            quantity: Number(item?.quantity || 0),
-          })),
-          paperWidthMm,
-          autoCut,
-          labels: receiptLabels,
-        });
-        const result = await printBytes(savedPrinter.address, escposData);
-        if (result.ok) {
-          onKitchenPrinted?.();
-          return;
-        }
-        setOrderModalError(result.error || receiptLabels.printerError);
-        return;
-      }
-
-      const html = buildKitchenOrderHtml({
+      const paperWidthMm = await getThermalPaperWidthMm();
+      const autoCut = await isAutoCutEnabled();
+      const escposData = buildKitchenEscPos({
         mesaNumber: mesaLabel,
-        mesaStatus: selectedMesa.status,
-        items: itemsParaCocinaConNombre,
-        createdAt: new Date(),
+        items: itemsParaCocinaConNombre.map((item) => ({
+          name: item?.products?.name || item?.combos?.nombre || 'Item',
+          quantity: Number(item?.quantity || 0),
+        })),
+        paperWidthMm,
+        autoCut,
         labels: receiptLabels,
       });
-      if (__DEV__) console.warn('[Print] Kitchen: calling Print.printAsync for mesa ' + mesaLabel);
-      await Print.printAsync({ html });
-      if (__DEV__) console.warn('[Print] Kitchen: Print.printAsync resolved');
-      onKitchenPrinted?.();
+      const result = await connectPrintDisconnect(savedPrinter.address, escposData);
+      if (result.ok) {
+        onKitchenPrinted?.();
+        closeOrderModal();
+        return;
+      }
+      onPrintError?.(result.error || receiptLabels.printerError);
+      closeOrderModal();
     } catch (err) {
-      if (__DEV__) console.error('[Print] Kitchen: Print.printAsync error', err);
-      setOrderModalError(err instanceof Error ? err.message : 'No se pudo imprimir la orden.');
+      if (__DEV__) console.error('[Print] Kitchen: print error', err);
+      onPrintError?.(err instanceof Error ? err.message : 'No se pudo imprimir la orden.');
+      closeOrderModal();
     } finally {
       endPrintFlow();
     }
   }, [
     beginPrintFlow,
     catalogItemsRef,
+    closeOrderModal,
     endPrintFlow,
     onKitchenPrinted,
+    onNoKitchenItems,
+    onNoPrinterConnected,
+    onPrintError,
     orderItems,
     selectedMesa,
     setOrderModalError,
