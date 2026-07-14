@@ -65,6 +65,9 @@ export function useSupabaseRealtime({
     let dbChannel: ReturnType<ReturnType<typeof getSupabaseClient>['channel']> | null = null;
     let broadcastChannel: ReturnType<ReturnType<typeof getSupabaseClient>['channel']> | null = null;
     let realtimeConnected = false;
+    let backoffMs = 0;
+    const BACKOFF_BASE_MS = 2000;
+    const BACKOFF_MAX_MS = 30000;
 
     let client;
     try {
@@ -78,12 +81,18 @@ export function useSupabaseRealtime({
 
     function startPolling() {
       if (fallbackTimer || cancelled || !hasPollHandler || !canPollByFocus) return;
+      const intervalMs = pollIntervalMs > 0 ? pollIntervalMs : Math.max(BACKOFF_BASE_MS, backoffMs);
       fallbackTimer = setInterval(() => {
+        if (cancelled) return;
         onPollTickRef.current?.();
-      }, pollIntervalMs);
+        if (pollIntervalMs <= 0) {
+          backoffMs = Math.min(backoffMs * 2 || BACKOFF_BASE_MS, BACKOFF_MAX_MS);
+        }
+      }, intervalMs);
     }
 
     function stopPolling() {
+      backoffMs = 0;
       if (fallbackTimer) {
         clearInterval(fallbackTimer);
         fallbackTimer = null;

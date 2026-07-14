@@ -27,6 +27,7 @@ export function useMesaEditLock({
   onCloseAuxiliaryOrderModals,
   onHandleDismissOrderModal,
   sendBroadcast,
+  sendBroadcastRef,
 }: {
   session: Session;
   context: { businessId?: string | null } | null | undefined;
@@ -37,6 +38,7 @@ export function useMesaEditLock({
   onCloseAuxiliaryOrderModals?: () => void;
   onHandleDismissOrderModal?: () => void;
   sendBroadcast?: (event: string, payload: Record<string, unknown>) => void;
+  sendBroadcastRef?: React.MutableRefObject<((event: string, payload: Record<string, unknown>) => void) | null>;
 }) {
   const [mesaLocksByTableId, setMesaLocksByTableId] = useState<Record<string, MesaEditLock>>({});
   const [heldMesaLock, setHeldMesaLock] = useState<HeldMesaLock | null>(null);
@@ -109,8 +111,10 @@ export function useMesaEditLock({
         ? String(input.lockExpiresAt || '').trim() || new Date(Date.now() + lockTtlMs).toISOString()
         : null;
 
-      if (sendBroadcast) {
-        sendBroadcast('mesa_lock_changed', {
+      const broadcaster = sendBroadcast || sendBroadcastRef?.current;
+      if (broadcaster) {
+        console.log('[Broadcast] Sending mesa_lock_changed', { mesaId: tableId, locked, mode: input.mode });
+        broadcaster('mesa_lock_changed', {
           sender_user_id: session.user.id,
           sender_client_id: clientInstanceIdRef.current,
           mesa_id: tableId,
@@ -123,9 +127,11 @@ export function useMesaEditLock({
           lock_ttl_ms: locked ? lockTtlMs : null,
           emitted_at: Date.now(),
         });
+      } else {
+        console.warn('[Broadcast] No broadcaster available for mesa_lock_changed');
       }
     },
-    [sendBroadcast, session.user.id],
+    [sendBroadcast, sendBroadcastRef, session.user.id],
   );
 
   const releaseHeldMesaLock = useCallback(

@@ -1,6 +1,20 @@
 import type { Session } from '@supabase/supabase-js';
 import type { MesaOrderCatalogItem, MesaOrderItem } from '../../../services/mesaOrderService';
 import type { MesaRecord } from '../../../services/mesasService';
+import {
+  isMesaOccupied as isMesaOccupiedShared,
+  normalizeTableIdentifier as normalizeTableIdentifierShared,
+  compareMesaTableIdentifiers as compareMesaTableIdentifiersShared,
+  resolveMesaSyncVersion as resolveMesaSyncVersionShared,
+  mesaDisplayName as mesaDisplayNameShared,
+} from '@stocky/shared/mesa-utils';
+import {
+  normalizeOrderReference as normalizeOrderReferenceShared,
+  normalizeOrderItemQuantity as normalizeOrderItemQuantityShared,
+  normalizeOrderItemSubtotal as normalizeOrderItemSubtotalShared,
+  sumOrderItemsQuantity as sumOrderItemsQuantityShared,
+} from '@stocky/shared/order-normalization';
+import { reconcileOrderItemsFromServer as reconcileOrderItemsFromServerShared } from '@stocky/shared/order-reconciliation';
 
 export const MESA_IN_USE_MESSAGE = 'Alguien esta usando esta mesa.';
 
@@ -17,46 +31,16 @@ export function getDenominationsForCountry(countryCode: string): number[] {
   return DENOMINATIONS_BY_COUNTRY[countryCode] || DENOMINATIONS_BY_COUNTRY.CO;
 }
 
-export function isMesaOccupied(status: string | null | undefined) {
-  return (
-    String(status || '')
-      .trim()
-      .toLowerCase() === 'occupied'
-  );
-}
-
-export function normalizeTableIdentifier(value: string | number | null | undefined) {
-  return String(value ?? '').trim();
-}
-
-export function compareMesaTableIdentifiers(left: MesaRecord, right: MesaRecord) {
-  const leftId = normalizeTableIdentifier(left?.table_number ?? left?.table_name ?? left?.id);
-  const rightId = normalizeTableIdentifier(right?.table_number ?? right?.table_name ?? right?.id);
-
-  return leftId.localeCompare(rightId, 'es', {
-    numeric: true,
-    sensitivity: 'base',
-  });
-}
-
-export function resolveMesaSyncVersion(mesa: Partial<MesaRecord> | null | undefined): number {
-  const raw = Number(mesa?.sync_version);
-  if (!Number.isFinite(raw)) return 0;
-  return Math.max(0, Math.floor(raw));
-}
-
-export function mesaDisplayName(mesa: MesaRecord, tablePrefix?: string): string {
-  if (mesa.table_name && String(mesa.table_name).trim()) return String(mesa.table_name).trim();
-  const prefix = tablePrefix || 'Mesa';
-  if (
-    mesa.table_number !== null &&
-    mesa.table_number !== undefined &&
-    String(mesa.table_number).trim()
-  ) {
-    return `${prefix} ${String(mesa.table_number).trim()}`;
-  }
-  return `${prefix} ${mesa.id.slice(0, 6)}`;
-}
+export const isMesaOccupied = isMesaOccupiedShared;
+export const normalizeTableIdentifier = normalizeTableIdentifierShared;
+export const compareMesaTableIdentifiers = compareMesaTableIdentifiersShared;
+export const resolveMesaSyncVersion = resolveMesaSyncVersionShared;
+export const mesaDisplayName = mesaDisplayNameShared;
+export const normalizeOrderReference = normalizeOrderReferenceShared;
+export const normalizeOrderItemQuantity = normalizeOrderItemQuantityShared;
+export const normalizeOrderItemSubtotal = normalizeOrderItemSubtotalShared;
+export const sumOrderItemsQuantity = sumOrderItemsQuantityShared;
+export const reconcileOrderItemsFromServer = reconcileOrderItemsFromServerShared;
 
 export function resolveSessionDisplayName(session: Session): string {
   const metadata =
@@ -96,34 +80,6 @@ export function buildCashBreakdown(change: number, denominations?: number[]) {
   return breakdown;
 }
 
-export function sumOrderItemsQuantity(items: MesaOrderItem[]) {
-  return (Array.isArray(items) ? items : []).reduce(
-    (sum, item) => sum + Math.max(0, Number(item.quantity || 0)),
-    0,
-  );
-}
-
-export function normalizeOrderReference(value: unknown): string {
-  return String(value || '').trim();
-}
-
-export function normalizeOrderItemQuantity(value: unknown): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return 0;
-  return Math.max(0, Math.floor(parsed));
-}
-
-export function normalizeOrderItemSubtotal(row: Record<string, unknown>): number {
-  const subtotal = Number(row?.subtotal);
-  if (Number.isFinite(subtotal)) {
-    return Math.max(0, subtotal);
-  }
-  const quantity = normalizeOrderItemQuantity(row?.quantity);
-  const price = Number(row?.price);
-  const safePrice = Number.isFinite(price) ? price : 0;
-  return Math.max(0, quantity * safePrice);
-}
-
 export function formatCatalogItemMeta(item: MesaOrderCatalogItem) {
   const code = item.code ? `${item.code} · ` : '';
   if (item.item_type === 'combo') {
@@ -143,60 +99,4 @@ export function isSameOrderItemIdentity(left: MesaOrderItem, right: MesaOrderIte
   if (leftProduct && rightProduct) return leftProduct === rightProduct;
   if (leftCombo && rightCombo) return leftCombo === rightCombo;
   return false;
-}
-
-export function reconcileOrderItemsFromServer(
-  current: MesaOrderItem[],
-  fromServer: MesaOrderItem[],
-) {
-  const local = Array.isArray(current) ? current : [];
-  const server = Array.isArray(fromServer) ? fromServer : [];
-
-  const serverById = new Map(server.map((item) => [String(item.id || ''), item]));
-  const serverByIdentity = new Map<string, MesaOrderItem>();
-  server.forEach((item) => {
-    const key = item.product_id
-      ? `p:${item.product_id}`
-      : item.combo_id
-        ? `c:${item.combo_id}`
-        : '';
-    if (!key) return;
-    if (!serverByIdentity.has(key)) {
-      serverByIdentity.set(key, item);
-    }
-  });
-
-  const usedServerIds = new Set<string>();
-
-  const merged = local.map((localItem) => {
-    const localId = String(localItem.id || '');
-    const exact = localId ? serverById.get(localId) : null;
-    if (exact) {
-      usedServerIds.add(String(exact.id || ''));
-      return exact;
-    }
-
-    const identityKey = localItem.product_id
-      ? `p:${localItem.product_id}`
-      : localItem.combo_id
-        ? `c:${localItem.combo_id}`
-        : '';
-    if (identityKey) {
-      const byIdentity = serverByIdentity.get(identityKey);
-      if (byIdentity) {
-        usedServerIds.add(String(byIdentity.id || ''));
-        return byIdentity;
-      }
-    }
-
-    return localItem;
-  });
-
-  server.forEach((serverItem) => {
-    const serverId = String(serverItem.id || '');
-    if (!serverId || usedServerIds.has(serverId)) return;
-    merged.push(serverItem);
-  });
-
-  return merged;
 }

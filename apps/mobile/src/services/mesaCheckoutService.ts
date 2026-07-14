@@ -7,6 +7,7 @@ import { normalizeNumber, normalizeReference, normalizeText } from '../utils/nor
 import { isFunctionUnavailableError } from '../utils/supabaseErrors';
 import type { MesaOrderItem } from './mesaOrderService';
 import type { SupabaseErrorLike } from '../types/errors';
+import { checkRateLimit } from './mesasService';
 
 export type PaymentMethod =
   | 'cash'
@@ -432,6 +433,12 @@ export async function closeOrderSingle({
   changeBreakdown?: CashChangeEntry[] | null;
   orderItems: MesaOrderItem[];
 }): Promise<{ saleTotal: number; saleId: string | null }> {
+  // Rate limiting check
+  const allowed = await checkRateLimit('close_order', 30, 60);
+  if (!allowed) {
+    throw new Error('Demasiadas solicitudes. Intenta de nuevo en un minuto.');
+  }
+
   const normalizedItems = normalizeOrderItemsForSale(orderItems);
   if (normalizedItems.length === 0) {
     throw new Error('No hay productos en la orden para cerrar.');
@@ -567,6 +574,12 @@ export async function closeOrderAsSplit({
   tableId: string;
   subAccounts: SplitSubAccount[];
 }): Promise<{ totalSold: number; saleIds: string[] }> {
+  // Rate limiting check
+  const allowed = await checkRateLimit('close_order_split', 10, 60);
+  if (!allowed) {
+    throw new Error('Demasiadas solicitudes. Intenta de nuevo en un minuto.');
+  }
+
   const normalizedSubAccounts = (Array.isArray(subAccounts) ? subAccounts : [])
     .map((sub, index) => {
       const normalizedItems = normalizeOrderItemsForSale(

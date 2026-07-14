@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { Session } from '@supabase/supabase-js';
 
@@ -39,6 +39,7 @@ export type OrderModalProps = {
     mutatingOrderItemId: string | null;
     insufficientItems: StockShortage[];
     insufficientComboComponents: ComboComponentShortage[];
+    hasPendingChanges?: boolean;
   };
 
   actions: {
@@ -81,6 +82,7 @@ export const OrderModal = React.memo(function OrderModal({
     mutatingOrderItemId,
     insufficientItems,
     insufficientComboComponents,
+    hasPendingChanges,
   } = orderState;
 
   const {
@@ -140,7 +142,15 @@ export const OrderModal = React.memo(function OrderModal({
           >
             <Ionicons name="cart-outline" size={32} color="#D1D5DB" />
           </LinearGradient>
-          <Text style={styles.orderModalHeaderTitle}>{orderModalTitle}</Text>
+          <View style={styles.orderModalHeaderTitleBlock}>
+            <Text style={styles.orderModalHeaderTitle}>{orderModalTitle}</Text>
+            {hasPendingChanges && !isSavingOrder && (
+              <View style={styles.autoSaveBadge}>
+                <ActivityIndicator size="small" color="#6366F1" />
+                <Text style={styles.autoSaveBadgeText}>{t('print.saving')}</Text>
+              </View>
+            )}
+          </View>
         </View>
       }
       contentContainerStyle={styles.orderModalContent}
@@ -178,11 +188,15 @@ export const OrderModal = React.memo(function OrderModal({
             onPress={onPrintKitchen}
             disabled={orderItems.length === 0 || releasingEmptyOrder || isPrintInProgress}
           >
-            <Ionicons
-              name="print-outline"
-              size={20}
-              color={orderItems.length === 0 ? '#93A5CD' : '#64748B'}
-            />
+            {isPrintInProgress ? (
+              <ActivityIndicator size="small" color="#64748B" />
+            ) : (
+              <Ionicons
+                name="print-outline"
+                size={20}
+                color={orderItems.length === 0 ? '#93A5CD' : '#64748B'}
+              />
+            )}
             <Text style={[styles.orderActionButtonText, styles.orderPrintButtonText]}>
               {isPrintInProgress ? t('print.printing') : t('buttons.printKitchen')}
             </Text>
@@ -284,12 +298,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  orderModalHeaderTitle: {
+  orderModalHeaderTitleBlock: {
     flex: 1,
+    gap: 4,
+  },
+  orderModalHeaderTitle: {
     color: '#111827',
     fontSize: 22,
     lineHeight: 28,
     fontWeight: '800',
+  },
+  autoSaveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
+  autoSaveBadgeText: {
+    color: '#6366F1',
+    fontSize: 12,
+    fontWeight: '600',
   },
   orderModalContent: {
     paddingHorizontal: 14,

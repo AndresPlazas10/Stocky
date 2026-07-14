@@ -46,6 +46,10 @@ import { useMesaRefSync } from './hooks/useMesaRefSync';
 import { useMesaKeyboard } from './hooks/useMesaKeyboard';
 import { useMesaDeleteModal } from './hooks/useMesaDeleteModal';
 import { usePaymentFlow } from './hooks/usePaymentFlow';
+import { useMesaAutoSave } from './hooks/useMesaAutoSave';
+import { useMesaDataLoader } from './hooks/useMesaDataLoader';
+import { useMesaOpenClose } from './hooks/useMesaOpenClose';
+import { useMesaActionBroadcast } from './hooks/useMesaActionBroadcast';
 import { MesasGrid } from './components/MesasGrid';
 import { MesasPanelHeader } from './components/MesasPanelHeader';
 import { MesasModals } from './components/MesasModals';
@@ -121,7 +125,6 @@ export function MesasPanel({ session, businessContext }: Props) {
   const { isKeyboardVisible } = useMesaKeyboard();
 
   const selectedMesaIdRef = useRef<string>('');
-  const mesaActionVersionRef = useRef<Record<string, number>>({});
 
   const [actorDisplayName, setActorDisplayName] = useState(() =>
     resolveSessionDisplayName(session),
@@ -182,7 +185,11 @@ export function MesasPanel({ session, businessContext }: Props) {
     isOrderFlowActive,
     cashChangeData,
     ensureCatalogLoaded,
+    hasPendingChanges,
+    setHasPendingChanges,
   } = orderState;
+
+  const sendBroadcastRef = useRef<((event: string, payload: Record<string, unknown>) => void) | null>(null);
 
   const editLock = useMesaEditLock({
     session,
@@ -206,6 +213,7 @@ export function MesasPanel({ session, businessContext }: Props) {
       setPaymentMethod('cash');
       setAmountReceived('');
     },
+    sendBroadcastRef,
   });
 
   const {
@@ -275,6 +283,24 @@ export function MesasPanel({ session, businessContext }: Props) {
     setActiveOrderId,
   } = realtime;
 
+  const {
+    bumpMesaActionVersion,
+    isMesaActionVersionCurrent,
+    sendMesaSyncBroadcast,
+  } = useMesaActionBroadcast({
+    mesasSyncBroadcastChannelRef,
+    mesasSyncBroadcastReadyRef,
+  });
+
+  // Set sendBroadcastRef so useMesaEditLock can send broadcasts via the realtime channel
+  useEffect(() => {
+    sendBroadcastRef.current = (event: string, payload: Record<string, unknown>) => {
+      const channel = mesasSyncBroadcastChannelRef.current;
+      if (!channel) return;
+      (channel as { send: (msg: unknown) => void }).send({ type: 'broadcast', event, payload });
+    };
+  }, [mesasSyncBroadcastChannelRef]);
+
   useMesaRefSync({
     selectedMesaId: selectedMesa?.id ?? undefined,
     mesas,
@@ -288,152 +314,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     selectedMesaIdRef,
     mesasLengthRef,
   });
-
-  const bumpMesaActionVersion = useCallback((mesaId: string) => {
-    const normalizedMesaId = String(mesaId || '').trim();
-    if (!normalizedMesaId) return 0;
-    const current = Number(mesaActionVersionRef.current[normalizedMesaId] || 0);
-    const next = current + 1;
-    mesaActionVersionRef.current[normalizedMesaId] = next;
-    return next;
-  }, []);
-
-  const isMesaActionVersionCurrent = useCallback((mesaId: string, version: number) => {
-    const normalizedMesaId = String(mesaId || '').trim();
-    if (!normalizedMesaId) return false;
-    return Number(mesaActionVersionRef.current[normalizedMesaId] || 0) === Number(version || 0);
-  }, []);
-
-  const sendMesaSyncBroadcast = useCallback(
-    (event: string, payload: Record<string, unknown>) => {
-      const channel = mesasSyncBroadcastChannelRef.current;
-      if (!channel) return;
-
-      const message = {
-        type: 'broadcast',
-        event,
-        payload,
-      } as const;
-
-      const canHttpSend = typeof channel?.httpSend === 'function';
-      const isReady = mesasSyncBroadcastReadyRef.current === true;
-
-      if (!isReady && canHttpSend) {
-        void channel.httpSend(message);
-        return;
-      }
-
-      const sendResult = channel.send(message);
-      if (sendResult && typeof sendResult.then === 'function') {
-        void sendResult.catch(() => {
-          if (canHttpSend) {
-            return channel.httpSend(message);
-          }
-          return undefined;
-        });
-      }
-    },
-    [mesasSyncBroadcastChannelRef, mesasSyncBroadcastReadyRef],
-  );
-
-  const loadData = useCallback(async () => {
-    const shouldShowLoading = mesasLengthRef.current === 0 && !hasLoadedOnceRef.current;
-    if (shouldShowLoading) {
-      setLoading(true);
-    }
-    setError(null);
-
-    try {
-      const nextContext = businessContext?.businessId
-        ? businessContext
-        : await resolveBusinessContext(session.user.id);
-      if (!nextContext?.businessId) {
-        setContext(null);
-        setMesas([]);
-        setMesaLocksByTableId({});
-        orderItemsCacheRef.current.clear();
-        setError(t('mesas.notFound'));
-        return;
-      }
-
-      setContext(nextContext);
-      const fallbackName = sessionDisplayName;
-      void resolveMesaEditorDisplayName({
-        businessId: nextContext.businessId,
-        userId: session.user.id,
-        fallbackName,
-      })
-        .then((name) => {
-          setActorDisplayName(name);
-        })
-        .catch(() => {
-          setActorDisplayName(fallbackName);
-        });
-      if (catalogBusinessIdRef.current !== nextContext.businessId) {
-        catalogBusinessIdRef.current = null;
-        catalogUpdatedAtRef.current = 0;
-        setCatalogItems([]);
-        orderItemsCacheRef.current.clear();
-      }
-      void readCatalogFromStorage(nextContext.businessId)
-        .then((cached) => {
-          if (!cached) return;
-          if (
-            catalogBusinessIdRef.current === nextContext.businessId &&
-            catalogItemsRef.current.length > 0
-          ) {
-            return;
-          }
-          catalogBusinessIdRef.current = nextContext.businessId;
-          catalogUpdatedAtRef.current = cached.cachedAt || 0;
-          setCatalogItems(cached.items);
-        })
-        .catch(() => {
-          // no-op
-        });
-      void ensureCatalogLoaded(nextContext.businessId).catch(() => {
-        // no-op: no bloquear carga de mesas por catalogo
-      });
-
-      const initialFetchStart = Date.now();
-      const nextMesas = await fetchMesasByBusinessId(nextContext.businessId);
-      traceAsyncDuration('initial_fetch_mesas', initialFetchStart, {
-        businessId: nextContext.businessId,
-        rows: Array.isArray(nextMesas) ? nextMesas.length : 0,
-      });
-      const sortedMesas = nextMesas.sort(compareMesaTableIdentifiers);
-      setMesas(sortedMesas);
-      void refreshMesaLocks(nextContext.businessId);
-
-      // Pre-fetch order items for occupied tables in background
-      const occupiedMesas = sortedMesas.filter(
-        (m) => m.status === 'occupied' && m.current_order_id,
-      );
-      for (const mesa of occupiedMesas) {
-        void loadOpenOrderSnapshot(mesa.current_order_id!, { forceRefresh: false });
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('mesas.loadFailed'));
-    } finally {
-      hasLoadedOnceRef.current = true;
-      if (shouldShowLoading) {
-        setLoading(false);
-      }
-    }
-  }, [
-    businessContext,
-    catalogBusinessIdRef,
-    catalogItemsRef,
-    catalogUpdatedAtRef,
-    ensureCatalogLoaded,
-    orderItemsCacheRef,
-    refreshMesaLocks,
-    session.user.id,
-    sessionDisplayName,
-    setCatalogItems,
-    setMesaLocksByTableId,
-    traceAsyncDuration,
-  ]);
 
   const publishMesaStateBroadcast = useCallback(
     (
@@ -497,12 +377,6 @@ export function MesasPanel({ session, businessContext }: Props) {
       session.user.id,
     ],
   );
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial de datos
-    void loadData();
-    void preloadRpcCompatibility();
-  }, [loadData]);
 
   useEffect(() => {
     const held = heldMesaLockRef.current;
@@ -639,123 +513,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     [catalogNameByIdentity],
   );
 
-  const patchMesaOrderTotal = useCallback(
-    (mesaId: string, orderId: string, total: number) => {
-      setMesas((prev) =>
-        prev.map((mesa) => {
-          if (mesa.id !== mesaId) return mesa;
-          return {
-            ...mesa,
-            status: 'occupied',
-            current_order_id: orderId,
-            orders: {
-              ...(mesa.orders || {}),
-              id: orderId,
-              total,
-            },
-          };
-        }),
-      );
-
-      setSelectedMesa((prev) => {
-        if (!prev || prev.id !== mesaId) return prev;
-        return {
-          ...prev,
-          status: 'occupied',
-          current_order_id: orderId,
-          orders: {
-            ...(prev.orders || {}),
-            id: orderId,
-            total,
-          },
-        };
-      });
-    },
-    [setSelectedMesa],
-  );
-
-  const publishRealtimeOrderSummary = useCallback(
-    (
-      mesa: MesaRecord | null | undefined,
-      orderId: string,
-      total: number,
-      units: number,
-      mode: 'optimistic' | 'confirmed' | 'rollback' = 'optimistic',
-    ) => {
-      const normalizedMesaId = String(mesa?.id || '').trim();
-      const normalizedOrderId = String(orderId || '').trim();
-      const normalizedBusinessId = String(mesa?.business_id || context?.businessId || '').trim();
-      if (!normalizedMesaId || !normalizedOrderId || !normalizedBusinessId) return;
-
-      publishMesaStateBroadcast(
-        {
-          id: normalizedMesaId,
-          business_id: normalizedBusinessId,
-          status: 'occupied',
-          current_order_id: normalizedOrderId,
-          table_number: mesa?.table_number ?? null,
-          table_name: mesa?.table_name ?? null,
-          orders: {
-            id: normalizedOrderId,
-            status: 'open',
-            total: Number(total || 0),
-          },
-        },
-        {
-          previousOrderId: normalizedOrderId,
-          mode,
-          orderUnits: Math.max(0, Math.floor(Number(units || 0))),
-        },
-      );
-    },
-    [context?.businessId, publishMesaStateBroadcast],
-  );
-
-  const markMesaAsAvailableAfterSale = useCallback(
-    (mesaId: string) => {
-      let orderIdToClear = '';
-      let mesaBusinessId = String(context?.businessId || '').trim();
-      let mesaTableNumber: string | number | null | undefined = null;
-      let mesaTableName: string | null | undefined = null;
-      setMesas((prev) => {
-        const target = prev.find((mesa) => mesa.id === mesaId) || null;
-        orderIdToClear = String(target?.current_order_id || '').trim();
-        mesaBusinessId = String(target?.business_id || mesaBusinessId || '').trim();
-        mesaTableNumber = target?.table_number;
-        mesaTableName = target?.table_name;
-        return prev.map((mesa) =>
-          mesa.id === mesaId
-            ? {
-                ...mesa,
-                status: 'available',
-                current_order_id: null,
-                orders: null,
-              }
-            : mesa,
-        );
-      });
-      if (orderIdToClear) {
-        orderItemsCacheRef.current.delete(orderIdToClear);
-      }
-
-      publishMesaStateBroadcast(
-        {
-          id: mesaId,
-          business_id: mesaBusinessId,
-          status: 'available',
-          current_order_id: null,
-          table_number: mesaTableNumber ?? null,
-          table_name: mesaTableName ?? null,
-          orders: null,
-        },
-        {
-          previousOrderId: orderIdToClear || null,
-        },
-      );
-    },
-    [context?.businessId, orderItemsCacheRef, publishMesaStateBroadcast],
-  );
-
   const countryDenominations = useMemo(
     () => getDenominationsForCountry(context?.country_code || 'CO'),
     [context?.country_code],
@@ -765,6 +522,45 @@ export function MesasPanel({ session, businessContext }: Props) {
     (change: number) => buildCashBreakdown(change, countryDenominations),
     [countryDenominations],
   );
+
+  const {
+    loadData,
+    patchMesaOrderTotal,
+    publishRealtimeOrderSummary,
+    markMesaAsAvailableAfterSale,
+  } = useMesaDataLoader({
+    session,
+    businessContext,
+    sessionDisplayName,
+    setContext,
+    setMesas,
+    setLoading,
+    setError,
+    setActorDisplayName,
+    setCatalogItems,
+    setMesaLocksByTableId,
+    ensureCatalogLoaded,
+    publishMesaStateBroadcast,
+    traceAsyncDuration,
+    readCatalogFromStorage,
+    refreshMesaLocks,
+    heldMesaLockRef,
+    releaseHeldMesaLock,
+    catalogBusinessIdRef,
+    catalogUpdatedAtRef,
+    catalogItemsRef,
+    orderItemsCacheRef,
+    mesasLengthRef,
+    hasLoadedOnceRef,
+    realtimeClientInstanceIdRef,
+    actorDisplayName,
+  });
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial de datos
+    void loadData();
+    void preloadRpcCompatibility();
+  }, [loadData]);
 
   const mutations = useMesaOrderMutations({
     order: orderState,
@@ -803,6 +599,30 @@ export function MesasPanel({ session, businessContext }: Props) {
     onKitchenPrinted: () => {
       toast.showSuccess(toastMessages.mesas.orderSent());
     },
+    onNoKitchenItems: () => {
+      toast.showWarning({
+        title: t('mesas:toast.noKitchenItems.title', 'Sin productos de cocina'),
+        message: t(
+          'mesas:toast.noKitchenItems.message',
+          "No hay productos de la categoría 'Platos' para imprimir",
+        ),
+      });
+    },
+    onNoPrinterConnected: () => {
+      toast.showError({
+        title: t('mesas:toast.noPrinter.title', 'Sin impresora'),
+        message: t(
+          'mesas:toast.noPrinter.message',
+          'No hay una impresora conectada. Ve a Configuración > Impresión para conectar una.',
+        ),
+      });
+    },
+    onPrintError: (error: string) => {
+      toast.showError({
+        title: t('mesas:toast.printError.title', 'Error de impresión'),
+        message: error,
+      });
+    },
   });
 
   const {
@@ -818,6 +638,12 @@ export function MesasPanel({ session, businessContext }: Props) {
     processSplitPaymentAndClose,
     handlePrintKitchen,
   } = mutations;
+
+  useMesaAutoSave({
+    hasPendingChanges,
+    onSave: handleSaveOrder,
+    enabled: showOrderModal && !isSavingOrder && !isClosingOrder,
+  });
 
   const closeOrderModal = useCallback(() => {
     setActiveOrderId(null);
@@ -895,193 +721,29 @@ export function MesasPanel({ session, businessContext }: Props) {
     selectedMesa,
   ]);
 
-  const handleOpenClose = useCallback(
-    async (mesa: MesaRecord, action: 'open' | 'close') => {
-      if (!session.access_token) {
-        setError(t('mesas.noSession'));
-        return;
-      }
-
-      setActingMesaId(mesa.id);
-      if (action === 'open') {
-        orderModalOpenIntentRef.current = true;
-      }
-      setError(null);
-      const previousOrderId = String(mesa.current_order_id || '').trim() || null;
-      const actionVersion = bumpMesaActionVersion(mesa.id);
-
-      const optimisticMesa: MesaRecord =
-        action === 'open'
-          ? {
-              ...mesa,
-              status: 'occupied',
-              orders: {
-                ...(mesa.orders || {}),
-                status: 'open',
-              },
-            }
-          : {
-              ...mesa,
-              status: 'available',
-              current_order_id: null,
-              orders: null,
-            };
-
-      publishMesaStateBroadcast(optimisticMesa, {
-        previousOrderId,
-        mode: 'optimistic',
-      });
-
-      if (action === 'open') {
-        setSelectedMesa({
-          ...mesa,
-          status: 'occupied',
-        });
-        setOrderItems([]);
-        setOrderModalError(null);
-        setLoadingOrder(true);
-        setShowOrderModal(true);
-      }
-
-      try {
-        if (action === 'open') {
-          const [lockAcquired, updatedMesa] = await Promise.all([
-            acquireMesaLockForEdition(mesa),
-            openCloseMesa({
-              accessToken: session.access_token,
-              userId: session.user.id,
-              tableId: mesa.id,
-              action,
-            }),
-            ...(context?.businessId
-              ? [ensureCatalogLoaded(context.businessId, { forceRefresh: true }).catch(() => [])]
-              : []),
-          ]);
-
-          if (!isMesaActionVersionCurrent(mesa.id, actionVersion)) {
-            return;
-          }
-
-          const mergedMesa: MesaRecord = {
-            ...mesa,
-            ...updatedMesa,
-            table_number: updatedMesa.table_number ?? mesa.table_number,
-            table_name: updatedMesa.table_name ?? mesa.table_name,
-            orders: {
-              ...(mesa.orders || {}),
-              ...(updatedMesa.orders || {}),
-            },
-          };
-
-          if (!lockAcquired) {
-            publishMesaStateBroadcast(mesa, {
-              previousOrderId,
-              mode: 'rollback',
-            });
-            closeOrderModal();
-            setActingMesaId(null);
-            return;
-          }
-
-          setMesas((prev) =>
-            prev
-              .map((row) => (row.id === mergedMesa.id ? mergedMesa : row))
-              .sort(compareMesaTableIdentifiers),
-          );
-          publishMesaStateBroadcast(mergedMesa, {
-            previousOrderId,
-            mode: 'confirmed',
-          });
-
-          if (mergedMesa.current_order_id) {
-            const openedOrderId = String(mergedMesa.current_order_id || '').trim();
-            if (openedOrderId) {
-              orderItemsCacheRef.current.set(openedOrderId, []);
-              setActiveOrderId(openedOrderId);
-            }
-            if (orderModalOpenIntentRef.current) {
-              void openOrderModal(mergedMesa, {
-                skipOrderItemsFetch: true,
-                initialItems: [],
-                skipLockAcquire: true,
-              });
-            }
-          } else {
-            closeOrderModal();
-            setError(t('mesas.orderNotFound'));
-          }
-        } else {
-          const updatedMesa = await openCloseMesa({
-            accessToken: session.access_token,
-            userId: session.user.id,
-            tableId: mesa.id,
-            action,
-          });
-
-          if (!isMesaActionVersionCurrent(mesa.id, actionVersion)) {
-            return;
-          }
-
-          const mergedMesa: MesaRecord = {
-            ...mesa,
-            ...updatedMesa,
-            table_number: updatedMesa.table_number ?? mesa.table_number,
-            table_name: updatedMesa.table_name ?? mesa.table_name,
-            orders: {
-              ...(mesa.orders || {}),
-              ...(updatedMesa.orders || {}),
-            },
-          };
-
-          setMesas((prev) =>
-            prev
-              .map((row) => (row.id === mergedMesa.id ? mergedMesa : row))
-              .sort(compareMesaTableIdentifiers),
-          );
-          publishMesaStateBroadcast(mergedMesa, {
-            previousOrderId,
-            mode: 'confirmed',
-          });
-
-          if (selectedMesa?.id === mergedMesa.id) {
-            closeOrderModal();
-          }
-        }
-      } catch (err) {
-        if (action === 'open') {
-          closeOrderModal();
-        }
-        publishMesaStateBroadcast(mesa, {
-          previousOrderId,
-          mode: 'rollback',
-        });
-        setError(err instanceof Error ? err.message : t('mesas.updateFailed'));
-      } finally {
-        setActingMesaId((current) => (current === mesa.id ? null : current));
-      }
-    },
-    [
-      acquireMesaLockForEdition,
-      bumpMesaActionVersion,
-      closeOrderModal,
-      context,
-      ensureCatalogLoaded,
-      isMesaActionVersionCurrent,
-      openOrderModal,
-      orderItemsCacheRef,
-      orderModalOpenIntentRef,
-      publishMesaStateBroadcast,
-      selectedMesa,
-      session.access_token,
-      session.user.id,
-      setLoadingOrder,
-      setOrderItems,
-      setOrderModalError,
-      setSelectedMesa,
-      setShowOrderModal,
-      setActiveOrderId,
-    ],
-  );
+  const { handleOpenClose } = useMesaOpenClose({
+    session,
+    context,
+    selectedMesa,
+    setSelectedMesa,
+    setMesas,
+    setOrderItems,
+    setLoadingOrder,
+    setOrderModalError,
+    setShowOrderModal,
+    setError,
+    setActingMesaId,
+    setActiveOrderId,
+    closeOrderModal,
+    openOrderModal,
+    acquireMesaLockForEdition,
+    ensureCatalogLoaded,
+    publishMesaStateBroadcast,
+    bumpMesaActionVersion,
+    isMesaActionVersionCurrent,
+    orderItemsCacheRef,
+    orderModalOpenIntentRef,
+  });
 
   const handleMesaPress = useCallback(
     (
@@ -1144,6 +806,7 @@ export function MesasPanel({ session, businessContext }: Props) {
       mutatingOrderItemId,
       insufficientItems,
       insufficientComboComponents,
+      hasPendingChanges,
     }),
     [
       selectedMesa,
@@ -1161,6 +824,7 @@ export function MesasPanel({ session, businessContext }: Props) {
       mutatingOrderItemId,
       insufficientItems,
       insufficientComboComponents,
+      hasPendingChanges,
     ],
   );
 
