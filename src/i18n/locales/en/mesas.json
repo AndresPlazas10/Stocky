@@ -48,7 +48,11 @@
     "tableUpdated": "Table Updated"
   },
   "defaults": {
-    "generalSale": "General sale"
+    "generalSale": "General sale",
+    "someoneUsingTable": "Someone is using this table.",
+    "user": "User",
+    "item": "Product",
+    "unknownError": "Unknown error"
   },
   "empty": {
     "noTables": "No tables created yet",
