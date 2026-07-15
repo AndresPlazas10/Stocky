@@ -79,6 +79,7 @@
     "transactions": "transacciones"
   },
   "errors": {
+    "general": "Error",
     "loadFailed": "Error al cargar los datos",
     "saveFailed": "Error al guardar",
     "deleteFailed": "Error al eliminar",
