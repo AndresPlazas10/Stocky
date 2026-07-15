@@ -47,13 +47,22 @@ function normalizeSplitSubAccountsForRpc(subAccounts = []) {
 
     const normalizedItems = Array.isArray(sub?.items)
         ? sub.items
-          .map((item) => {
+          .map((item, itemIndex) => {
             const productId = item?.product_id || item?.products?.id || null;
             const comboId = item?.combo_id || item?.combos?.id || null;
             const quantity = Number(item?.quantity);
             const unitPrice = Number(item?.unit_price ?? item?.price ?? item?.unitPrice);
 
-            if ((!productId && !comboId) || (productId && comboId)) return null;
+            if ((!productId && !comboId) || (productId && comboId)) {
+              logger.warn('normalizeSplitSubAccountsForRpc: item filtrado - sin referencia válida', {
+                subIndex: index,
+                itemIndex,
+                productId,
+                comboId,
+                originalItem: item
+              });
+              return null;
+            }
             if (!Number.isFinite(quantity) || quantity <= 0) return null;
             if (!Number.isFinite(unitPrice) || unitPrice < 0) return null;
 
@@ -619,9 +628,18 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
   const saleIds = [];
   // Para combo bypass, siempre cerrar orden/mesa por separado para evitar conflictos de estado
   const shouldAlwaysFinalizeSeparately = isComboBypass || shouldFallbackWithoutOrderContext;
+  logger.info('closeOrderAsSplit: iniciando fallback', {
+    subAccountCount: subAccountsWithItems.length,
+    isComboBypass,
+    shouldFallbackWithoutOrderContext,
+    shouldAlwaysFinalizeSeparately
+  });
   for (let i = 0; i < subAccountsWithItems.length; i++) {
     const sub = subAccountsWithItems[i];
-    if (!sub.items || sub.items.length === 0) continue;
+    if (!sub.items || sub.items.length === 0) {
+      logger.warn(`closeOrderAsSplit: subcuenta ${i} sin items, saltando`);
+      continue;
+    }
 
     const saleTotal = sub.items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
     totalSold += saleTotal;
@@ -632,6 +650,12 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
       quantity: item.quantity,
       unit_price: item.unit_price
     }));
+
+    logger.info(`closeOrderAsSplit: procesando subcuenta ${i + 1}`, {
+      itemsCount: itemsForRpc.length,
+      hasComboItems: itemsForRpc.some(item => Boolean(item?.combo_id)),
+      saleTotal
+    });
 
     const isLastSale = i === subAccountsWithItems.length - 1;
     const closeOrderInsideRpc = isLastSale && !shouldAlwaysFinalizeSeparately;
@@ -669,6 +693,11 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     });
 
     if (rpcError || !result?.[0]) {
+      logger.error(`closeOrderAsSplit: error en subcuenta ${i + 1}`, {
+        rpcError,
+        result,
+        itemsForRpc
+      });
       throw new Error(getFriendlySaleErrorMessage(
         rpcError,
         `❌ No se pudo registrar la venta ${i + 1}. Intenta de nuevo.`
@@ -677,6 +706,10 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
 
     const createdSaleId = result[0].sale_id || null;
     if (createdSaleId) saleIds.push(createdSaleId);
+    logger.info(`closeOrderAsSplit: subcuenta ${i + 1} procesada`, {
+      saleId: createdSaleId,
+      totalAmount: result[0].total_amount
+    });
 
     await persistSaleCashMetadata({
       businessId,

@@ -425,8 +425,9 @@ export interface MesaDeleteModalProps {
 export interface SplitBillOrderItem {
   id: string;
   product_id?: string;
-  products?: { name: string };
-  combos?: { nombre?: string; name?: string };
+  combo_id?: string;
+  products?: { id?: string; name: string };
+  combos?: { id?: string; nombre?: string; name?: string };
   quantity: number;
   price: string;
   subtotal: string | number;

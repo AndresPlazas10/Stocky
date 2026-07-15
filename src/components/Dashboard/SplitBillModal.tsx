@@ -48,6 +48,18 @@ const getOrderItemName = (item: SplitBillOrderItem) => (
   || 'Item'
 );
 
+const getOrderItemComboId = (item: SplitBillOrderItem): string | null => {
+  if (item?.combo_id) return item.combo_id;
+  if (item?.combos?.id) return item.combos.id;
+  return null;
+};
+
+const getOrderItemProductId = (item: SplitBillOrderItem): string | null => {
+  if (item?.product_id) return item.product_id;
+  if (item?.products?.id) return item.products.id;
+  return null;
+};
+
 function getInitialAssignments(orderItems: SplitBillOrderItem[], defaultAccountId: number = 1): Record<string, Record<number, number>> {
   const initial: Record<string, Record<number, number>> = {};
   orderItems.forEach((item) => {
@@ -154,7 +166,8 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
           const price = parseFloat(item.price) || 0;
           items.push({
             id: item.id,
-            product_id: item.product_id,
+            product_id: getOrderItemProductId(item),
+            combo_id: getOrderItemComboId(item),
             products: item.products,
             combos: item.combos,
             price: item.price,
