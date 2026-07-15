@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../theme/tokens';
 
 type FilterFieldState = {
@@ -29,6 +30,7 @@ export function RecordFilterCard({
   secondField,
   onClearFilters,
 }: Props) {
+  const { t } = useTranslation();
   return (
     <View style={styles.filtersCard}>
       <Pressable style={styles.filtersHeaderRow} onPress={onToggle}>
@@ -37,7 +39,7 @@ export function RecordFilterCard({
           <Text style={styles.filtersTitle}>{title}</Text>
         </View>
         <Pressable style={styles.filtersToggleButton} onPress={onToggle}>
-          <Text style={styles.filtersToggleText}>{expanded ? 'Cerrar' : 'Abrir'}</Text>
+          <Text style={styles.filtersToggleText}>{expanded ? t('buttons.close') : t('buttons.open')}</Text>
           <Ionicons
             name={expanded ? 'chevron-up' : 'chevron-down'}
             size={16}
@@ -70,7 +72,7 @@ export function RecordFilterCard({
 
           <Pressable style={styles.clearFilterButton} onPress={onClearFilters}>
             <Ionicons name="close" size={16} color={STOCKY_COLORS.textMuted} />
-            <Text style={styles.clearFilterButtonText}>Limpiar</Text>
+            <Text style={styles.clearFilterButtonText}>{t('buttons.clear')}</Text>
           </Pressable>
         </>
       ) : null}

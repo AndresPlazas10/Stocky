@@ -1,9 +1,20 @@
-node_modules/
-.expo/
-dist/
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-*.orig.*
+# Build artifacts
+android/
+outputs/
+apk/
+debug/
+release/
+bundle/
+coverage/
+
+# Build tarballs
+build-*.tar.gz
+
+# Credentials (keep secure)
+@andres_plazas__stocky-mobile.jks
+credentials.json
+android-upload.keystore
+google-services.json
+
+# Debug files
+build-output.txt

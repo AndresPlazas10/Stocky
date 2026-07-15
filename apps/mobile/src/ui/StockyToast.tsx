@@ -103,7 +103,7 @@ export function StockyToast({
   }));
 
   const config = TYPE_CONFIG[type];
-  const topOffset = Math.max(insets.top - 32, 0);
+  const topOffset = insets.top + 16;
 
   return (
     <Animated.View

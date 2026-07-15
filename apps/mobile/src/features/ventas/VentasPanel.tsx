@@ -438,12 +438,13 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
       <SaleCard
         venta={item}
         canDelete={canDeleteSales}
+        isPrinting={isPrinting}
         onViewDetails={openVentaDetails}
         onPrint={handlePrintSale}
         onDelete={askDeleteVenta}
       />
     ),
-    [canDeleteSales, openVentaDetails, handlePrintSale, askDeleteVenta],
+    [canDeleteSales, isPrinting, openVentaDetails, handlePrintSale, askDeleteVenta],
   );
 
   return (

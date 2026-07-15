@@ -4,8 +4,7 @@ import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { logger } from '@/utils/logger';
-import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
-import { SaleErrorAlert } from '../ui/SaleErrorAlert';
+import { useAppToast } from '../../hooks/useAppToast';
 import {
   updateBusinessProfile
 } from '../../data/commands/businessCommands';
@@ -53,11 +52,10 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
   const { t } = useTranslation('common');
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [editingBusiness, setEditingBusiness] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const { showError, showSuccess, ToastComponent } = useAppToast();
   const [businessData, setBusinessData] = useState({
     name: '',
     nit: '',
@@ -90,14 +88,12 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
     e.preventDefault();
 
     if (!businessData.name.trim()) {
-      setError('⚠️ ' + t('messages.businessNameRequired'));
+      showError(t('errors.operationError'), t('messages.businessNameRequired'));
       return;
     }
 
     try {
       setLoading(true);
-      setError('');
-      setSuccess('');
 
       const data = await updateBusinessProfile({
         businessId: business.id,
@@ -110,17 +106,15 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
         }
       });
 
-      setSuccess(t('messages.infoUpdated'));
+      showSuccess(t('settings.saved'), t('messages.infoUpdated'));
       setEditingBusiness(false);
 
       if (onBusinessUpdate && data) {
         onBusinessUpdate(data);
       }
 
-      setTimeout(() => setSuccess(''), 3000);
-
     } catch (err) {
-      setError((err as Error).message || t('messages.errorUpdating'));
+      showError(t('errors.operationError'), (err as Error).message || t('messages.errorUpdating'));
     } finally {
       setLoading(false);
     }
@@ -131,21 +125,20 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
       await signOutSession();
       navigate('/');
     } catch {
-      setError('❌ ' + t('messages.errorSigningOut'));
+      showError(t('errors.operationError'), t('messages.errorSigningOut'));
     }
   }, [navigate, t]);
 
   const handleDeleteAccount = useCallback(async () => {
     if (deletingAccount) return;
     setDeletingAccount(true);
-    setError('');
     let deleted = false;
     try {
       const { error: deleteError } = await supabase.functions.invoke('delete-account', { body: {} });
       if (deleteError) throw deleteError;
       deleted = true;
     } catch (err) {
-      setError((err as Error)?.message || '❌ ' + t('messages.errorDeletingAccount'));
+      showError(t('errors.operationError'), (err as Error)?.message || t('messages.errorDeletingAccount'));
     }
 
     if (deleted) {
@@ -162,16 +155,6 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
       setShowDeleteAccountModal(false);
     }
   }, [deletingAccount, navigate, t]);
-
-  useEffect(() => {
-    let errorTimer: ReturnType<typeof setTimeout>, successTimer: ReturnType<typeof setTimeout>;
-    if (error) errorTimer = setTimeout(() => setError(''), 5000);
-    if (success) successTimer = setTimeout(() => setSuccess(''), 5000);
-    return () => {
-      if (errorTimer) clearTimeout(errorTimer);
-      if (successTimer) clearTimeout(successTimer);
-    };
-  }, [error, success]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#C4DFE6]/10 p-4 md:p-6">
@@ -193,23 +176,6 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
             </div>
           </div>
         </motion.div>
-
-        {/* Alertas mejoradas */}
-        <SaleErrorAlert
-          isVisible={!!error}
-          onClose={() => setError('')}
-          title="Error"
-          message={error}
-          duration={5000}
-        />
-
-        <SaleSuccessAlert
-          isVisible={!!success}
-          onClose={() => setSuccess('')}
-          title={'✨ ' + t('settings.saved')}
-          details={[{ label: t('labels.action'), value: success }]}
-          duration={5000}
-        />
 
         {/* Información del Usuario */}
         <motion.div
@@ -635,6 +601,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
           )}
         </AnimatePresence>
       </div>
+      <ToastComponent />
     </div>
   );
 }

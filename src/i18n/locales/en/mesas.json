@@ -47,6 +47,9 @@
     "tableCreated": "Table Created",
     "tableUpdated": "Table Updated"
   },
+  "defaults": {
+    "generalSale": "General sale"
+  },
   "empty": {
     "noTables": "No tables created yet",
     "noTablesDescription": "Create your first table to start registering orders.",

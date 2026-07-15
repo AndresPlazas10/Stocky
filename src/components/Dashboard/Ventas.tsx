@@ -42,9 +42,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import PaymentMethodSelect from '../ui/PaymentMethodSelect.jsx';
-import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
-import { SaleErrorAlert } from '../ui/SaleErrorAlert';
-import { SaleUpdateAlert } from '../ui/SaleUpdateAlert';
+import { useAppToast } from '../../hooks/useAppToast';
 import { PrintReceiptConfirmModal } from '../ui/PrintReceiptConfirmModal';
 import Pagination from '../Pagination';
 import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
@@ -165,6 +163,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
   const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
   const dateConfig = { timezone: config.timezone, locale: config.locale };
   
+  const { showError, showSuccess, showLoading, ToastComponent } = useAppToast();
   const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
   const fmtDate = (timestamp, options = {}) => formatDate(timestamp, options, dateConfig);
   const fmtDateOnly = (timestamp) => formatDateOnly(timestamp, dateConfig);
@@ -180,10 +179,6 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
   const [loading, setLoading] = useState(true);
   const [showSaleModal, setShowSaleModal] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [successDetails, setSuccessDetails] = useState([]);
-  const [successTitle, setSuccessTitle] = useState(t('alerts.saleCreated'));
-  const [alertType, setAlertType] = useState('success'); // 'success' o 'error'
   const [sessionChecked, setSessionChecked] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false); // Verificar si es empleado
   
@@ -236,7 +231,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
   // Callbacks para modal de impresión
   const handlePrintConfirm = useCallback(async () => {
     if (!printSaleData) {
-      setError('⚠️ ' + t('ventas:errors.noPrintData'));
+      showError('Error', t('ventas:errors.noPrintData'));
       return;
     }
 
@@ -251,11 +246,11 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       });
 
       if (!printResult.ok) {
-        setError('⚠️ ' + t('ventas:errors.printFailed'));
+        showError('Error', t('ventas:errors.printFailed'));
       }
     } catch (err) {
       logger.error('print_receipt_failed', err);
-      setError('⚠️ ' + t('ventas:errors.printFailed'));
+      showError('Error', t('ventas:errors.printFailed'));
     } finally {
       setIsPrintingReceipt(false);
       setShowPrintModal(false);
@@ -580,8 +575,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
         // Incrementar el contador total
         setTotalCount(prev => prev + 1);
 
-        setSuccess(t('ventas:alerts.saleCreated'));
-        setTimeout(() => setSuccess(null), 3000);
+        showSuccess(t('ventas:alerts.saleCreated'));
       });
     },
     onUpdate: (updatedSale) => {
@@ -797,7 +791,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
     
     setIsSubmitting(true);
     setError(null);
-    setSuccess(null);
+    showLoading(t('ventas:labels.generating'));
     
     try {
       if (cart.length === 0) {
@@ -852,17 +846,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       // Registrar latencia para debugging
       recordSaleCreationTime(elapsedMs);
 
-      // Mostrar alerta con detalles de la venta
-      setSuccessTitle(t('alerts.saleCreated'));
-      setSuccessDetails([
-        { label: t('labels.total', { ns: 'common' }), value: fmtPrice(saleTotal) },
-        { label: t('ventas:labels.paymentMethodLabel'), value: getPaymentMethodLabel(paymentMethod, t) },
-        { label: t('ventas:labels.time'), value: `${elapsedMs.toFixed(0)}ms` },
-        { label: t('ventas:labels.articles'), value: cart.length },
-        ...(result?.data?.pending_sync ? [{ label: t('ventas:labels.status'), value: t('ventas:labels.pendingSync') }] : [])
-      ]);
-      setAlertType('success');
-      setSuccess(true);
+      showSuccess(t('alerts.saleCreated'), `${t('labels.total', { ns: 'common' })}: ${fmtPrice(saleTotal)} | ${t('ventas:labels.paymentMethodLabel')}: ${getPaymentMethodLabel(paymentMethod, t)} | ${t('ventas:labels.time')}: ${elapsedMs.toFixed(0)}ms | ${t('ventas:labels.articles')}: ${cart.length}`);
 
       if (result?.data?.pending_sync) {
         const pendingSale = {
@@ -979,6 +963,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
         }, 2000);
       }
       setError(buildDiagnosticAlertMessage(error, t('ventas:errors.processFailed')));
+      showError('Error', t('ventas:errors.processFailed'));
     } finally {
       setIsSubmitting(false); // SIEMPRE desbloquear
     }
@@ -999,13 +984,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
     try {
       await deleteSaleWithDetails(saleToDelete, businessId);
 
-      setSuccessTitle(t('ventas:alerts.saleDeleted'));
-      setSuccessDetails([
-        { label: t('ventas:labels.action'), value: t('ventas:alerts.saleDeletedCorrectly') }
-      ]);
-      setAlertType('error');
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 4000);
+      showSuccess(t('ventas:alerts.saleDeleted'), t('ventas:alerts.saleDeletedCorrectly'));
 
       // Recargar ventas
       await loadVentas(currentFilters, { limit, offset: (page - 1) * limit, includeCount: false });
@@ -1015,7 +994,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
 
     } catch (error) {
       setError('❌ ' + (error.message || t('ventas:errors.deleteFailed')));
-      setTimeout(() => setError(null), 8000);
+      showError('Error', error.message || t('ventas:errors.deleteFailed'));
       setShowDeleteModal(false);
       setSaleToDelete(null);
     } finally {
@@ -1066,14 +1045,12 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
     try {
       saleDetails = await fetchSaleDetails(sale.id);
     } catch {
-      setError(t('ventas:errors.detailsFailed'));
-      setTimeout(() => setError(null), 3000);
+      showError('Error', t('ventas:errors.detailsFailed'));
       return;
     }
 
     if (!saleDetails || saleDetails.length === 0) {
-      setError(t('ventas:errors.detailsFailed'));
-      setTimeout(() => setError(null), 3000);
+      showError('Error', t('ventas:errors.detailsFailed'));
       return;
     }
 
@@ -1085,8 +1062,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
     });
 
     if (!printResult.ok) {
-      setError(t('ventas:errors.printWindowFailed'));
-      setTimeout(() => setError(null), 3000);
+      showError('Error', t('ventas:errors.printWindowFailed'));
     }
   }, [fetchSaleDetails, businessId, t]);
 
@@ -1131,35 +1107,20 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
     rootMargin: '220px',
     resetKey: `${cart.length}:${lowMotionMode ? 'low' : 'full'}`
   });
-  // Cleanup de timers de mensajes
-  useEffect(() => {
-    if (success) {
-      const timer = setTimeout(() => setSuccess(null), 8000);
-      return () => clearTimeout(timer);
-    }
-  }, [success]);
-
-  useEffect(() => {
-    if (error) {
-      const timer = setTimeout(() => setError(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [error]);
 
   // Generar factura desde una venta existente (memoizado)
   const generateInvoiceFromSale = useCallback(async () => {
     if (!invoiceCustomerEmail || !invoiceCustomerEmail.includes('@')) {
-      setError('⚠️ ' + t('ventas:errors.emailRequired'));
+      showError('Error', t('ventas:errors.emailRequired'));
       return;
     }
     if (!invoiceCustomerName) {
-      setError('⚠️ ' + t('ventas:errors.nameRequired'));
+      showError('Error', t('ventas:errors.nameRequired'));
       return;
     }
 
     try {
       setGeneratingInvoice(true);
-      setError(null);
 
       // Obtener detalles de la venta
       const saleDetails = await fetchSaleDetails(selectedSale.id);
@@ -1192,7 +1153,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       });
 
       if (emailResult.success) {
-        setSuccess(`✅ ${t('ventas:email.sentSuccessfully')} ${invoiceCustomerEmail}`);
+        showSuccess(t('ventas:email.sentSuccessfully'), invoiceCustomerEmail);
       } else {
         throw new Error(emailResult.error || t('ventas:errors.sendFailed'));
       }
@@ -1205,7 +1166,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       setSelectedSale(null);
 
     } catch (error) {
-      setError('❌ ' + (error.message || t('ventas:errors.sendFailedRetry')));
+      showError('Error', error.message || t('ventas:errors.sendFailedRetry'));
     } finally {
       setGeneratingInvoice(false);
     }
@@ -1321,30 +1282,6 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
 
       {/* Mensajes */}
       <AnimatePresence>
-        <SaleUpdateAlert
-          key="sale-submit-loading"
-          isVisible={isSubmitting}
-          onClose={() => {}}
-          title={t('ventas:labels.generating')}
-          details={[]}
-          duration={600000}
-        />
-        <SaleSuccessAlert 
-          key="sale-success"
-          isVisible={success && alertType === 'success'}
-          onClose={() => setSuccess(false)}
-          title={successTitle}
-          details={successDetails}
-          duration={6000}
-        />
-        <SaleErrorAlert 
-          key="sale-error"
-          isVisible={success && alertType === 'error'}
-          onClose={() => setSuccess(false)}
-          title={successTitle}
-          details={successDetails}
-          duration={7000}
-        />
         <PrintReceiptConfirmModal
           key="print-receipt-confirm"
           isOpen={showPrintModal}
@@ -1394,16 +1331,10 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                 onClick={() => {
                   const retried = retryAllSalesOutboxErrorEvents();
                   if (retried <= 0) {
-                    setError('⚠️ ' + t('ventas:sync.noErrors'));
+                    showError('Error', t('ventas:sync.noErrors'));
                     return;
                   }
-                  setSuccessTitle(t('ventas:sync.retryStarted'));
-                  setSuccessDetails([
-                    { label: t('ventas:title'), value: retried },
-                    { label: t('ventas:labels.status'), value: t('ventas:sync.retrying') }
-                  ]);
-                  setAlertType('update');
-                  setSuccess(true);
+                  showSuccess(t('ventas:sync.retryStarted'), `${t('ventas:title')}: ${retried}`);
                 }}
               >
                 {t('ventas:buttons.retryErrors')}
@@ -1960,7 +1891,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                                   onClick={() => {
                                     const retried = retrySalesOutboxEventByTempSaleId(sale.id);
                                     if (!retried) {
-                                      setError('⚠️ ' + t('ventas:errors.retryNotFound'));
+                                      showError('Error', t('ventas:errors.retryNotFound'));
                                       return;
                                     }
                                     void flushSalesOutbox();
@@ -2403,6 +2334,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
         )}
       </AnimatePresence>
 
+      <ToastComponent />
     </div>
     </AsyncStateWrapper>
   );

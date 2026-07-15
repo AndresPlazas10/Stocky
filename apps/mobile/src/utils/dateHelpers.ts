@@ -1,3 +1,5 @@
+import i18next from 'i18next';
+
 export function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
@@ -53,12 +55,13 @@ export function formatDayLabelFromKey(
   key: string,
   options?: { locale?: string; t?: (key: string) => string },
 ) {
+  const locale = options?.locale || i18next.language || 'es-CO';
   if (!key || key === 'all') {
-    return options?.t ? options.t('salesFilters.allDays') : 'Todos los días';
+    return options?.t ? options.t('salesFilters.allDays') : (locale.startsWith('en') ? 'All days' : 'Todos los días');
   }
   const parsed = new Date(`${key}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) return key;
-  return new Intl.DateTimeFormat(options?.locale || 'es-CO', {
+  return new Intl.DateTimeFormat(locale, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -72,24 +75,35 @@ export function formatDateTime(
   value: string | null,
   options?: { locale?: string; timezone?: string },
 ) {
-  if (!value) return options?.locale?.startsWith('en') ? 'No date' : 'Sin fecha';
+  const locale = options?.locale || i18next.language || 'es-CO';
+  if (!value) return locale.startsWith('en') ? 'No date' : 'Sin fecha';
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime()))
-    return options?.locale?.startsWith('en') ? 'No date' : 'Sin fecha';
-  return new Intl.DateTimeFormat(options?.locale || 'es-CO', {
+    return locale.startsWith('en') ? 'No date' : 'Sin fecha';
+  return new Intl.DateTimeFormat(locale, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: options?.timezone || 'America/Bogota',
+    timeZone: options?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
   }).format(parsed);
 }
 
-export function getRecordDayKey(value: string | null) {
+export function getRecordDayKey(value: string | null, timezone?: string) {
   if (!value) return '';
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '';
+  if (timezone) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(parsed);
+    const getPart = (type: string) => parts.find(p => p.type === type)?.value || '';
+    return `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
+  }
   const year = parsed.getFullYear();
   const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
   const day = `${parsed.getDate()}`.padStart(2, '0');

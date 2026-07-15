@@ -16,8 +16,7 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
-import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
-import { SaleErrorAlert } from '../ui/SaleErrorAlert';
+import { useAppToast } from '../../hooks/useAppToast';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import type { DashboardModuleProps } from '@/types/components';
 
@@ -51,10 +50,10 @@ export default function Combos({ businessId }: DashboardModuleProps) {
   const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
   
   const [combos, setCombos] = useState<Array<{ id: string; nombre: string; precio_venta: number; descripcion?: string; estado: string; combo_items?: Array<{ producto_id: string; cantidad: number; products?: { name?: string } }> }>>([]);
-  const [products, setProducts] = useState<Array<{ id: string; name: string; code?: string; stock: number }>>([]);
+  const [products, setProducts] = useState<Array<{ id: string; name: string; code?: string; stock: number; manage_stock: boolean }>>([]);
+  const { showError, showSuccess, ToastComponent } = useAppToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [showFormModal, setShowFormModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -205,16 +204,16 @@ export default function Combos({ businessId }: DashboardModuleProps) {
 
       if (editingCombo?.id) {
         await updateCombo(editingCombo.id, businessId, payload);
-        setSuccess(t('messages.savedSuccessfully'));
+        showSuccess('Éxito', t('combosSection.messages.savedSuccessfully'));
       } else {
         await createCombo(businessId, payload);
-        setSuccess(t('messages.savedSuccessfully'));
+        showSuccess('Éxito', t('combosSection.messages.savedSuccessfully'));
       }
 
       closeFormModal();
       await loadData();
     } catch (err) {
-      setError(`❌ ${(err as Error)?.message || t('errors.saveError')}`);
+      showError('Error', (err as Error)?.message || t('combosSection.errors.saveError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -237,26 +236,15 @@ export default function Combos({ businessId }: DashboardModuleProps) {
       setIsDeleting(true);
       setError(null);
       await deleteCombo(comboToDelete.id, businessId);
-      setSuccess(t('messages.deletedSuccessfully'));
+      showSuccess('Éxito', t('combosSection.messages.deletedSuccessfully'));
       closeDeleteModal();
       await loadData();
     } catch (err) {
-      setError(`❌ ${(err as Error)?.message || t('errors.deleteError')}`);
+      showError('Error', (err as Error)?.message || t('combosSection.errors.deleteError'));
     } finally {
       setIsDeleting(false);
     }
   };
-
-  const clearMessages = useCallback(() => {
-    setError(null);
-    setSuccess(null);
-  }, []);
-
-  useEffect(() => {
-    if (!success && !error) return undefined;
-    const timer = setTimeout(clearMessages, 5000);
-    return () => clearTimeout(timer);
-  }, [success, error, clearMessages]);
 
   return (
     <AsyncStateWrapper
@@ -307,24 +295,6 @@ export default function Combos({ businessId }: DashboardModuleProps) {
           </Card>
         </motion.div>
 
-        <AnimatePresence>
-          <SaleSuccessAlert
-            isVisible={!!success}
-            onClose={() => setSuccess(null)}
-            title={success || '✨ Operación exitosa'}
-            details={[]}
-            duration={5000}
-          />
-          <SaleErrorAlert
-            isVisible={!!error}
-            onClose={() => setError(null)}
-            title="❌ Error"
-            message={error || ''}
-            details={[]}
-            duration={7000}
-          />
-        </AnimatePresence>
-
         <Card className="shadow-xl rounded-2xl bg-white border-none">
           <div className="p-4 sm:p-6">
             {combos.length === 0 ? (
@@ -350,7 +320,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                           </Badge>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="grid grid-cols-2 gap-2 text-sm text-center">
                           <div className="rounded-lg bg-accent-50 p-2">
                             <p className="text-accent-600 text-xs uppercase">{t('form.price')}</p>
                             <p className="font-bold text-primary-900">{fmtPrice(combo.precio_venta)}</p>
@@ -547,7 +517,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                               if (isAlreadySelected) return null;
                               return (
                                 <option key={product.id} value={product.id}>
-                                  {product.name} ({product.code || t('form.noCode')}) - Stock: {product.stock}
+                                  {product.name} ({product.code || t('form.noCode')}){product.manage_stock !== false ? ` - Stock: ${product.stock}` : ''}
                                 </option>
                               );
                             })}
@@ -586,7 +556,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                 {formData.items.length > 0 && (
                   <div className="rounded-xl border border-accent-200 bg-accent-50 p-3">
                     <p className="text-sm font-semibold text-primary-800 mb-2">{t('form.description')}</p>
-                    <div className="space-y-1 text-sm text-primary-700">
+                    <div className="space-y-1 text-sm text-primary-700 text-center">
                       {formData.items.map((item, index) => {
                         const product = productsById.get(item.producto_id);
                         const quantity = Number(item.cantidad);
@@ -629,6 +599,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
           </motion.div>
         )}
       </AnimatePresence>
+      <ToastComponent />
     </AsyncStateWrapper>
   );
 }

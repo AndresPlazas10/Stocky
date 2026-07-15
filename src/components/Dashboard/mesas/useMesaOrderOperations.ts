@@ -34,7 +34,8 @@ import {
   buildDiagnosticAlertMessage,
   sanitizeMesaOrderAssociation,
   reconcileTablesWithOpenOrders,
-  reconcileClosedOrdersFromOutbox
+  reconcileClosedOrdersFromOutbox,
+  isMesaLockExpired
 } from './mesaHelpers';
 import { isConnectivityError } from '../../../utils/connectivity';
 import { normalizeTableRecord } from '../../../utils/tableStatus';
@@ -47,7 +48,6 @@ import {
 import { invalidateOrderCache } from '../../../data/adapters/cacheInvalidation.js';
 import { closeModalImmediate } from '../../../utils/closeModalImmediate';
 import { logger } from '@/utils/logger';
-import type { AlertDetail } from '../../../types/components';
 
 type SetState<T> = React.Dispatch<React.SetStateAction<T>>;
 
@@ -107,6 +107,7 @@ interface UseMesaOrderOperationsParams {
   waitForPendingOrderItemOps: () => Promise<boolean>;
   enqueueOrderItemWrite: (itemId: string, writeFn: () => Promise<unknown>) => Promise<void>;
   acquireMesaEditLockWeb: (params: { targetBusinessId: string; tableId: string; lockToken: string }) => Promise<MesaLockResult>;
+  selectMesaEditLockByTableId: (params: { businessId: string; tableId: string }) => Promise<Record<string, unknown> | null>;
   _releaseMesaEditLockWeb: unknown;
   _sendMesaSyncBroadcast: unknown;
   publishMesaLockBroadcast: (params: { tableId: string; locked: boolean; mode: string; lockToken: string | null }) => void;
@@ -114,11 +115,6 @@ interface UseMesaOrderOperationsParams {
   isOfflineFirstRuntime: boolean;
   setMesaOpenDebugStage: (stage: string) => void;
   buildMesaOpenDebugTag: (error: unknown, mesa: any) => string;
-  setError: SetState<string | null>;
-  setSuccess: SetState<boolean>;
-  setSuccessTitle: SetState<string>;
-  setSuccessDetails: SetState<AlertDetail[]>;
-  setAlertType: SetState<string>;
   isCreatingTable: boolean;
   setIsCreatingTable: SetState<boolean>;
   newTableNumber: string;
@@ -142,6 +138,8 @@ interface UseMesaOrderOperationsParams {
   showAddForm: boolean;
   setShowAddForm: SetState<boolean>;
   isOpeningTableRef: React.MutableRefObject<boolean>;
+  showError: (title: string, message?: string) => void;
+  showSuccess: (title: string, message?: string) => void;
 }
 
 export function useMesaOrderOperations({
@@ -178,6 +176,7 @@ export function useMesaOrderOperations({
   waitForPendingOrderItemOps,
   enqueueOrderItemWrite,
   acquireMesaEditLockWeb,
+  selectMesaEditLockByTableId,
   _releaseMesaEditLockWeb,
   _sendMesaSyncBroadcast,
   publishMesaLockBroadcast,
@@ -185,11 +184,6 @@ export function useMesaOrderOperations({
   isOfflineFirstRuntime,
   setMesaOpenDebugStage,
   buildMesaOpenDebugTag,
-  setError,
-  setSuccess,
-  setSuccessTitle,
-  setSuccessDetails,
-  setAlertType,
   isCreatingTable,
   setIsCreatingTable,
   newTableNumber,
@@ -213,6 +207,8 @@ export function useMesaOrderOperations({
     showAddForm,
     setShowAddForm,
     isOpeningTableRef,
+    showError,
+    showSuccess,
   }: UseMesaOrderOperationsParams) {
   const { t } = useTranslation(['mesas']);
   const pendingOrderItemOpsCountRef = pendingOrderItemOpsRef;
@@ -289,12 +285,12 @@ export function useMesaOrderOperations({
       if (offline) {
         setMesas([]);
       } else {
-        setError(t('mesas:errors.loadTablesFailed'));
+        showError('Error', t('mesas:errors.loadTablesFailed'));
       }
     } finally {
       setLoading(false);
     }
-  }, [businessId, setMesas, setError, setLoading, t]);
+  }, [businessId, setMesas, showError, setLoading, t]);
 
   const clearClosedMesaCache = useCallback(async ({ tableId, orderId = null }: { tableId?: string | null; orderId?: string | null } = {}) => {
     const normalizedTableId = normalizeEntityId(tableId);
@@ -323,15 +319,13 @@ export function useMesaOrderOperations({
 
     if (!canManageTables || isEmployee) {
       setShowAddForm(false);
-      setError(t('mesas:errors.adminOnly'));
+      showError('Error', t('mesas:errors.adminOnly'));
       return;
     }
     
     if (isCreatingTable) return;
     
     setIsCreatingTable(true);
-    setError(null);
-    setSuccess(null);
     
     try {
       const tableIdentifier = normalizeTableIdentifier(newTableNumber);
@@ -364,21 +358,16 @@ export function useMesaOrderOperations({
         throw error;
       }
 
-      setAlertType('success');
-      setSuccessTitle(t('mesas:success.tableCreated'));
-      setSuccessDetails([
-        { label: t('mesas:labels.table'), value: `#${tableIdentifier}` }
-      ]);
-      setSuccess(true);
+      showSuccess(t('mesas:success.tableCreated'), `#${tableIdentifier}`);
       setNewTableNumber('');
       setShowAddForm(false);
       
     } catch (error: unknown) {
-      setError((error as Error)?.message || t('mesas:errors.createFailed'));
+      showError('Error', (error as Error)?.message || t('mesas:errors.createFailed'));
     } finally {
       setIsCreatingTable(false);
     }
-  }, [canManageTables, isEmployee, isCreatingTable, newTableNumber, businessId, loadMesas, setMesas, setError, setSuccess, setSuccessTitle, setSuccessDetails, setAlertType, setNewTableNumber, setShowAddForm, setIsCreatingTable, t]);
+  }, [canManageTables, isEmployee, isCreatingTable, newTableNumber, businessId, loadMesas, setMesas, showError, showSuccess, setNewTableNumber, setShowAddForm, setIsCreatingTable, t]);
 
   const createNewOrder = useCallback(async (mesa: any, options?: { resolvedUserId?: string | null }) => {
     const openLocalOfflineOrder = () => {
@@ -425,7 +414,6 @@ export function useMesaOrderOperations({
     };
 
     try {
-      setError(null);
       setMesaOpenDebugStage('create:start');
 
       if (isOfflineFirstRuntime) {
@@ -558,9 +546,9 @@ export function useMesaOrderOperations({
       setShowOrderDetails(false);
       setModalOpenIntent(false);
       setSelectedMesa(null);
-      setError(`${t('mesas:errors.openTableFailed')}: ${(error as Error)?.message || t('mesas:defaults.unknownError')} [${buildMesaOpenDebugTag(error, mesa)}]`);
+      showError('Error',`${t('mesas:errors.openTableFailed')}: ${(error as Error)?.message || t('mesas:defaults.unknownError')} [${buildMesaOpenDebugTag(error, mesa)}]`);
     }
-  }, [buildMesaOpenDebugTag, businessId, currentUser, isOfflineFirstRuntime, loadMesas, setMesaOpenDebugStage, setPendingQuantityUpdatesSafe, setMesas, setSelectedMesa, setOrderItems, setShowOrderDetails, setModalOpenIntent, setError, orderItemsDirtyRef, orderItemsRef, pendingQuantityUpdatesRef, t]);
+  }, [buildMesaOpenDebugTag, businessId, currentUser, isOfflineFirstRuntime, loadMesas, setMesaOpenDebugStage, setPendingQuantityUpdatesSafe, setMesas, setSelectedMesa, setOrderItems, setShowOrderDetails, setModalOpenIntent, showError, orderItemsDirtyRef, orderItemsRef, pendingQuantityUpdatesRef, t]);
 
   const loadOrderDetails = useCallback(async (mesa: any, { requestId = null }: { requestId?: number | null } = {}) => {
     const normalizedRequestId = Number(requestId);
@@ -697,9 +685,9 @@ export function useMesaOrderOperations({
         return;
       }
 
-      setError(buildDiagnosticAlertMessage(error, t));
+      showError('Error',buildDiagnosticAlertMessage(error, t));
     }
-  }, [setPendingQuantityUpdatesSafe, setSelectedMesa, setOrderItems, setShowOrderDetails, setModalOpenIntent, setError, orderDetailsRequestRef, orderItemsDirtyRef, pendingQuantityUpdatesRef, t]);
+  }, [setPendingQuantityUpdatesSafe, setSelectedMesa, setOrderItems, setShowOrderDetails, setModalOpenIntent, showError, orderDetailsRequestRef, orderItemsDirtyRef, pendingQuantityUpdatesRef, t]);
 
   const handleOpenTable = useCallback(async (mesa: any) => {
     setMesaOpenDebugStage('open:start');
@@ -719,7 +707,7 @@ export function useMesaOrderOperations({
       const lockState = getMesaLockState(normalizedMesa?.id);
       if (lockState?.lockedByOther) {
         setMesaOpenDebugStage('open:lock-blocked');
-        setError(getMesaInUseMessage(t));
+        showError('Error',getMesaInUseMessage(t));
         return;
       }
     }
@@ -727,8 +715,30 @@ export function useMesaOrderOperations({
     const resolvedUserId = await ensureCurrentUser();
     if (!resolvedUserId) {
       setMesaOpenDebugStage('open:user-missing');
-      setError(t('mesas:errors.sessionFailed'));
+      showError('Error',t('mesas:errors.sessionFailed'));
       return;
+    }
+
+    // Direct DB check to catch locks immediately (bypasses broadcast/Postgres Changes delay)
+    if (!isOfflineFirstRuntime && normalizedMesa?.id && businessId) {
+      setMesaOpenDebugStage('open:db-lock-check');
+      try {
+        const dbLock = await selectMesaEditLockByTableId({
+          businessId: businessId,
+          tableId: normalizedMesa.id,
+        });
+        if (dbLock && !isMesaLockExpired(dbLock) && String(dbLock.lock_owner_user_id || '').trim() !== resolvedUserId) {
+          setMesaOpenDebugStage('open:db-lock-blocked');
+          logger.info('[MesaOpen] Lock detected via direct DB check', {
+            mesaId: normalizedMesa.id,
+            lockOwner: dbLock.lock_owner_user_id,
+          });
+          showError('Error',getMesaInUseMessage(t));
+          return;
+        }
+      } catch (err) {
+        logger.warn('[MesaOpen] Direct DB lock check failed, continuing with optimistic approach', err);
+      }
     }
 
     if (!isOfflineFirstRuntime && normalizedMesa?.id && businessId) {
@@ -782,7 +792,7 @@ export function useMesaOrderOperations({
           });
           activeMesaBroadcastRef.current = null;
           heldMesaLockRef.current = null;
-          setError(getMesaInUseMessage(t));
+          showError('Error',getMesaInUseMessage(t));
           return;
         }
       }
@@ -824,7 +834,7 @@ export function useMesaOrderOperations({
     setModalOpenIntent,
     setShowOrderDetails,
     setOrderItems,
-    setError,
+    showError,
     orderDetailsRequestRef,
     orderItemsDirtyRef,
     orderItemsRef,
@@ -1030,7 +1040,7 @@ export function useMesaOrderOperations({
 
   const removeItem = useCallback(async (itemId: string) => {
     if (pendingOrderItemOpsRef.current > 0) {
-      setError(t('mesas:errors.syncingChanges'));
+      showError('Error',t('mesas:errors.syncingChanges'));
       return;
     }
 
@@ -1078,7 +1088,7 @@ export function useMesaOrderOperations({
 
       updateOrderTotal(selectedMesa?.current_order_id, nextOrderItems, { skipMesaState: true }).catch((err: unknown) => { logger.warn('mesas:order_operations:update_total_remote_remove failed', err); });
     } catch (_error) {
-      setError(t('mesas:errors.deleteItemFailed'));
+      showError('Error',t('mesas:errors.deleteItemFailed'));
       try {
         const freshItems = await getOrderItemsByOrderId({
           orderId: selectedMesa?.current_order_id,
@@ -1098,7 +1108,7 @@ export function useMesaOrderOperations({
     } finally {
       markOrderItemOpFinished();
     }
-  }, [selectedMesa, isOfflineFirstRuntime, updateOrderTotal, setPendingQuantityUpdatesSafe, businessId, markOrderItemOpStarted, markOrderItemOpFinished, pendingOrderItemOpsRef, optimisticTempItemQuantitiesRef, setError, setOrderItems, orderItemsRef, orderItemsDirtyRef, pendingQuantityUpdatesRef, t]);
+  }, [selectedMesa, isOfflineFirstRuntime, updateOrderTotal, setPendingQuantityUpdatesSafe, businessId, markOrderItemOpStarted, markOrderItemOpFinished, pendingOrderItemOpsRef, optimisticTempItemQuantitiesRef, showError, setOrderItems, orderItemsRef, orderItemsDirtyRef, pendingQuantityUpdatesRef, t]);
 
   const handleRefreshOrder = useCallback(async () => {
     if (!selectedMesa) return;
@@ -1106,7 +1116,7 @@ export function useMesaOrderOperations({
     try {
       const hasSettledPendingOps = await waitForPendingOrderItemOps();
       if (!hasSettledPendingOps) {
-        setError(t('mesas:errors.applyingChanges'));
+        showError('Error',t('mesas:errors.applyingChanges'));
         return;
       }
 
@@ -1160,7 +1170,7 @@ export function useMesaOrderOperations({
 
       if (!hasSavedItems) {
         if (hasOrderTotalSignal) {
-          setError(t('mesas:errors.orderSyncDetected'));
+          showError('Error',t('mesas:errors.orderSyncDetected'));
           orderItemsDirtyRef.current = false;
           setShowOrderDetails(false);
           setModalOpenIntent(false);
@@ -1201,14 +1211,7 @@ export function useMesaOrderOperations({
       setOrderItems([]);
       setSearchProduct('');
       
-      setSuccessTitle(t('mesas:success.tableUpdated'));
-      setSuccessDetails([
-        { label: t('mesas:labels.table'), value: `#${mesaSnapshot.table_number}` },
-        { label: t('mesas:labels.status'), value: t('mesas:labels.updated') }
-      ]);
-      setAlertType('update');
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      showSuccess(t('mesas:success.tableUpdated'), `${t('mesas:labels.table')} #${mesaSnapshot.table_number}`);
 
       (async () => {
         try {
@@ -1223,7 +1226,7 @@ export function useMesaOrderOperations({
         }
       })();
     } catch {
-      setError(t('mesas:errors.saveOrderFailed'));
+      showError('Error',t('mesas:errors.saveOrderFailed'));
     }
   }, [
     selectedMesa,
@@ -1238,11 +1241,8 @@ export function useMesaOrderOperations({
     setSelectedMesa,
     setOrderItems,
     setSearchProduct,
-    setSuccessTitle,
-    setSuccessDetails,
-    setAlertType,
-    setSuccess,
-    setError,
+    showError,
+    showSuccess,
     orderItemsRef,
     orderItemsDirtyRef,
     pendingQuantityUpdatesRef,
@@ -1273,19 +1273,19 @@ export function useMesaOrderOperations({
       const itemName = catalogItem?.name || catalogItem?.nombre || 'Item';
 
       if (!itemId) {
-        setError(t('mesas:errors.itemNotIdentified'));
+        showError('Error',t('mesas:errors.itemNotIdentified'));
         return;
       }
 
       const precio = Number(catalogItem?.sale_price ?? catalogItem?.price ?? 0);
       if (!Number.isFinite(precio) || precio < 0) {
-        setError(t('mesas:errors.invalidItemPrice', { itemName }));
+        showError('Error',t('mesas:errors.invalidItemPrice', { itemName }));
         return;
       }
 
       const qty = parseInt(String(quantityToAdd));
       if (isNaN(qty) || qty <= 0) {
-        setError(t('mesas:errors.quantityMustBePositive'));
+        showError('Error',t('mesas:errors.quantityMustBePositive'));
         return;
       }
 
@@ -1295,7 +1295,7 @@ export function useMesaOrderOperations({
         && typeof catalogItem.stock === 'number'
         && qty > catalogItem.stock
       ) {
-        setError(t('mesas:errors.insufficientStock', { itemName, available: catalogItem.stock }));
+        showError('Error',t('mesas:errors.insufficientStock', { itemName, available: catalogItem.stock }));
       }
 
       const currentOrderItems = Array.isArray(orderItemsRef.current) ? orderItemsRef.current : [];
@@ -1346,7 +1346,7 @@ export function useMesaOrderOperations({
               orderId: selectedMesa.current_order_id
             })
           )).catch(async () => {
-            setError(t('mesas:errors.addItemFailed'));
+            showError('Error',t('mesas:errors.addItemFailed'));
             try {
               const freshItems = await getOrderItemsByOrderId({
                 orderId: selectedMesa.current_order_id,
@@ -1498,7 +1498,7 @@ export function useMesaOrderOperations({
                 return next;
               });
             }).catch(async () => {
-              setError(`${t('mesas:errors.addItemFailed')} [${itemDebugTag('quantity-sync-failed')}]`);
+              showError('Error',`${t('mesas:errors.addItemFailed')} [${itemDebugTag('quantity-sync-failed')}]`);
               try {
                 const freshItems = await getOrderItemsByOrderId({
                   orderId: selectedMesa.current_order_id,
@@ -1520,7 +1520,7 @@ export function useMesaOrderOperations({
             });
           }).catch(async (err: unknown) => {
             logger.warn('mesas:order_operations:insert_item_catch failed', err);
-            setError(`${t('mesas:errors.addItemFailed')} [${itemDebugTag('insert-catch')}]`);
+            showError('Error',`${t('mesas:errors.addItemFailed')} [${itemDebugTag('insert-catch')}]`);
             delete optimisticTempItemQuantitiesRef.current[tempId];
             setOrderItems((prevItems) => prevItems.filter((item) => item.id !== tempId));
             setPendingQuantityUpdatesSafe((prev) => {
@@ -1556,7 +1556,7 @@ export function useMesaOrderOperations({
       setSearchProduct('');
       setQuantityToAdd(1);
     } catch (error: unknown) {
-      setError(`${t('mesas:errors.addItemFailed')} [MESA_ITEM_DBG|stage=outer-catch|msg=${String((error as Error)?.message || error || 'unknown').replace(/\s+/g, ' ').slice(0, 80)}]`);
+      showError('Error',`${t('mesas:errors.addItemFailed')} [MESA_ITEM_DBG|stage=outer-catch|msg=${String((error as Error)?.message || error || 'unknown').replace(/\s+/g, ' ').slice(0, 80)}]`);
       try {
         const freshItems = await getOrderItemsByOrderId({
           orderId: selectedMesa?.current_order_id,
@@ -1574,12 +1574,12 @@ export function useMesaOrderOperations({
         logger.warn('mesas:order_operations:add_catalog_item_refresh_items failed', err);
       }
     }
-  }, [selectedMesa, quantityToAdd, updateOrderTotal, setPendingQuantityUpdatesSafe, businessId, isOfflineFirstRuntime, markOrderItemOpStarted, markOrderItemOpFinished, enqueueOrderItemWrite, setError, setOrderItems, setSearchProduct, setQuantityToAdd, pendingQuantityUpdatesRef, optimisticTempItemQuantitiesRef, pendingOrderItemOpsRef, orderItemsRef, orderItemsDirtyRef, t]);
+  }, [selectedMesa, quantityToAdd, updateOrderTotal, setPendingQuantityUpdatesSafe, businessId, isOfflineFirstRuntime, markOrderItemOpStarted, markOrderItemOpFinished, enqueueOrderItemWrite, showError, setOrderItems, setSearchProduct, setQuantityToAdd, pendingQuantityUpdatesRef, optimisticTempItemQuantitiesRef, pendingOrderItemOpsRef, orderItemsRef, orderItemsDirtyRef, t]);
 
   const updateItemQuantity = useCallback(async (itemId: string, newQuantity: number) => {
     try {
       if (pendingOrderItemOpsRef.current > 0) {
-        setError(t('mesas:errors.syncingChanges'));
+        showError('Error',t('mesas:errors.syncingChanges'));
         return;
       }
 
@@ -1610,7 +1610,7 @@ export function useMesaOrderOperations({
         optimisticTempItemQuantitiesRef.current[itemId] = normalizedQuantity;
       }
     } catch {
-      setError(t('mesas:errors.updateQuantityFailed'));
+      showError('Error',t('mesas:errors.updateQuantityFailed'));
       try {
         const currentOrderId = String(selectedMesa?.current_order_id || '');
         const isLocalOnlyOrder = (
@@ -1638,7 +1638,7 @@ export function useMesaOrderOperations({
       }
       setPendingQuantityUpdatesSafe({});
     }
-  }, [selectedMesa, isOfflineFirstRuntime, removeItem, setPendingQuantityUpdatesSafe, pendingOrderItemOpsRef, optimisticTempItemQuantitiesRef, setError, setOrderItems, pendingQuantityUpdatesRef, orderItemsRef, orderItemsDirtyRef, t]);
+  }, [selectedMesa, isOfflineFirstRuntime, removeItem, setPendingQuantityUpdatesSafe, pendingOrderItemOpsRef, optimisticTempItemQuantitiesRef, showError, setOrderItems, pendingQuantityUpdatesRef, orderItemsRef, orderItemsDirtyRef, t]);
 
   const handleCloseModal = useCallback(() => {
     const mesaSnapshot = selectedMesa ? { ...selectedMesa } : null;
@@ -1660,7 +1660,7 @@ export function useMesaOrderOperations({
 
     if (effectiveItemsSnapshot.length === 0) {
       if (hasOrderTotalSignal) {
-        setError(t('mesas:errors.orderSyncDetected'));
+        showError('Error',t('mesas:errors.orderSyncDetected'));
         closeModalImmediate(() => {
           orderItemsDirtyRef.current = false;
           setShowOrderDetails(false);
@@ -1717,14 +1717,7 @@ export function useMesaOrderOperations({
         )
       );
 
-      setSuccessTitle(t('mesas:success.tableUpdated'));
-      setSuccessDetails([
-        { label: t('mesas:labels.table'), value: `#${mesaSnapshot.table_number}` },
-        { label: t('mesas:labels.status'), value: t('mesas:labels.updated') }
-      ]);
-      setAlertType('update');
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      showSuccess(t('mesas:success.tableUpdated'), `${t('mesas:labels.table')} #${mesaSnapshot.table_number}`);
     }
 
     closeModalImmediate(() => {
@@ -1747,11 +1740,8 @@ export function useMesaOrderOperations({
     setSelectedMesa,
     setOrderItems,
     setPendingQuantityUpdatesSafe,
-    setSuccessTitle,
-    setSuccessDetails,
-    setAlertType,
-    setSuccess,
-    setError,
+    showError,
+    showSuccess,
     orderItemsRef,
     orderItemsDirtyRef,
     pendingQuantityUpdatesRef,

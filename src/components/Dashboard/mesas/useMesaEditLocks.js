@@ -10,6 +10,7 @@ import {
   MESA_LOCK_TTL_SECONDS,
 } from './mesaHelpers';
 import { supabase } from '../../../supabase/Client';
+import { logger } from '../../../utils/logger.ts';
 
 export function useMesaEditLocks({
   businessId,
@@ -142,13 +143,23 @@ export function useMesaEditLocks({
 
   const applyRealtimeMesaLockBroadcast = useCallback(
     (payload) => {
+      logger.info('[Broadcast] Received broadcast', { 
+        mesaId: payload?.mesa_id, 
+        locked: payload?.locked, 
+        mode: payload?.mode,
+        senderClientId: payload?.sender_client_id 
+      });
+      
       const senderClientId = String(payload?.sender_client_id || '').trim();
-      if (senderClientId && senderClientId === String(mesaSyncClientIdRef.current || '').trim())
+      if (senderClientId && senderClientId === String(mesaSyncClientIdRef.current || '').trim()) {
+        logger.info('[Broadcast] Ignoring own broadcast');
         return;
+      }
 
       const normalizedBusinessId = String(businessId || '').trim();
       const payloadBusinessId = String(payload?.business_id || '').trim();
       if (normalizedBusinessId && (!payloadBusinessId || payloadBusinessId !== normalizedBusinessId)) {
+        logger.info('[Broadcast] Ignoring broadcast from different business');
         return;
       }
 

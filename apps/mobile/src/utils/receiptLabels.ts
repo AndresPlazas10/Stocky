@@ -1,4 +1,5 @@
 export interface ReceiptLabels {
+  t: (key: string, opts?: { defaultValue?: string }) => string;
   title: string;
   receiptNumber: string;
   seller: string;
@@ -20,6 +21,8 @@ export interface ReceiptLabels {
   statusOccupied: string;
   statusAvailable: string;
   itemsLabel: string;
+  productsHeader: string;
+  quantityHeader: string;
   printError: string;
   printerError: string;
 }
@@ -28,6 +31,7 @@ export function buildReceiptLabels(
   t: (key: string, opts?: { defaultValue?: string }) => string,
 ): ReceiptLabels {
   return {
+    t,
     title: t('mesas:receipt.title'),
     receiptNumber: t('mesas:receipt.receiptNumber'),
     seller: t('mesas:receipt.seller'),
@@ -49,6 +53,8 @@ export function buildReceiptLabels(
     statusOccupied: t('mesas:receipt.statusOccupied'),
     statusAvailable: t('mesas:receipt.statusAvailable'),
     itemsLabel: t('mesas:receipt.itemsLabel'),
+    productsHeader: t('mesas:receipt.productsHeader'),
+    quantityHeader: t('mesas:receipt.quantityHeader'),
     printError: t('mesas:receipt.printError'),
     printerError: t('mesas:receipt.printerError'),
   };

@@ -47,6 +47,9 @@
     "tableCreated": "Mesa Creada",
     "tableUpdated": "Mesa Actualizada"
   },
+  "defaults": {
+    "generalSale": "Venta general"
+  },
   "empty": {
     "noTables": "Aún no hay mesas creadas",
     "noTablesDescription": "Crea tu primera mesa para empezar a registrar órdenes.",

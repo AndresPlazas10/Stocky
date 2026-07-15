@@ -1,8 +1,6 @@
-import * as Print from 'expo-print';
-import { buildSaleReceiptHtml } from '../utils/printTemplates';
-import { getErrorMessage } from '../utils/error';
+import i18next from 'i18next';
 import { buildSaleEscPos, type SaleReceipt } from '../services/escposService';
-import { getSavedPrinter, printBytes } from '../services/bluetoothPrinterService';
+import { getSavedPrinter, connectPrintDisconnect } from '../services/bluetoothPrinterService';
 import { getThermalPaperWidthMm, isAutoCutEnabled } from '../utils/printer';
 import type { VentaDetailRecord, VentaRecord } from '../services/ventasService';
 import { buildReceiptLabels, type ReceiptLabels } from '../utils/receiptLabels';
@@ -12,6 +10,7 @@ function buildReceiptForEscPos(opts: {
   saleDetails: VentaDetailRecord[];
   customerName?: string;
   businessName?: string;
+  timezone?: string;
   labels: ReceiptLabels;
 }): SaleReceipt {
   const { sale, saleDetails, customerName, businessName, labels } = opts;
@@ -20,17 +19,33 @@ function buildReceiptForEscPos(opts: {
   const fmtPrice = (v: number) => `$${v.toLocaleString('es-CO')}`;
   const fmtDate = (ts: string | Date) => {
     const d = new Date(ts);
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    let h = d.getHours();
-    const ampm = h >= 12 ? 'p.m.' : 'a.m.';
-    h = h % 12 || 12;
-    const mins = String(d.getMinutes()).padStart(2, '0');
-    return `${day}/${month}/${year} ${h}:${mins} ${ampm}`;
+    const tz = opts.timezone || 'America/Bogota';
+    const dateParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).formatToParts(d);
+
+    const getPart = (type: string) => dateParts.find(p => p.type === type)?.value || '';
+    const day = getPart('day');
+    const month = getPart('month');
+    const year = getPart('year');
+    const hour = getPart('hour');
+    const minute = getPart('minute');
+    const rawPeriod = getPart('dayPeriod').toLowerCase();
+    const dayPeriod = rawPeriod.includes('a') ? 'a.m.' : 'p.m.';
+    return `${day}/${month}/${year} ${hour}:${minute} ${dayPeriod}`;
   };
   const methodLabel = (m?: string | null) => {
-    const map: Record<string, string> = {
+    const key = String(m || '').trim().toLowerCase();
+    const translated = i18next.t(`common:paymentMethods.${key}`, { defaultValue: '' });
+    if (translated) return translated;
+
+    const fallback: Record<string, string> = {
       cash: 'Efectivo',
       card: 'Tarjeta',
       transfer: 'Transferencia',
@@ -50,7 +65,7 @@ function buildReceiptForEscPos(opts: {
       cashapp: 'Cash App',
       zelle: 'Zelle',
     };
-    return map[String(m || '')] || m || labels.notSpecified;
+    return fallback[key] || m || labels.notSpecified;
   };
 
   return {
@@ -95,6 +110,9 @@ function buildReceiptForEscPos(opts: {
       alignment: 'center',
     },
     itemsHeader: `${labels.productHeader}       ${labels.quantityAbbreviation}      ${labels.total}`,
+    productHeader: labels.productHeader,
+    quantityAbbreviation: labels.quantityAbbreviation,
+    total: labels.total,
     tipLabel: labels.tip,
     totalLabel: labels.total,
     methodLabel: labels.method,
@@ -108,6 +126,7 @@ export async function printSaleReceipt(
   opts?: {
     customerName?: string;
     businessName?: string;
+    timezone?: string;
     t?: (key: string, opts?: { defaultValue?: string }) => string;
   },
 ): Promise<{ ok: boolean; error?: string }> {
@@ -141,6 +160,8 @@ export async function printSaleReceipt(
           'mesas:receipt.statusOccupied': 'Ocupada',
           'mesas:receipt.statusAvailable': 'Disponible',
           'mesas:receipt.itemsLabel': 'Productos',
+          'mesas:receipt.productsHeader': 'Productos',
+          'mesas:receipt.quantityHeader': 'Cantidad',
           'mesas:receipt.printError': 'La venta no tiene items para imprimir.',
           'mesas:receipt.printerError':
             'No se pudo enviar a la impresora. Verifica la conexión Bluetooth.',
@@ -149,39 +170,28 @@ export async function printSaleReceipt(
       });
 
   const savedPrinter = await getSavedPrinter();
-  if (savedPrinter) {
-    const receipt = buildReceiptForEscPos({
-      sale: saleRecord,
-      saleDetails,
-      customerName: opts?.customerName,
-      businessName: opts?.businessName,
-      labels,
-    });
-    const paperWidthMm = await getThermalPaperWidthMm();
-    const autoCut = await isAutoCutEnabled();
-    const escposData = buildSaleEscPos(receipt, paperWidthMm, autoCut);
-    const result = await printBytes(savedPrinter.address, escposData);
-    if (result.ok) return { ok: true };
+  if (!savedPrinter) {
     return {
       ok: false,
-      error: result.error || labels.printerError,
+      error: 'No hay una impresora conectada. Ve a Configuración > Impresión para conectar una.',
     };
   }
 
-  try {
-    const printerWidthMm = await getThermalPaperWidthMm();
-    const html = buildSaleReceiptHtml({
-      sale: saleRecord,
-      saleDetails,
-      sellerName: saleRecord.seller_name,
-      printerWidthMm,
-      customerName: opts?.customerName,
-      businessName: opts?.businessName,
-      labels,
-    });
-    await Print.printAsync({ html });
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: getErrorMessage(err) };
-  }
+  const receipt = buildReceiptForEscPos({
+    sale: saleRecord,
+    saleDetails,
+    customerName: opts?.customerName,
+    businessName: opts?.businessName,
+    timezone: opts?.timezone,
+    labels,
+  });
+  const paperWidthMm = await getThermalPaperWidthMm();
+  const autoCut = await isAutoCutEnabled();
+  const escposData = buildSaleEscPos(receipt, paperWidthMm, autoCut);
+  const result = await connectPrintDisconnect(savedPrinter.address, escposData);
+  if (result.ok) return { ok: true };
+  return {
+    ok: false,
+    error: 'error' in result ? result.error : labels.printerError,
+  };
 }

@@ -6,8 +6,7 @@ import { DashboardLayout } from '../components/layout/DashboardLayout';
 import BusinessDisabledModal from '../components/BusinessDisabledModal';
 import WhatsNewModal from '../components/Modals/WhatsNewModal';
 import { AsyncStateWrapper } from '../ui/system/async-state/index';
-import { ModernToast } from '../components/ui/modern-alert.jsx';
-import { useToast } from '../hooks/useToast.js';
+import { useAppToast } from '../hooks/useAppToast';
 import { BusinessConfigProvider } from '../contexts/BusinessConfigContext';
 import {
   getAuthenticatedUser,
@@ -78,7 +77,7 @@ function Dashboard() {
   const [businessLogo, setBusinessLogo] = useState<string | null>(null);
   const [isBusinessDisabled, setIsBusinessDisabled] = useState(false);
   const warmupStatus = useWarmupStatus(business?.id);
-  const { message: toastMessage, showWarning, clear: clearToast } = useToast(1000);
+  const { showWarning, ToastComponent } = useAppToast();
 
   useEffect(() => {
     if (business?.logo_url !== undefined) {
@@ -376,12 +375,7 @@ function Dashboard() {
           </Suspense>
         </div>
       </DashboardLayout>
-      <ModernToast
-        isOpen={Boolean(toastMessage?.text)}
-        type={toastMessage?.type || 'info'}
-        message={toastMessage?.text || ''}
-        onClose={clearToast}
-      />
+      <ToastComponent />
       <PerformanceHud
         enabled={perfHudEnabled}
         activeSection={activeSection}

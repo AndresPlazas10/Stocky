@@ -5,9 +5,8 @@ import { sendInvoiceEmail } from '../../utils/emailService.js';
 import { formatPrice, formatDate } from '../../utils/formatters';
 import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 import { AnimatePresence, motion } from 'framer-motion';
-import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
-import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { XCircle, AlertTriangle, Trash2 } from 'lucide-react';
+import { useAppToast } from '../../hooks/useAppToast';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import {
   cancelInvoiceAndRestoreStock,
@@ -71,7 +70,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const { showError, showSuccess, ToastComponent } = useAppToast();
   
   // Refs
   const formRef = useRef(null);
@@ -169,21 +168,6 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
     loadData();
   }, [loadData]);
 
-  // Cleanup de mensajes
-  useEffect(() => {
-    if (success) {
-      const timer = setTimeout(() => setSuccess(''), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [success]);
-
-  useEffect(() => {
-    if (error) {
-      const timer = setTimeout(() => setError(''), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [error]);
-
   // Scroll al formulario cuando se abre (especialmente útil en móvil)
   useEffect(() => {
     if (showForm && formRef.current) {
@@ -195,12 +179,12 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
 
   const handleAddProduct = useCallback((producto) => {
     if (!producto.stock || producto.stock <= 0) {
-      setError(t('facturas:errors.noStock', { name: producto.name }));
+      showError('Error', t('facturas:errors.noStock', { name: producto.name }));
       return;
     }
 
     if (!producto.sale_price || producto.sale_price <= 0) {
-      setError(t('facturas:errors.noPrice', { name: producto.name }));
+      showError('Error', t('facturas:errors.noPrice', { name: producto.name }));
       return;
     }
 
@@ -209,7 +193,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
       
       if (existingItem) {
         if (existingItem.quantity >= producto.stock) {
-          setError(t('facturas:errors.insufficientStock', { stock: producto.stock, name: producto.name }));
+          showError('Error', t('facturas:errors.insufficientStock', { stock: producto.stock, name: producto.name }));
           return prevItems;
         }
 
@@ -273,7 +257,6 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
     if (isCreatingInvoice) return;
     
     setIsCreatingInvoice(true);
-    setError('');
     
     try {
       // Validaciones
@@ -358,8 +341,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
         successMessage = `✅ ${t('facturas:alerts.invoiceCreatedNoCustomerEmail', { number: invoiceNumber })}`;
       }
 
-      setSuccess(successMessage);
-      setTimeout(() => setSuccess(''), 8000);
+      showSuccess('Éxito', successMessage);
       setShowForm(false);
       resetForm();
       if (localOnly) {
@@ -382,8 +364,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
           navigate('/login');
         }, 2000);
       }
-      setError(error.message || t('facturas:errors.processFailed'));
-      setTimeout(() => setError(''), 8000);
+      showError('Error', error.message || t('facturas:errors.processFailed'));
     } finally {
       setIsCreatingInvoice(false);
     }
@@ -400,7 +381,6 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
 
   const handleSendToClient = async (facturaId) => {
     setLoading(true);
-    setError('');
     let shouldReloadAfterSend = true;
     
     try {
@@ -410,8 +390,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
 
       // Validar que la factura tenga email del cliente
       if (!invoice.customer_email) {
-        setError('⚠️ ' + t('facturas:errors.noCustomerEmail'));
-        setTimeout(() => setError(''), 5000);
+        showError('Error', t('facturas:errors.noCustomerEmail'));
         setLoading(false);
         return;
       }
@@ -440,18 +419,16 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
               ? { ...item, status: 'sent', sent_at: new Date().toISOString() }
               : item
           )));
-          setSuccess(`✅ ${t('facturas:alerts.invoiceSentLocal', { number: invoice.invoice_number })}`);
+          showSuccess('Éxito', t('facturas:alerts.invoiceSentLocal', { number: invoice.invoice_number }));
         } else if (emailResult.demo) {
-          setSuccess(`✅ ${t('facturas:alerts.invoiceSentDemo', { number: invoice.invoice_number })}`);
+          showSuccess('Éxito', t('facturas:alerts.invoiceSentDemo', { number: invoice.invoice_number }));
         } else {
-          setSuccess(`✅ ${t('facturas:alerts.emailSent', { number: invoice.invoice_number, email: invoice.customer_email })}`);
+          showSuccess('Éxito', t('facturas:alerts.emailSent', { number: invoice.invoice_number, email: invoice.customer_email }));
         }
       } catch (emailError) {
         // Error al enviar email
         throw new Error(t('facturas:errors.emailFailed') + ': ' + emailError.message);
       }
-      
-      setTimeout(() => setSuccess(''), 8000);
       
       // Recargar facturas
       const { businessId } = await resolveBusinessContext();
@@ -467,8 +444,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
         }, 2000);
       }
       // Error al enviar factura
-      setError(error.message || t('facturas:errors.sendFailed'));
-      setTimeout(() => setError(''), 8000);
+      showError('Error', error.message || t('facturas:errors.sendFailed'));
     } finally {
       setLoading(false);
     }
@@ -483,7 +459,6 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
     if (!invoiceToCancel) return;
 
     setLoading(true);
-    setError('');
     
     try {
       const { businessId } = await resolveBusinessContext();
@@ -496,14 +471,14 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
         invoiceItems
       });
 
-      setSuccess(
+      showSuccess(
+        'Éxito',
         localOnly
-          ? '✅ ' + t('facturas:alerts.invoiceCancelledLocal')
+          ? t('facturas:alerts.invoiceCancelledLocal')
           : restoreError
-          ? '✅ ' + t('facturas:alerts.invoiceCancelledStockWarning')
-          : '✅ ' + t('facturas:alerts.invoiceCancelled')
+          ? t('facturas:alerts.invoiceCancelledStockWarning')
+          : t('facturas:alerts.invoiceCancelled')
       );
-      setTimeout(() => setSuccess(''), 5000);
       
       // Obtener business_id del usuario actual
       if (localOnly) {
@@ -526,8 +501,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
         }, 2000);
       }
       // Error al cancelar factura
-      setError(error.message || t('facturas:errors.cancelFailed'));
-      setTimeout(() => setError(''), 8000);
+      showError('Error', error.message || t('facturas:errors.cancelFailed'));
       setShowCancelModal(false);
       setInvoiceToCancel(null);
     } finally {
@@ -545,7 +519,6 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
     if (!invoiceToDelete) return;
 
     setLoading(true);
-    setError('');
     
     try {
       const { businessId } = await resolveBusinessContext();
@@ -554,12 +527,12 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
         businessId
       });
 
-      setSuccess(
+      showSuccess(
+        'Éxito',
         deleteResult?.localOnly
-          ? '✅ ' + t('facturas:alerts.invoiceDeletedLocal')
-          : '✅ ' + t('facturas:alerts.invoiceDeleted')
+          ? t('facturas:alerts.invoiceDeletedLocal')
+          : t('facturas:alerts.invoiceDeleted')
       );
-      setTimeout(() => setSuccess(''), 4000);
 
       if (deleteResult?.localOnly) {
         setInvoices((prev) => prev.filter((item) => item.id !== invoiceToDelete));
@@ -577,8 +550,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
         }, 2000);
       }
       // Error al eliminar factura
-      setError(error.message || t('facturas:errors.deleteFailed'));
-      setTimeout(() => setError(''), 8000);
+      showError('Error', error.message || t('facturas:errors.deleteFailed'));
       setShowDeleteModal(false);
       setInvoiceToDelete(null);
     } finally {
@@ -638,23 +610,6 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
           {showForm ? '❌ ' + t('buttons.cancel') : '➕ ' + t('buttons.newInvoice')}
         </button>
       </div>
-
-      {/* Alertas mejoradas */}
-      <SaleErrorAlert 
-        isVisible={!!error}
-        onClose={() => setError('')}
-        title={t('common:status.error')}
-        message={error}
-        duration={5000}
-      />
-
-      <SaleSuccessAlert 
-        isVisible={!!success}
-        onClose={() => setSuccess('')}
-        title={'✨ ' + t('facturas:alerts.invoiceCreated')}
-        details={[{ label: t('facturas:labels.action'), value: success }]}
-        duration={5000}
-      />
 
       {showForm && (
         <div ref={formRef} className="mb-6 bg-white p-6 rounded-lg shadow-md">
@@ -1208,6 +1163,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
           </motion.div>
         )}
       </AnimatePresence>
+      <ToastComponent />
     </div>
   );
 }

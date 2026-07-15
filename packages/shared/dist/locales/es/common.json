@@ -26,6 +26,8 @@
         "viewLess": "Ver menos",
         "viewDetails": "Ver Detalles",
         "viewHistory": "Ver Historial",
+        "open": "Abrir",
+        "clear": "Limpiar",
         "signOut": "Cerrar Sesión",
         "signIn": "Iniciar Sesión",
         "signUp": "Registrarse",
@@ -808,6 +810,10 @@
         "title": "Empleados",
         "subtitle": "Gestiona empleados y accesos",
         "addEmployee": "Invitar Empleado",
+        "newEmployee": "Nuevo Empleado",
+        "createEmployee": "Crear Empleado",
+        "creatingEmployee": "Creando empleado...",
+        "formSubtitle": "Crea un acceso para tu equipo",
         "loading": "Cargando empleados...",
         "emptyState": "No hay empleados registrados.",
         "showing": "Mostrando {{count}} empleados",
@@ -816,6 +822,42 @@
         "deleteMessage": "¿Seguro que deseas eliminar a {{name}}?",
         "deleteMessageFallback": "este empleado",
         "deleteWarning": "Esta acción revoca su acceso al negocio.",
+        "cancel": "Cancelar",
+        "fields": {
+            "fullName": "Nombre Completo *",
+            "fullNamePlaceholder": "Ej: Juan Pérez",
+            "username": "Usuario *",
+            "usernamePlaceholder": "juan_perez",
+            "usernameHelper": "Solo letras minúsculas, números y guión bajo.",
+            "password": "Contraseña *",
+            "passwordPlaceholder": "Mínimo 6 caracteres",
+            "passwordHelper": "Esta será la contraseña para iniciar sesión."
+        },
+        "roleAssigned": "Rol asignado: Empleado",
+        "roles": {
+            "owner": "Propietario",
+            "admin": "Administrador",
+            "employee": "Empleado"
+        },
+        "credentials": {
+            "title": "Credenciales generadas",
+            "shareMessage": "Comparte estas credenciales con {{name}}:",
+            "shareMessageFallback": "el empleado",
+            "understood": "Entendido",
+            "username": "Usuario",
+            "password": "Contraseña"
+        },
+        "card": {
+            "employee": "EMPLEADO",
+            "username": "USUARIO",
+            "status": "ESTADO",
+            "role": "ROL",
+            "action": "ACCIÓN",
+            "active": "Activo",
+            "inactive": "Inactivo",
+            "yourUser": "Tu usuario",
+            "delete": "Eliminar"
+        },
         "buttons": {
             "creatingEmployee": "Creando empleado...",
             "loadMoreEmployees": "Cargar más empleados"
@@ -861,14 +903,54 @@
     },
     "proveedores": {
         "title": "Proveedores",
+        "subtitle": "Gestiona tu red de proveedores",
         "addSupplier": "Nuevo Proveedor",
+        "editSupplier": "Editar Proveedor",
         "loading": "Cargando proveedores...",
+        "loadingForm": "Cargando formulario...",
+        "loadingFields": "Cargando campos adicionales...",
         "emptyState": "No hay proveedores registrados.",
         "showing": "Mostrando {{count}} proveedores",
         "loadMore": "Cargar más proveedores",
         "deleteTitle": "Eliminar proveedor",
         "deleteMessage": "¿Seguro que deseas eliminar el proveedor {{name}}?",
         "deleteWarning": "Si tiene compras asociadas no se podrá eliminar...",
+        "saving": "Guardando...",
+        "update": "Actualizar",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "edit": "Editar",
+        "delete": "Eliminar",
+        "fields": {
+            "companyName": "Nombre de la Empresa *",
+            "companyNamePlaceholder": "Ej: Distribuidora ABC",
+            "contactPerson": "Persona de Contacto",
+            "contactPersonPlaceholder": "Ej: Juan Pérez",
+            "nit": "NIT",
+            "nitPlaceholder": "Ej: 900123456-7",
+            "email": "Email",
+            "emailPlaceholder": "Ej: empresa@mail.com",
+            "phone": "Teléfono",
+            "phonePlaceholder": "Ej: 300 123 4567",
+            "address": "Dirección",
+            "addressPlaceholder": "Ej: Calle 10 #5-20, Bogotá",
+            "notes": "Notas",
+            "notesPlaceholder": "Ej: Entregas los lunes y miércoles"
+        },
+        "labels": {
+            "contact": "CONTACTO",
+            "email": "EMAIL",
+            "phone": "TELÉFONO",
+            "address": "DIRECCIÓN",
+            "notes": "NOTAS"
+        },
+        "emptyValues": {
+            "noNit": "Sin NIT",
+            "noContact": "Sin contacto",
+            "noEmail": "Sin email",
+            "noPhone": "Sin teléfono",
+            "noAddress": "Sin dirección"
+        },
         "errors": {
             "cannotDeleteSupplierWithPurchases": "No se puede eliminar proveedor con compras asociadas",
             "deletingSupplier": "Error al eliminar proveedor",
@@ -910,6 +992,11 @@
         "labels": {
             "action": "Acción",
             "optional": "Opcional"
+        },
+        "profile": {
+            "owner": "Propietario",
+            "employee": "Empleado",
+            "unknown": "Desconocido"
         },
         "messages": {
             "businessNameRequired": "El nombre del negocio es obligatorio",
@@ -1413,7 +1500,13 @@
         "averageTicket": "Ticket promedio",
         "result": "Resultado",
         "ownerProfile": "Perfil: Propietario",
-        "employeeProfile": "Perfil: Empleado"
+        "employeeProfile": "Perfil: Empleado",
+        "salesVsPurchasesChart": "Comparativo Ventas vs Compras",
+        "periodTotals": "Valores totales del periodo seleccionado",
+        "paymentDistribution": "Distribución por método",
+        "noChartData": "No hay datos para graficar.",
+        "topSellersChart": "Top vendedores (gráfico)",
+        "noSellersToChart": "No hay vendedores para graficar."
     },
     "ventasSection": {
         "perUnit": "por unidad",
@@ -1492,6 +1585,8 @@
         "noSupplier": "Sin proveedor",
         "allSuppliers": "Todos los proveedores",
         "catalogLoadError": "No se pudo cargar el catalogo de compras.",
+        "stockManagementHint": "Solo se muestran productos con control de stock habilitado.",
+        "selectSupplierError": "Selecciona un proveedor.",
         "selectSupplierError": "Selecciona un proveedor.",
         "addProductError": "Agrega al menos un producto a la compra.",
         "noStockControlError": "Hay productos sin control de stock en el carrito. Retiralos para continuar.",
@@ -1499,5 +1594,8 @@
         "zeroTotalError": "El total de la compra debe ser mayor a 0.",
         "createPurchaseError": "Error al registrar compra.",
         "deletePurchaseError": "Error al eliminar compra."
+    },
+    "print": {
+        "printing": "Imprimiendo..."
     }
 }

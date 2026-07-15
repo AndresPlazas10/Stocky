@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { InteractionManager } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 import { StockyModal } from '../../../ui/StockyModal';
 import type { ProveedorRecord } from '../../../services/proveedoresService';
@@ -34,6 +35,7 @@ export function SupplierFormModal({
   formDetailsReady,
   setFormDetailsReady,
 }: SupplierFormModalProps) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!visible) {
       setFormDetailsReady(false);
@@ -63,7 +65,7 @@ export function SupplierFormModal({
       deferFallback={
         <View style={styles.formDeferredFallback}>
           <ActivityIndicator color={STOCKY_COLORS.primary900} />
-          <Text style={styles.formDeferredFallbackText}>Cargando formulario...</Text>
+          <Text style={styles.formDeferredFallbackText}>{t('proveedores.loadingForm')}</Text>
         </View>
       }
       bodyFlex
@@ -83,7 +85,7 @@ export function SupplierFormModal({
             <Ionicons name={editingSupplier ? 'create-outline' : 'add'} size={30} color="#D1D5DB" />
           </LinearGradient>
           <Text style={styles.supplierFormHeaderTitle}>
-            {editingSupplier ? 'Editar Proveedor' : 'Nuevo Proveedor'}
+            {editingSupplier ? t('proveedores.editSupplier') : t('proveedores.addSupplier')}
           </Text>
           <Pressable
             style={[styles.supplierFormHeaderClose, saving && styles.buttonDisabled]}
@@ -102,7 +104,7 @@ export function SupplierFormModal({
             onPress={onClose}
             disabled={saving}
           >
-            <Text style={styles.supplierFormCancelText}>Cancelar</Text>
+            <Text style={styles.supplierFormCancelText}>{t('proveedores.cancel')}</Text>
           </Pressable>
           <Pressable
             style={[styles.supplierFormSaveButton, saving && styles.buttonDisabled]}
@@ -111,7 +113,7 @@ export function SupplierFormModal({
           >
             {saving ? <ActivityIndicator size="small" color="#F5F3FF" /> : null}
             <Text style={styles.supplierFormSaveText}>
-              {saving ? 'Guardando...' : editingSupplier ? 'Actualizar' : 'Guardar'}
+              {saving ? t('proveedores.saving') : editingSupplier ? t('proveedores.update') : t('proveedores.save')}
             </Text>
           </Pressable>
         </View>
@@ -125,11 +127,11 @@ export function SupplierFormModal({
           </View>
         ) : null}
         <View style={styles.fieldGroup}>
-          <Text style={styles.inputLabel}>Nombre de la Empresa *</Text>
+          <Text style={styles.inputLabel}>{t('proveedores.fields.companyName')}</Text>
           <TextInput
             value={form.business_name}
             onChangeText={(next) => onFormChange({ business_name: next })}
-            placeholder="Ej: Distribuidora ABC"
+            placeholder={t('proveedores.fields.companyNamePlaceholder')}
             placeholderTextColor={STOCKY_COLORS.textMuted}
             style={styles.input}
           />
@@ -139,22 +141,22 @@ export function SupplierFormModal({
           <>
             <View style={styles.formRow}>
               <View style={[styles.fieldGroup, styles.formCol]}>
-                <Text style={styles.inputLabel}>Persona de Contacto</Text>
+                <Text style={styles.inputLabel}>{t('proveedores.fields.contactPerson')}</Text>
                 <TextInput
                   value={form.contact_name}
                   onChangeText={(next) => onFormChange({ contact_name: next })}
-                  placeholder="Ej: Juan Pérez"
+                  placeholder={t('proveedores.fields.contactPersonPlaceholder')}
                   placeholderTextColor={STOCKY_COLORS.textMuted}
                   style={styles.input}
                 />
               </View>
 
               <View style={[styles.fieldGroup, styles.formCol]}>
-                <Text style={styles.inputLabel}>NIT</Text>
+                <Text style={styles.inputLabel}>{t('proveedores.fields.nit')}</Text>
                 <TextInput
                   value={form.nit}
                   onChangeText={(next) => onFormChange({ nit: next })}
-                  placeholder="Ej: 900123456-7"
+                  placeholder={t('proveedores.fields.nitPlaceholder')}
                   placeholderTextColor={STOCKY_COLORS.textMuted}
                   style={styles.input}
                   autoCapitalize="none"
@@ -165,11 +167,11 @@ export function SupplierFormModal({
 
             <View style={styles.formRow}>
               <View style={[styles.fieldGroup, styles.formCol]}>
-                <Text style={styles.inputLabel}>Email</Text>
+                <Text style={styles.inputLabel}>{t('proveedores.fields.email')}</Text>
                 <TextInput
                   value={form.email}
                   onChangeText={(next) => onFormChange({ email: next })}
-                  placeholder="Ej: empresa@mail.com"
+                  placeholder={t('proveedores.fields.emailPlaceholder')}
                   placeholderTextColor={STOCKY_COLORS.textMuted}
                   style={styles.input}
                   autoCapitalize="none"
@@ -179,11 +181,11 @@ export function SupplierFormModal({
               </View>
 
               <View style={[styles.fieldGroup, styles.formCol]}>
-                <Text style={styles.inputLabel}>Teléfono</Text>
+                <Text style={styles.inputLabel}>{t('proveedores.fields.phone')}</Text>
                 <TextInput
                   value={form.phone}
                   onChangeText={(next) => onFormChange({ phone: next })}
-                  placeholder="Ej: 300 123 4567"
+                  placeholder={t('proveedores.fields.phonePlaceholder')}
                   placeholderTextColor={STOCKY_COLORS.textMuted}
                   style={styles.input}
                   keyboardType="phone-pad"
@@ -193,22 +195,22 @@ export function SupplierFormModal({
 
             <View style={styles.formRow}>
               <View style={[styles.fieldGroup, styles.formCol]}>
-                <Text style={styles.inputLabel}>Dirección</Text>
+                <Text style={styles.inputLabel}>{t('proveedores.fields.address')}</Text>
                 <TextInput
                   value={form.address}
                   onChangeText={(next) => onFormChange({ address: next })}
-                  placeholder="Ej: Calle 10 #5-20, Bogotá"
+                  placeholder={t('proveedores.fields.addressPlaceholder')}
                   placeholderTextColor={STOCKY_COLORS.textMuted}
                   style={styles.input}
                 />
               </View>
 
               <View style={[styles.fieldGroup, styles.formCol]}>
-                <Text style={styles.inputLabel}>Notas</Text>
+                <Text style={styles.inputLabel}>{t('proveedores.fields.notes')}</Text>
                 <TextInput
                   value={form.notes}
                   onChangeText={(next) => onFormChange({ notes: next })}
-                  placeholder="Ej: Entregas los lunes y miércoles"
+                  placeholder={t('proveedores.fields.notesPlaceholder')}
                   placeholderTextColor={STOCKY_COLORS.textMuted}
                   style={[styles.input, styles.textArea]}
                   multiline
@@ -219,7 +221,7 @@ export function SupplierFormModal({
         ) : (
           <View style={styles.formSectionLoader}>
             <ActivityIndicator color={STOCKY_COLORS.primary900} />
-            <Text style={styles.formSectionLoaderText}>Cargando campos adicionales...</Text>
+            <Text style={styles.formSectionLoaderText}>{t('proveedores.loadingFields')}</Text>
           </View>
         )}
       </View>

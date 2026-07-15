@@ -144,12 +144,6 @@ export const OrderModal = React.memo(function OrderModal({
           </LinearGradient>
           <View style={styles.orderModalHeaderTitleBlock}>
             <Text style={styles.orderModalHeaderTitle}>{orderModalTitle}</Text>
-            {hasPendingChanges && !isSavingOrder && (
-              <View style={styles.autoSaveBadge}>
-                <ActivityIndicator size="small" color="#6366F1" />
-                <Text style={styles.autoSaveBadgeText}>{t('print.saving')}</Text>
-              </View>
-            )}
           </View>
         </View>
       }
@@ -172,7 +166,14 @@ export const OrderModal = React.memo(function OrderModal({
             }}
             disabled={releasingEmptyOrder || isSavingOrder}
           >
-            <Ionicons name="save-outline" size={20} color="#111827" />
+            {releasingEmptyOrder || isSavingOrder ? (
+              <ActivityIndicator size="small" color="#111827" />
+            ) : (
+              <View style={styles.saveButtonIconContainer}>
+                <Ionicons name="save-outline" size={20} color="#111827" />
+                {hasPendingChanges && <View style={styles.pendingChangesDot} />}
+              </View>
+            )}
             <Text style={styles.orderActionButtonText}>
               {releasingEmptyOrder || isSavingOrder ? t('print.saving') : t('buttons.saveOrder')}
             </Text>
@@ -415,5 +416,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '500',
     textAlign: 'center',
+  },
+  saveButtonIconContainer: {
+    position: 'relative',
+    width: 20,
+    height: 20,
+  },
+  pendingChangesDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#6366F1',
   },
 });

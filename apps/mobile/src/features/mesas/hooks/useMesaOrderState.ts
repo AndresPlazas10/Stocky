@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useDeferredValue, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
 import {
@@ -13,6 +13,7 @@ import {
 } from '../../../services/mesaOrderService';
 import { mesaDisplayName, type MesaRecord } from '../../../services/mesasService';
 import type { PaymentMethod } from '../../../services/mesaCheckoutService';
+import { onCatalogInvalidated } from '../../../utils/catalogEvents';
 
 const CATALOG_STORAGE_PREFIX = 'stocky:mesa-catalog:';
 const CATALOG_LOCAL_TTL_MS = 180_000;
@@ -84,6 +85,13 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
   const orderModalOpenIntentRef = useRef(false);
   const pendingQuantityUpdatesRef = useRef(new Map<string, PendingQuantityUpdate>());
   const quantitySyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onCatalogInvalidated(() => {
+      catalogUpdatedAtRef.current = 0;
+    });
+    return unsubscribe;
+  }, []);
 
   const ensureCatalogLoaded = useCallback(
     async (businessId: string, options?: { forceRefresh?: boolean }) => {

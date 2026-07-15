@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { formatPrice } from '../../utils/formatters';
 import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 import { getReportsSnapshot } from '../../data/queries/reportsQueries';
+import { useAppToast } from '../../hooks/useAppToast';
 import {
   TrendingUp,
   TrendingDown,
@@ -36,6 +36,7 @@ function Reports({ businessId }: DashboardModuleProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('month');
+  const { showError, ToastComponent } = useAppToast();
   
   const [metrics, setMetrics] = useState({
     totalSales: 0,
@@ -253,7 +254,8 @@ function Reports({ businessId }: DashboardModuleProps) {
         if (Array.isArray(cached?.topProducts)) setTopProducts(cached.topProducts as Array<{ name: string; quantity: number }>);
         if (Array.isArray(cached?.salesByMethod)) setSalesByMethod(cached.salesByMethod as Array<{ method: string; total: number }>);
       } else {
-        setError('❌ ' + t('reports:errors.loadFailed'));
+        setError(t('reports:errors.loadFailed'));
+        showError(t('reports:errors.loadFailed'));
       }
     } finally {
       setLoading(false);
@@ -348,21 +350,6 @@ function Reports({ businessId }: DashboardModuleProps) {
             </div>
           </div>
         </motion.div>
-
-        {/* Alertas */}
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex items-center gap-3"
-            >
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              <span className="text-red-700">{error}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <AsyncStateWrapper
           loading={loading}
@@ -662,6 +649,7 @@ function Reports({ businessId }: DashboardModuleProps) {
           </div>
         </AsyncStateWrapper>
       </div>
+      <ToastComponent />
     </div>
   );
 }

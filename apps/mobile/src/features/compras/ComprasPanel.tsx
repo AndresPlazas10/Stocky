@@ -11,6 +11,7 @@ import { DayFilterCalendarModal } from '../../ui/DayFilterCalendarModal';
 import { RecordFilterCard } from '../../ui/RecordFilterCard';
 import { formatCop } from '../../utils/money';
 import { getErrorMessage } from '../../utils/error';
+import { useBusinessConfig } from '../../contexts/BusinessConfigContext';
 import {
   listRecentCompras,
   listCompraDetails,
@@ -192,6 +193,7 @@ type Props = {
 
 export function ComprasPanel({ businessId, businessName, userId, source }: Props) {
   const { t } = useTranslation();
+  const { timezone } = useBusinessConfig();
   const toast = useToastContext();
   const toastMessages = useToastMessages();
   const [loading, setLoading] = useState(true);
@@ -252,7 +254,7 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
     selectedSupplierLabel,
     openDayFilterCalendar,
     clearFilters,
-  } = useCompraFilters(purchases, supplierNameById);
+  } = useCompraFilters(purchases, supplierNameById, timezone);
 
   const {
     selectedPurchase,

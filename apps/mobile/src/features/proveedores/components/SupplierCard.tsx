@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 import type { ProveedorRecord } from '../../../services/proveedoresService';
 import { proveedoresStyles as styles } from '../proveedoresStyles';
 
@@ -17,6 +18,7 @@ export const SupplierCard = memo(function SupplierCard({
   onEdit,
   onDelete,
 }: SupplierCardProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.supplierCard}>
       <View style={styles.supplierHeader}>
@@ -31,7 +33,7 @@ export const SupplierCard = memo(function SupplierCard({
       <View style={styles.supplierTagRow}>
         <View style={styles.supplierNitTag}>
           <Ionicons name="document-text-outline" size={13} color="#111827" />
-          <Text style={styles.supplierNitTagText}>NIT: {supplier.nit || 'Sin NIT'}</Text>
+          <Text style={styles.supplierNitTagText}>NIT: {supplier.nit || t('proveedores.emptyValues.noNit')}</Text>
         </View>
       </View>
 
@@ -41,46 +43,46 @@ export const SupplierCard = memo(function SupplierCard({
         <View style={styles.supplierInfoCell}>
           <View style={styles.infoTitleRow}>
             <Ionicons name="person-outline" size={16} color="#111827" />
-            <Text style={styles.infoLabel}>CONTACTO</Text>
+            <Text style={styles.infoLabel}>{t('proveedores.labels.contact')}</Text>
           </View>
           <Text style={styles.infoValue} numberOfLines={2}>
-            {supplier.contact_name || 'Sin contacto'}
+            {supplier.contact_name || t('proveedores.emptyValues.noContact')}
           </Text>
         </View>
 
         <View style={styles.supplierInfoCell}>
           <View style={styles.infoTitleRow}>
             <Ionicons name="mail-outline" size={16} color="#111827" />
-            <Text style={styles.infoLabel}>EMAIL</Text>
+            <Text style={styles.infoLabel}>{t('proveedores.labels.email')}</Text>
           </View>
           <Text style={styles.infoLink} numberOfLines={2}>
-            {supplier.email || 'Sin email'}
+            {supplier.email || t('proveedores.emptyValues.noEmail')}
           </Text>
         </View>
 
         <View style={styles.supplierInfoCell}>
           <View style={styles.infoTitleRow}>
             <Ionicons name="call-outline" size={16} color="#111827" />
-            <Text style={styles.infoLabel}>TELÉFONO</Text>
+            <Text style={styles.infoLabel}>{t('proveedores.labels.phone')}</Text>
           </View>
           <Text style={styles.infoValue} numberOfLines={2}>
-            {supplier.phone || 'Sin teléfono'}
+            {supplier.phone || t('proveedores.emptyValues.noPhone')}
           </Text>
         </View>
 
         <View style={styles.supplierInfoCell}>
           <View style={styles.infoTitleRow}>
             <Ionicons name="location-outline" size={16} color="#111827" />
-            <Text style={styles.infoLabel}>DIRECCIÓN</Text>
+            <Text style={styles.infoLabel}>{t('proveedores.labels.address')}</Text>
           </View>
           <Text style={styles.infoValue} numberOfLines={2}>
-            {supplier.address || 'Sin dirección'}
+            {supplier.address || t('proveedores.emptyValues.noAddress')}
           </Text>
         </View>
 
         {supplier.notes ? (
           <View style={[styles.supplierInfoCell, styles.supplierInfoCellFull]}>
-            <Text style={styles.notesLabel}>NOTAS</Text>
+            <Text style={styles.notesLabel}>{t('proveedores.labels.notes')}</Text>
             <Text style={styles.notesText}>{supplier.notes}</Text>
           </View>
         ) : null}
@@ -95,14 +97,14 @@ export const SupplierCard = memo(function SupplierCard({
               onPress={() => onEdit(supplier)}
             >
               <Ionicons name="create-outline" size={18} color="#DDE6FF" />
-              <Text style={styles.supplierEditButtonText}>Editar</Text>
+              <Text style={styles.supplierEditButtonText}>{t('proveedores.edit')}</Text>
             </Pressable>
             <Pressable
               style={[styles.supplierDeleteButton, styles.supplierActionHalf]}
               onPress={() => onDelete(supplier)}
             >
               <Ionicons name="trash-outline" size={18} color="#FFE4E6" />
-              <Text style={styles.supplierDeleteButtonText}>Eliminar</Text>
+              <Text style={styles.supplierDeleteButtonText}>{t('proveedores.delete')}</Text>
             </Pressable>
           </View>
         </>

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { formatDateTime } from '../../../utils/dateHelpers';
+import { useBusinessConfig } from '../../../contexts/BusinessConfigContext';
 import { getBankLogoSource, isBankPaymentMethod } from '../../../utils/paymentMethodBranding';
 import { getPaymentMethodLabel, getPaymentMethodTheme } from '../../../utils/paymentMethods';
 import type { CompraRecord } from '../../../services/comprasService';
@@ -25,11 +26,12 @@ export const PurchaseCard = memo(function PurchaseCard({
   onDelete,
 }: PurchaseCardProps) {
   const { t } = useTranslation();
+  const { timezone } = useBusinessConfig();
   return (
     <View style={s.saleCard}>
       <View style={s.saleDateRow}>
         <Ionicons name="calendar-outline" size={26} color="#111827" />
-        <Text style={s.saleDateText}>{formatDateTime(purchase.created_at)}</Text>
+        <Text style={s.saleDateText}>{formatDateTime(purchase.created_at, { timezone })}</Text>
       </View>
 
       <View style={s.saleInfoGrid}>

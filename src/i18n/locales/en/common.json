@@ -396,6 +396,8 @@
     "signIn": "Sign In",
     "enterCredentials": "Enter your username and password to continue in Stocky",
     "loginError": "Login error",
+    "invalidCredentials": "Invalid username or password",
+    "sessionExpired": "Inactivity detected. For your security, please sign in again.",
     "username": "Username",
     "usernamePlaceholder": "Your username",
     "password": "Password",
@@ -772,6 +774,37 @@
   "inventarioSection": {
     "errors": {
       "general": "Error"
+    }
+  },
+  "businessService": {
+    "success": {
+      "businessLoaded": "Business information loaded successfully",
+      "businessesLoaded": "Businesses loaded successfully"
+    },
+    "errors": {
+      "loadBusinessFailed": "Error loading business information",
+      "loadBusinessesFailed": "Error loading businesses",
+      "userNotAuthenticated": "User not authenticated"
+    }
+  },
+  "combosService": {
+    "errors": {
+      "loadFailed": "Could not load combos",
+      "createFailed": "Could not create combo",
+      "updateFailed": "Could not update combo",
+      "deleteFailed": "Could not delete combo",
+      "deleteWithMovements": "Cannot delete combo because it has associated movements. You can deactivate it.",
+      "itemsSaveFailed": "Could not save combo products",
+      "itemsUpdateFailed": "Could not update combo products",
+      "comboNotFound": "Combo does not exist or you don't have permissions to delete it",
+      "nameRequired": "Combo name is required",
+      "priceMustBePositive": "Sale price must be greater than 0",
+      "quantityMustBePositive": "Quantity must be greater than 0",
+      "atLeastOneProduct": "You must add at least one product to the combo",
+      "productRequired": "Select a product in row {{row}}",
+      "duplicateProducts": "Duplicate products are not allowed in the combo",
+      "businessIdRequired": "businessId is required",
+      "comboIdRequired": "comboId is required"
     }
   },
   "syncIncidents": {

@@ -133,6 +133,8 @@
     "statusAvailable": "Disponible",
     "invalidDate": "Fecha inválida",
     "itemsLabel": "Productos",
+    "productsHeader": "Productos",
+    "quantityHeader": "Cantidad",
     "printError": "La venta no tiene items para imprimir.",
     "printerError": "No se pudo enviar a la impresora. Verifica la conexión Bluetooth."
   },
@@ -147,6 +149,22 @@
     "notFound": "No se encontró un negocio asociado a esta cuenta.",
     "noSession": "No hay token de sesión activo para ejecutar la acción.",
     "orderNotFound": "La mesa se abrió, pero no se encontró una orden activa.",
-    "updateFailed": "No se pudo actualizar la mesa."
+    "updateFailed": "No se pudo actualizar la mesa.",
+    "tableIdentifierRequired": "Ingresa un identificador de mesa válido.",
+    "tableAlreadyExists": "Ese identificador de mesa ya existe.",
+    "tableMustBeNumeric": "En esta base de datos el identificador de mesa debe ser numérico."
+  },
+  "toast": {
+    "noKitchenItems": {
+      "title": "Sin productos de cocina",
+      "message": "No hay productos de la categoría 'Platos' para imprimir"
+    },
+    "noPrinter": {
+      "title": "Sin impresora",
+      "message": "No hay una impresora conectada. Ve a Configuración > Impresión para conectar una."
+    },
+    "printError": {
+      "title": "Error de impresión"
+    }
   }
 }

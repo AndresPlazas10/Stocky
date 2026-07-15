@@ -2,9 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { logger } from '@/utils/logger';
-import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
-import { SaleErrorAlert } from '../ui/SaleErrorAlert';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
+import { useAppToast } from '../../hooks/useAppToast';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
 import {
   getBusinessUsernameById,
@@ -43,7 +42,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const { showError, showSuccess, ToastComponent } = useAppToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [generatedCode, setGeneratedCode] = useState<{ username: string; password: string; fullName: string } | null>(null);
@@ -168,7 +167,6 @@ function Empleados({ businessId }: DashboardModuleProps) {
     
     setIsSubmitting(true);
     setError(null);
-    setSuccess(null);
     
     try {
       if (!businessId) {
@@ -257,11 +255,11 @@ function Empleados({ businessId }: DashboardModuleProps) {
       setShowCodeModal(true);
       setFormData(INITIAL_EMPLOYEE_FORM);
       setShowForm(false);
-      setSuccess(t('success.employeeCreated'));
+      showSuccess('Éxito', t('success.employeeCreated'));
       loadEmployees().catch((err) => { logger.warn('empleados:create_reload failed', err); });
       
     } catch (err) {
-      setError((err as Error).message || t('errors.creatingEmployee'));
+      showError('Error', (err as Error).message || t('errors.creatingEmployee'));
     } finally {
       setIsSubmitting(false);
     }
@@ -281,13 +279,13 @@ function Empleados({ businessId }: DashboardModuleProps) {
         businessId
       });
 
-      setSuccess(t('success.employeeDeleted'));
+      showSuccess('Éxito', t('success.employeeDeleted'));
       setEmployees((prev) => prev.filter((employee) => employee.id !== employeeToDelete.id));
       loadEmployees().catch((err) => { logger.warn('empleados:confirm_delete_reload failed', err); });
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
     } catch {
-      setError(t('errors.deletingEmployee'));
+      showError('Error', t('errors.deletingEmployee'));
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
     }
@@ -323,24 +321,6 @@ function Empleados({ businessId }: DashboardModuleProps) {
     active: employees.filter(e => e.is_active).length,
     inactive: employees.filter(e => !e.is_active).length
   }), [employees]);
-
-  const successTitle = useMemo(() => {
-    if (!success) return t('success.operationSuccess');
-    const normalized = success.toLowerCase();
-    if (normalized.includes('eliminad')) return t('success.employeeDeleted');
-    if (normalized.includes('cread')) return t('success.employeeRegistered');
-    return t('success.operationSuccess');
-  }, [success, t]);
-
-  useEffect(() => {
-    let errorTimer: ReturnType<typeof setTimeout>, successTimer: ReturnType<typeof setTimeout>;
-    if (error) errorTimer = setTimeout(() => setError(null), 5000);
-    if (success) successTimer = setTimeout(() => setSuccess(null), 5000);
-    return () => {
-      if (errorTimer) clearTimeout(errorTimer);
-      if (successTimer) clearTimeout(successTimer);
-    };
-  }, [error, success]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#C4DFE6]/10 p-4 md:p-6">
@@ -409,30 +389,13 @@ function Empleados({ businessId }: DashboardModuleProps) {
           </motion.div>
         </div>
 
-        {/* Alertas mejoradas */}
-        <SaleErrorAlert 
-          isVisible={!!error}
-          onClose={() => setError(null)}
-          title="Error"
-          message={error}
-          duration={5000}
-        />
-
-        <SaleSuccessAlert 
-          isVisible={!!success}
-          onClose={() => setSuccess(null)}
-          title={successTitle}
-          details={[]}
-          duration={5000}
-        />
-
         {/* Buscador */}
         <div className="bg-white rounded-xl shadow p-4 border border-gray-100">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder={t('placeholders.searchByNameUserOrCode')}
+              placeholder={t('empleados.placeholders.searchByNameUserOrCode')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
@@ -533,7 +496,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
             </div>
             <div className="border-t border-gray-100 px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-gray-500">
-                {t('labels.showing')} {filteredEmployees.length} {t('labels.of')} {employees.length} {t('labels.employees')}
+                {t('empleados.labels.showing')} {filteredEmployees.length} {t('empleados.labels.of')} {employees.length} {t('empleados.labels.employees')}
               </p>
               <button
                 type="button"
@@ -547,7 +510,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
                     {t('buttons.loading')}
                   </>
                 ) : (
-                  <>{t('buttons.loadMoreEmployees')}</>
+                  <>{t('empleados.buttons.loadMoreEmployees')}</>
                 )}
               </button>
             </div>
@@ -803,6 +766,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
           </motion.div>
         )}
       </AnimatePresence>
+      <ToastComponent />
     </div>
   );
 }

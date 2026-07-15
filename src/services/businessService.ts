@@ -1,5 +1,6 @@
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { BUSINESS_COLUMNS } from '../utils/businessColumns';
+import i18n from '../i18n';
 
 interface BusinessRow {
   id: string;
@@ -25,7 +26,7 @@ export async function getCurrentBusiness(): Promise<ServiceResult<BusinessRow>> 
     const { data: { user }, error: userError } = await supabaseAdapter.getCurrentUser();
     
     if (userError) throw userError;
-    if (!user) throw new Error('❌ Usuario no autenticado');
+    if (!user) throw new Error(i18n.t('businessService.errors.userNotAuthenticated'));
 
     const { data: business, error: businessError } = await supabaseAdapter.getBusinessByEmail(
       user.email!,
@@ -37,11 +38,11 @@ export async function getCurrentBusiness(): Promise<ServiceResult<BusinessRow>> 
     return {
       success: true,
       data: business as unknown as BusinessRow,
-      message: 'Información del negocio obtenida exitosamente'
+      message: i18n.t('businessService.success.businessLoaded')
     };
 
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error al obtener la información del negocio';
+    const message = error instanceof Error ? error.message : i18n.t('businessService.errors.loadBusinessFailed');
     return {
       success: false,
       data: null,
@@ -55,7 +56,7 @@ export async function getAllBusinesses(): Promise<ServiceResult<BusinessRow[]>> 
     const { data: { user }, error: userError } = await supabaseAdapter.getCurrentUser();
     
     if (userError) throw userError;
-    if (!user) throw new Error('❌ Usuario no autenticado');
+    if (!user) throw new Error(i18n.t('businessService.errors.userNotAuthenticated'));
 
     const { data: businesses, error: businessError } = await supabaseAdapter.getBusinessesByOwnerId(
       user.id,
@@ -67,11 +68,11 @@ export async function getAllBusinesses(): Promise<ServiceResult<BusinessRow[]>> 
     return {
       success: true,
       data: (businesses as unknown as BusinessRow[]) ?? null,
-      message: 'Negocios obtenidos exitosamente'
+      message: i18n.t('businessService.success.businessesLoaded')
     };
 
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error al obtener los negocios';
+    const message = error instanceof Error ? error.message : i18n.t('businessService.errors.loadBusinessesFailed');
     return {
       success: false,
       data: null,

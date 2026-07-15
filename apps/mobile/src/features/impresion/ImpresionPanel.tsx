@@ -21,12 +21,10 @@ import {
   type PrinterConfig,
   cancelDiscovery,
   clearPrinter,
+  connectPrintDisconnect,
   connectToPrinter,
-  disconnectFromPrinter,
   getPairedDevices,
   getSavedPrinter,
-  isPrinterConnected,
-  printBytes,
   savePrinter,
   startDiscovery,
 } from '../../services/bluetoothPrinterService';
@@ -71,7 +69,6 @@ export function ImpresionPanel({ businessName }: Props) {
   const [devices, setDevices] = useState<BluetoothDevice[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [connected, setConnected] = useState(false);
   const [paperWidthMm, setPaperWidthMm] = useState(80);
   const [autoCut, setAutoCut] = useState(false);
   const [isPrintingTest, setIsPrintingTest] = useState(false);
@@ -88,14 +85,6 @@ export function ImpresionPanel({ businessName }: Props) {
       setPaperWidthMm(pw);
       const ac = await isAutoCutEnabled();
       setAutoCut(ac);
-      if (saved) {
-        let ok = await isPrinterConnected(saved.address);
-        if (!ok) {
-          if (__DEV__) console.warn('[Impresion] Printer not connected, attempting reconnect...');
-          ok = await connectToPrinter(saved.address);
-        }
-        setConnected(ok);
-      }
     })();
     return () => {
       cancelDiscovery().catch(() => {});
@@ -138,21 +127,11 @@ export function ImpresionPanel({ businessName }: Props) {
     setStatusMsg('');
     setIsConnecting(true);
     try {
-      const ok = await connectToPrinter(device.address);
-      if (ok) {
-        const config: PrinterConfig = { address: device.address, name: device.name };
-        await savePrinter(config);
-        setSavedPrinter(config);
-        setConnected(true);
-        toast.showSuccess(toastMessages.impresion.connectionSuccess());
-        setStatusMsg('');
-      } else {
-        toast.showError({
-          title: t('impresion.connectionError'),
-          message: t('impresion.connectionErrorMessage'),
-        });
-        setStatusMsg('');
-      }
+      const config: PrinterConfig = { address: device.address, name: device.name };
+      await savePrinter(config);
+      setSavedPrinter(config);
+      toast.showSuccess(toastMessages.impresion.connectionSuccess());
+      setStatusMsg('');
     } catch {
       toast.showError(toastMessages.impresion.connectionError());
     } finally {
@@ -161,14 +140,10 @@ export function ImpresionPanel({ businessName }: Props) {
   }, []);
 
   const handleDisconnect = useCallback(async () => {
-    if (savedPrinter) {
-      await disconnectFromPrinter(savedPrinter.address);
-    }
     await clearPrinter();
     setSavedPrinter(null);
-    setConnected(false);
     setStatusMsg(t('impresion.disconnected'));
-  }, [savedPrinter]);
+  }, []);
 
   const handlePaperChange = useCallback(async (mm: number) => {
     setPaperWidthMm(mm);
@@ -222,7 +197,7 @@ export function ImpresionPanel({ businessName }: Props) {
         footer: { message: t('impresion.bluetoothSuccess'), alignment: 'center' as const },
       };
       const escposData = buildSaleEscPos(receipt, paperWidthMm, autoCut);
-      const result = await printBytes(savedPrinter.address, escposData);
+      const result = await connectPrintDisconnect(savedPrinter.address, escposData);
       if (result.ok) {
         toast.showSuccess(toastMessages.impresion.testSent());
         setStatusMsg('');
@@ -296,9 +271,9 @@ export function ImpresionPanel({ businessName }: Props) {
           <View style={styles.printerInfo}>
             <View style={styles.printerRow}>
               <Ionicons
-                name={connected ? 'checkmark-circle' : 'close-circle'}
+                name="checkmark-circle"
                 size={20}
-                color={connected ? STOCKY_COLORS.successText : STOCKY_COLORS.errorText}
+                color={STOCKY_COLORS.successText}
               />
               <View style={styles.printerTextCol}>
                 <Text style={styles.printerName}>{savedPrinter.name}</Text>

@@ -7,6 +7,7 @@ import type { SplitBillOrderItem, OrderItem } from '../../types/components';
 import { calcularCambio } from '../../utils/cambio';
 import { Button } from '../ui/button';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
+import { useAppToast } from '../../hooks/useAppToast';
 import { getTotalProductUnits, getOrderItemRenderKey, getOrderItemName } from './mesas/mesaHelpers';
 import MesasGrid from './mesas/MesasGrid';
 import { useMesaEditLocks } from './mesas/useMesaEditLocks.js';
@@ -23,16 +24,17 @@ import { useCloseOrderLocks } from '../../hooks/useCloseOrderLocks.js';
 import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 import { MesasHeader } from './mesas/MesasHeader.jsx';
 import { AddMesaForm } from './mesas/AddMesaForm.jsx';
-import { MesasAlerts } from './mesas/MesasAlerts.jsx';
 import { OrderDetailsModal } from './mesas/OrderDetailsModal.jsx';
 import { CloseOrderChoiceModal } from './mesas/CloseOrderChoiceModal.jsx';
 import SplitBillModal from './SplitBillModal.jsx';
 import { MesaPaymentModal } from './MesaPaymentModal.jsx';
 import { MesaDeleteModal } from './MesaDeleteModal.jsx';
+import { PrintReceiptConfirmModal } from '../ui/PrintReceiptConfirmModal';
 
 function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRole?: string }) {
   const { t } = useTranslation(['mesas', 'common']);
   const config = useBusinessConfig();
+  const { showError, showSuccess, ToastComponent } = useAppToast();
   const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
   
   const state = useMesasState(businessId, userRole);
@@ -47,7 +49,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     businessId,
     setProducts: state.setProducts,
     setCombos: state.setCombos,
-    setError: state.setError,
+    showError,
   });
 
   const { acquireCloseOrderLock, releaseCloseOrderLock } = useCloseOrderLocks();
@@ -61,6 +63,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     applyRealtimeMesaLockRow,
     applyRealtimeMesaLockBroadcast,
     refreshMesaEditLockHeartbeatWeb,
+    selectMesaEditLockByTableId,
   } = useMesaEditLocks({
     businessId,
     currentUser: state.currentUser,
@@ -131,6 +134,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     waitForPendingOrderItemOps: refs.waitForPendingOrderItemOps,
     enqueueOrderItemWrite: refs.enqueueOrderItemWrite,
     acquireMesaEditLockWeb,
+    selectMesaEditLockByTableId,
     _releaseMesaEditLockWeb: releaseMesaEditLockWeb,
     _sendMesaSyncBroadcast: refs.sendMesaSyncBroadcast,
     publishMesaLockBroadcast: refs.publishMesaLockBroadcast,
@@ -138,11 +142,6 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     isOfflineFirstRuntime: refs.isOfflineFirstRuntime,
     setMesaOpenDebugStage: refs.setMesaOpenDebugStage,
     buildMesaOpenDebugTag: refs.buildMesaOpenDebugTag,
-    setError: state.setError,
-    setSuccess: state.setSuccess,
-    setSuccessTitle: state.setSuccessTitle,
-    setSuccessDetails: state.setSuccessDetails,
-    setAlertType: state.setAlertType,
     isCreatingTable: state.isCreatingTable,
     setIsCreatingTable: state.setIsCreatingTable,
     newTableNumber: state.newTableNumber,
@@ -166,6 +165,8 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     showAddForm: state.showAddForm,
     setShowAddForm: state.setShowAddForm,
     isOpeningTableRef,
+    showError,
+    showSuccess,
   });
 
   useMesaRealtime({
@@ -254,11 +255,6 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     waitForPendingOrderItemOps: refs.waitForPendingOrderItemOps,
     persistPendingQuantityUpdates: handleRefreshOrder,
     releaseEmptyOrderAndCloseModal,
-    setSuccess: state.setSuccess,
-    setSuccessTitle: state.setSuccessTitle,
-    setSuccessDetails: state.setSuccessDetails,
-    setAlertType: state.setAlertType,
-    setError: state.setError,
     productCatalogByIdRef: refs.productCatalogByIdRef,
     comboCatalogByIdRef: refs.comboCatalogByIdRef,
     pendingQuantityUpdatesRef: refs.pendingQuantityUpdatesRef,
@@ -274,6 +270,8 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     setPendingQuantityUpdatesSafe: refs.setPendingQuantityUpdatesSafe,
     setProducts: state.setProducts,
     priceConfig,
+    showError,
+    showSuccess,
   });
 
   useEffect(() => {
@@ -336,11 +334,12 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     try {
       await Promise.all([loadMesas(), state.loadCustomers()]);
     } catch {
-      state.setError(t('mesas:errors.loadFailed'));
+      showError('Error', t('mesas:errors.loadFailed'));
     }
   };
 
   return (
+    <>
     <AsyncStateWrapper
       loading={state.loading}
       error={state.mesas.length === 0 ? state.error : null}
@@ -374,22 +373,14 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
         />
 
         <div className="pt-6">
-          <MesasAlerts
-            isGeneratingSplitSales={state.isGeneratingSplitSales}
-            isClosingOrder={state.isClosingOrder}
-            success={state.success}
-            alertType={state.alertType}
-            successTitle={state.successTitle}
-            successDetails={state.successDetails}
-            error={state.error}
-            showPrintModal={state.showPrintModal}
-            isPrintingReceipt={state.isPrintingReceipt}
-            printCustomerName={state.printCustomerName}
-            onPrintConfirm={handlePrintConfirm}
-            onPrintCancel={handlePrintCancel}
-            onPrintCustomerNameChange={state.setPrintCustomerName}
-            onSuccessClose={() => state.setSuccess(false)}
-            onErrorClose={() => state.setError(null)}
+          <PrintReceiptConfirmModal
+            key="print-receipt-confirm"
+            isOpen={state.showPrintModal}
+            onConfirm={handlePrintConfirm}
+            onCancel={handlePrintCancel}
+            isLoading={state.isPrintingReceipt}
+            customerName={state.printCustomerName}
+            onCustomerNameChange={state.setPrintCustomerName}
           />
 
           <AddMesaForm
@@ -546,11 +537,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
             state.setMesaToDelete(null);
             try {
               const deleteResult = await deleteTableCascadeOrders(mesaId, { businessId });
-              state.setAlertType('success');
-              state.setSuccessTitle(t('mesas:alerts.tableDeleted'));
-              state.setSuccessDetails([{ label: t('mesas:labels.table'), value: deletedTableLabel }]);
-              state.setSuccess(true);
-              setTimeout(() => state.setSuccess(false), 3000);
+              showSuccess(t('mesas:alerts.tableDeleted'), `${t('mesas:labels.table')}: ${deletedTableLabel}`);
               if (!deleteResult?.__localOnly) {
                 await loadMesas();
               }
@@ -562,16 +549,18 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
               const diag = [code ? `code=${code}` : null, hint ? `hint=${hint}` : null, details ? `details=${details}` : null]
                 .filter(Boolean)
                 .join(' | ');
-              state.setError(
+              showError(
+                'Error',
                 `${t('mesas:errors.deleteFailed')}${message ? ` ${message}` : ''}${diag ? ` [${diag}]` : ''}`,
               );
               state.setMesas(snapshotMesas);
-              setTimeout(() => state.setError(null), 5000);
             }
           }}
         />
       </motion.section>
     </AsyncStateWrapper>
+    <ToastComponent />
+    </>
   );
 }
 

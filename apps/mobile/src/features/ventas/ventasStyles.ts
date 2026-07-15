@@ -252,6 +252,9 @@ export const ventasStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  salePrintButtonDisabled: {
+    opacity: 0.7,
+  },
   saleDeleteButton: {
     minHeight: 42,
     borderRadius: 12,

@@ -56,6 +56,7 @@ export function useAuth() {
       if (_event === 'SIGNED_OUT') {
         localStorage.clear();
         sessionStorage.clear();
+        localStorage.setItem('stocky.session_expired', '1');
         navigate('/login');
       }
 

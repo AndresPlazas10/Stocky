@@ -8,10 +8,10 @@ interface UseMesaCatalogProps {
   businessId: string;
   setProducts: (products: any[]) => void;
   setCombos: (combos: any[]) => void;
-  setError: (error: string) => void;
+  showError: (title: string, message?: string) => void;
 }
 
-export function useMesaCatalog({ businessId, setProducts, setCombos, setError }: UseMesaCatalogProps) {
+export function useMesaCatalog({ businessId, setProducts, setCombos, showError }: UseMesaCatalogProps) {
   const { t } = useTranslation(['mesas']);
   const catalogWarmupPromiseRef = useRef<PromiseSettledResult<void>[] | null>(null);
 
@@ -48,10 +48,10 @@ export function useMesaCatalog({ businessId, setProducts, setCombos, setError }:
       if (offline) {
         setProducts([]);
       } else {
-        setError(t('mesas.errors.loadCatalogFailed'));
+        showError('Error', t('mesas.errors.loadCatalogFailed'));
       }
     }
-  }, [businessId, setProducts, setError, t]);
+  }, [businessId, setProducts, showError, t]);
 
   const loadCombos = useCallback(async () => {
     const offline = isOfflineMode();
@@ -86,10 +86,10 @@ export function useMesaCatalog({ businessId, setProducts, setCombos, setError }:
       if (offline) {
         setCombos([]);
       } else {
-        setError(t('mesas.errors.loadCombosFailed'));
+        showError('Error', t('mesas.errors.loadCombosFailed'));
       }
     }
-  }, [businessId, setCombos, setError, t]);
+  }, [businessId, setCombos, showError, t]);
 
   const ensureCatalogWarmup = useCallback(async (): Promise<void> => {
     if (catalogWarmupPromiseRef.current) {

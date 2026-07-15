@@ -7,6 +7,7 @@ import { STOCKY_COLORS } from '../../../theme/tokens';
 import { StockyModal } from '../../../ui/StockyModal';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { formatDateTime } from '../../../utils/dateHelpers';
+import { useBusinessConfig } from '../../../contexts/BusinessConfigContext';
 import { getPaymentMethodLabel, getPaymentMethodTheme } from '../../../utils/paymentMethods';
 import type { CompraDetailRecord, CompraRecord } from '../../../services/comprasService';
 import { comprasStyles as s } from '../comprasStyles';
@@ -29,6 +30,7 @@ export const PurchaseDetailsModal = React.memo(function PurchaseDetailsModal({
   onClose,
 }: PurchaseDetailsModalProps) {
   const { t } = useTranslation();
+  const { timezone } = useBusinessConfig();
   const selectedPurchaseItemsCount = useMemo(
     () =>
       selectedPurchaseDetails.reduce(
@@ -123,7 +125,7 @@ export const PurchaseDetailsModal = React.memo(function PurchaseDetailsModal({
             <View style={s.purchaseDetailsHeroMetaItem}>
               <Ionicons name="calendar-outline" size={14} color="#64748B" />
               <Text style={s.purchaseDetailsHeroMetaText}>
-                {formatDateTime(selectedPurchase.created_at)}
+                {formatDateTime(selectedPurchase.created_at, { timezone })}
               </Text>
             </View>
             <View style={s.purchaseDetailsHeroMetaItem}>

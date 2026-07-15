@@ -396,6 +396,8 @@
     "signIn": "Iniciar Sesión",
     "enterCredentials": "Ingresa tu usuario y contraseña para continuar en Stocky",
     "loginError": "Error de acceso",
+    "invalidCredentials": "Usuario o contraseña incorrectos",
+    "sessionExpired": "Se ha detectado inactividad. Por tu seguridad, inicia sesión de nuevo.",
     "username": "Usuario",
     "usernamePlaceholder": "Tu nombre de usuario",
     "password": "Contraseña",
@@ -772,6 +774,37 @@
   "inventarioSection": {
     "errors": {
       "general": "Error"
+    }
+  },
+  "businessService": {
+    "success": {
+      "businessLoaded": "Información del negocio obtenida exitosamente",
+      "businessesLoaded": "Negocios obtenidos exitosamente"
+    },
+    "errors": {
+      "loadBusinessFailed": "Error al obtener la información del negocio",
+      "loadBusinessesFailed": "Error al obtener los negocios",
+      "userNotAuthenticated": "Usuario no autenticado"
+    }
+  },
+  "combosService": {
+    "errors": {
+      "loadFailed": "No se pudieron cargar los combos",
+      "createFailed": "No se pudo crear el combo",
+      "updateFailed": "No se pudo actualizar el combo",
+      "deleteFailed": "No se pudo eliminar el combo",
+      "deleteWithMovements": "No se puede eliminar el combo porque tiene movimientos asociados. Puedes desactivarlo.",
+      "itemsSaveFailed": "No se pudieron guardar los productos del combo",
+      "itemsUpdateFailed": "No se pudieron actualizar los productos del combo",
+      "comboNotFound": "El combo no existe o no tienes permisos para eliminarlo",
+      "nameRequired": "El nombre del combo es obligatorio",
+      "priceMustBePositive": "El precio de venta debe ser mayor a 0",
+      "quantityMustBePositive": "La cantidad debe ser mayor a 0",
+      "atLeastOneProduct": "Debes agregar al menos un producto al combo",
+      "productRequired": "Selecciona un producto en la fila {{row}}",
+      "duplicateProducts": "No se permiten productos repetidos en el combo",
+      "businessIdRequired": "businessId es obligatorio",
+      "comboIdRequired": "comboId es obligatorio"
     }
   },
   "syncIncidents": {

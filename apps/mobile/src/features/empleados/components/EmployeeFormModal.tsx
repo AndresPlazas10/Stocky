@@ -1,6 +1,7 @@
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { StockyModal } from '../../../ui/StockyModal';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 import { empleadosStyles as s } from '../empleadosStyles';
@@ -25,6 +26,7 @@ export function EmployeeFormModal({
   onClose,
   onSubmit,
 }: EmployeeFormModalProps) {
+  const { t } = useTranslation();
   return (
     <StockyModal
       visible={visible}
@@ -50,8 +52,8 @@ export function EmployeeFormModal({
               <Ionicons name="person-add-outline" size={20} color="#4F46E5" />
             </View>
             <View style={s.employeeFormHeaderTitleWrap}>
-              <Text style={s.employeeFormHeaderTitle}>Nuevo Empleado</Text>
-              <Text style={s.employeeFormHeaderSubtitle}>Crea un acceso para tu equipo</Text>
+              <Text style={s.employeeFormHeaderTitle}>{t('empleados.newEmployee')}</Text>
+              <Text style={s.employeeFormHeaderSubtitle}>{t('empleados.formSubtitle')}</Text>
             </View>
           </View>
           <Pressable
@@ -74,7 +76,7 @@ export function EmployeeFormModal({
             onPress={onClose}
             disabled={creating}
           >
-            <Text style={s.employeeFormCancelText}>Cancelar</Text>
+            <Text style={s.employeeFormCancelText}>{t('empleados.cancel')}</Text>
           </Pressable>
           <Pressable
             style={[s.employeeFormSaveWrap, creating && s.buttonDisabled]}
@@ -93,7 +95,7 @@ export function EmployeeFormModal({
                 <Ionicons name="person-add-outline" size={17} color="#FFFFFF" />
               )}
               <Text style={s.employeeFormSaveText}>
-                {creating ? 'Creando empleado...' : 'Crear Empleado'}
+                {creating ? t('empleados.creatingEmployee') : t('empleados.createEmployee')}
               </Text>
             </LinearGradient>
           </Pressable>
@@ -102,48 +104,48 @@ export function EmployeeFormModal({
     >
       <View style={s.employeeFormFields}>
         <View style={s.fieldGroup}>
-          <Text style={s.inputLabel}>Nombre Completo *</Text>
+          <Text style={s.inputLabel}>{t('empleados.fields.fullName')}</Text>
           <TextInput
             value={form.full_name}
             onChangeText={(next) => onFormChange({ full_name: next })}
-            placeholder="Ej: Juan Perez"
+            placeholder={t('empleados.fields.fullNamePlaceholder')}
             placeholderTextColor={STOCKY_COLORS.textMuted}
             style={s.input}
           />
         </View>
 
         <View style={s.fieldGroup}>
-          <Text style={s.inputLabel}>Usuario *</Text>
+          <Text style={s.inputLabel}>{t('empleados.fields.username')}</Text>
           <TextInput
             value={form.username}
             onChangeText={(next) =>
               onFormChange({ username: next.toLowerCase().replace(/\s+/g, '') })
             }
-            placeholder="juan_perez"
+            placeholder={t('empleados.fields.usernamePlaceholder')}
             placeholderTextColor={STOCKY_COLORS.textMuted}
             style={s.input}
             autoCapitalize="none"
             autoCorrect={false}
           />
-          <Text style={s.helperText}>Solo letras minusculas, numeros y guion bajo.</Text>
+          <Text style={s.helperText}>{t('empleados.fields.usernameHelper')}</Text>
         </View>
 
         <View style={s.fieldGroup}>
-          <Text style={s.inputLabel}>Contraseña *</Text>
+          <Text style={s.inputLabel}>{t('empleados.fields.password')}</Text>
           <TextInput
             value={form.password}
             onChangeText={(next) => onFormChange({ password: next })}
-            placeholder="Minimo 6 caracteres"
+            placeholder={t('empleados.fields.passwordPlaceholder')}
             placeholderTextColor={STOCKY_COLORS.textMuted}
             style={s.input}
             autoCapitalize="none"
             autoCorrect={false}
           />
-          <Text style={s.helperText}>Esta será la contraseña para iniciar sesión.</Text>
+          <Text style={s.helperText}>{t('empleados.fields.passwordHelper')}</Text>
         </View>
 
         <View style={s.roleInfoCard}>
-          <Text style={s.roleInfoText}>Rol asignado: Empleado</Text>
+          <Text style={s.roleInfoText}>{t('empleados.roleAssigned')}</Text>
         </View>
 
         {error ? (
