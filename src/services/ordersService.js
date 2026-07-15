@@ -128,6 +128,11 @@ function isOrderContextError(errorLike) {
   );
 }
 
+function isComboBypassError(errorLike) {
+  const message = String(errorLike?.message || errorLike || '').toLowerCase();
+  return message.includes('split combos bypass atomic rpc');
+}
+
 function isFunctionUnavailableError(errorLike, functionName) {
   const message = String(errorLike?.message || errorLike || '').toLowerCase();
   if (!message) return false;
@@ -180,6 +185,11 @@ function getFriendlySaleErrorMessage(errorLike, fallbackMessage) {
 
   if (normalized.includes('idx_sales_prevent_duplicates')) {
     return 'La venta ya estaba siendo procesada o ya fue registrada. Actualiza y verifica en Ventas.';
+  }
+
+  // Ocultar errores internos de bypass de combos
+  if (normalized.includes('split combos bypass atomic rpc')) {
+    return 'Procesando cuenta dividida con combos...';
   }
 
   const baseMessage = rawMessage || fallbackMessage;
@@ -362,8 +372,13 @@ async function finalizeOrderAndTable({ businessId, orderId, tableId }) {
       payload: { status: 'closed', closed_at: new Date().toISOString() }
     });
 
+    // Ignorar si la orden ya fue cerrada (puede ocurrir en fallback por combos)
     if (orderCloseError) {
-      throw new Error(orderCloseError.message || '❌ No se pudo cerrar la orden.');
+      const orderMsg = String(orderCloseError.message || '').toLowerCase();
+      const isAlreadyClosed = orderMsg.includes('already closed') || orderMsg.includes('ya está cerrada');
+      if (!isAlreadyClosed) {
+        throw new Error(orderCloseError.message || '❌ No se pudo cerrar la orden.');
+      }
     }
   }
 
@@ -374,8 +389,13 @@ async function finalizeOrderAndTable({ businessId, orderId, tableId }) {
       payload: { current_order_id: null, status: 'available' }
     });
 
+    // Ignorar si la mesa ya fue liberada (puede ocurrir en fallback por combos)
     if (tableReleaseError) {
-      throw new Error(tableReleaseError.message || '❌ No se pudo liberar la mesa.');
+      const tableMsg = String(tableReleaseError.message || '').toLowerCase();
+      const isAlreadyFreed = tableMsg.includes('already') || tableMsg.includes('ya está disponible');
+      if (!isAlreadyFreed) {
+        throw new Error(tableReleaseError.message || '❌ No se pudo liberar la mesa.');
+      }
     }
   }
 }
@@ -585,9 +605,10 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     atomicError,
     'create_split_sales_complete'
   );
+  const isComboBypass = isComboBypassError(atomicError);
   const shouldFallbackWithoutOrderContext = isOrderContextError(atomicError);
   const shouldFallbackDueToDuplicateIndex = isSalesDuplicateIndexError(atomicError);
-  if (!isMissingAtomicFn && !shouldFallbackWithoutOrderContext && !shouldFallbackDueToDuplicateIndex) {
+  if (!isMissingAtomicFn && !isComboBypass && !shouldFallbackWithoutOrderContext && !shouldFallbackDueToDuplicateIndex) {
     throw new Error(getFriendlySaleErrorMessage(
       atomicError,
       '❌ No se pudo cerrar la orden dividida. Intenta de nuevo.'
@@ -596,6 +617,8 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
 
   let totalSold = 0;
   const saleIds = [];
+  // Para combo bypass, siempre cerrar orden/mesa por separado para evitar conflictos de estado
+  const shouldAlwaysFinalizeSeparately = isComboBypass || shouldFallbackWithoutOrderContext;
   for (let i = 0; i < subAccountsWithItems.length; i++) {
     const sub = subAccountsWithItems[i];
     if (!sub.items || sub.items.length === 0) continue;
@@ -611,7 +634,7 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     }));
 
     const isLastSale = i === subAccountsWithItems.length - 1;
-    const closeOrderInsideRpc = isLastSale && !shouldFallbackWithoutOrderContext;
+    const closeOrderInsideRpc = isLastSale && !shouldAlwaysFinalizeSeparately;
     const subKey = `${idempotencyKey}:sub:${i + 1}`;
     const subIdempotentBaseParams = {
       p_business_id: businessId,
@@ -665,7 +688,7 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     });
   }
 
-  if (shouldFallbackWithoutOrderContext) {
+  if (shouldAlwaysFinalizeSeparately) {
     await finalizeOrderAndTable({ businessId, orderId, tableId });
   }
 
