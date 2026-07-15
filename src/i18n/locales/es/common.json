@@ -113,7 +113,8 @@
     "serverErrorDescription": "Ha ocurrido un error inesperado. Por favor, intenta nuevamente.",
     "pageNotFound": "Página No Encontrada",
     "pageNotFoundDescription": "La página que buscas no existe o ha sido movida.",
-    "operationError": "Error en la operación"
+    "operationError": "Error en la operación",
+    "productHasSales": "Este producto tiene ventas asociadas y no puede ser eliminado. Puedes desactivarlo en su lugar."
   },
   "success": {
     "saved": "Información actualizada correctamente",

@@ -113,7 +113,8 @@
     "serverErrorDescription": "An unexpected error has occurred. Please try again.",
     "pageNotFound": "Page Not Found",
     "pageNotFoundDescription": "The page you are looking for does not exist or has been moved.",
-    "operationError": "Operation error"
+    "operationError": "Operation error",
+    "productHasSales": "This product has associated sales and cannot be deleted. You can deactivate it instead."
   },
   "success": {
     "saved": "Information updated successfully",
