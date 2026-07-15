@@ -1,3 +1,25 @@
-# EAS Build ignore file
-# Allow shared/dist to be included in the build
-!packages/shared/dist/
+# Dependencies (EAS will install them)
+node_modules/
+
+# Build artifacts
+apps/mobile/android/
+apps/mobile/outputs/
+apps/mobile/apk/
+apps/mobile/debug/
+apps/mobile/release/
+apps/mobile/bundle/
+apps/mobile/coverage/
+
+# Build tarballs
+apps/mobile/build-*.tar.gz
+
+# Sensitive files (keystore managed by EAS)
+credentials.json
+
+# Debug files
+apps/mobile/build-output.txt
+
+# Other
+.git/
+.vercel
+.archive/

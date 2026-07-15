@@ -22,7 +22,6 @@ import {
 import { invalidateOrderCache } from '../../../data/adapters/cacheInvalidation.js';
 import { normalizeTableRecord } from '../../../utils/tableStatus';
 import { logger } from '@/utils/logger';
-import type { AlertDetail } from '../../../types/components';
 
 type SetState<T> = React.Dispatch<React.SetStateAction<T>>;
 
@@ -357,11 +356,6 @@ interface UseMesaPaymentParams {
   waitForPendingOrderItemOps: () => Promise<boolean>;
   persistPendingQuantityUpdates: (...args: any[]) => Promise<void>;
   releaseEmptyOrderAndCloseModal: (...args: any[]) => any;
-  setSuccess: SetState<boolean>;
-  setSuccessTitle: SetState<string>;
-  setSuccessDetails: SetState<AlertDetail[]>;
-  setAlertType: SetState<string>;
-  setError: SetState<string | null>;
   productCatalogByIdRef: React.MutableRefObject<Map<string, any>>;
   comboCatalogByIdRef: React.MutableRefObject<Map<string, any>>;
   pendingQuantityUpdatesRef: React.MutableRefObject<Record<string, number>>;
@@ -376,6 +370,8 @@ interface UseMesaPaymentParams {
   orderTotal: number;
   setPendingQuantityUpdatesSafe: SetState<Record<string, number>>;
   setProducts: SetState<any[]>;
+  showError: (title: string, message?: string) => void;
+  showSuccess: (title: string, message?: string) => void;
 }
 
 export function useMesaPayment({
@@ -434,11 +430,6 @@ export function useMesaPayment({
   waitForPendingOrderItemOps,
   persistPendingQuantityUpdates,
   releaseEmptyOrderAndCloseModal,
-  setSuccess,
-  setSuccessTitle,
-  setSuccessDetails,
-  setAlertType,
-  setError,
   productCatalogByIdRef,
   comboCatalogByIdRef,
   pendingQuantityUpdatesRef,
@@ -453,6 +444,8 @@ export function useMesaPayment({
   orderTotal,
   setPendingQuantityUpdatesSafe,
   setProducts,
+  showError,
+  showSuccess,
 }: UseMesaPaymentParams) {
   const { t } = useTranslation(['mesas', 'common']);
   const fmtPrice = (value: number, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig || {});
@@ -559,14 +552,14 @@ export function useMesaPayment({
           });
 
           if (!printResult.ok) {
-            setError(t('mesas:errors.printFailed'));
+            showError('Error',t('mesas:errors.printFailed'));
           }
         } catch {
-          setError(t('mesas:errors.printFailed'));
+          showError('Error',t('mesas:errors.printFailed'));
         }
       }
     } catch {
-      setError(t('mesas:errors.printAllFailed'));
+      showError('Error',t('mesas:errors.printAllFailed'));
     } finally {
       setIsPrintingReceipt(false);
       setShowPrintModal(false);
@@ -603,10 +596,10 @@ export function useMesaPayment({
       });
 
       if (!printResult.ok) {
-        setError(t('mesas:errors.printAutoFailed'));
+        showError('Error',t('mesas:errors.printAutoFailed'));
       }
     } catch {
-      setError(t('mesas:errors.printAutoFailed'));
+      showError('Error',t('mesas:errors.printAutoFailed'));
     }
   }, [businessId]);
 
@@ -617,7 +610,7 @@ export function useMesaPayment({
 
     if (insufficientItems.length > 0) {
       const firstShortage = insufficientItems[0];
-      setError(
+      showError('Error',
         t('mesas:errors.insufficientStockShortage', {
           productName: firstShortage.product_name,
           available: firstShortage.available_stock,
@@ -629,7 +622,7 @@ export function useMesaPayment({
 
     if (hasInsufficientComboStock) {
       const firstShortage = insufficientComboComponents[0];
-      setError(
+      showError('Error',
         t('mesas:errors.insufficientStockShortage', {
           productName: firstShortage.product_name,
           available: firstShortage.available_stock,
@@ -641,11 +634,10 @@ export function useMesaPayment({
 
     setIsClosingOrder(true);
     setIsGeneratingSplitSales(true);
-    setError(null);
 
     const mesaSnapshot = selectedMesa ? { ...selectedMesa } : null;
     if (!mesaSnapshot?.id || !mesaSnapshot?.current_order_id) {
-      setError(t('mesas:errors.noActiveOrder'));
+      showError('Error',t('mesas:errors.noActiveOrder'));
       setIsGeneratingSplitSales(false);
       setIsClosingOrder(false);
       return;
@@ -653,7 +645,7 @@ export function useMesaPayment({
 
     splitCloseLockKey = `split:${businessId}:${mesaSnapshot.id}:${mesaSnapshot.current_order_id}`;
     if (!acquireCloseOrderLock(splitCloseLockKey)) {
-      setError(t('mesas:errors.orderClosing'));
+      showError('Error',t('mesas:errors.orderClosing'));
       setIsGeneratingSplitSales(false);
       setIsClosingOrder(false);
       return;
@@ -694,15 +686,10 @@ export function useMesaPayment({
     applyLocalStockConsumption(splitConsumptionByProduct, { businessId, setProducts });
     setIsGeneratingSplitSales(false);
     setIsClosingOrder(false);
-    setSuccessDetails([
-      { label: t('mesas:labels.total'), value: fmtPrice(optimisticSplitTotal) },
-      { label: t('mesas:labels.table'), value: `#${mesaSnapshot.table_number}` },
-      { label: t('mesas:labels.accounts'), value: String(subAccounts.length) },
-      { label: t('mesas:labels.sync'), value: t('mesas:labels.syncing') }
-    ]);
-    setSuccessTitle(`✨ ${t('mesas:success.saleRegistered')}`);
-    setAlertType('success');
-    setSuccess(true);
+    showSuccess(
+      `✨ ${t('mesas:success.saleRegistered')}`,
+      `${t('mesas:labels.table')} #${mesaSnapshot.table_number}`
+    );
 
     try {
       const closeResult = await closeOrderAsSplit(businessId, {
@@ -743,7 +730,7 @@ export function useMesaPayment({
       }, MODAL_REOPEN_GUARD_MS);
     } catch (error) {
       applyLocalStockConsumption(splitConsumptionByProduct, { mode: 'restore', businessId, setProducts });
-        setError(buildDiagnosticAlertMessage(error, t));
+        showError('Error',buildDiagnosticAlertMessage(error, t));
       try { await loadMesas(); } catch (err) { logger.warn('mesas:payment:load_mesas_recovery_split failed', err); }
       try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch (err) { logger.warn('mesas:payment:reset_modal_state_split failed', err); }
     } finally {
@@ -760,7 +747,7 @@ export function useMesaPayment({
 
     if (insufficientItems.length > 0) {
       const firstShortage = insufficientItems[0];
-      setError(
+      showError('Error',
         t('mesas:errors.insufficientStockShortage', {
           productName: firstShortage.product_name,
           available: firstShortage.available_stock,
@@ -772,7 +759,7 @@ export function useMesaPayment({
 
     if (hasInsufficientComboStock) {
       const firstShortage = insufficientComboComponents[0];
-      setError(
+      showError('Error',
         t('mesas:errors.insufficientStockShortage', {
           productName: firstShortage.product_name,
           available: firstShortage.available_stock,
@@ -791,7 +778,7 @@ export function useMesaPayment({
 
     if (paymentSnapshot === 'cash') {
       if (!cashChangeData?.isValid) {
-        setError(cashChangeData?.reason === 'insufficient'
+        showError('Error',cashChangeData?.reason === 'insufficient'
           ? t('mesas:errors.insufficientAmount')
           : t('mesas:errors.invalidAmount'));
         return;
@@ -799,18 +786,17 @@ export function useMesaPayment({
     }
 
     setIsClosingOrder(true);
-    setError(null);
 
     const mesaSnapshot = selectedMesa ? { ...selectedMesa } : null;
     if (!mesaSnapshot?.id || !mesaSnapshot?.current_order_id) {
-      setError(t('mesas:errors.noActiveOrder'));
+      showError('Error',t('mesas:errors.noActiveOrder'));
       setIsClosingOrder(false);
       return;
     }
 
     closeLockKey = `single:${businessId}:${mesaSnapshot.id}:${mesaSnapshot.current_order_id}`;
     if (!acquireCloseOrderLock(closeLockKey)) {
-      setError(t('mesas:errors.orderClosing'));
+      showError('Error',t('mesas:errors.orderClosing'));
       setIsClosingOrder(false);
       return;
     }
@@ -848,15 +834,10 @@ export function useMesaPayment({
     justCompletedSaleRef.current = true;
     setCanShowOrderModal(false);
     setIsClosingOrder(false);
-    setSuccessDetails([
-      { label: t('mesas:labels.total'), value: fmtPrice(optimisticSaleTotal) },
-      { label: t('mesas:labels.table'), value: `#${mesaSnapshot?.table_number || '-'}` },
-      { label: t('mesas:labels.method'), value: getPaymentMethodLabel(paymentSnapshot) },
-      { label: t('mesas:labels.sync'), value: t('mesas:labels.syncing') }
-    ]);
-    setSuccessTitle(`✨ ${t('mesas:success.saleRegistered')}`);
-    setAlertType('success');
-    setSuccess(true);
+    showSuccess(
+      `✨ ${t('mesas:success.saleRegistered')}`,
+      `${t('mesas:labels.table')} #${mesaSnapshot?.table_number || '-'}`
+    );
 
     (async () => {
       try {
@@ -913,7 +894,7 @@ export function useMesaPayment({
         }, MODAL_REOPEN_GUARD_MS);
       } catch (error) {
         applyLocalStockConsumption(orderConsumptionByProduct, { mode: 'restore', businessId, setProducts });
-      setError(buildDiagnosticAlertMessage(error, t));
+      showError('Error',buildDiagnosticAlertMessage(error, t));
         try { await loadMesas(); } catch (err) { logger.warn('mesas:payment:load_mesas_recovery_single failed', err); }
         try { justCompletedSaleRef.current = false; setCanShowOrderModal(true); } catch (err) { logger.warn('mesas:payment:reset_modal_state_single failed', err); }
       } finally {
@@ -925,8 +906,7 @@ export function useMesaPayment({
 
   const handlePrintOrder = () => {
     if (!selectedMesa || orderItems.length === 0) {
-      setError(t('mesas:errors.noItemsToPrint'));
-      setTimeout(() => setError(null), 3000);
+      showError('Error', t('mesas:errors.noItemsToPrint'));
       return;
     }
 
@@ -946,8 +926,7 @@ export function useMesaPayment({
     });
 
     if (itemsParaCocina.length === 0) {
-      setError(t('mesas:errors.noKitchenItems'));
-      setTimeout(() => setError(null), 3000);
+      showError('Error', t('mesas:errors.noKitchenItems'));
       return;
     }
 
@@ -957,8 +936,7 @@ export function useMesaPayment({
       status: selectedMesa.status,
       orderTotal,
       onError: (msg: string) => {
-        setError(msg);
-        if (msg) setTimeout(() => setError(null), 3000);
+        if (msg) showError('Error', msg);
       },
     });
   };

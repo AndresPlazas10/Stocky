@@ -454,7 +454,6 @@ export async function listPurchaseProducts(
       .select('id,name,purchase_price,supplier_id,stock,manage_stock,is_active')
       .eq('business_id', normalizedBusinessId)
       .eq('is_active', true)
-      .gt('stock', 0)
       .order('name', { ascending: true });
 
     if (error) throw error;

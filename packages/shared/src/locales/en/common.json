@@ -26,6 +26,8 @@
     "viewLess": "View less",
     "viewDetails": "View Details",
     "viewHistory": "View History",
+    "open": "Open",
+    "clear": "Clear",
     "signOut": "Sign Out",
     "signIn": "Sign In",
     "signUp": "Sign Up",
@@ -808,6 +810,10 @@
     "title": "Employees",
     "subtitle": "Manage employees and access",
     "addEmployee": "Invite Employee",
+    "newEmployee": "New Employee",
+    "createEmployee": "Create Employee",
+    "creatingEmployee": "Creating employee...",
+    "formSubtitle": "Create access for your team",
     "loading": "Loading employees...",
     "emptyState": "No employees registered.",
     "showing": "Showing {{count}} employees",
@@ -816,6 +822,42 @@
     "deleteMessage": "Are you sure you want to delete {{name}}?",
     "deleteMessageFallback": "this employee",
     "deleteWarning": "This action revokes their access to the business.",
+    "cancel": "Cancel",
+    "fields": {
+      "fullName": "Full Name *",
+      "fullNamePlaceholder": "Ex: John Smith",
+      "username": "Username *",
+      "usernamePlaceholder": "john_smith",
+      "usernameHelper": "Only lowercase letters, numbers and underscore.",
+      "password": "Password *",
+      "passwordPlaceholder": "Minimum 6 characters",
+      "passwordHelper": "This will be the password to log in."
+    },
+    "roleAssigned": "Assigned role: Employee",
+    "roles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "employee": "Employee"
+    },
+    "credentials": {
+      "title": "Credentials generated",
+      "shareMessage": "Share these credentials with {{name}}:",
+      "shareMessageFallback": "the employee",
+      "understood": "Understood",
+      "username": "Username",
+      "password": "Password"
+    },
+    "card": {
+      "employee": "EMPLOYEE",
+      "username": "USERNAME",
+      "status": "STATUS",
+      "role": "ROLE",
+      "action": "ACTION",
+      "active": "Active",
+      "inactive": "Inactive",
+      "yourUser": "Your user",
+      "delete": "Delete"
+    },
     "buttons": {
       "creatingEmployee": "Creating employee...",
       "loadMoreEmployees": "Load more employees"
@@ -861,14 +903,54 @@
   },
   "proveedores": {
     "title": "Suppliers",
+    "subtitle": "Manage your supplier network",
     "addSupplier": "New Supplier",
+    "editSupplier": "Edit Supplier",
     "loading": "Loading suppliers...",
+    "loadingForm": "Loading form...",
+    "loadingFields": "Loading additional fields...",
     "emptyState": "No suppliers registered.",
     "showing": "Showing {{count}} suppliers",
     "loadMore": "Load more suppliers",
     "deleteTitle": "Delete supplier",
     "deleteMessage": "Are you sure you want to delete supplier {{name}}?",
     "deleteWarning": "If it has associated purchases it cannot be deleted...",
+    "saving": "Saving...",
+    "update": "Update",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "fields": {
+      "companyName": "Company Name *",
+      "companyNamePlaceholder": "Ex: ABC Distribution",
+      "contactPerson": "Contact Person",
+      "contactPersonPlaceholder": "Ex: John Smith",
+      "nit": "Tax ID",
+      "nitPlaceholder": "Ex: 12-3456789",
+      "email": "Email",
+      "emailPlaceholder": "Ex: company@mail.com",
+      "phone": "Phone",
+      "phonePlaceholder": "Ex: (555) 123-4567",
+      "address": "Address",
+      "addressPlaceholder": "Ex: 123 Main St, New York",
+      "notes": "Notes",
+      "notesPlaceholder": "Ex: Deliveries on Mondays and Wednesdays"
+    },
+    "labels": {
+      "contact": "CONTACT",
+      "email": "EMAIL",
+      "phone": "PHONE",
+      "address": "ADDRESS",
+      "notes": "NOTES"
+    },
+    "emptyValues": {
+      "noNit": "No Tax ID",
+      "noContact": "No contact",
+      "noEmail": "No email",
+      "noPhone": "No phone",
+      "noAddress": "No address"
+    },
     "errors": {
       "cannotDeleteSupplierWithPurchases": "Cannot delete supplier with associated purchases",
       "deletingSupplier": "Error deleting supplier",
@@ -910,6 +992,11 @@
     "labels": {
       "action": "Action",
       "optional": "Optional"
+    },
+    "profile": {
+      "owner": "Owner",
+      "employee": "Employee",
+      "unknown": "Unknown"
     },
     "messages": {
       "businessNameRequired": "Business name is required",
@@ -1413,7 +1500,13 @@
     "averageTicket": "Average ticket",
     "result": "Result",
     "ownerProfile": "Profile: Owner",
-    "employeeProfile": "Profile: Employee"
+    "employeeProfile": "Profile: Employee",
+    "salesVsPurchasesChart": "Sales vs Purchases Comparison",
+    "periodTotals": "Total values for selected period",
+    "paymentDistribution": "Distribution by method",
+    "noChartData": "No data to chart.",
+    "topSellersChart": "Top sellers (chart)",
+    "noSellersToChart": "No sellers to chart."
   },
   "ventasSection": {
     "perUnit": "per unit",
@@ -1492,6 +1585,8 @@
     "noSupplier": "No supplier",
     "allSuppliers": "All suppliers",
     "catalogLoadError": "Could not load the purchase catalog.",
+    "stockManagementHint": "Only products with stock management enabled are shown.",
+    "selectSupplierError": "Select a supplier.",
     "selectSupplierError": "Select a supplier.",
     "addProductError": "Add at least one product to the purchase.",
     "noStockControlError": "There are products without stock control in the cart. Remove them to continue.",
@@ -1499,5 +1594,8 @@
     "zeroTotalError": "Purchase total must be greater than 0.",
     "createPurchaseError": "Error registering purchase.",
     "deletePurchaseError": "Error deleting purchase."
+  },
+  "print": {
+    "printing": "Printing..."
   }
 }

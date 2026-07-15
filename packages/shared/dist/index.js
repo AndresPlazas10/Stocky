@@ -9,4 +9,10 @@ export { COLOMBIAN_DENOMINATIONS, parseCopAmount, calcularCambio } from './cambi
 export { isConnectivityError } from './connectivity.js';
 // Normalization
 export { normalizeText, normalizeOptionalText, normalizeNumber, normalizeOptionalAmount, normalizeReference } from './normalization.js';
+// Mesa Utilities
+export { isMesaOccupied, normalizeTableIdentifier, compareMesaTableIdentifiers, resolveMesaSyncVersion, mesaDisplayName } from './mesaUtils.js';
+// Order Normalization
+export { normalizeOrderReference, normalizeOrderItemQuantity, normalizeOrderItemSubtotal, calculateOrderTotal, calculateOrderUnits, sumOrderItemsQuantity } from './orderNormalization.js';
+// Order Reconciliation
+export { reconcileOrderItemsFromServer } from './orderReconciliation.js';
 //# sourceMappingURL=index.js.map

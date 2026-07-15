@@ -24,9 +24,7 @@ import {
 import { formatPrice, formatDateOnly } from '../../utils/formatters';
 import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js';
-import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
-import { SaleErrorAlert } from '../ui/SaleErrorAlert';
-import { SaleUpdateAlert } from '../ui/SaleUpdateAlert';
+import { useAppToast } from '../../hooks/useAppToast';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -75,7 +73,6 @@ function Compras({ businessId }: DashboardModuleProps) {
   const [suppliers, setSuppliers] = useState([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
@@ -88,6 +85,7 @@ function Compras({ businessId }: DashboardModuleProps) {
   const [purchaseToDelete, setPurchaseToDelete] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const lowMotionMode = useLowMotionMode();
+  const { showError, showSuccess, showLoading, ToastComponent } = useAppToast();
 
   const loadCompras = useCallback(async (filters = currentFiltersPurchases, pagination: any = {}) => {
     const offline = isOfflineMode();
@@ -193,7 +191,9 @@ function Compras({ businessId }: DashboardModuleProps) {
         setPurchases(safe);
         setTotalCountPurchases(safe.length);
       } else {
-        setError(formatLoadError(t('compras:errors.loadFailed'), error));
+        const msg = formatLoadError(t('compras:errors.loadFailed'), error);
+        setError(msg);
+        showError(msg);
       }
     } finally {
       setLoading(false);
@@ -261,7 +261,9 @@ function Compras({ businessId }: DashboardModuleProps) {
         setSuppliers(Array.isArray(cached) ? cached : []);
       } else {
         setSuppliers([]);
-        setError(formatLoadError(t('compras:errors.loadSuppliersFailed'), error));
+        const msg = formatLoadError(t('compras:errors.loadSuppliersFailed'), error);
+        setError(msg);
+        showError(msg);
       }
     } finally {
       setLoadingSuppliers(false);
@@ -352,8 +354,7 @@ function Compras({ businessId }: DashboardModuleProps) {
         return [purchaseWithDetails, ...prev];
       });
       
-      setSuccess(t('compras:alerts.purchaseCreated'));
-      setTimeout(() => setSuccess(''), 3000);
+      showSuccess(t('compras:alerts.purchaseCreated'));
     },
     onUpdate: (updatedPurchase) => {
       setPurchases(prev => prev.map(c => c.id === updatedPurchase.id ? { ...c, ...updatedPurchase } : c));
@@ -382,19 +383,9 @@ function Compras({ businessId }: DashboardModuleProps) {
     onDelete: () => {}
   });
 
-  useEffect(() => {
-    if (success || error) {
-      const timer = setTimeout(() => {
-        setSuccess('');
-        setError('');
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [success, error]);
-
   const addToCart = useCallback((product) => {
     if (product?.manage_stock === false) {
-      setError(t('compras:errors.stockNotManaged'));
+      showError(t('compras:errors.stockNotManaged'));
       return;
     }
 
@@ -473,8 +464,7 @@ function Compras({ businessId }: DashboardModuleProps) {
     if (isCreatingPurchase) return;
     
     setIsCreatingPurchase(true);
-    setError('');
-    setSuccess('');
+    showLoading(t('compras:alerts.generatingPurchase'));
     
     try {
       if (!supplierId) throw new Error(t('compras:alerts.selectSupplierFirst'));
@@ -513,7 +503,7 @@ function Compras({ businessId }: DashboardModuleProps) {
         }))
       });
 
-      setSuccess(t('compras:alerts.purchaseCreated'));
+      showSuccess(t('compras:alerts.purchaseCreated'));
       resetForm();
       setShowModal(false);
       void result;
@@ -521,7 +511,7 @@ function Compras({ businessId }: DashboardModuleProps) {
       loadProductos();
       
     } catch (err) {
-      setError(t('compras:errors.processFailed') + ': ' + err.message);
+      showError(t('compras:errors.processFailed') + ': ' + err.message);
     } finally {
       setIsCreatingPurchase(false);
     }
@@ -555,7 +545,7 @@ function Compras({ businessId }: DashboardModuleProps) {
       setSelectedPurchase({ ...purchase, details: data });
       setShowDetailsModal(true);
     } catch {
-      setError(t('compras:errors.detailsFailed'));
+      showError(t('compras:errors.detailsFailed'));
     }
   }, [t]);
 
@@ -569,8 +559,6 @@ function Compras({ businessId }: DashboardModuleProps) {
     if (!purchaseToDelete) return;
 
     setLoading(true);
-    setError('');
-    setSuccess('');
     
     try {
       const { appliedManualFallback } = await deletePurchaseWithStockFallback({
@@ -578,12 +566,11 @@ function Compras({ businessId }: DashboardModuleProps) {
         businessId
       });
 
-      setSuccess(
+      showSuccess(
         appliedManualFallback
           ? t('compras:alerts.purchaseDeletedManualStock')
           : t('compras:alerts.purchaseDeleted')
       );
-      setTimeout(() => setSuccess(''), 4000);
 
       // Recargar datos
       await loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (pagePurchases - 1) * limitPurchases });
@@ -593,8 +580,7 @@ function Compras({ businessId }: DashboardModuleProps) {
       setPurchaseToDelete(null);
 
     } catch (error) {
-      setError(t('compras:errors.deleteFailed') + ': ' + (error.message || t('compras:errors.deleteFailed')));
-      setTimeout(() => setError(''), 8000);
+      showError(t('compras:errors.deleteFailed') + ': ' + (error.message || t('compras:errors.deleteFailed')));
       setShowDeleteModal(false);
       setPurchaseToDelete(null);
     } finally {
@@ -696,31 +682,6 @@ function Compras({ businessId }: DashboardModuleProps) {
           </div>
         </Card>
       </motion.div>
-
-      {/* Alertas mejoradas */}
-      <SaleErrorAlert 
-        isVisible={!!error}
-        onClose={() => setError('')}
-        title={t('common:error')}
-        message={error}
-        duration={5000}
-      />
-
-      <SaleUpdateAlert
-        isVisible={isCreatingPurchase}
-        onClose={() => {}}
-        title={t('compras:alerts.generatingPurchase')}
-        details={[]}
-        duration={600000}
-      />
-
-      <SaleSuccessAlert 
-        isVisible={!!success}
-        onClose={() => setSuccess('')}
-        title={t('compras:alerts.purchaseRegistered')}
-        details={[{ label: t('compras:labels.action'), value: success }]}
-        duration={5000}
-      />
 
         {/* Filtros */}
         <PurchaseFilters
@@ -1265,6 +1226,7 @@ function Compras({ businessId }: DashboardModuleProps) {
           </motion.div>
         )}
       </AnimatePresence>
+      <ToastComponent />
     </div>
     </AsyncStateWrapper>
   );

@@ -1,5 +1,6 @@
 import { Text, View } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
+import { useTranslation } from 'react-i18next';
 import { reportesStyles as s } from '../reportesStyles';
 
 interface FinanceBarChartProps {
@@ -21,10 +22,11 @@ export default function FinanceBarChart({
   height,
   chartConfig,
 }: FinanceBarChartProps) {
+  const { t } = useTranslation();
   return (
     <View style={s.blockCard}>
-      <Text style={s.sectionTitle}>Comparativo Ventas vs Compras</Text>
-      <Text style={s.chartCaption}>Valores totales del periodo seleccionado</Text>
+      <Text style={s.sectionTitle}>{t('reportes.salesVsPurchasesChart')}</Text>
+      <Text style={s.chartCaption}>{t('reportes.periodTotals')}</Text>
       <View style={s.chartWrap}>
         <BarChart
           data={data}

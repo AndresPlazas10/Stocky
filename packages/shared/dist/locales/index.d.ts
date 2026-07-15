@@ -28,6 +28,8 @@ export declare const resources: {
                 viewLess: string;
                 viewDetails: string;
                 viewHistory: string;
+                open: string;
+                clear: string;
                 signOut: string;
                 signIn: string;
                 signUp: string;
@@ -810,6 +812,10 @@ export declare const resources: {
                 title: string;
                 subtitle: string;
                 addEmployee: string;
+                newEmployee: string;
+                createEmployee: string;
+                creatingEmployee: string;
+                formSubtitle: string;
                 loading: string;
                 emptyState: string;
                 showing: string;
@@ -818,6 +824,42 @@ export declare const resources: {
                 deleteMessage: string;
                 deleteMessageFallback: string;
                 deleteWarning: string;
+                cancel: string;
+                fields: {
+                    fullName: string;
+                    fullNamePlaceholder: string;
+                    username: string;
+                    usernamePlaceholder: string;
+                    usernameHelper: string;
+                    password: string;
+                    passwordPlaceholder: string;
+                    passwordHelper: string;
+                };
+                roleAssigned: string;
+                roles: {
+                    owner: string;
+                    admin: string;
+                    employee: string;
+                };
+                credentials: {
+                    title: string;
+                    shareMessage: string;
+                    shareMessageFallback: string;
+                    understood: string;
+                    username: string;
+                    password: string;
+                };
+                card: {
+                    employee: string;
+                    username: string;
+                    status: string;
+                    role: string;
+                    action: string;
+                    active: string;
+                    inactive: string;
+                    yourUser: string;
+                    delete: string;
+                };
                 buttons: {
                     creatingEmployee: string;
                     loadMoreEmployees: string;
@@ -863,14 +905,54 @@ export declare const resources: {
             };
             proveedores: {
                 title: string;
+                subtitle: string;
                 addSupplier: string;
+                editSupplier: string;
                 loading: string;
+                loadingForm: string;
+                loadingFields: string;
                 emptyState: string;
                 showing: string;
                 loadMore: string;
                 deleteTitle: string;
                 deleteMessage: string;
                 deleteWarning: string;
+                saving: string;
+                update: string;
+                save: string;
+                cancel: string;
+                edit: string;
+                delete: string;
+                fields: {
+                    companyName: string;
+                    companyNamePlaceholder: string;
+                    contactPerson: string;
+                    contactPersonPlaceholder: string;
+                    nit: string;
+                    nitPlaceholder: string;
+                    email: string;
+                    emailPlaceholder: string;
+                    phone: string;
+                    phonePlaceholder: string;
+                    address: string;
+                    addressPlaceholder: string;
+                    notes: string;
+                    notesPlaceholder: string;
+                };
+                labels: {
+                    contact: string;
+                    email: string;
+                    phone: string;
+                    address: string;
+                    notes: string;
+                };
+                emptyValues: {
+                    noNit: string;
+                    noContact: string;
+                    noEmail: string;
+                    noPhone: string;
+                    noAddress: string;
+                };
                 errors: {
                     cannotDeleteSupplierWithPurchases: string;
                     deletingSupplier: string;
@@ -912,6 +994,11 @@ export declare const resources: {
                 labels: {
                     action: string;
                     optional: string;
+                };
+                profile: {
+                    owner: string;
+                    employee: string;
+                    unknown: string;
                 };
                 messages: {
                     businessNameRequired: string;
@@ -1416,6 +1503,12 @@ export declare const resources: {
                 result: string;
                 ownerProfile: string;
                 employeeProfile: string;
+                salesVsPurchasesChart: string;
+                periodTotals: string;
+                paymentDistribution: string;
+                noChartData: string;
+                topSellersChart: string;
+                noSellersToChart: string;
             };
             ventasSection: {
                 perUnit: string;
@@ -1494,6 +1587,7 @@ export declare const resources: {
                 noSupplier: string;
                 allSuppliers: string;
                 catalogLoadError: string;
+                stockManagementHint: string;
                 selectSupplierError: string;
                 addProductError: string;
                 noStockControlError: string;
@@ -1501,6 +1595,9 @@ export declare const resources: {
                 zeroTotalError: string;
                 createPurchaseError: string;
                 deletePurchaseError: string;
+            };
+            print: {
+                printing: string;
             };
         };
         ventas: {
@@ -2091,6 +2188,8 @@ export declare const resources: {
                 statusAvailable: string;
                 invalidDate: string;
                 itemsLabel: string;
+                productsHeader: string;
+                quantityHeader: string;
                 printError: string;
                 printerError: string;
             };
@@ -2106,6 +2205,22 @@ export declare const resources: {
                 noSession: string;
                 orderNotFound: string;
                 updateFailed: string;
+                tableIdentifierRequired: string;
+                tableAlreadyExists: string;
+                tableMustBeNumeric: string;
+            };
+            toast: {
+                noKitchenItems: {
+                    title: string;
+                    message: string;
+                };
+                noPrinter: {
+                    title: string;
+                    message: string;
+                };
+                printError: {
+                    title: string;
+                };
             };
         };
         reports: {
@@ -2238,6 +2353,8 @@ export declare const resources: {
                 viewLess: string;
                 viewDetails: string;
                 viewHistory: string;
+                open: string;
+                clear: string;
                 signOut: string;
                 signIn: string;
                 signUp: string;
@@ -3020,6 +3137,10 @@ export declare const resources: {
                 title: string;
                 subtitle: string;
                 addEmployee: string;
+                newEmployee: string;
+                createEmployee: string;
+                creatingEmployee: string;
+                formSubtitle: string;
                 loading: string;
                 emptyState: string;
                 showing: string;
@@ -3028,6 +3149,42 @@ export declare const resources: {
                 deleteMessage: string;
                 deleteMessageFallback: string;
                 deleteWarning: string;
+                cancel: string;
+                fields: {
+                    fullName: string;
+                    fullNamePlaceholder: string;
+                    username: string;
+                    usernamePlaceholder: string;
+                    usernameHelper: string;
+                    password: string;
+                    passwordPlaceholder: string;
+                    passwordHelper: string;
+                };
+                roleAssigned: string;
+                roles: {
+                    owner: string;
+                    admin: string;
+                    employee: string;
+                };
+                credentials: {
+                    title: string;
+                    shareMessage: string;
+                    shareMessageFallback: string;
+                    understood: string;
+                    username: string;
+                    password: string;
+                };
+                card: {
+                    employee: string;
+                    username: string;
+                    status: string;
+                    role: string;
+                    action: string;
+                    active: string;
+                    inactive: string;
+                    yourUser: string;
+                    delete: string;
+                };
                 buttons: {
                     creatingEmployee: string;
                     loadMoreEmployees: string;
@@ -3073,14 +3230,54 @@ export declare const resources: {
             };
             proveedores: {
                 title: string;
+                subtitle: string;
                 addSupplier: string;
+                editSupplier: string;
                 loading: string;
+                loadingForm: string;
+                loadingFields: string;
                 emptyState: string;
                 showing: string;
                 loadMore: string;
                 deleteTitle: string;
                 deleteMessage: string;
                 deleteWarning: string;
+                saving: string;
+                update: string;
+                save: string;
+                cancel: string;
+                edit: string;
+                delete: string;
+                fields: {
+                    companyName: string;
+                    companyNamePlaceholder: string;
+                    contactPerson: string;
+                    contactPersonPlaceholder: string;
+                    nit: string;
+                    nitPlaceholder: string;
+                    email: string;
+                    emailPlaceholder: string;
+                    phone: string;
+                    phonePlaceholder: string;
+                    address: string;
+                    addressPlaceholder: string;
+                    notes: string;
+                    notesPlaceholder: string;
+                };
+                labels: {
+                    contact: string;
+                    email: string;
+                    phone: string;
+                    address: string;
+                    notes: string;
+                };
+                emptyValues: {
+                    noNit: string;
+                    noContact: string;
+                    noEmail: string;
+                    noPhone: string;
+                    noAddress: string;
+                };
                 errors: {
                     cannotDeleteSupplierWithPurchases: string;
                     deletingSupplier: string;
@@ -3122,6 +3319,11 @@ export declare const resources: {
                 labels: {
                     action: string;
                     optional: string;
+                };
+                profile: {
+                    owner: string;
+                    employee: string;
+                    unknown: string;
                 };
                 messages: {
                     businessNameRequired: string;
@@ -3626,6 +3828,12 @@ export declare const resources: {
                 result: string;
                 ownerProfile: string;
                 employeeProfile: string;
+                salesVsPurchasesChart: string;
+                periodTotals: string;
+                paymentDistribution: string;
+                noChartData: string;
+                topSellersChart: string;
+                noSellersToChart: string;
             };
             ventasSection: {
                 perUnit: string;
@@ -3704,6 +3912,7 @@ export declare const resources: {
                 noSupplier: string;
                 allSuppliers: string;
                 catalogLoadError: string;
+                stockManagementHint: string;
                 selectSupplierError: string;
                 addProductError: string;
                 noStockControlError: string;
@@ -3711,6 +3920,9 @@ export declare const resources: {
                 zeroTotalError: string;
                 createPurchaseError: string;
                 deletePurchaseError: string;
+            };
+            print: {
+                printing: string;
             };
         };
         ventas: {
@@ -4301,6 +4513,8 @@ export declare const resources: {
                 statusAvailable: string;
                 invalidDate: string;
                 itemsLabel: string;
+                productsHeader: string;
+                quantityHeader: string;
                 printError: string;
                 printerError: string;
             };
@@ -4316,6 +4530,22 @@ export declare const resources: {
                 noSession: string;
                 orderNotFound: string;
                 updateFailed: string;
+                tableIdentifierRequired: string;
+                tableAlreadyExists: string;
+                tableMustBeNumeric: string;
+            };
+            toast: {
+                noKitchenItems: {
+                    title: string;
+                    message: string;
+                };
+                noPrinter: {
+                    title: string;
+                    message: string;
+                };
+                printError: {
+                    title: string;
+                };
             };
         };
         reports: {

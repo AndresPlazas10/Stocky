@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { printSaleReceipt } from '../../../utils/printDispatcher';
+import { useBusinessConfig } from '../../../contexts/BusinessConfigContext';
 import type { VentaRecord } from '../../../services/ventasService';
 
 export function useVentaPrint(
@@ -8,6 +9,7 @@ export function useVentaPrint(
   setError: (error: string | null) => void,
 ) {
   const { t } = useTranslation('mesas');
+  const { timezone } = useBusinessConfig();
   const [isPrinting, setIsPrinting] = useState(false);
 
   const handlePrintSale = useCallback(
@@ -25,6 +27,7 @@ export function useVentaPrint(
 
         const result = await printSaleReceipt(venta, details, {
           businessName: businessName ?? undefined,
+          timezone,
           t,
         });
 
@@ -37,7 +40,7 @@ export function useVentaPrint(
         setIsPrinting(false);
       }
     },
-    [businessName, setError, t],
+    [businessName, setError, t, timezone],
   );
 
   return {

@@ -159,30 +159,19 @@ function DownloadPage() {
       subtitle: apkVersion ? `v${apkVersion}` : t('download.latestVersion'),
       description: t('download.androidCompatible'),
       href: apkUrl,
-      label: t('download.downloadButton'),
+      label: t('download.downloadBtn'),
       apkOnly: true,
     },
     {
       icon: Monitor,
       title: 'Windows',
       subtitle: windowsVersion ? `v${windowsVersion}` : t('download.latestVersion'),
-      description: t('download.windowsInstaller'),
+      description: '',
       href: windowsUrl,
-      label: t('download.downloadButton'),
-      note: t('download.smartScreenWarning'),
+      label: t('download.downloadBtn'),
+      note: t('download.smartscreenWarning'),
     },
-    {
-      icon: Printer,
-      title: 'Print Bridge',
-      subtitle: 'APK',
-      description: t('download.printBridgeDescription'),
-      href: '/apk/stocky-print-bridge.apk',
-      download: 'stocky-print-bridge.apk',
-      label: t('download.downloadButton'),
-      note: t('download.printBridgeInstallNote'),
-      apkOnly: true,
-    },
-  ], [apkVersion, windowsVersion, apkUrl, windowsUrl, t]);
+  ], [apkVersion, apkUrl, windowsVersion, windowsUrl, t]);
 
   const toggleIOsSteps = useCallback(() => setShowIOsSteps((v) => !v), []);
 
@@ -203,7 +192,7 @@ function DownloadPage() {
             className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
           >
             <ArrowLeft className="h-4 w-4" />
-            {t('download.back')}
+            {t('buttons.back')}
           </button>
         </div>
       </header>
@@ -225,14 +214,14 @@ function DownloadPage() {
                 ? t('download.onIphoneMessage')
                 : userIsAndroid
                   ? t('download.onAndroidMessage')
-                  : t('download.allPlatformsMessage')}
+                  : t('download.allPlatforms')}
             </motion.p>
           </div>
         </section>
 
         <section className="px-4 pb-10 sm:px-6 sm:pb-14 lg:px-8 lg:pb-20">
           <div className="mx-auto max-w-5xl">
-            <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 justify-items-center max-w-2xl mx-auto">
               {downloads.map((item, index) => {
                 const isBlockedOnIOs = userIsOnIOs && item.apkOnly;
 
@@ -271,36 +260,20 @@ function DownloadPage() {
                     <p className="mb-3 sm:mb-4 text-xs leading-relaxed text-neutral-400">{item.note}</p>
                   )}
 
-                  {item.download ? (
-                    <a
-                      href={isBlockedOnIOs ? undefined : item.href}
-                      download={isBlockedOnIOs ? undefined : item.download}
-                      className={`inline-flex h-10 sm:h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition-all touch-manipulation active:scale-[0.98] no-underline ${
-                        isBlockedOnIOs
-                          ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed pointer-events-none'
-                          : 'bg-neutral-900 text-white sm:hover:bg-neutral-800'
-                      }`}
-                      aria-disabled={isBlockedOnIOs}
-                    >
-                      <Download className="h-4 w-4" />
-                      {item.label}
-                    </a>
-                  ) : (
-                    <a
-                      href={isBlockedOnIOs ? undefined : item.href}
-                      target={isBlockedOnIOs ? undefined : '_blank'}
-                      rel={isBlockedOnIOs ? undefined : 'noopener noreferrer'}
-                      className={`inline-flex h-10 sm:h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition-all touch-manipulation active:scale-[0.98] no-underline ${
-                        isBlockedOnIOs
-                          ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed pointer-events-none'
-                          : 'bg-neutral-900 text-white sm:hover:bg-neutral-800'
-                      }`}
-                      aria-disabled={isBlockedOnIOs}
-                    >
-                      <Download className="h-4 w-4" />
-                      {item.label}
-                    </a>
-                  )}
+                  <a
+                    href={isBlockedOnIOs ? undefined : item.href}
+                    target={isBlockedOnIOs ? undefined : '_blank'}
+                    rel={isBlockedOnIOs ? undefined : 'noopener noreferrer'}
+                    className={`inline-flex h-10 sm:h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition-all touch-manipulation active:scale-[0.98] no-underline ${
+                      isBlockedOnIOs
+                        ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed pointer-events-none'
+                        : 'bg-neutral-900 text-white sm:hover:bg-neutral-800'
+                    }`}
+                    aria-disabled={isBlockedOnIOs}
+                  >
+                    <Download className="h-4 w-4" />
+                    {item.label}
+                  </a>
 
                   {item.title === 'Windows' && !isBlockedOnIOs && (
                     <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl opacity-0 transition-opacity duration-500 sm:group-hover:opacity-100" aria-hidden="true">

@@ -5,7 +5,7 @@ const AUTO_SAVE_DEBOUNCE_MS = 3000;
 
 type UseMesaAutoSaveParams = {
   hasPendingChanges: boolean;
-  onSave: () => Promise<void> | void;
+  onSave: (options?: { isAutoSave?: boolean }) => Promise<void> | void;
   enabled: boolean;
 };
 
@@ -27,7 +27,7 @@ export function useMesaAutoSave({ hasPendingChanges, onSave, enabled }: UseMesaA
     if (!hasPendingRef.current || isSavingRef.current) return;
     isSavingRef.current = true;
     try {
-      await onSaveRef.current();
+      await onSaveRef.current({ isAutoSave: true });
     } finally {
       isSavingRef.current = false;
     }

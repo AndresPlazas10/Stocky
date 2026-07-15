@@ -1,3 +1,4 @@
+import i18next from 'i18next';
 import { getSupabaseClient } from '../../lib/supabase';
 import { normalizeNumber, normalizeReference, normalizeText } from '../../utils/normalization';
 import type {
@@ -68,16 +69,9 @@ function normalizeCompraRow(row: Record<string, unknown>): ReportesCompraRow {
 }
 
 function resolvePaymentMethodLabel(method: string) {
-  if (method === 'cash') return 'Efectivo';
-  if (method === 'card') return 'Tarjeta';
-  if (method === 'transfer') return 'Transferencia';
-  if (method === 'mixed') return 'Mixto';
-  if (method === 'nequi') return 'Nequi';
-  if (method === 'bancolombia') return 'Bancolombia';
-  if (method === 'banco_bogota') return 'Banco de Bogotá';
-  if (method === 'nu') return 'Nu';
-  if (method === 'davivienda') return 'Davivienda';
-  return method || 'Otro';
+  const translated = i18next.t(`common:paymentMethods.${method}`, { defaultValue: '' });
+  if (translated) return translated;
+  return method || i18next.t('common:paymentMethods.other', { defaultValue: 'Otro' });
 }
 
 function buildPaymentBreakdown(ventas: ReportesVentaRow[]): ReportesPaymentBreakdownItem[] {

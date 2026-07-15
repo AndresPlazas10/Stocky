@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useLowMotionMode } from '../../../hooks/useLowMotionMode.js';
 import { useProgressiveList } from '../../../hooks/useProgressiveList.js';
 import { useDebounce } from '../../../hooks/optimized.js';
@@ -9,7 +8,7 @@ import {
   isEmployeeInBusiness as isEmployeeInBusinessForOrders,
 } from '../../../data/queries/authQueries';
 import { isAdminRole } from '../../../utils/roles.js';
-import type { MesaRecord, AlertDetail } from '../../../types/components';
+import type { MesaRecord } from '../../../types/components';
 import type { ProductWithSupplier } from '../../../types/product';
 
 interface ComboItem {
@@ -19,15 +18,10 @@ interface ComboItem {
 }
 
 export function useMesasState(businessId: string, userRole: string = 'admin') {
-  const { t } = useTranslation(['mesas']);
   const canManageTables = isAdminRole(userRole);
   const [mesas, setMesas] = useState<MesaRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<boolean>(false);
-  const [successDetails, setSuccessDetails] = useState<AlertDetail[]>([]);
-  const [successTitle, setSuccessTitle] = useState<string>(t('mesas.defaults.actionCompleted'));
-  const [alertType, setAlertType] = useState<string>('success');
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [selectedMesa, setSelectedMesa] = useState<MesaRecord | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState<boolean>(false);
@@ -135,14 +129,11 @@ export function useMesasState(businessId: string, userRole: string = 'admin') {
 
   useEffect(() => {
     let errorTimer: ReturnType<typeof setTimeout>;
-    let successTimer: ReturnType<typeof setTimeout>;
     if (error) errorTimer = setTimeout(() => setError(null), 5000);
-    if (success) successTimer = setTimeout(() => setSuccess(false), 5000);
     return () => {
       if (errorTimer) clearTimeout(errorTimer);
-      if (successTimer) clearTimeout(successTimer);
     };
-  }, [error, success]);
+  }, [error]);
 
   return {
     canManageTables,
@@ -152,14 +143,6 @@ export function useMesasState(businessId: string, userRole: string = 'admin') {
     setLoading,
     error,
     setError,
-    success,
-    setSuccess,
-    successDetails,
-    setSuccessDetails,
-    successTitle,
-    setSuccessTitle,
-    alertType,
-    setAlertType,
     showAddForm,
     setShowAddForm,
     selectedMesa,

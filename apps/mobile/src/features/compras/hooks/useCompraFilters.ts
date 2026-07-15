@@ -13,7 +13,7 @@ import type { CompraRecord } from '../../../services/comprasService';
 
 const PAGE_SIZE = 20;
 
-export function useCompraFilters(purchases: CompraRecord[], supplierNameById: Map<string, string>) {
+export function useCompraFilters(purchases: CompraRecord[], supplierNameById: Map<string, string>, timezone?: string) {
   const { t } = useTranslation();
   const [dayFilter, setDayFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
@@ -27,12 +27,12 @@ export function useCompraFilters(purchases: CompraRecord[], supplierNameById: Ma
     const unique = Array.from(
       new Set(
         purchases
-          .map((purchase) => getRecordDayKey(purchase.created_at))
+          .map((purchase) => getRecordDayKey(purchase.created_at, timezone))
           .filter((value) => Boolean(value)),
       ),
     ).sort((a, b) => a.localeCompare(b));
     return unique[0] || null;
-  }, [purchases]);
+  }, [purchases, timezone]);
 
   const minSelectableDayKey = fallbackFirstCompraDayKey || todayDayKey;
   const maxSelectableDayKey = todayDayKey;
@@ -71,13 +71,13 @@ export function useCompraFilters(purchases: CompraRecord[], supplierNameById: Ma
     return purchases.filter((purchase) => {
       if (
         effectiveDayFilter !== 'all' &&
-        getRecordDayKey(purchase.created_at) !== effectiveDayFilter
+        getRecordDayKey(purchase.created_at, timezone) !== effectiveDayFilter
       )
         return false;
       if (supplierFilter !== 'all' && purchase.supplier_id !== supplierFilter) return false;
       return true;
     });
-  }, [effectiveDayFilter, purchases, supplierFilter]);
+  }, [effectiveDayFilter, purchases, supplierFilter, timezone]);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(filteredPurchases.length / PAGE_SIZE)),

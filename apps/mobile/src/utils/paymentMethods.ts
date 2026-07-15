@@ -1,4 +1,5 @@
 import type Ionicons from '@expo/vector-icons/Ionicons';
+import i18next from 'i18next';
 
 type PaymentMethod =
   | 'cash'
@@ -92,12 +93,12 @@ const EMOJI: Record<string, string> = {
 
 export function getPaymentMethodLabel(
   method: string | null | undefined,
-  options?: { emoji?: boolean; t?: (key: string) => string },
+  options?: { emoji?: boolean },
 ): string {
   const normalized = normalizeMethod(method);
-  const label = options?.t
-    ? options.t(`paymentMethods.${normalized}`)
-    : LABELS[normalized] || normalized || '-';
+  const label = i18next.t(`common:paymentMethods.${normalized}`, {
+    defaultValue: LABELS[normalized] || normalized || '-',
+  });
 
   if (options?.emoji) {
     return `${EMOJI[normalized] || ''} ${label}`;

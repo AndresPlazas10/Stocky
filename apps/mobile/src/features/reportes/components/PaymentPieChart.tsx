@@ -1,5 +1,6 @@
 import { Text, View } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
+import { useTranslation } from 'react-i18next';
 import { reportesStyles as s } from '../reportesStyles';
 
 interface PaymentPieDataItem {
@@ -23,11 +24,12 @@ export default function PaymentPieChart({
   height,
   chartConfig,
 }: PaymentPieChartProps) {
+  const { t } = useTranslation();
   return (
     <View style={s.blockCard}>
-      <Text style={s.sectionTitle}>Distribución por método</Text>
+      <Text style={s.sectionTitle}>{t('reportes.paymentDistribution')}</Text>
       {data.length === 0 ? (
-        <Text style={s.emptyText}>No hay datos para graficar.</Text>
+        <Text style={s.emptyText}>{t('reportes.noChartData')}</Text>
       ) : (
         <View style={s.chartWrap}>
           <PieChart

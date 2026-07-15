@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createMesa } from '../../../services/mesasService';
 import { getErrorCode, getErrorMessage } from '../../../utils/error';
 import { normalizeTableIdentifier } from '../utils/mesaHelpers';
@@ -25,28 +26,30 @@ export function useMesaCreate({
   onCreated,
   onError,
 }: UseMesaCreateProps): UseMesaCreateReturn {
+  const { t } = useTranslation('mesas');
   const [showCreateMesaModal, setShowCreateMesaModal] = useState(false);
   const [newTableNumber, setNewTableNumber] = useState('');
   const [isCreatingMesa, setIsCreatingMesa] = useState(false);
 
   const mesaPreviewName = useMemo(() => {
+    const tableLabel = t('labels.table');
     const identifier = normalizeTableIdentifier(newTableNumber);
-    if (!identifier) return 'Mesa';
-    if (/^mesa\s+/i.test(identifier)) return identifier;
-    return `Mesa ${identifier}`;
-  }, [newTableNumber]);
+    if (!identifier) return tableLabel;
+    if (new RegExp(`^${tableLabel}\\s+`, 'i').test(identifier)) return identifier;
+    return `${tableLabel} ${identifier}`;
+  }, [newTableNumber, t]);
 
   const handleCreateMesa = useCallback(async () => {
     if (isCreatingMesa) return;
 
     if (!context?.businessId) {
-      onError('No se encontro el negocio activo.');
+      onError(t('errors.loadFailed'));
       return;
     }
 
     const tableIdentifier = normalizeTableIdentifier(newTableNumber);
     if (!tableIdentifier) {
-      onError('Ingresa un identificador de mesa valido.');
+      onError(t('errors.tableIdentifierRequired') || t('errors.loadFailed'));
       return;
     }
 
@@ -65,9 +68,9 @@ export function useMesaCreate({
     } catch (err) {
       const code = getErrorCode(err);
       if (code === '23505') {
-        onError('Ese identificador de mesa ya existe.');
+        onError(t('errors.tableAlreadyExists') || t('errors.loadFailed'));
       } else if (code === '22P02') {
-        onError('En esta base de datos el identificador de mesa debe ser numerico.');
+        onError(t('errors.tableMustBeNumeric') || t('errors.loadFailed'));
       } else {
         onError(getErrorMessage(err));
       }

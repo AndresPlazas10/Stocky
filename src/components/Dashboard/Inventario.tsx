@@ -1,10 +1,7 @@
 import type { DashboardModuleProps } from '@/types/components';
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AnimatePresence, motion } from 'framer-motion';
 import { Package } from 'lucide-react';
-import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
-import { SaleErrorAlert } from '../ui/SaleErrorAlert';
+import { useAppToast } from '../../hooks/useAppToast';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
@@ -23,9 +20,6 @@ function Inventario({ businessId, userRole = 'admin' }: DashboardModuleProps) {
     suppliers,
     loading,
     error,
-    setError,
-    success,
-    setSuccess,
     isEmployee,
     hasAdminPrivileges,
     visibleProducts,
@@ -37,6 +31,8 @@ function Inventario({ businessId, userRole = 'admin' }: DashboardModuleProps) {
     loadProducts,
     setProductsWithSnapshot,
   } = useInventoryProducts(businessId, userRole);
+
+  const { showError, showSuccess, ToastComponent } = useAppToast();
 
   const {
     formData,
@@ -65,6 +61,8 @@ function Inventario({ businessId, userRole = 'admin' }: DashboardModuleProps) {
     setProductsWithSnapshot,
     hasAdminPrivileges,
     isEmployee,
+    showSuccess,
+    showError,
   });
 
   const handleToggleForm = () => {
@@ -94,39 +92,29 @@ function Inventario({ businessId, userRole = 'admin' }: DashboardModuleProps) {
   const handleDeleteConfirm = async () => {
     try {
       await confirmDelete();
-      setSuccess(t('success.deleted'));
+      showSuccess(t('success.deleted'));
     } catch (err) {
-      setError(err.message || t('errors.deleteFailed'));
+      showError(t('errors.general'), err.message || t('errors.deleteFailed'));
     }
   };
 
   const handleDeactivateConfirm = async () => {
     try {
       await confirmDeactivate();
-      setSuccess(t('success.deleted'));
+      showSuccess(t('success.deleted'));
     } catch (err) {
-      setError(err.message || t('errors.deleteFailed'));
+      showError(t('errors.general'), err.message || t('errors.deleteFailed'));
     }
   };
 
   const handleToggleActive = async (productId, currentStatus) => {
     try {
       await toggleActive(productId, currentStatus);
-      setSuccess(`${t('success.updated')} / ${t('status.inactive')}`);
+      showSuccess(`${t('success.updated')} / ${t('status.inactive')}`);
     } catch (err) {
-      setError(err.message || t('errors.deleteFailed'));
+      showError(t('errors.general'), err.message || t('errors.deleteFailed'));
     }
   };
-
-  const successTitle = useMemo(() => {
-    const normalized = String(success || '').toLowerCase();
-    if (normalized.includes('eliminad')) return t('success.deleted');
-    if (normalized.includes('desactivad')) return t('success.deleted');
-    if (normalized.includes('activad')) return t('success.updated');
-    if (normalized.includes('actualizad')) return t('success.updated');
-    if (normalized.includes('cread')) return t('success.created');
-    return t('success.saved');
-  }, [success, t]);
 
   return (
     <AsyncStateWrapper
@@ -154,16 +142,6 @@ function Inventario({ businessId, userRole = 'admin' }: DashboardModuleProps) {
     >
       <div>
         <InventoryHeader hasAdminPrivileges={hasAdminPrivileges} showForm={showForm} onToggleForm={handleToggleForm} />
-
-        <SaleErrorAlert isVisible={!!error} onClose={() => setError('')} title={t('errors.general')} message={error} duration={5000} />
-
-        <SaleSuccessAlert
-          isVisible={!!success}
-          onClose={() => setSuccess('')}
-          title={successTitle}
-          details={[{ label: t('labels.action'), value: success }]}
-          duration={5000}
-        />
 
         <ProductFormModal
           mode={editingProduct ? 'edit' : 'create'}
@@ -210,6 +188,8 @@ function Inventario({ businessId, userRole = 'admin' }: DashboardModuleProps) {
           onConfirm={handleDeactivateConfirm}
           onCancel={cancelDelete}
         />
+
+        <ToastComponent />
       </div>
     </AsyncStateWrapper>
   );

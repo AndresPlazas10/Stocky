@@ -589,6 +589,13 @@ export const comprasStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  stockManagementHint: {
+    color: STOCKY_COLORS.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+    fontStyle: 'italic',
+    marginTop: -4,
+  },
   filterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

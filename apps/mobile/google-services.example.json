@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "YOUR_MOBILESDK_APP_ID",
         "android_client_info": {
-          "package_name": "com.stocky.mobile"
+          "package_name": "app.stockypos"
         }
       },
       "oauth_client": [],

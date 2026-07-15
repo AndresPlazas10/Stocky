@@ -70,17 +70,32 @@ export function useMesasRefs({
 
   const sendMesaSyncBroadcast = useCallback((event, payload) => {
     const channel = mesaSyncBroadcastChannelRef.current;
-    if (!channel) return;
+    if (!channel) {
+      logger.warn('[Broadcast] No channel available for sending', { event });
+      return;
+    }
     const message = { type: 'broadcast', event, payload };
     const canHttpSend = typeof channel?.httpSend === 'function';
     const isReady = mesaSyncBroadcastReadyRef.current === true;
+    
+    logger.info('[Broadcast] Sending broadcast', { 
+      event, 
+      mesaId: payload?.mesa_id, 
+      locked: payload?.locked, 
+      mode: payload?.mode,
+      isReady,
+      willUseHttp: !isReady && canHttpSend 
+    });
+    
     if (!isReady && canHttpSend) {
+      logger.warn('[Broadcast] Channel not ready, using HTTP fallback');
       void channel.httpSend(message);
       return;
     }
     const sendResult = channel.send(message);
     if (sendResult && typeof sendResult.then === 'function') {
-      void sendResult.catch(() => {
+      void sendResult.catch((err) => {
+        logger.error('[Broadcast] Send failed, trying HTTP fallback', err);
         if (canHttpSend) return channel.httpSend(message);
         return undefined;
       });

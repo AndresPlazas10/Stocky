@@ -24,9 +24,11 @@ interface UseInventoryCrudParams {
   setProductsWithSnapshot: (updater: ProductWithSupplier[] | ((prev: ProductWithSupplier[]) => ProductWithSupplier[])) => void;
   hasAdminPrivileges: boolean;
   isEmployee: boolean;
+  showSuccess: (title: string, message?: string) => void;
+  showError: (title: string, message?: string) => void;
 }
 
-export function useInventoryCrud({ businessId, loadProducts, setProductsWithSnapshot, hasAdminPrivileges, isEmployee }: UseInventoryCrudParams) {
+export function useInventoryCrud({ businessId, loadProducts, setProductsWithSnapshot, hasAdminPrivileges, isEmployee, showSuccess, showError }: UseInventoryCrudParams) {
   const [formData, setFormData] = useState<ProductFormData>(INITIAL_FORM_STATE);
   const [showForm, setShowForm] = useState<boolean>(false);
   const [editingProduct, setEditingProduct] = useState<ProductWithSupplier | null>(null);
@@ -90,6 +92,9 @@ export function useInventoryCrud({ businessId, loadProducts, setProductsWithSnap
       setShowEditModal(false);
       setEditingProduct(null);
       resetForm();
+      showSuccess('Éxito', 'Producto actualizado');
+    } catch (err) {
+      showError('Error', (err as Error)?.message || 'Error al actualizar el producto');
     } finally {
       setIsSubmitting(false);
     }
@@ -106,16 +111,16 @@ export function useInventoryCrud({ businessId, loadProducts, setProductsWithSnap
         const normalizedSalePrice = parsePriceInput(formData.sale_price, NaN);
         const normalizedPurchasePrice = parsePriceInput(formData.purchase_price, 0);
 
-        if (!formData.name?.trim()) throw new Error('El nombre del producto es requerido');
-        if (!formData.category?.trim()) throw new Error('La categoría del producto es requerida');
+        if (!formData.name?.trim()) { showError('Error', 'El nombre del producto es requerido'); return; }
+        if (!formData.category?.trim()) { showError('Error', 'La categoría del producto es requerida'); return; }
         if (!formData.sale_price || !Number.isFinite(normalizedSalePrice) || normalizedSalePrice <= 0) {
-          throw new Error('El precio de venta debe ser mayor a 0');
+          showError('Error', 'El precio de venta debe ser mayor a 0'); return;
         }
         if (formData.purchase_price && normalizedPurchasePrice < 0) {
-          throw new Error('El precio de compra no puede ser negativo');
+          showError('Error', 'El precio de compra no puede ser negativo'); return;
         }
         if (formData.sale_price && formData.purchase_price && normalizedSalePrice < normalizedPurchasePrice) {
-          throw new Error('El precio de venta no puede ser menor al precio de compra');
+          showError('Error', 'El precio de venta no puede ser menor al precio de compra'); return;
         }
 
         if (editingProduct) {
@@ -157,6 +162,9 @@ export function useInventoryCrud({ businessId, loadProducts, setProductsWithSnap
 
         setShowForm(false);
         resetForm();
+        showSuccess('Éxito', 'Producto creado');
+      } catch (err) {
+        showError('Error', (err as Error)?.message || 'Error al crear el producto');
       } finally {
         setIsSubmitting(false);
       }

@@ -180,7 +180,7 @@ export function SyncStyleAlert({
                     </h3>
                   )}
                   {normalizedMessage && (
-                    <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                    <p className="mt-1 text-xs leading-relaxed text-slate-100">
                       {normalizedMessage}
                     </p>
                   )}
@@ -250,7 +250,7 @@ export function SyncStyleAlert({
                   )}
 
                   {normalizedMessage && (
-                    <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                    <p className="mt-2 text-sm leading-relaxed text-slate-100">
                       {normalizedMessage}
                     </p>
                   )}

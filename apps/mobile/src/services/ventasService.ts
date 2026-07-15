@@ -248,17 +248,15 @@ async function resolveSellerContext(businessId: string) {
 
 function normalizeVentaRecord(row: Record<string, unknown>): VentaRecord {
   const paymentMethod = normalizeText(row?.payment_method).toLowerCase();
-  const safeMethod: PaymentMethod =
-    paymentMethod === 'card' ||
-    paymentMethod === 'transfer' ||
-    paymentMethod === 'mixed' ||
-    paymentMethod === 'nequi' ||
-    paymentMethod === 'bancolombia' ||
-    paymentMethod === 'banco_bogota' ||
-    paymentMethod === 'nu' ||
-    paymentMethod === 'davivienda'
-      ? paymentMethod
-      : 'cash';
+  const VALID_PAYMENT_METHODS = new Set([
+    'cash', 'card', 'transfer', 'mixed',
+    'nequi', 'bancolombia', 'banco_bogota', 'nu', 'davivienda', 'daviplata',
+    'spei', 'oxxo', 'yape', 'plin', 'mercadopago',
+    'venmo', 'cashapp', 'zelle',
+  ]);
+  const safeMethod: PaymentMethod = VALID_PAYMENT_METHODS.has(paymentMethod)
+    ? (paymentMethod as PaymentMethod)
+    : 'cash';
 
   return {
     id: normalizeText(row?.id),

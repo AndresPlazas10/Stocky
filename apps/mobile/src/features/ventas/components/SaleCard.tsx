@@ -1,9 +1,10 @@
 import { memo } from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { formatDateTime } from '../../../utils/dateHelpers';
+import { useBusinessConfig } from '../../../contexts/BusinessConfigContext';
 import { getBankLogoSource, isBankPaymentMethod } from '../../../utils/paymentMethodBranding';
 import { getPaymentMethodLabel, getPaymentMethodTheme } from '../../../utils/paymentMethods';
 import type { VentaRecord } from '../../../services/ventasService';
@@ -12,6 +13,7 @@ import { ventasStyles as s } from '../ventasStyles';
 type SaleCardProps = {
   venta: VentaRecord;
   canDelete: boolean;
+  isPrinting?: boolean;
   onViewDetails: (venta: VentaRecord) => void;
   onPrint: (venta: VentaRecord) => void;
   onDelete: (venta: VentaRecord) => void;
@@ -20,16 +22,18 @@ type SaleCardProps = {
 export const SaleCard = memo(function SaleCard({
   venta,
   canDelete,
+  isPrinting = false,
   onViewDetails,
   onPrint,
   onDelete,
 }: SaleCardProps) {
   const { t } = useTranslation();
+  const { timezone } = useBusinessConfig();
   return (
     <View style={s.saleCard}>
       <View style={s.saleDateRow}>
         <Ionicons name="calendar-outline" size={26} color="#111827" />
-        <Text style={s.saleDateText}>{formatDateTime(venta.created_at)}</Text>
+        <Text style={s.saleDateText}>{formatDateTime(venta.created_at, { timezone })}</Text>
       </View>
 
       <View style={s.saleInfoGrid}>
@@ -85,9 +89,19 @@ export const SaleCard = memo(function SaleCard({
           <Text style={s.saleDetailsText}>{t('buttons.viewDetails')}</Text>
         </Pressable>
 
-        <Pressable style={[s.salePrintButton, s.saleActionHalf]} onPress={() => onPrint(venta)}>
-          <Ionicons name="print-outline" size={20} color="#DCFCE7" />
-          <Text style={s.salePrintText}>{t('buttons.print')}</Text>
+        <Pressable
+          style={[s.salePrintButton, s.saleActionHalf, isPrinting && s.salePrintButtonDisabled]}
+          onPress={() => onPrint(venta)}
+          disabled={isPrinting}
+        >
+          {isPrinting ? (
+            <ActivityIndicator size="small" color="#DCFCE7" />
+          ) : (
+            <Ionicons name="print-outline" size={20} color="#DCFCE7" />
+          )}
+          <Text style={s.salePrintText}>
+            {isPrinting ? t('print.printing') : t('buttons.print')}
+          </Text>
         </Pressable>
       </View>
 

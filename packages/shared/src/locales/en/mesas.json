@@ -133,6 +133,8 @@
     "statusAvailable": "Available",
     "invalidDate": "Invalid date",
     "itemsLabel": "Items",
+    "productsHeader": "Products",
+    "quantityHeader": "Quantity",
     "printError": "The sale has no items to print.",
     "printerError": "Could not send to printer. Check Bluetooth connection."
   },
@@ -147,6 +149,22 @@
     "notFound": "No business found associated with this account.",
     "noSession": "No active session token to execute the action.",
     "orderNotFound": "The table was opened, but no active order was found.",
-    "updateFailed": "Could not update the table."
+    "updateFailed": "Could not update the table.",
+    "tableIdentifierRequired": "Enter a valid table identifier.",
+    "tableAlreadyExists": "That table identifier already exists.",
+    "tableMustBeNumeric": "In this database the table identifier must be numeric."
+  },
+  "toast": {
+    "noKitchenItems": {
+      "title": "No kitchen products",
+      "message": "There are no products in the 'Dishes' category to print"
+    },
+    "noPrinter": {
+      "title": "No printer",
+      "message": "No printer connected. Go to Settings > Printing to connect one."
+    },
+    "printError": {
+      "title": "Print error"
+    }
   }
 }

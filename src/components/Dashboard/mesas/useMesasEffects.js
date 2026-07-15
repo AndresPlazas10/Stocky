@@ -54,16 +54,20 @@ export function useMesasEffects({
   // Broadcast Channel
   useEffect(() => {
     if (!businessId) return undefined;
+    logger.info('[Broadcast] Setting up channel', { businessId });
     const channel = supabase
       .channel(`private:mobile-mesas-sync:${businessId}`)
       .on('broadcast', { event: 'mesa_lock_changed' }, ({ payload }) => {
+        logger.info('[Broadcast] Event received on channel', { mesaId: payload?.mesa_id });
         applyRealtimeMesaLockBroadcast(payload);
       });
     channel.subscribe((status) => {
+      logger.info('[Broadcast] Channel status changed', { status });
       mesaSyncBroadcastReadyRef.current = status === 'SUBSCRIBED';
     });
     mesaSyncBroadcastChannelRef.current = channel;
     return () => {
+      logger.info('[Broadcast] Cleaning up channel');
       mesaSyncBroadcastReadyRef.current = false;
       if (mesaSyncBroadcastChannelRef.current) {
         supabase.removeChannel(mesaSyncBroadcastChannelRef.current);

@@ -37,7 +37,10 @@ export function buildSaleEscPos(
   writeLine(out, cleanText(header?.businessName || 'Sistema Stocky'));
 
   const dateText = cleanText(header?.dateText || '');
-  if (dateText) writeLine(out, dateText);
+  if (dateText) {
+    feed(out, 1);
+    writeLine(out, dateText);
+  }
 
   feed(out, 2);
   align(out, 0);
@@ -49,6 +52,7 @@ export function buildSaleEscPos(
     for (const row of metadata) {
       if (!row) continue;
       twoColumns(out, cleanText(row.label) + ':', cleanText(row.value), columns);
+      feed(out, 1);
     }
   }
 
@@ -58,9 +62,15 @@ export function buildSaleEscPos(
 
   bold(out, true);
   align(out, 0);
-  writeLine(out, cleanText(receipt.itemsHeader || 'PRODUCTO       CANT.      TOTAL'));
+  threeColumns(
+    out,
+    cleanText(receipt.productHeader || 'Producto'),
+    cleanText(receipt.quantityAbbreviation || 'Cant.'),
+    cleanText(receipt.total || 'Total'),
+    columns,
+  );
   bold(out, false);
-  feed(out, 2);
+  feed(out, 1);
 
   const items = receipt.items;
   if (items) {
@@ -89,12 +99,8 @@ export function buildSaleEscPos(
 
     bold(out, true);
     size(out, true);
-    twoColumns(
-      out,
-      (receipt.totalLabel || 'TOTAL') + ':',
-      cleanText(totals.totalText || ''),
-      columns,
-    );
+    const totalText = (receipt.totalLabel || 'TOTAL') + ': ' + cleanText(totals.totalText || '');
+    writeLine(out, totalText);
     size(out, false);
     bold(out, false);
   }
@@ -211,21 +217,29 @@ interface ReceiptItem {
   name?: string;
 }
 
+function threeColumns(out: ByteStream, left: string, center: string, right: string, columns: number) {
+  const colWidth = Math.floor(columns / 3);
+  const leftCol = left.padStart(Math.floor((colWidth + left.length) / 2)).padEnd(colWidth);
+  const centerCol = center.padStart(Math.floor((colWidth + center.length) / 2)).padEnd(colWidth);
+  const rightCol = right.padStart(Math.floor((colWidth + right.length) / 2));
+  writeLine(out, leftCol + centerCol + rightCol);
+}
+
 function itemLines(out: ByteStream, item: ReceiptItem, columns: number) {
   const qty = item.quantity || 0;
   const total = cleanText(item.subtotalText || String(item.subtotal || 0));
-  const qtyTotal = 'x' + qty + ' ' + total;
-  const nameWidth = Math.max(12, columns - qtyTotal.length - 1);
   const name = cleanText(item.name || 'Item');
-  const names = wrapText(name, nameWidth);
+  const colWidth = Math.floor(columns / 3);
+  const qtyStr = 'x' + qty;
 
-  for (let i = 0; i < names.length; i++) {
-    if (i > 0) {
-      writeLine(out, names[i]);
-    } else {
-      const line = names[i].padEnd(columns - qtyTotal.length, ' ') + qtyTotal;
-      writeLine(out, line);
-    }
+  const nameLines = wrapText(name, colWidth);
+  for (let i = 0; i < nameLines.length; i++) {
+    const nameCol = nameLines[i].padEnd(colWidth);
+    const qtyCol = i === 0
+      ? qtyStr.padStart(Math.floor((colWidth + qtyStr.length) / 2)).padEnd(colWidth)
+      : ' '.repeat(colWidth);
+    const totalCol = i === 0 ? total : '';
+    writeLine(out, nameCol + qtyCol + totalCol);
   }
 }
 
@@ -263,6 +277,9 @@ export interface SaleReceipt {
     alignment?: 'left' | 'center' | 'right';
   };
   itemsHeader?: string;
+  productHeader?: string;
+  quantityAbbreviation?: string;
+  total?: string;
   tipLabel?: string;
   totalLabel?: string;
   methodLabel?: string;
@@ -276,6 +293,7 @@ export function buildKitchenEscPos(opts: {
   businessName?: string;
   paperWidthMm: number;
   autoCut?: boolean;
+  timezone?: string;
   labels: ReceiptLabels;
 }): Uint8Array {
   const columns = opts.paperWidthMm <= 58 ? 32 : opts.paperWidthMm <= 80 ? 48 : 64;
@@ -301,14 +319,26 @@ export function buildKitchenEscPos(opts: {
   feed(out, 1);
 
   const now = opts.createdAt ? new Date(opts.createdAt) : new Date();
-  const day = String(now.getDate()).padStart(2, '0');
-  const mo = String(now.getMonth() + 1).padStart(2, '0');
-  const yr = now.getFullYear();
-  let hr = now.getHours();
-  const ap = hr >= 12 ? 'p.m.' : 'a.m.';
-  hr = hr % 12 || 12;
-  const mi = String(now.getMinutes()).padStart(2, '0');
-  writeLine(out, `${day}/${mo}/${yr} ${hr}:${mi} ${ap}`);
+  const tz = opts.timezone || 'America/Bogota';
+  const dateParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).formatToParts(now);
+
+  const getPart = (type: string) => dateParts.find(p => p.type === type)?.value || '';
+  const day = getPart('day');
+  const month = getPart('month');
+  const year = getPart('year');
+  const hour = getPart('hour');
+  const minute = getPart('minute');
+  const rawPeriod = getPart('dayPeriod').toLowerCase();
+  const dayPeriod = rawPeriod.includes('a') ? 'a.m.' : 'p.m.';
+  writeLine(out, `${day}/${month}/${year} ${hour}:${minute} ${dayPeriod}`);
 
   feed(out, 1);
   align(out, 0);
@@ -321,11 +351,17 @@ export function buildKitchenEscPos(opts: {
   thinSeparator(out, columns);
   feed(out, 1);
 
+  bold(out, true);
+  twoColumns(out, cleanText(labels.productsHeader), cleanText(labels.quantityHeader), columns);
+  bold(out, false);
+  feed(out, 1);
+
   for (const item of opts.items) {
     if (!item || !item.name) continue;
     bold(out, true);
-    writeLine(out, cleanText(item.name) + '  x' + (item.quantity || 0));
+    twoColumns(out, cleanText(item.name), 'x' + (item.quantity || 0), columns);
     bold(out, false);
+    feed(out, 1);
   }
 
   feed(out, 1);

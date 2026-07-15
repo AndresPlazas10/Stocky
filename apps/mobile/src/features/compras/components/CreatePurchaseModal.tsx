@@ -174,6 +174,8 @@ export const CreatePurchaseModal = memo(function CreatePurchaseModal({
         editable={Boolean(supplierId)}
       />
 
+      <Text style={s.stockManagementHint}>{t('comprasSection.stockManagementHint')}</Text>
+
       {!supplierId ? (
         <Text style={s.emptyText}>{t('comprasSection.selectSupplierCatalog')}</Text>
       ) : loadingCatalog ? (

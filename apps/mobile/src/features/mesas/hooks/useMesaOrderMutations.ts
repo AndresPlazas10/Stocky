@@ -5,6 +5,7 @@ import { getSavedPrinter, connectPrintDisconnect } from '../../../services/bluet
 import { getThermalPaperWidthMm, isAutoCutEnabled } from '../../../utils/printer';
 import { buildKitchenEscPos } from '../../../services/escposService';
 import { buildReceiptLabels } from '../../../utils/receiptLabels';
+import { useBusinessConfig } from '../../../contexts/BusinessConfigContext';
 import {
   calculateOrderTotal,
   listOrderItems,
@@ -236,6 +237,7 @@ export function useMesaOrderMutations({
   onPrintError,
 }: UseMesaOrderMutationsParams) {
   const { t } = useTranslation('mesas');
+  const { timezone } = useBusinessConfig();
   const {
     showOrderModal: _showOrderModal,
     setShowOrderModal,
@@ -783,22 +785,24 @@ export function useMesaOrderMutations({
     ],
   );
 
-  const handleSaveOrder = useCallback(async () => {
+  const handleSaveOrder = useCallback(async (options?: { isAutoSave?: boolean }) => {
+    const isAutoSave = options?.isAutoSave ?? false;
+    
     if (releasingEmptyOrder || isClosingOrder || isSavingOrder || loadingOrder) return;
 
     const snapshotBeforeSave = latestOrderItemsRef.current;
     if (snapshotBeforeSave.length === 0) {
-      void releaseEmptyOrderAndClose();
+      if (!isAutoSave) void releaseEmptyOrderAndClose();
       return;
     }
 
     if (!selectedMesa?.id || !selectedMesa.current_order_id) {
-      setOrderModalError('No hay una orden activa para guardar.');
+      if (!isAutoSave) setOrderModalError('No hay una orden activa para guardar.');
       return;
     }
 
     setIsSavingOrder(true);
-    setOrderModalError(null);
+    if (!isAutoSave) setOrderModalError(null);
 
     try {
       if (quantitySyncTimerRef.current) {
@@ -819,7 +823,7 @@ export function useMesaOrderMutations({
 
       const snapshotToPersist = latestOrderItemsRef.current;
       if (snapshotToPersist.length === 0) {
-        void releaseEmptyOrderAndClose();
+        if (!isAutoSave) void releaseEmptyOrderAndClose();
         return;
       }
 
@@ -841,20 +845,25 @@ export function useMesaOrderMutations({
         persistedUnits,
         'confirmed',
       );
-      closeOrderModal();
-      onOrderSaved?.();
+      // Only close modal on manual save, not auto-save
+      if (!isAutoSave) {
+        closeOrderModal();
+        onOrderSaved?.();
+      }
       setHasPendingChanges(false);
     } catch (err) {
-      const fallbackMessage = 'No se pudo guardar la orden.';
-      const message =
-        err instanceof Error
-          ? err.message
-          : String(
-              (err as { message?: string; details?: string } | null)?.message ||
-                (err as { details?: string } | null)?.details ||
-                fallbackMessage,
-            );
-      setOrderModalError(message || fallbackMessage);
+      if (!isAutoSave) {
+        const fallbackMessage = 'No se pudo guardar la orden.';
+        const message =
+          err instanceof Error
+            ? err.message
+            : String(
+                (err as { message?: string; details?: string } | null)?.message ||
+                  (err as { details?: string } | null)?.details ||
+                  fallbackMessage,
+              );
+        setOrderModalError(message || fallbackMessage);
+      }
     } finally {
       setIsSavingOrder(false);
     }
@@ -1302,6 +1311,7 @@ export function useMesaOrderMutations({
         })),
         paperWidthMm,
         autoCut,
+        timezone,
         labels: receiptLabels,
       });
       const result = await connectPrintDisconnect(savedPrinter.address, escposData);
@@ -1310,7 +1320,7 @@ export function useMesaOrderMutations({
         closeOrderModal();
         return;
       }
-      onPrintError?.(result.error || receiptLabels.printerError);
+      onPrintError?.('error' in result ? result.error : receiptLabels.printerError);
       closeOrderModal();
     } catch (err) {
       if (__DEV__) console.error('[Print] Kitchen: print error', err);

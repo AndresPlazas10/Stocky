@@ -129,7 +129,7 @@ export async function connectToPrinter(address: string): Promise<boolean> {
 
   await delay(CONNECT_DELAY_MS);
 
-  // La PT-210 y otras impresoras termicas chinas suelen preferir conexion secure
+  // Intentar conexión segura (las impresoras térmicas suelen usar conexión secure)
   try {
     await BluetoothClassic.connectToDevice(address, {
       connectorType: 'rfcomm',
@@ -140,19 +140,7 @@ export async function connectToPrinter(address: string): Promise<boolean> {
     return true;
   } catch (secureError) {
     if (__DEV__) console.error('[BT Printer] connectToDevice (secure) failed:', secureError);
-    try {
-      await BluetoothClassic.connectToDevice(address, {
-        connectorType: 'rfcomm',
-        secure: false,
-      });
-      if (__DEV__) console.warn('[BT Printer] Connected (insecure) to', address);
-      await delay(CONNECT_DELAY_MS);
-      return true;
-    } catch (insecureError) {
-      if (__DEV__)
-        console.error('[BT Printer] connectToDevice (insecure fallback) failed:', insecureError);
-      return false;
-    }
+    return false;
   }
 }
 
@@ -172,6 +160,7 @@ export async function printBytes(address: string, data: Uint8Array): Promise<Pri
     if (__DEV__) console.error('[BT Printer] printBytes:', moduleError);
     return { ok: false, error: moduleError };
   }
+
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       if (attempt > 0) {
@@ -186,7 +175,11 @@ export async function printBytes(address: string, data: Uint8Array): Promise<Pri
         const reconnected = await connectToPrinter(address);
         if (!reconnected) {
           if (__DEV__) console.error('[BT Printer] Reconnection failed');
-          continue;
+          return {
+            ok: false,
+            error:
+              'La impresora parece estar apagada o fuera de rango. Verifica que esté encendida y cerca.',
+          };
         }
       }
 
@@ -222,6 +215,7 @@ export async function printBytes(address: string, data: Uint8Array): Promise<Pri
       }
     }
   }
+
   return { ok: false, error: 'No se pudo conectar ni enviar datos a la impresora.' };
 }
 
@@ -236,5 +230,40 @@ export async function isPrinterConnected(address: string): Promise<boolean> {
   } catch (error) {
     if (__DEV__) console.error('[BT Printer] isPrinterConnected failed:', error);
     return false;
+  }
+}
+
+/**
+ * Connect → Print → Disconnect
+ * Conecta a la impresora, envía los datos y desconecta inmediatamente.
+ * Esto permite que múltiples dispositivos compartan la misma impresora
+ * sin bloquearla con una conexión persistente.
+ */
+export async function connectPrintDisconnect(
+  address: string,
+  data: Uint8Array,
+): Promise<PrintResult> {
+  const moduleError = checkBluetoothModule();
+  if (moduleError) {
+    if (__DEV__) console.error('[BT Printer] connectPrintDisconnect:', moduleError);
+    return { ok: false, error: moduleError };
+  }
+
+  if (__DEV__) console.warn('[BT Printer] connectPrintDisconnect: Connecting to', address);
+  const connected = await connectToPrinter(address);
+  if (!connected) {
+    return {
+      ok: false,
+      error: 'Impresora ocupada, por favor intente de nuevo...',
+    };
+  }
+
+  try {
+    if (__DEV__) console.warn('[BT Printer] connectPrintDisconnect: Printing...');
+    const result = await printBytes(address, data);
+    return result;
+  } finally {
+    if (__DEV__) console.warn('[BT Printer] connectPrintDisconnect: Disconnecting...');
+    await disconnectFromPrinter(address);
   }
 }

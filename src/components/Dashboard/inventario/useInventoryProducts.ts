@@ -29,7 +29,6 @@ export function useInventoryProducts(businessId: string, userRole: string = 'adm
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [isEmployee, setIsEmployee] = useState<boolean>(false);
   const [page, setPage] = useState<number>(1);
   const [hasMoreProductsRemote, setHasMoreProductsRemote] = useState<boolean>(true);
@@ -202,20 +201,6 @@ export function useInventoryProducts(businessId: string, userRole: string = 'adm
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId, loadProducts, loadSuppliers]);
 
-  useEffect(() => {
-    if (success) {
-      const timer = setTimeout(() => setSuccess(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [success]);
-
-  useEffect(() => {
-    if (error) {
-      const timer = setTimeout(() => setError(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [error]);
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   useRealtimeSubscription('products', {
     filter: { business_id: businessId },
@@ -236,9 +221,6 @@ export function useInventoryProducts(businessId: string, userRole: string = 'adm
         if (exists) return prev;
         return [productWithSupplier, ...prev];
       });
-
-      setSuccess('Nuevo producto agregado');
-      setTimeout(() => setSuccess(null), 3000);
     },
     onUpdate: (updatedProduct: ProductWithSupplier) => {
       setProductsWithSnapshot((prev) =>
@@ -257,8 +239,6 @@ export function useInventoryProducts(businessId: string, userRole: string = 'adm
     loading,
     error,
     setError,
-    success,
-    setSuccess,
     isEmployee,
     hasAdminPrivileges,
     visibleProducts,

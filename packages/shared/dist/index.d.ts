@@ -8,4 +8,7 @@ export type { CashBreakdownEntry, ChangeResult } from './cambio.js';
 export { COLOMBIAN_DENOMINATIONS, parseCopAmount, calcularCambio } from './cambio.js';
 export { isConnectivityError } from './connectivity.js';
 export { normalizeText, normalizeOptionalText, normalizeNumber, normalizeOptionalAmount, normalizeReference } from './normalization.js';
+export { isMesaOccupied, normalizeTableIdentifier, compareMesaTableIdentifiers, resolveMesaSyncVersion, mesaDisplayName } from './mesaUtils.js';
+export { normalizeOrderReference, normalizeOrderItemQuantity, normalizeOrderItemSubtotal, calculateOrderTotal, calculateOrderUnits, sumOrderItemsQuantity } from './orderNormalization.js';
+export { reconcileOrderItemsFromServer } from './orderReconciliation.js';
 //# sourceMappingURL=index.d.ts.map

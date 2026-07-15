@@ -53,6 +53,8 @@ dist-ssr
 !/public/apk/stocky-print-bridge.apk
 /apps/mobile/*.apk
 /apps/mobile/*.aab
+apps/mobile/android-upload.keystore
+apps/mobile/credentials.json
 
 # Supabase local temp files
 /supabase/.temp/

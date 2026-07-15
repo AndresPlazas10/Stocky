@@ -1,6 +1,8 @@
 import { getSupabaseClient } from '../lib/supabase';
 import { normalizeNumber, normalizeText } from '../utils/normalization';
 import { isFunctionUnavailableError, isMissingColumnError } from '../utils/supabaseErrors';
+import { emitCatalogInvalidated } from '../utils/catalogEvents';
+import { clearCatalogFromStorage } from '../features/mesas/utils/catalogCache';
 import type { SupabaseErrorLike } from '../types/errors';
 
 export type MesaOrderProduct = {
@@ -510,11 +512,14 @@ export function invalidateCatalogItemsCache(businessId?: string) {
   if (normalizedBusinessId) {
     catalogCacheByBusinessId.delete(normalizedBusinessId);
     catalogInFlightByBusinessId.delete(normalizedBusinessId);
+    void clearCatalogFromStorage(normalizedBusinessId);
+    emitCatalogInvalidated();
     return;
   }
 
   catalogCacheByBusinessId.clear();
   catalogInFlightByBusinessId.clear();
+  emitCatalogInvalidated();
 }
 
 export function invalidateOrderItemsCache(orderId?: string) {

@@ -40,3 +40,12 @@ export async function writeCatalogToStorage(businessId: string, items: MesaOrder
     // no-op
   }
 }
+
+export async function clearCatalogFromStorage(businessId: string): Promise<void> {
+  const storageKey = `${CATALOG_STORAGE_PREFIX}${businessId}`;
+  try {
+    await AsyncStorage.removeItem(storageKey);
+  } catch {
+    // no-op
+  }
+}

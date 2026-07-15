@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 import { type EmpleadoRecord } from '../../../services/empleadosService';
 import { empleadosStyles as s } from '../empleadosStyles';
 import { formatRoleLabel } from '../empleadosUtils';
@@ -22,6 +23,7 @@ export const EmployeeCard = memo(function EmployeeCard({
   deleting,
   onDelete,
 }: EmployeeCardProps) {
+  const { t } = useTranslation();
   const initial =
     String(employee.full_name || '?')
       .trim()
@@ -33,8 +35,8 @@ export const EmployeeCard = memo(function EmployeeCard({
   return (
     <View style={s.employeeCard}>
       <View style={s.tableHeader}>
-        <Text style={[s.tableHeaderText, s.cellEmployee]}>EMPLEADO</Text>
-        <Text style={[s.tableHeaderText, s.cellUser]}>USUARIO</Text>
+        <Text style={[s.tableHeaderText, s.cellEmployee]}>{t('empleados.card.employee')}</Text>
+        <Text style={[s.tableHeaderText, s.cellUser]}>{t('empleados.card.username')}</Text>
       </View>
 
       <View style={s.tableRow}>
@@ -51,9 +53,9 @@ export const EmployeeCard = memo(function EmployeeCard({
       </View>
 
       <View style={s.tableHeader}>
-        <Text style={[s.tableHeaderText, s.cellStatus]}>ESTADO</Text>
-        <Text style={[s.tableHeaderText, s.cellRole]}>ROL</Text>
-        <Text style={[s.tableHeaderText, s.cellAction]}>ACCIÓN</Text>
+        <Text style={[s.tableHeaderText, s.cellStatus]}>{t('empleados.card.status')}</Text>
+        <Text style={[s.tableHeaderText, s.cellRole]}>{t('empleados.card.role')}</Text>
+        <Text style={[s.tableHeaderText, s.cellAction]}>{t('empleados.card.action')}</Text>
       </View>
 
       <View style={s.tableRow}>
@@ -70,7 +72,7 @@ export const EmployeeCard = memo(function EmployeeCard({
                 employee.is_active ? s.statusActiveText : s.statusInactiveText,
               ]}
             >
-              {employee.is_active ? 'Activo' : 'Inactivo'}
+              {employee.is_active ? t('empleados.card.active') : t('empleados.card.inactive')}
             </Text>
           </View>
         </View>
@@ -90,7 +92,7 @@ export const EmployeeCard = memo(function EmployeeCard({
               disabled={deleteDisabled}
             >
               <Ionicons name="trash-outline" size={18} color="#9F1239" />
-              <Text style={s.deleteActionText}>{isSelfUser ? 'Tu usuario' : 'Eliminar'}</Text>
+              <Text style={s.deleteActionText}>{isSelfUser ? t('empleados.card.yourUser') : t('empleados.card.delete')}</Text>
             </Pressable>
           ) : (
             <Text style={s.roleValue}>-</Text>

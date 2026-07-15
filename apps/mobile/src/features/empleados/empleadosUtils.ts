@@ -1,3 +1,5 @@
+import i18next from 'i18next';
+
 export type EmployeeFormState = {
   full_name: string;
   username: string;
@@ -20,7 +22,11 @@ export function normalizeRole(value: unknown): string {
 
 export function formatRoleLabel(role: string): string {
   const normalized = normalizeRole(role);
-  if (normalized === 'owner' || normalized === 'propietario') return 'Propietario';
-  if (normalized === 'admin' || normalized === 'administrador') return 'Administrador';
-  return 'Empleado';
+  if (normalized === 'owner' || normalized === 'propietario') {
+    return i18next.t('empleados.roles.owner', { defaultValue: 'Propietario' });
+  }
+  if (normalized === 'admin' || normalized === 'administrador') {
+    return i18next.t('empleados.roles.admin', { defaultValue: 'Administrador' });
+  }
+  return i18next.t('empleados.roles.employee', { defaultValue: 'Empleado' });
 }

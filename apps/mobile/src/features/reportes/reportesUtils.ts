@@ -11,7 +11,7 @@ export const PERIOD_OPTIONS: { value: ReportesPeriod; label: string }[] = [
 export function formatShortDateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'n/a';
-  return new Intl.DateTimeFormat('es-CO', {
+  return new Intl.DateTimeFormat(i18next.language || 'es-CO', {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(date);

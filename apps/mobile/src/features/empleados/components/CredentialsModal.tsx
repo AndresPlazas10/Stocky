@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { STOCKY_COLORS, STOCKY_RADIUS } from '../../../theme/tokens';
 import { StockyModal } from '../../../ui/StockyModal';
 
@@ -15,6 +16,7 @@ interface CredentialsModalProps {
 }
 
 export function CredentialsModal({ visible, credentials, onClose }: CredentialsModalProps) {
+  const { t } = useTranslation();
   return (
     <StockyModal
       visible={visible}
@@ -37,7 +39,7 @@ export function CredentialsModal({ visible, credentials, onClose }: CredentialsM
             <View style={styles.headerIconWrap}>
               <Ionicons name="key-outline" size={18} color="#D1FAE5" />
             </View>
-            <Text style={styles.headerTitle}>Credenciales generadas</Text>
+            <Text style={styles.headerTitle}>{t('empleados.credentials.title')}</Text>
           </View>
           <Pressable style={styles.headerClose} onPress={onClose}>
             <Ionicons name="close" size={19} color="#D1FAE5" />
@@ -48,7 +50,7 @@ export function CredentialsModal({ visible, credentials, onClose }: CredentialsM
         <View style={styles.actionsRow}>
           <Pressable style={styles.confirmButton} onPress={onClose}>
             <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" />
-            <Text style={styles.confirmText}>Entendido</Text>
+            <Text style={styles.confirmText}>{t('empleados.credentials.understood')}</Text>
           </Pressable>
         </View>
       }
@@ -56,7 +58,7 @@ export function CredentialsModal({ visible, credentials, onClose }: CredentialsM
       <View style={styles.messageCard}>
         <Ionicons name="information-circle-outline" size={16} color="#065F46" />
         <Text style={styles.messageText}>
-          Comparte estas credenciales con {credentials?.fullName || 'el empleado'}:
+          {t('empleados.credentials.shareMessage', { name: credentials?.fullName || t('empleados.credentials.shareMessageFallback') })}
         </Text>
       </View>
 
@@ -65,7 +67,7 @@ export function CredentialsModal({ visible, credentials, onClose }: CredentialsM
           <Ionicons name="person-outline" size={16} color="#059669" />
         </View>
         <View style={styles.credentialTextWrap}>
-          <Text style={styles.credentialLabel}>Usuario</Text>
+          <Text style={styles.credentialLabel}>{t('empleados.credentials.username')}</Text>
           <Text style={styles.credentialValue}>{credentials?.username || '-'}</Text>
         </View>
       </View>
@@ -75,7 +77,7 @@ export function CredentialsModal({ visible, credentials, onClose }: CredentialsM
           <Ionicons name="lock-closed-outline" size={16} color="#059669" />
         </View>
         <View style={styles.credentialTextWrap}>
-          <Text style={styles.credentialLabel}>Contraseña</Text>
+          <Text style={styles.credentialLabel}>{t('empleados.credentials.password')}</Text>
           <Text style={styles.credentialValue}>{credentials?.password || '-'}</Text>
         </View>
       </View>

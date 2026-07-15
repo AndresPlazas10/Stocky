@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { SaleSuccessAlert } from '../ui/SaleSuccessAlert';
-import { SaleErrorAlert } from '../ui/SaleErrorAlert';
+import { useAppToast } from '../../hooks/useAppToast';
 import { getSuppliersForManagementPage } from '../../data/queries/suppliersQueries';
 import {
   deleteSupplierById,
@@ -40,8 +39,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<{ id: string; business_name: string; contact_name?: string; email?: string; phone?: string; address?: string; nit?: string; notes?: string } | null>(null);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const { showError, showSuccess, ToastComponent } = useAppToast();
   const [searchTerm, setSearchTerm] = useState('');
   
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -107,7 +105,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
         setHasMoreSuppliers(false);
         setPage(1);
       } else {
-        setError(`❌ ${t('errors.loadingSuppliers')}: ${(err as Error)?.message || t('errors.unknown')}`);
+        showError(t('errors.loadingSuppliers'), (err as Error)?.message || t('errors.unknown'));
       }
     } finally {
       setLoading(false);
@@ -132,7 +130,6 @@ function Proveedores({ businessId }: DashboardModuleProps) {
     if (isSubmitting) return;
     
     setIsSubmitting(true);
-    setError('');
     
     try {
       if (!businessId) {
@@ -162,14 +159,14 @@ function Proveedores({ businessId }: DashboardModuleProps) {
       const { taxColumn } = result;
       if (taxColumn !== supplierTaxColumn) setSupplierTaxColumn(taxColumn);
 
-      setSuccess(editingSupplier ? t('success.updated') : t('success.created'));
+      showSuccess(editingSupplier ? t('success.updated') : t('success.created'));
       resetForm();
       void result;
       await loadProveedores();
       setShowModal(false);
       
     } catch (err) {
-      setError((err as Error).message || t('errors.savingSupplier'));
+      showError(t('errors.savingSupplier'), (err as Error).message);
     } finally {
       setIsSubmitting(false);
     }
@@ -206,7 +203,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
         loadProveedores();
       } catch (err) {
         if ((err as Record<string, unknown>)?.code === '23503') {
-          setError(`❌ ${t('errors.cannotDeleteSupplierWithPurchases')}`);
+          showError(t('errors.cannotDeleteSupplierWithPurchases'));
           setShowDeleteModal(false);
           setSupplierToDelete(null);
           return;
@@ -214,11 +211,11 @@ function Proveedores({ businessId }: DashboardModuleProps) {
         throw err;
       }
 
-      setSuccess(`✅ ${t('success.deleted')}`);
+      showSuccess(t('success.deleted'));
       setShowDeleteModal(false);
       setSupplierToDelete(null);
     } catch {
-      setError(`❌ ${t('errors.deletingSupplier')}`);
+      showError(t('errors.deletingSupplier'));
       setShowDeleteModal(false);
       setSupplierToDelete(null);
     }
@@ -241,16 +238,6 @@ function Proveedores({ businessId }: DashboardModuleProps) {
       [name]: value
     }));
   };
-
-  useEffect(() => {
-    let errorTimer: ReturnType<typeof setTimeout>, successTimer: ReturnType<typeof setTimeout>;
-    if (error) errorTimer = setTimeout(() => setError(''), 5000);
-    if (success) successTimer = setTimeout(() => setSuccess(''), 5000);
-    return () => {
-      if (errorTimer) clearTimeout(errorTimer);
-      if (successTimer) clearTimeout(successTimer);
-    };
-  }, [error, success]);
 
   const filteredSuppliers = useMemo(() => {
     if (!searchTerm.trim()) return suppliers;
@@ -280,14 +267,6 @@ function Proveedores({ businessId }: DashboardModuleProps) {
     canLoadMore: canLoadMoreSuppliers,
     loading: loadingMore
   });
-
-  const successTitle = useMemo(() => {
-    const normalized = success.toLowerCase();
-    if (normalized.includes('eliminad')) return `✨ ${t('success.deleted')}`;
-    if (normalized.includes('actualizad')) return `✨ ${t('success.updated')}`;
-    if (normalized.includes('cread')) return `✨ ${t('success.created')}`;
-    return `✨ ${t('success.saved')}`;
-  }, [success, t]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#C4DFE6]/10 p-4 md:p-6">
@@ -322,23 +301,6 @@ function Proveedores({ businessId }: DashboardModuleProps) {
             </button>
           </div>
         </motion.div>
-
-        {/* Alertas mejoradas */}
-        <SaleErrorAlert 
-          isVisible={!!error}
-          onClose={() => setError('')}
-          title={t('errors.error')}
-          message={error}
-          duration={5000}
-        />
-
-        <SaleSuccessAlert 
-          isVisible={!!success}
-          onClose={() => setSuccess('')}
-          title={successTitle}
-          details={[{ label: t('labels.action'), value: success }]}
-          duration={5000}
-        />
 
         {/* Barra de búsqueda y estadísticas */}
         <motion.div
@@ -823,6 +785,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
           </motion.div>
         )}
       </AnimatePresence>
+      <ToastComponent />
     </div>
   );
 }

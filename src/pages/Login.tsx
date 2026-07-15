@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ChangeEvent } from 'react';
+import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { SaleErrorAlert } from '@/components/ui/SaleErrorAlert';
+import { useAppToast } from '@/hooks/useAppToast';
 
 import { User, Lock, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import logoStocky from '../assets/logoStocky.png';
@@ -27,8 +27,16 @@ function Login() {
     password: ''
   });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const { showError, showWarning, ToastComponent } = useAppToast();
+
+  useEffect(() => {
+    const sessionExpired = localStorage.getItem('stocky.session_expired');
+    if (sessionExpired) {
+      localStorage.removeItem('stocky.session_expired');
+      showWarning(t('login.sessionExpired'));
+    }
+  }, []);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -41,13 +49,14 @@ function Login() {
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
 
     try {
       const { username, password } = formData;
       
       if (!username || !password) {
-        throw new Error(t('login.enterUsernamePassword'));
+        showError(t('login.loginError'), t('login.enterUsernamePassword'));
+        setLoading(false);
+        return;
       }
 
       const { user } = await signInWithUsernamePassword({
@@ -64,7 +73,10 @@ function Login() {
       }
     } catch (err) {
       const msg = (err as Error).message;
-      setError(msg === 'INVALID_CREDENTIALS' ? t('login.invalidCredentials') : msg);
+      showError(
+        t('login.loginError'),
+        msg === 'INVALID_CREDENTIALS' ? t('login.invalidCredentials') : msg
+      );
       setLoading(false);
     }
   };
@@ -100,19 +112,6 @@ function Login() {
           {t('login.back')}
         </Button>
       </motion.div>
-
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-4 pointer-events-none">
-        <div className="pointer-events-auto">
-          <SaleErrorAlert
-            isVisible={!!error}
-            onClose={() => setError(null)}
-            title={t('login.loginError')}
-            message={error || ''}
-            duration={5000}
-            usePortal={false}
-          />
-        </div>
-      </div>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -205,6 +204,7 @@ function Login() {
           </CardContent>
         </Card>
       </motion.div>
+      <ToastComponent />
     </div>
   );
 }

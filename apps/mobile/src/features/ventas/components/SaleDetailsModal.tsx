@@ -7,6 +7,7 @@ import { STOCKY_COLORS } from '../../../theme/tokens';
 import { StockyModal } from '../../../ui/StockyModal';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { formatDateTime } from '../../../utils/dateHelpers';
+import { useBusinessConfig } from '../../../contexts/BusinessConfigContext';
 import { getBankLogoSource, isBankPaymentMethod } from '../../../utils/paymentMethodBranding';
 import { getPaymentMethodLabel, getPaymentMethodTheme } from '../../../utils/paymentMethods';
 import { getOrderItemName, type MesaOrderItem } from '../../../services/mesaOrderService';
@@ -31,6 +32,7 @@ export const SaleDetailsModal = React.memo(function SaleDetailsModal({
   onClose,
 }: SaleDetailsModalProps) {
   const { t } = useTranslation();
+  const { timezone } = useBusinessConfig();
   const selectedVentaItemsCount = useMemo(
     () =>
       selectedVentaDetails.reduce((sum, item) => sum + Math.max(0, Number(item.quantity || 0)), 0),
@@ -117,7 +119,7 @@ export const SaleDetailsModal = React.memo(function SaleDetailsModal({
             <View style={s.saleDetailsHeroMetaItem}>
               <Ionicons name="calendar-outline" size={14} color="#64748B" />
               <Text style={s.saleDetailsHeroMetaText}>
-                {formatDateTime(selectedVenta.created_at)}
+                {formatDateTime(selectedVenta.created_at, { timezone })}
               </Text>
             </View>
             <View style={s.saleDetailsHeroMetaItem}>
