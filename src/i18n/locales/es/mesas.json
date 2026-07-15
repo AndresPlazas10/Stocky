@@ -48,7 +48,11 @@
     "tableUpdated": "Mesa Actualizada"
   },
   "defaults": {
-    "generalSale": "Venta general"
+    "generalSale": "Venta general",
+    "someoneUsingTable": "Alguien está usando esta mesa.",
+    "user": "Usuario",
+    "item": "Producto",
+    "unknownError": "Error desconocido"
   },
   "empty": {
     "noTables": "Aún no hay mesas creadas",
