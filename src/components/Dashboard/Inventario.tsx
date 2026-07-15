@@ -89,12 +89,20 @@ function Inventario({ businessId, userRole = 'admin' }: DashboardModuleProps) {
     handleSubmit(e);
   };
 
+  const getFriendlyErrorMessage = (err: unknown): string => {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('sale_detail') || message.includes('product_id') || message.includes('combo_id')) {
+      return t('errors.productHasSales');
+    }
+    return message || t('errors.deleteFailed');
+  };
+
   const handleDeleteConfirm = async () => {
     try {
       await confirmDelete();
       showSuccess(t('success.deleted'));
     } catch (err) {
-      showError(t('errors.general'), err.message || t('errors.deleteFailed'));
+      showError(t('errors.general'), getFriendlyErrorMessage(err));
     }
   };
 
@@ -103,7 +111,7 @@ function Inventario({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       await confirmDeactivate();
       showSuccess(t('success.deleted'));
     } catch (err) {
-      showError(t('errors.general'), err.message || t('errors.deleteFailed'));
+      showError(t('errors.general'), getFriendlyErrorMessage(err));
     }
   };
 
