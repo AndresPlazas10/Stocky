@@ -1617,5 +1617,25 @@
     },
     "print": {
         "printing": "Printing..."
+    },
+    "combosService": {
+        "errors": {
+            "loadFailed": "Could not load combos",
+            "createFailed": "Could not create combo",
+            "updateFailed": "Could not update combo",
+            "deleteFailed": "Could not delete combo",
+            "deleteWithMovements": "Cannot delete combo because it has associated movements. You can deactivate it.",
+            "itemsSaveFailed": "Could not save combo products",
+            "itemsUpdateFailed": "Could not update combo products",
+            "comboNotFound": "Combo does not exist or you don't have permissions to delete it",
+            "nameRequired": "Combo name is required",
+            "priceMustBePositive": "Sale price must be greater than 0",
+            "quantityMustBePositive": "Quantity must be greater than 0",
+            "atLeastOneProduct": "You must add at least one product to the combo",
+            "productRequired": "Select a product in row {{row}}",
+            "duplicateProducts": "Duplicate products are not allowed in the combo",
+            "businessIdRequired": "businessId is required",
+            "comboIdRequired": "comboId is required"
+        }
     }
 }
