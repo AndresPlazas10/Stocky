@@ -861,8 +861,14 @@ export declare const resources: {
                     delete: string;
                 };
                 buttons: {
+                    cancel: string;
+                    createEmployee: string;
                     creatingEmployee: string;
+                    delete: string;
+                    loading: string;
                     loadMoreEmployees: string;
+                    newEmployee: string;
+                    understood: string;
                 };
                 errors: {
                     businessNotFound: string;
@@ -871,13 +877,22 @@ export declare const resources: {
                     loadingEmployees: string;
                 };
                 labels: {
+                    actions: string;
                     employees: string;
                     of: string;
+                    role: string;
                     showing: string;
+                    status: string;
+                    total: string;
+                    user: string;
                 };
                 messages: {
+                    actionCannotBeUndone: string;
+                    clickNewEmployeeToCreateFirst: string;
+                    confirmDelete: string;
                     employeeCanLoginImmediately: string;
                     noEmployeesFound: string;
+                    noEmployeesYet: string;
                 };
                 placeholders: {
                     searchByNameUserOrCode: string;
@@ -894,8 +909,10 @@ export declare const resources: {
                     nameNeedsLetter: string;
                     nameNotOnlyNumbers: string;
                     nameRequired: string;
+                    passwordHelp: string;
                     passwordMinLength: string;
                     passwordRequired: string;
+                    usernameFormat: string;
                     usernameInvalidFormat: string;
                     usernameIsBusiness: string;
                     usernameNotOnlyNumbers: string;
@@ -3186,8 +3203,14 @@ export declare const resources: {
                     delete: string;
                 };
                 buttons: {
+                    cancel: string;
+                    createEmployee: string;
                     creatingEmployee: string;
+                    delete: string;
+                    loading: string;
                     loadMoreEmployees: string;
+                    newEmployee: string;
+                    understood: string;
                 };
                 errors: {
                     businessNotFound: string;
@@ -3196,13 +3219,22 @@ export declare const resources: {
                     loadingEmployees: string;
                 };
                 labels: {
+                    actions: string;
                     employees: string;
                     of: string;
+                    role: string;
                     showing: string;
+                    status: string;
+                    total: string;
+                    user: string;
                 };
                 messages: {
+                    actionCannotBeUndone: string;
+                    clickNewEmployeeToCreateFirst: string;
+                    confirmDelete: string;
                     employeeCanLoginImmediately: string;
                     noEmployeesFound: string;
+                    noEmployeesYet: string;
                 };
                 placeholders: {
                     searchByNameUserOrCode: string;
@@ -3219,8 +3251,10 @@ export declare const resources: {
                     nameNeedsLetter: string;
                     nameNotOnlyNumbers: string;
                     nameRequired: string;
+                    passwordHelp: string;
                     passwordMinLength: string;
                     passwordRequired: string;
+                    usernameFormat: string;
                     usernameInvalidFormat: string;
                     usernameIsBusiness: string;
                     usernameNotOnlyNumbers: string;

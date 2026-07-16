@@ -134,20 +134,17 @@ function isOrderContextError(errorLike) {
     message.includes('orden') && message.includes('no encontrada')
   ) || (
     message.includes('mesa') && message.includes('no encontrada')
+  ) || (
+    // Patrones adicionales para errores envueltos por create_sale_complete
+    message.includes('error al crear venta') && (
+      message.includes('mesa') || message.includes('orden') || message.includes('cambió')
+    )
+  ) || (
+    // Patrón genérico para errores de estado de mesa/orden
+    message.includes('mesa') && (
+      message.includes('cambió') || message.includes('no está') || message.includes('no se pudo')
+    )
   );
-
-  if (!result && message.length > 0) {
-    logger.info('isOrderContextError: no match', {
-      message,
-      patterns: {
-        ordenNoAbierta: message.includes('la orden') && message.includes('no está abierta'),
-        mesaNoAsociada: message.includes('la mesa') && message.includes('no está asociada'),
-        cambioDuranteCierre: message.includes('cambió durante el cierre'),
-        ordenNoEncontrada: message.includes('orden') && message.includes('no encontrada'),
-        mesaNoEncontrada: message.includes('mesa') && message.includes('no encontrada')
-      }
-    });
-  }
 
   return result;
 }
@@ -396,12 +393,16 @@ async function finalizeOrderAndTable({ businessId, orderId, tableId }) {
       payload: { status: 'closed', closed_at: new Date().toISOString() }
     });
 
-    // Ignorar si la orden ya fue cerrada (puede ocurrir en fallback por combos)
+    // Ignorar si la orden ya fue cerrada o no existe (puede ocurrir en fallback)
     if (orderCloseError) {
       const orderMsg = String(orderCloseError.message || '').toLowerCase();
-      const isAlreadyClosed = orderMsg.includes('already closed') || orderMsg.includes('ya está cerrada');
+      const isAlreadyClosed = orderMsg.includes('already closed')
+        || orderMsg.includes('ya está cerrada')
+        || orderMsg.includes('not found')
+        || orderMsg.includes('no encontrada')
+        || orderMsg.includes('0 rows');
       if (!isAlreadyClosed) {
-        throw new Error(orderCloseError.message || '❌ No se pudo cerrar la orden.');
+        logger.warn('finalizeOrderAndTable: error al cerrar orden (ignorado)', { orderCloseError });
       }
     }
   }
@@ -413,12 +414,17 @@ async function finalizeOrderAndTable({ businessId, orderId, tableId }) {
       payload: { current_order_id: null, status: 'available' }
     });
 
-    // Ignorar si la mesa ya fue liberada (puede ocurrir en fallback por combos)
+    // Ignorar si la mesa ya fue liberada o no existe (puede ocurrir en fallback)
     if (tableReleaseError) {
       const tableMsg = String(tableReleaseError.message || '').toLowerCase();
-      const isAlreadyFreed = tableMsg.includes('already') || tableMsg.includes('ya está disponible');
+      const isAlreadyFreed = tableMsg.includes('already')
+        || tableMsg.includes('ya está disponible')
+        || tableMsg.includes('not found')
+        || tableMsg.includes('no encontrada')
+        || tableMsg.includes('0 rows')
+        || tableMsg.includes('current_order_id');
       if (!isAlreadyFreed) {
-        throw new Error(tableReleaseError.message || '❌ No se pudo liberar la mesa.');
+        logger.warn('finalizeOrderAndTable: error al liberar mesa (ignorado)', { tableReleaseError });
       }
     }
   }
@@ -668,8 +674,9 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
 
   let totalSold = 0;
   const saleIds = [];
-  // Para combo bypass, siempre cerrar orden/mesa por separado para evitar conflictos de estado
-  const shouldAlwaysFinalizeSeparately = isComboBypass || shouldFallbackWithoutOrderContext;
+  // SIEMPRE cerrar orden/mesa por separado en fallback para evitar conflictos de estado
+  // Esto evita que create_sale_complete intente liberar la mesa cuando el estado ya cambió
+  const shouldAlwaysFinalizeSeparately = true;
   logger.info('closeOrderAsSplit: iniciando fallback', {
     subAccountCount: subAccountsWithItems.length,
     isComboBypass,

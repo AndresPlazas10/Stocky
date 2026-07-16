@@ -372,6 +372,26 @@ export const toFiniteNumber = (value: unknown, fallback = 0): number => {
 };
 
 /**
+ * Retorna clases CSS de Tailwind para tamaño de fuente responsivo
+ * basado en la longitud del valor formateado.
+ * Útil para mostrar valores monetarios largos sin truncar.
+ * 
+ * Ejemplos:
+ * - "$1.000 COP" (9 chars) → 'text-2xl sm:text-3xl'
+ * - "$1.000.000 COP" (14 chars) → 'text-xl sm:text-2xl'
+ * - "$1.000.000.000 COP" (18 chars) → 'text-lg sm:text-xl'
+ */
+export const getResponsiveFontSize = (formattedValue: string): string => {
+  const length = formattedValue.length;
+
+  if (length <= 7) return 'text-2xl sm:text-3xl';
+  if (length <= 10) return 'text-xl sm:text-2xl';
+  if (length <= 13) return 'text-lg sm:text-xl';
+  if (length <= 16) return 'text-base sm:text-lg';
+  return 'text-sm sm:text-base';
+};
+
+/**
  * Formatea fecha y hora de forma completa para reportes
  */
 export const formatDateTimeReport = (

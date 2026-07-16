@@ -679,8 +679,14 @@
   },
   "empleados": {
     "buttons": {
+      "cancel": "Cancelar",
+      "createEmployee": "Crear empleado",
       "creatingEmployee": "Creando empleado...",
-      "loadMoreEmployees": "Cargar más empleados"
+      "delete": "Eliminar",
+      "loading": "Cargando...",
+      "loadMoreEmployees": "Cargar más empleados",
+      "newEmployee": "Nuevo empleado",
+      "understood": "Entendido"
     },
     "errors": {
       "businessNotFound": "Negocio no encontrado",
@@ -689,13 +695,22 @@
       "loadingEmployees": "Error al cargar empleados"
     },
     "labels": {
+      "actions": "Acciones",
       "employees": "Empleados",
       "of": "de",
-      "showing": "Mostrando"
+      "role": "Rol",
+      "showing": "Mostrando",
+      "status": "Estado",
+      "total": "Total",
+      "user": "Usuario"
     },
     "messages": {
+      "actionCannotBeUndone": "Esta acción no se puede deshacer",
+      "clickNewEmployeeToCreateFirst": "Haz clic en Nuevo empleado para crear el primero",
+      "confirmDelete": "Confirmar eliminación",
       "employeeCanLoginImmediately": "El empleado puede iniciar sesión inmediatamente con estas credenciales.",
-      "noEmployeesFound": "No se encontraron empleados"
+      "noEmployeesFound": "No se encontraron empleados",
+      "noEmployeesYet": "Aún no hay empleados"
     },
     "placeholders": {
       "searchByNameUserOrCode": "Buscar por nombre, usuario o código..."
@@ -712,8 +727,10 @@
       "nameNeedsLetter": "El nombre debe contener al menos una letra",
       "nameNotOnlyNumbers": "El nombre no puede ser solo números",
       "nameRequired": "El nombre es obligatorio",
+      "passwordHelp": "Mínimo 6 caracteres",
       "passwordMinLength": "La contraseña debe tener al menos 6 caracteres",
       "passwordRequired": "La contraseña es obligatoria",
+      "usernameFormat": "Formato: letras, números y guiones bajos",
       "usernameInvalidFormat": "Formato de usuario inválido",
       "usernameIsBusiness": "Este nombre de usuario está reservado para el negocio",
       "usernameNotOnlyNumbers": "El usuario no puede ser solo números",

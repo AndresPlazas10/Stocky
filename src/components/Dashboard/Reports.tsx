@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { formatPrice } from '../../utils/formatters';
+import { formatPrice, getResponsiveFontSize } from '../../utils/formatters';
 import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 import { getReportsSnapshot } from '../../data/queries/reportsQueries';
 import { useAppToast } from '../../hooks/useAppToast';
@@ -382,7 +382,7 @@ function Reports({ businessId }: DashboardModuleProps) {
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs sm:text-sm opacity-90">{t('labels.totalSales')}</p>
-                  <p className="text-2xl sm:text-3xl font-bold truncate">{fmtPrice(metrics.totalSales)}</p>
+                  <p className={`${getResponsiveFontSize(fmtPrice(metrics.totalSales))} font-bold`}>{fmtPrice(metrics.totalSales)}</p>
                   <p className="text-xs sm:text-sm opacity-80">{metrics.salesCount} {t('reports:labels.transactions')}</p>
                 </div>
               </motion.div>
@@ -403,7 +403,7 @@ function Reports({ businessId }: DashboardModuleProps) {
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs sm:text-sm opacity-90">{t('labels.totalPurchases')}</p>
-                  <p className="text-2xl sm:text-3xl font-bold truncate">{fmtPrice(metrics.totalPurchases)}</p>
+                  <p className={`${getResponsiveFontSize(fmtPrice(metrics.totalPurchases))} font-bold`}>{fmtPrice(metrics.totalPurchases)}</p>
                   <p className="text-xs sm:text-sm opacity-80">{metrics.purchasesCount} {t('reports:labels.totalPurchases')}</p>
                 </div>
               </motion.div>
@@ -428,7 +428,7 @@ function Reports({ businessId }: DashboardModuleProps) {
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs sm:text-sm opacity-90">{t('labels.grossProfit')}</p>
-                  <p className="text-2xl sm:text-3xl font-bold truncate">{fmtPrice(metrics.grossProfit)}</p>
+                  <p className={`${getResponsiveFontSize(fmtPrice(metrics.grossProfit))} font-bold`}>{fmtPrice(metrics.grossProfit)}</p>
                   <p className="text-xs sm:text-sm opacity-80">
                     {metrics.grossProfit >= 0 ? t('metrics.positive') + ' ✓' : t('metrics.negative') + ' ⚠'}
                   </p>
@@ -636,7 +636,7 @@ function Reports({ businessId }: DashboardModuleProps) {
                             )}
                             <span className="font-semibold text-gray-800">{getPaymentMethodLabel(metodo.method, t)}</span>
                           </div>
-                          <span className="text-lg font-bold text-green-600">
+                          <span className={`${getResponsiveFontSize(fmtPrice(metodo.total))} font-bold text-green-600`}>
                             {fmtPrice(metodo.total)}
                           </span>
                         </motion.div>
