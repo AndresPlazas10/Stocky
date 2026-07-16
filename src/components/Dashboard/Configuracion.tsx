@@ -106,7 +106,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
         }
       });
 
-      showSuccess(t('settings.saved'), t('messages.infoUpdated'));
+      showSuccess(t('settings.saved'), t('configuracion.messages.infoUpdated'));
       setEditingBusiness(false);
 
       if (onBusinessUpdate && data) {
