@@ -160,6 +160,7 @@ export declare const resources: {
                 supplier: string;
                 category: string;
                 stock: string;
+                manageStock: string;
                 minStock: string;
                 code: string;
                 date: string;
@@ -2502,6 +2503,7 @@ export declare const resources: {
                 supplier: string;
                 category: string;
                 stock: string;
+                manageStock: string;
                 minStock: string;
                 code: string;
                 date: string;
