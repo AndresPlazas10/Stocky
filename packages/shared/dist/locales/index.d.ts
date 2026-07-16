@@ -1620,6 +1620,26 @@ export declare const resources: {
             print: {
                 printing: string;
             };
+            combosService: {
+                errors: {
+                    loadFailed: string;
+                    createFailed: string;
+                    updateFailed: string;
+                    deleteFailed: string;
+                    deleteWithMovements: string;
+                    itemsSaveFailed: string;
+                    itemsUpdateFailed: string;
+                    comboNotFound: string;
+                    nameRequired: string;
+                    priceMustBePositive: string;
+                    quantityMustBePositive: string;
+                    atLeastOneProduct: string;
+                    productRequired: string;
+                    duplicateProducts: string;
+                    businessIdRequired: string;
+                    comboIdRequired: string;
+                };
+            };
         };
         ventas: {
             title: string;
@@ -1758,6 +1778,26 @@ export declare const resources: {
                 customerName: string;
                 defaultCustomer: string;
                 printing: string;
+            };
+            combosService: {
+                errors: {
+                    loadFailed: string;
+                    createFailed: string;
+                    updateFailed: string;
+                    deleteFailed: string;
+                    deleteWithMovements: string;
+                    itemsSaveFailed: string;
+                    itemsUpdateFailed: string;
+                    comboNotFound: string;
+                    nameRequired: string;
+                    priceMustBePositive: string;
+                    quantityMustBePositive: string;
+                    atLeastOneProduct: string;
+                    productRequired: string;
+                    duplicateProducts: string;
+                    businessIdRequired: string;
+                    comboIdRequired: string;
+                };
                 printSuccess: string;
                 printFailed: string;
             };
@@ -2182,6 +2222,26 @@ export declare const resources: {
             print: {
                 kitchenOrder: string;
                 printing: string;
+            };
+            combosService: {
+                errors: {
+                    loadFailed: string;
+                    createFailed: string;
+                    updateFailed: string;
+                    deleteFailed: string;
+                    deleteWithMovements: string;
+                    itemsSaveFailed: string;
+                    itemsUpdateFailed: string;
+                    comboNotFound: string;
+                    nameRequired: string;
+                    priceMustBePositive: string;
+                    quantityMustBePositive: string;
+                    atLeastOneProduct: string;
+                    productRequired: string;
+                    duplicateProducts: string;
+                    businessIdRequired: string;
+                    comboIdRequired: string;
+                };
                 saving: string;
                 processing: string;
                 printSuccess: string;
@@ -3964,6 +4024,26 @@ export declare const resources: {
             print: {
                 printing: string;
             };
+            combosService: {
+                errors: {
+                    loadFailed: string;
+                    createFailed: string;
+                    updateFailed: string;
+                    deleteFailed: string;
+                    deleteWithMovements: string;
+                    itemsSaveFailed: string;
+                    itemsUpdateFailed: string;
+                    comboNotFound: string;
+                    nameRequired: string;
+                    priceMustBePositive: string;
+                    quantityMustBePositive: string;
+                    atLeastOneProduct: string;
+                    productRequired: string;
+                    duplicateProducts: string;
+                    businessIdRequired: string;
+                    comboIdRequired: string;
+                };
+            };
         };
         ventas: {
             title: string;
@@ -4102,6 +4182,26 @@ export declare const resources: {
                 customerName: string;
                 defaultCustomer: string;
                 printing: string;
+            };
+            combosService: {
+                errors: {
+                    loadFailed: string;
+                    createFailed: string;
+                    updateFailed: string;
+                    deleteFailed: string;
+                    deleteWithMovements: string;
+                    itemsSaveFailed: string;
+                    itemsUpdateFailed: string;
+                    comboNotFound: string;
+                    nameRequired: string;
+                    priceMustBePositive: string;
+                    quantityMustBePositive: string;
+                    atLeastOneProduct: string;
+                    productRequired: string;
+                    duplicateProducts: string;
+                    businessIdRequired: string;
+                    comboIdRequired: string;
+                };
                 printSuccess: string;
                 printFailed: string;
             };
@@ -4526,6 +4626,26 @@ export declare const resources: {
             print: {
                 kitchenOrder: string;
                 printing: string;
+            };
+            combosService: {
+                errors: {
+                    loadFailed: string;
+                    createFailed: string;
+                    updateFailed: string;
+                    deleteFailed: string;
+                    deleteWithMovements: string;
+                    itemsSaveFailed: string;
+                    itemsUpdateFailed: string;
+                    comboNotFound: string;
+                    nameRequired: string;
+                    priceMustBePositive: string;
+                    quantityMustBePositive: string;
+                    atLeastOneProduct: string;
+                    productRequired: string;
+                    duplicateProducts: string;
+                    businessIdRequired: string;
+                    comboIdRequired: string;
+                };
                 saving: string;
                 processing: string;
                 printSuccess: string;
