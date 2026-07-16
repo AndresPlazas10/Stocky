@@ -61,6 +61,13 @@
     "orderSaved": "Order Saved",
     "orderClosed": "Order Closed"
   },
+  "defaults": {
+    "generalSale": "General sale",
+    "someoneUsingTable": "Someone is using this table.",
+    "user": "User",
+    "item": "Product",
+    "unknownError": "Unknown error"
+  },
   "empty": {
     "noTables": "No tables created yet",
     "noTablesDescription": "Create your first table to start registering orders.",
