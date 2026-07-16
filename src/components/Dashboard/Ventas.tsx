@@ -350,7 +350,8 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       if (!offline || hasLocalData) {
         saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
       }
-    } catch {
+    } catch (error) {
+      logger.error('loadProductos failed', { businessId, error: error.message || error });
       if (offline) {
         const cached = readOfflineSnapshot(offlineSnapshotKey, []);
         setProducts(Array.isArray(cached) ? cached : []);
@@ -383,7 +384,8 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
       if (!offline || hasLocalData) {
         saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
       }
-    } catch {
+    } catch (error) {
+      logger.error('loadCombos failed', { businessId, error: error.message || error });
       if (offline) {
         const cached = readOfflineSnapshot(offlineSnapshotKey, []);
         setCombos(Array.isArray(cached) ? cached : []);
@@ -453,7 +455,8 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
         loadCombos(),
         checkIfEmployee()
       ]);
-    } catch {
+    } catch (error) {
+      logger.error('loadData failed', { businessId, error: error.message || error });
       setError('⚠️ ' + t('ventas:errors.loadFailed'));
     } finally {
       setLoading(false);
@@ -920,7 +923,8 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
             };
 
             detailsForPrint = Array.isArray(saleDetails) ? saleDetails : [];
-          } catch {
+          } catch (error) {
+            logger.warn('fetchSaleDetails for print failed', { saleId: sale.id, error: error.message || error });
             saleForPrint = {
               id: result.data.id,
               total: saleTotal,

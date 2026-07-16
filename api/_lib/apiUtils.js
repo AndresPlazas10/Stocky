@@ -199,7 +199,6 @@ export function getEnvConfig() {
   return {
     SUPABASE_URL,
     SUPABASE_ANON_KEY,
-    SERVICE_ROLE_KEY,
     APP_ORIGIN,
   };
 }
