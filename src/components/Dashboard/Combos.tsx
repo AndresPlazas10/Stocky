@@ -454,7 +454,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                     <Input
                       value={formData.nombre}
                       onChange={(event) => setFormData((prev) => ({ ...prev, nombre: event.target.value }))}
-                      placeholder="Ej: Cubetazo"
+                      placeholder={t('placeholders.comboNameExample')}
                       className="h-11 border-accent-300"
                       required
                     />
@@ -468,7 +468,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                       step="0.01"
                       value={formData.precio_venta}
                       onChange={(event) => setFormData((prev) => ({ ...prev, precio_venta: event.target.value }))}
-                      placeholder="Ej: 25000"
+                      placeholder={t('placeholders.priceExample')}
                       className="h-11 border-accent-300"
                       required
                     />
@@ -480,7 +480,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                   <textarea
                     value={formData.descripcion}
                     onChange={(event) => setFormData((prev) => ({ ...prev, descripcion: event.target.value }))}
-                    placeholder="Descripción del combo"
+                    placeholder={t('placeholders.comboDescription')}
                     className="w-full min-h-[90px] rounded-xl border-2 border-accent-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all p-3"
                   />
                 </div>
@@ -529,7 +529,7 @@ export default function Combos({ businessId }: DashboardModuleProps) {
                             step="0.01"
                             value={item.cantidad}
                             onChange={(event) => handleItemChange(index, 'cantidad', event.target.value)}
-                            placeholder="Cantidad"
+                            placeholder={t('placeholders.quantity')}
                             className="h-11 border-accent-300"
                             required
                           />

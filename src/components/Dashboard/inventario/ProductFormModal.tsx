@@ -95,7 +95,7 @@ export function ProductFormModal({
                     <Input
                       name="name"
                       type="text"
-                      placeholder="Ej: Laptop HP"
+                      placeholder={t('placeholders.productNameExample')}
                       value={formData.name}
                       onChange={onChange}
                       required

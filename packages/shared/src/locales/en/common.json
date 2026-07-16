@@ -209,7 +209,19 @@
   "placeholders": {
     "fullNameExample": "Ex: John Doe",
     "minCharacters": "Minimum 6 characters",
-    "supplierExample": "Ex: ABC Distribution Inc."
+    "supplierExample": "Ex: ABC Distribution Inc.",
+    "businessNameExample": "My Business LLC",
+    "addressExample": "123 Main St, City",
+    "addressSupplierExample": "123 Main St, New York",
+    "supplierNotes": "Additional supplier information, payment terms, etc...",
+    "productNameExample": "Eg: HP Laptop",
+    "searchPlaceholder": "Search...",
+    "comboNameExample": "Eg: Bucket Deal",
+    "priceExample": "Eg: 25.00",
+    "comboDescription": "Combo description",
+    "quantity": "Quantity",
+    "tableExample": "Eg: 1, A1, Patio-2...",
+    "registerAddressExample": "123 Main St"
   },
   "settings": {
     "manageAccount": "Manage your account",

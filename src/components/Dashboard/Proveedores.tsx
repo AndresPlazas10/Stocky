@@ -660,7 +660,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                         name="address"
                         value={formData.address}
                         onChange={handleChange}
-                        placeholder="Calle 123 #45-67, Bogotá"
+                        placeholder={t('placeholders.addressSupplierExample')}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
                       />
                     </div>
@@ -674,7 +674,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
                         name="notes"
                         value={formData.notes}
                         onChange={handleChange}
-                        placeholder="Información adicional sobre el proveedor, términos de pago, etc..."
+                        placeholder={t('placeholders.supplierNotes')}
                         rows={3}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all resize-none"
                       />

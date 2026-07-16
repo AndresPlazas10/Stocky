@@ -324,7 +324,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                       onChange={handleBusinessChange}
                       required
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all"
-                      placeholder="Mi Negocio S.A.S"
+                      placeholder={t('placeholders.businessNameExample')}
                     />
                   </div>
 
@@ -385,7 +385,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                       onChange={handleBusinessChange}
                       rows={3}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all resize-none"
-                      placeholder="Calle 123 #45-67, Ciudad"
+                      placeholder={t('placeholders.addressExample')}
                     />
                   </div>
                 </div>
