@@ -286,7 +286,7 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
                   <thead>
                     <tr className="border-b-2 border-accent-200 bg-accent-50/50">
                       <th className="p-3 text-left text-sm font-semibold text-primary-700 min-w-[180px] max-w-[260px] align-top">
-                        {t('labels.product')}
+                        {t('common:labels.product')}
                       </th>
                       {subAccounts.map((acc) => (
                         <th
