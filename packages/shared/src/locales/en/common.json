@@ -159,6 +159,8 @@
     "category": "Category",
     "stock": "Stock",
     "manageStock": "Enable if this product needs stock control",
+    "currentStock": "Current stock",
+    "unitOfMeasure": "Units of measure",
     "minStock": "Minimum stock",
     "code": "Code",
     "date": "Date",

@@ -161,6 +161,8 @@ export declare const resources: {
                 category: string;
                 stock: string;
                 manageStock: string;
+                currentStock: string;
+                unitOfMeasure: string;
                 minStock: string;
                 code: string;
                 date: string;
@@ -1128,6 +1130,7 @@ export declare const resources: {
                 stockControl: string;
                 stockControlQuestion: string;
                 currentStock: string;
+                unitOfMeasure: string;
                 initialStock: string;
                 disabled: string;
                 minimumStock: string;
@@ -3471,6 +3474,7 @@ export declare const resources: {
                 stockControl: string;
                 stockControlQuestion: string;
                 currentStock: string;
+                unitOfMeasure: string;
                 initialStock: string;
                 disabled: string;
                 minimumStock: string;

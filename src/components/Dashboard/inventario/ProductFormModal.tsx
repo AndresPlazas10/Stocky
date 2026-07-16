@@ -189,12 +189,12 @@ export function ProductFormModal({
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       <Package className="w-4 h-4" />
-                      {isEdit ? t('form.stock') : `${t('form.stock')} ${formData.manage_stock !== false ? '*' : '(deshabilitado)'}`}
+                      {isEdit ? t('form.currentStock') : t('form.currentStock')}
                     </label>
                     {isEdit ? (
                       <div className="h-11 px-4 rounded-xl border border-gray-300 bg-gray-100 flex items-center">
                         <span className="text-gray-500">
-                          {formData.manage_stock === false ? t('form.stock') : formData.stock}
+                          {formData.manage_stock === false ? t('form.currentStock') : formData.stock}
                         </span>
                       </div>
                     ) : (
@@ -241,7 +241,7 @@ export function ProductFormModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">{t('form.stock')}</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{t('form.unitOfMeasure')}</label>
                     <select
                       name="unit"
                       value={formData.unit}

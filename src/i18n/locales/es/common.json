@@ -152,6 +152,8 @@
     "category": "Categoría",
     "stock": "Stock",
     "manageStock": "Activar si este producto necesita control de stock",
+    "currentStock": "Stock actual",
+    "unitOfMeasure": "Unidades de medida",
     "minStock": "Stock mínimo",
     "code": "Código",
     "date": "Fecha",
