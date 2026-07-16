@@ -31,6 +31,7 @@ function readSalesOutbox() {
     return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
     logger.warn('data:sales:read_outbox_failed', err);
+    return [];
   }
 }
 

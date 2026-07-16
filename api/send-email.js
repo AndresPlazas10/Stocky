@@ -218,6 +218,9 @@ export default async function handler(req, res) {
       </html>
     `;
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -229,8 +232,11 @@ export default async function handler(req, res) {
         to: [email],
         subject: `Comprobante de Pago ${invoiceNumber} - ${businessName || 'Stocky'}`,
         html: htmlContent
-      })
+      }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeout);
 
     const data = await response.json();
 
@@ -240,6 +246,10 @@ export default async function handler(req, res) {
 
     sendSuccess(res, { data });
   } catch (error) {
+    if (error.name === 'AbortError') {
+      sendError(res, 504, 'Timeout al conectar con el servicio de email');
+      return;
+    }
     const status = error?.message === 'Unauthorized' ? 401 : 500;
     sendError(res, status, error?.message || 'server error');
   }

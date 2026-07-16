@@ -217,8 +217,8 @@ export async function getSales(businessId) {
     });
 
     return enrichedSales;
-  } catch {
-    // Error en getSales
+  } catch (error) {
+    logger.error('getSales failed', { businessId, error: error.message || error });
     return [];
   }
 }
@@ -515,8 +515,8 @@ export async function getAvailableProducts(businessId) {
 
     if (error) throw error;
     return data || [];
-  } catch {
-    // Error obteniendo productos
+  } catch (error) {
+    logger.error('getAvailableProducts failed', { businessId, error: error.message || error });
     return [];
   }
 }
@@ -562,7 +562,11 @@ export async function deleteSale(saleId) {
         : { error: null };
       
       if (restoreError) {
-        // Log error pero no fallar (venta ya fue eliminada)
+        logger.error('deleteSale:stock_restore_failed', {
+          saleId,
+          productUpdates,
+          error: restoreError.message || restoreError,
+        });
       }
     }
 
