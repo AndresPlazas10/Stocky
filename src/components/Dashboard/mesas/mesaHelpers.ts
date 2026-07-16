@@ -13,7 +13,7 @@ export const MESA_LOCK_TTL_SECONDS = 45;
 export const MESA_LOCK_HEARTBEAT_MS = 20000;
 
 export const getMesaInUseMessage = (t: TranslateFunction): string =>
-  t('mesas.defaults.someoneUsingTable');
+  t('mesas:defaults.someoneUsingTable');
 
 export const ORDER_ITEMS_SELECT = `
   id,
@@ -129,7 +129,7 @@ export const calculateOrderItemsTotal = (items: OrderItem[] = []): number =>
 
 export const normalizeDisplayName = (value: unknown, t: TranslateFunction): string => {
   const normalized = String(value || '').trim();
-  return normalized || t('mesas.defaults.user');
+  return normalized || t('mesas:defaults.user');
 };
 
 export const isMesaLockExpired = (lock: Lock): boolean => {
@@ -260,10 +260,10 @@ export const applyPendingQuantities = (items: OrderItem[] = [], pendingUpdates: 
 };
 
 export const getOrderItemName = (item: OrderItem, t: TranslateFunction): string =>
-  item?.products?.name || item?.combos?.nombre || t('mesas.defaults.item');
+  item?.products?.name || item?.combos?.nombre || t('mesas:defaults.item');
 
 export const buildDiagnosticAlertMessage = (errorLike: ErrorLike | string, t: TranslateFunction): string => {
-  const fallback = t('mesas.defaults.unknownError');
+  const fallback = t('mesas:defaults.unknownError');
   const message = String(typeof errorLike === 'string' ? errorLike : errorLike?.message || fallback).trim() || fallback;
   const code = String(typeof errorLike === 'object' ? errorLike?.code : '').trim();
   const status = String(typeof errorLike === 'object' ? (errorLike?.status || errorLike?.statusCode) : '').trim();
