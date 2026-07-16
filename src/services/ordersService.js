@@ -124,7 +124,7 @@ function isOrderContextError(errorLike) {
   const message = String(errorLike?.message || errorLike || '').toLowerCase();
   if (!message) return false;
 
-  return (
+  const result = (
     message.includes('la orden') && message.includes('no está abierta')
   ) || (
     message.includes('la mesa') && message.includes('no está asociada')
@@ -135,6 +135,21 @@ function isOrderContextError(errorLike) {
   ) || (
     message.includes('mesa') && message.includes('no encontrada')
   );
+
+  if (!result && message.length > 0) {
+    logger.info('isOrderContextError: no match', {
+      message,
+      patterns: {
+        ordenNoAbierta: message.includes('la orden') && message.includes('no está abierta'),
+        mesaNoAsociada: message.includes('la mesa') && message.includes('no está asociada'),
+        cambioDuranteCierre: message.includes('cambió durante el cierre'),
+        ordenNoEncontrada: message.includes('orden') && message.includes('no encontrada'),
+        mesaNoEncontrada: message.includes('mesa') && message.includes('no encontrada')
+      }
+    });
+  }
+
+  return result;
 }
 
 function isComboBypassError(errorLike) {
@@ -564,6 +579,19 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
     atomicError = { message: 'split combos bypass atomic rpc' };
   }
 
+  if (atomicError) {
+    logger.info('closeOrderAsSplit: atomic RPC error', {
+      message: atomicError?.message,
+      code: atomicError?.code,
+      details: atomicError?.details,
+      hint: atomicError?.hint,
+      isOrderContext: isOrderContextError(atomicError),
+      isComboBypass: isComboBypassError(atomicError),
+      isMissingFn: isFunctionUnavailableError(atomicError, 'create_split_sales_complete'),
+      isDuplicate: isSalesDuplicateIndexError(atomicError)
+    });
+  }
+
   if (!atomicError && atomicResult?.[0]?.status === 'success') {
     const atomicSalesCount = Number(atomicResult[0].sales_count || 0);
     const atomicTotalSold = Number(atomicResult[0].total_sold || 0);
@@ -617,7 +645,21 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
   const isComboBypass = isComboBypassError(atomicError);
   const shouldFallbackWithoutOrderContext = isOrderContextError(atomicError);
   const shouldFallbackDueToDuplicateIndex = isSalesDuplicateIndexError(atomicError);
+
+  logger.info('closeOrderAsSplit: fallback flags', {
+    isMissingAtomicFn,
+    isComboBypass,
+    shouldFallbackWithoutOrderContext,
+    shouldFallbackDueToDuplicateIndex,
+    willThrow: !isMissingAtomicFn && !isComboBypass && !shouldFallbackWithoutOrderContext && !shouldFallbackDueToDuplicateIndex
+  });
+
   if (!isMissingAtomicFn && !isComboBypass && !shouldFallbackWithoutOrderContext && !shouldFallbackDueToDuplicateIndex) {
+    logger.error('closeOrderAsSplit: error no detectado como fallback válido', {
+      atomicError,
+      errorMessage: atomicError?.message,
+      errorCode: atomicError?.code
+    });
     throw new Error(getFriendlySaleErrorMessage(
       atomicError,
       '❌ No se pudo cerrar la orden dividida. Intenta de nuevo.'
