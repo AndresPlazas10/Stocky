@@ -1227,7 +1227,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
             }}
             className="bg-white text-gray-700 border-2 border-gray-300 hover:bg-gray-100 transition-all duration-300 shadow-lg font-semibold px-4 py-2 rounded-xl"
           >
-            {t('ventas:buttons.clearFilters')}
+            {t('common:buttons.clearFilters')}
           </Button>
         </div>
       }
