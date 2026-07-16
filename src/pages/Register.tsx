@@ -463,7 +463,7 @@ function Register() {
                       id="address"
                       name="address"
                       type="text"
-                      placeholder="Calle 123 #45-67"
+                      placeholder={t('placeholders.registerAddressExample')}
                       value={formData.address}
                       onChange={handleChange}
                       className="pl-10 h-10 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"

@@ -209,7 +209,19 @@
     "placeholders": {
         "fullNameExample": "Ej: Juan Pérez",
         "minCharacters": "Mínimo 6 caracteres",
-        "supplierExample": "Ej: Distribuidora ABC S.A.S"
+        "supplierExample": "Ej: Distribuidora ABC S.A.S",
+        "businessNameExample": "Mi Negocio S.A.S",
+        "addressExample": "Calle 123 #45-67, Ciudad",
+        "addressSupplierExample": "Calle 123 #45-67, Bogotá",
+        "supplierNotes": "Información adicional sobre el proveedor, términos de pago, etc...",
+        "productNameExample": "Ej: Laptop HP",
+        "searchPlaceholder": "Buscar...",
+        "comboNameExample": "Ej: Cubetazo",
+        "priceExample": "Ej: 25000",
+        "comboDescription": "Descripción del combo",
+        "quantity": "Cantidad",
+        "tableExample": "Ej: 1, A1, Terraza-2...",
+        "registerAddressExample": "Calle 123 #45-67"
     },
     "settings": {
         "manageAccount": "Administra tu cuenta",

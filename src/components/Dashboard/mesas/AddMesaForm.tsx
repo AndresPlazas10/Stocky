@@ -28,7 +28,7 @@ export function AddMesaForm({ showAddForm, canManageTables, isCreatingTable, new
                     type="text"
                     value={newTableNumber}
                     onChange={onNewTableNumberChange}
-                    placeholder="Ej: 1, A1, Terraza-2..."
+                    placeholder={t('placeholders.tableExample')}
                     className="h-12 border-accent-300"
                     required
                   />

@@ -212,6 +212,18 @@ export declare const resources: {
                 fullNameExample: string;
                 minCharacters: string;
                 supplierExample: string;
+                businessNameExample: string;
+                addressExample: string;
+                addressSupplierExample: string;
+                supplierNotes: string;
+                productNameExample: string;
+                searchPlaceholder: string;
+                comboNameExample: string;
+                priceExample: string;
+                comboDescription: string;
+                quantity: string;
+                tableExample: string;
+                registerAddressExample: string;
             };
             settings: {
                 manageAccount: string;
