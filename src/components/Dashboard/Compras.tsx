@@ -615,7 +615,7 @@ function Compras({ businessId }: DashboardModuleProps) {
       skeletonType="compras"
       hasFilters={Boolean(searchTerm.trim() || Object.keys(currentFiltersPurchases || {}).length > 0)}
       noResultsTitle={t('compras:empty.noResultsTitle')}
-      noResultsDescription={t('compras:empty.noResultsDescription')}
+      noResultsDescription={t('common:empty.noResultsDescription')}
       noResultsAction={
         <div className="flex flex-col sm:flex-row gap-3">
           <Button
