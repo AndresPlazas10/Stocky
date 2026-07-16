@@ -368,7 +368,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
             <div className="flex flex-col items-center justify-center py-20 px-6">
               <Search className="w-16 h-16 text-gray-400 mb-4" />
               <h3 className="text-xl font-bold text-gray-800 mb-2">{t('empty.noResults')}</h3>
-              <p className="text-gray-600">{t('empty.noResultsDescription')}</p>
+              <p className="text-gray-600">{t('common:empty.noResultsDescription')}</p>
             </div>
           ) : (
             <div className="space-y-4">
