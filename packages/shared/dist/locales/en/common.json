@@ -158,6 +158,7 @@
         "supplier": "Supplier",
         "category": "Category",
         "stock": "Stock",
+        "manageStock": "Enable if this product needs stock control",
         "minStock": "Minimum stock",
         "code": "Code",
         "date": "Date",
