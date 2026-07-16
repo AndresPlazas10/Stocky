@@ -175,7 +175,7 @@ export function ProductFormModal({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="md:col-span-3">
                     <label className="flex items-center justify-between p-3 border border-gray-200 rounded-xl bg-gray-50">
-                      <span className="text-sm font-medium text-gray-800">{t('form.stock')}</span>
+                      <span className="text-sm font-medium text-gray-800">{t('form.manageStock')}</span>
                       <input
                         name="manage_stock"
                         type="checkbox"

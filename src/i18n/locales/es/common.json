@@ -151,6 +151,7 @@
     "supplier": "Proveedor",
     "category": "Categoría",
     "stock": "Stock",
+    "manageStock": "Activar si este producto necesita control de stock",
     "minStock": "Stock mínimo",
     "code": "Código",
     "date": "Fecha",
