@@ -1639,6 +1639,21 @@ export declare const resources: {
                     businessIdRequired: string;
                     comboIdRequired: string;
                 };
+            inventoryService: {
+                success: {
+                    created: string;
+                    updated: string;
+                };
+                errors: {
+                    createFailed: string;
+                    updateFailed: string;
+                    nameRequired: string;
+                    categoryRequired: string;
+                    salePricePositive: string;
+                    purchasePriceNegative: string;
+                    salePriceLowerThanPurchase: string;
+                };
+            };
             };
         };
         ventas: {
@@ -1798,6 +1813,21 @@ export declare const resources: {
                     businessIdRequired: string;
                     comboIdRequired: string;
                 };
+            inventoryService: {
+                success: {
+                    created: string;
+                    updated: string;
+                };
+                errors: {
+                    createFailed: string;
+                    updateFailed: string;
+                    nameRequired: string;
+                    categoryRequired: string;
+                    salePricePositive: string;
+                    purchasePriceNegative: string;
+                    salePriceLowerThanPurchase: string;
+                };
+            };
                 printSuccess: string;
                 printFailed: string;
             };
@@ -2244,6 +2274,21 @@ export declare const resources: {
                     businessIdRequired: string;
                     comboIdRequired: string;
                 };
+            inventoryService: {
+                success: {
+                    created: string;
+                    updated: string;
+                };
+                errors: {
+                    createFailed: string;
+                    updateFailed: string;
+                    nameRequired: string;
+                    categoryRequired: string;
+                    salePricePositive: string;
+                    purchasePriceNegative: string;
+                    salePriceLowerThanPurchase: string;
+                };
+            };
                 saving: string;
                 processing: string;
                 printSuccess: string;
@@ -4045,6 +4090,21 @@ export declare const resources: {
                     businessIdRequired: string;
                     comboIdRequired: string;
                 };
+            inventoryService: {
+                success: {
+                    created: string;
+                    updated: string;
+                };
+                errors: {
+                    createFailed: string;
+                    updateFailed: string;
+                    nameRequired: string;
+                    categoryRequired: string;
+                    salePricePositive: string;
+                    purchasePriceNegative: string;
+                    salePriceLowerThanPurchase: string;
+                };
+            };
             };
         };
         ventas: {
@@ -4204,6 +4264,21 @@ export declare const resources: {
                     businessIdRequired: string;
                     comboIdRequired: string;
                 };
+            inventoryService: {
+                success: {
+                    created: string;
+                    updated: string;
+                };
+                errors: {
+                    createFailed: string;
+                    updateFailed: string;
+                    nameRequired: string;
+                    categoryRequired: string;
+                    salePricePositive: string;
+                    purchasePriceNegative: string;
+                    salePriceLowerThanPurchase: string;
+                };
+            };
                 printSuccess: string;
                 printFailed: string;
             };
@@ -4648,6 +4723,21 @@ export declare const resources: {
                     businessIdRequired: string;
                     comboIdRequired: string;
                 };
+            inventoryService: {
+                success: {
+                    created: string;
+                    updated: string;
+                };
+                errors: {
+                    createFailed: string;
+                    updateFailed: string;
+                    nameRequired: string;
+                    categoryRequired: string;
+                    salePricePositive: string;
+                    purchasePriceNegative: string;
+                    salePriceLowerThanPurchase: string;
+                };
+            };
                 saving: string;
                 processing: string;
                 printSuccess: string;

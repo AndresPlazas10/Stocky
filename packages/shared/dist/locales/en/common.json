@@ -1637,5 +1637,20 @@
             "businessIdRequired": "businessId is required",
             "comboIdRequired": "comboId is required"
         }
+    },
+    "inventoryService": {
+        "success": {
+            "created": "Product created",
+            "updated": "Product updated"
+        },
+        "errors": {
+            "createFailed": "Error creating product",
+            "updateFailed": "Error updating product",
+            "nameRequired": "Product name is required",
+            "categoryRequired": "Product category is required",
+            "salePricePositive": "Sale price must be greater than 0",
+            "purchasePriceNegative": "Purchase price cannot be negative",
+            "salePriceLowerThanPurchase": "Sale price cannot be lower than purchase price"
+        }
     }
 }

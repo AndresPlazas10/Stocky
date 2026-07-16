@@ -1637,5 +1637,20 @@
             "businessIdRequired": "businessId es obligatorio",
             "comboIdRequired": "comboId es obligatorio"
         }
+    },
+    "inventoryService": {
+        "success": {
+            "created": "Producto creado",
+            "updated": "Producto actualizado"
+        },
+        "errors": {
+            "createFailed": "Error al crear el producto",
+            "updateFailed": "Error al actualizar el producto",
+            "nameRequired": "El nombre del producto es requerido",
+            "categoryRequired": "La categoría del producto es requerida",
+            "salePricePositive": "El precio de venta debe ser mayor a 0",
+            "purchasePriceNegative": "El precio de compra no puede ser negativo",
+            "salePriceLowerThanPurchase": "El precio de venta no puede ser menor al precio de compra"
+        }
     }
 }
