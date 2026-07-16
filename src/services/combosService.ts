@@ -271,10 +271,16 @@ export async function deleteCombo(comboId: string, businessId: string): Promise<
   });
 
   if (error) {
-    if (error.code === '23503') {
+    const errorMessage = error.message || '';
+    if (
+      error.code === '23503' ||
+      errorMessage.includes('sale_detail') ||
+      errorMessage.includes('combo_id') ||
+      errorMessage.includes('order_item')
+    ) {
       throw new Error(i18n.t('combosService.errors.deleteWithMovements'));
     }
-    throw new Error(error.message || i18n.t('combosService.errors.deleteFailed'));
+    throw new Error(errorMessage || i18n.t('combosService.errors.deleteFailed'));
   }
 
   if (!(data as unknown as { id?: string })?.id) {
