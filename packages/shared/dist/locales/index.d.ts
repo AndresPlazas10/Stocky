@@ -1142,7 +1142,6 @@ export declare const resources: {
                 stockControl: string;
                 stockControlQuestion: string;
                 currentStock: string;
-                unitOfMeasure: string;
                 initialStock: string;
                 disabled: string;
                 minimumStock: string;
@@ -1651,6 +1650,7 @@ export declare const resources: {
                     businessIdRequired: string;
                     comboIdRequired: string;
                 };
+            };
             inventoryService: {
                 success: {
                     created: string;
@@ -1665,7 +1665,6 @@ export declare const resources: {
                     purchasePriceNegative: string;
                     salePriceLowerThanPurchase: string;
                 };
-            };
             };
         };
         ventas: {
@@ -1805,41 +1804,6 @@ export declare const resources: {
                 customerName: string;
                 defaultCustomer: string;
                 printing: string;
-            };
-            combosService: {
-                errors: {
-                    loadFailed: string;
-                    createFailed: string;
-                    updateFailed: string;
-                    deleteFailed: string;
-                    deleteWithMovements: string;
-                    itemsSaveFailed: string;
-                    itemsUpdateFailed: string;
-                    comboNotFound: string;
-                    nameRequired: string;
-                    priceMustBePositive: string;
-                    quantityMustBePositive: string;
-                    atLeastOneProduct: string;
-                    productRequired: string;
-                    duplicateProducts: string;
-                    businessIdRequired: string;
-                    comboIdRequired: string;
-                };
-            inventoryService: {
-                success: {
-                    created: string;
-                    updated: string;
-                };
-                errors: {
-                    createFailed: string;
-                    updateFailed: string;
-                    nameRequired: string;
-                    categoryRequired: string;
-                    salePricePositive: string;
-                    purchasePriceNegative: string;
-                    salePriceLowerThanPurchase: string;
-                };
-            };
                 printSuccess: string;
                 printFailed: string;
             };
@@ -2219,6 +2183,13 @@ export declare const resources: {
                 orderSaved: string;
                 orderClosed: string;
             };
+            defaults: {
+                generalSale: string;
+                someoneUsingTable: string;
+                user: string;
+                item: string;
+                unknownError: string;
+            };
             empty: {
                 noTables: string;
                 noTablesDescription: string;
@@ -2266,41 +2237,6 @@ export declare const resources: {
             print: {
                 kitchenOrder: string;
                 printing: string;
-            };
-            combosService: {
-                errors: {
-                    loadFailed: string;
-                    createFailed: string;
-                    updateFailed: string;
-                    deleteFailed: string;
-                    deleteWithMovements: string;
-                    itemsSaveFailed: string;
-                    itemsUpdateFailed: string;
-                    comboNotFound: string;
-                    nameRequired: string;
-                    priceMustBePositive: string;
-                    quantityMustBePositive: string;
-                    atLeastOneProduct: string;
-                    productRequired: string;
-                    duplicateProducts: string;
-                    businessIdRequired: string;
-                    comboIdRequired: string;
-                };
-            inventoryService: {
-                success: {
-                    created: string;
-                    updated: string;
-                };
-                errors: {
-                    createFailed: string;
-                    updateFailed: string;
-                    nameRequired: string;
-                    categoryRequired: string;
-                    salePricePositive: string;
-                    purchasePriceNegative: string;
-                    salePriceLowerThanPurchase: string;
-                };
-            };
                 saving: string;
                 processing: string;
                 printSuccess: string;
@@ -2626,6 +2562,8 @@ export declare const resources: {
                 category: string;
                 stock: string;
                 manageStock: string;
+                currentStock: string;
+                unitOfMeasure: string;
                 minStock: string;
                 code: string;
                 date: string;
@@ -2675,6 +2613,18 @@ export declare const resources: {
                 fullNameExample: string;
                 minCharacters: string;
                 supplierExample: string;
+                businessNameExample: string;
+                addressExample: string;
+                addressSupplierExample: string;
+                supplierNotes: string;
+                productNameExample: string;
+                searchPlaceholder: string;
+                comboNameExample: string;
+                priceExample: string;
+                comboDescription: string;
+                quantity: string;
+                tableExample: string;
+                registerAddressExample: string;
             };
             settings: {
                 manageAccount: string;
@@ -3593,7 +3543,6 @@ export declare const resources: {
                 stockControl: string;
                 stockControlQuestion: string;
                 currentStock: string;
-                unitOfMeasure: string;
                 initialStock: string;
                 disabled: string;
                 minimumStock: string;
@@ -4102,6 +4051,7 @@ export declare const resources: {
                     businessIdRequired: string;
                     comboIdRequired: string;
                 };
+            };
             inventoryService: {
                 success: {
                     created: string;
@@ -4116,7 +4066,6 @@ export declare const resources: {
                     purchasePriceNegative: string;
                     salePriceLowerThanPurchase: string;
                 };
-            };
             };
         };
         ventas: {
@@ -4256,41 +4205,6 @@ export declare const resources: {
                 customerName: string;
                 defaultCustomer: string;
                 printing: string;
-            };
-            combosService: {
-                errors: {
-                    loadFailed: string;
-                    createFailed: string;
-                    updateFailed: string;
-                    deleteFailed: string;
-                    deleteWithMovements: string;
-                    itemsSaveFailed: string;
-                    itemsUpdateFailed: string;
-                    comboNotFound: string;
-                    nameRequired: string;
-                    priceMustBePositive: string;
-                    quantityMustBePositive: string;
-                    atLeastOneProduct: string;
-                    productRequired: string;
-                    duplicateProducts: string;
-                    businessIdRequired: string;
-                    comboIdRequired: string;
-                };
-            inventoryService: {
-                success: {
-                    created: string;
-                    updated: string;
-                };
-                errors: {
-                    createFailed: string;
-                    updateFailed: string;
-                    nameRequired: string;
-                    categoryRequired: string;
-                    salePricePositive: string;
-                    purchasePriceNegative: string;
-                    salePriceLowerThanPurchase: string;
-                };
-            };
                 printSuccess: string;
                 printFailed: string;
             };
@@ -4670,6 +4584,13 @@ export declare const resources: {
                 orderSaved: string;
                 orderClosed: string;
             };
+            defaults: {
+                generalSale: string;
+                someoneUsingTable: string;
+                user: string;
+                item: string;
+                unknownError: string;
+            };
             empty: {
                 noTables: string;
                 noTablesDescription: string;
@@ -4703,6 +4624,8 @@ export declare const resources: {
                 grandTotal: string;
                 confirm: string;
                 maxAccounts: string;
+                quantityMismatch: string;
+                assignProductHint: string;
             };
             closeOrder: {
                 title: string;
@@ -4715,41 +4638,6 @@ export declare const resources: {
             print: {
                 kitchenOrder: string;
                 printing: string;
-            };
-            combosService: {
-                errors: {
-                    loadFailed: string;
-                    createFailed: string;
-                    updateFailed: string;
-                    deleteFailed: string;
-                    deleteWithMovements: string;
-                    itemsSaveFailed: string;
-                    itemsUpdateFailed: string;
-                    comboNotFound: string;
-                    nameRequired: string;
-                    priceMustBePositive: string;
-                    quantityMustBePositive: string;
-                    atLeastOneProduct: string;
-                    productRequired: string;
-                    duplicateProducts: string;
-                    businessIdRequired: string;
-                    comboIdRequired: string;
-                };
-            inventoryService: {
-                success: {
-                    created: string;
-                    updated: string;
-                };
-                errors: {
-                    createFailed: string;
-                    updateFailed: string;
-                    nameRequired: string;
-                    categoryRequired: string;
-                    salePricePositive: string;
-                    purchasePriceNegative: string;
-                    salePriceLowerThanPurchase: string;
-                };
-            };
                 saving: string;
                 processing: string;
                 printSuccess: string;

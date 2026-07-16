@@ -61,6 +61,13 @@
         "orderSaved": "Orden Guardada",
         "orderClosed": "Orden Cerrada"
     },
+    "defaults": {
+        "generalSale": "Venta general",
+        "someoneUsingTable": "Alguien está usando esta mesa.",
+        "user": "Usuario",
+        "item": "Producto",
+        "unknownError": "Error desconocido"
+    },
     "empty": {
         "noTables": "Aún no hay mesas creadas",
         "noTablesDescription": "Crea tu primera mesa para empezar a registrar órdenes.",
