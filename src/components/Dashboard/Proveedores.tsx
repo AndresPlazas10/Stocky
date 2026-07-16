@@ -203,7 +203,7 @@ function Proveedores({ businessId }: DashboardModuleProps) {
         loadProveedores();
       } catch (err) {
         if ((err as Record<string, unknown>)?.code === '23503') {
-          showError(t('errors.cannotDeleteSupplierWithPurchases'));
+          showError(t('proveedores.errors.cannotDeleteSupplierWithPurchases'));
           setShowDeleteModal(false);
           setSupplierToDelete(null);
           return;
@@ -752,15 +752,15 @@ function Proveedores({ businessId }: DashboardModuleProps) {
               {/* Contenido */}
               <div className="p-6">
                 <p className="text-gray-700 text-lg mb-4">
-                  {t('messages.confirmDeleteSupplier')}
+                  {t('proveedores.messages.confirmDeleteSupplier')}
                 </p>
                 
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
                   <div className="flex gap-3">
                     <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div className="text-sm text-amber-800">
-                      <p className="font-semibold mb-1">{t('messages.important')}:</p>
-                      <p>{t('messages.cannotDeleteSupplierWithPurchases')}</p>
+                      <p className="font-semibold mb-1">{t('proveedores.messages.important')}:</p>
+                      <p>{t('proveedores.messages.cannotDeleteSupplierWithPurchases')}</p>
                     </div>
                   </div>
                 </div>
