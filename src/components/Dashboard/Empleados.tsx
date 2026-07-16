@@ -76,7 +76,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
       setPage(nextPage);
       setHasMoreEmployees(Boolean(hasMore));
     } catch {
-      setError(t('errors.loadingEmployees'));
+      setError(t('empleados.errors.loadingEmployees'));
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -170,38 +170,38 @@ function Empleados({ businessId }: DashboardModuleProps) {
     
     try {
       if (!businessId) {
-        throw new Error(t('errors.businessNotFound'));
+        throw new Error(t('empleados.errors.businessNotFound'));
       }
 
-      if (!formData.full_name.trim()) throw new Error(t('validation.nameRequired'));
+      if (!formData.full_name.trim()) throw new Error(t('empleados.validation.nameRequired'));
       
       if (/^\d+$/.test(formData.full_name.trim())) {
-        throw new Error(t('validation.nameNotOnlyNumbers'));
+        throw new Error(t('empleados.validation.nameNotOnlyNumbers'));
       }
 
       if (!/[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(formData.full_name.trim())) {
-        throw new Error(t('validation.nameNeedsLetter'));
+        throw new Error(t('empleados.validation.nameNeedsLetter'));
       }
 
       if (formData.full_name.trim().length < 2) {
-        throw new Error(t('validation.nameMinLength'));
+        throw new Error(t('empleados.validation.nameMinLength'));
       }
 
-      if (!formData.username.trim()) throw new Error(t('validation.usernameRequired'));
-      if (!formData.password.trim()) throw new Error(t('validation.passwordRequired'));
-      if (formData.password.length < 6) throw new Error(t('validation.passwordMinLength'));
+      if (!formData.username.trim()) throw new Error(t('empleados.validation.usernameRequired'));
+      if (!formData.password.trim()) throw new Error(t('empleados.validation.passwordRequired'));
+      if (formData.password.length < 6) throw new Error(t('empleados.validation.passwordMinLength'));
 
       const cleanUsername = formData.username.toLowerCase().trim();
       const cleanPassword = formData.password.trim();
       const fixedRole = 'employee';
 
       if (/^\d+$/.test(cleanUsername)) {
-        throw new Error(t('validation.usernameNotOnlyNumbers'));
+        throw new Error(t('empleados.validation.usernameNotOnlyNumbers'));
       }
 
       const usernameRegex = /^[a-z0-9_]+$/;
       if (!usernameRegex.test(cleanUsername)) {
-        throw new Error(t('validation.usernameInvalidFormat'));
+        throw new Error(t('empleados.validation.usernameInvalidFormat'));
       }
 
       const usernameTaken = await isEmployeeUsernameTaken({
@@ -209,12 +209,12 @@ function Empleados({ businessId }: DashboardModuleProps) {
         username: cleanUsername
       });
       if (usernameTaken) {
-        throw new Error(t('validation.usernameTaken'));
+        throw new Error(t('empleados.validation.usernameTaken'));
       }
 
       const businessUsername = await getBusinessUsernameById(businessId);
       if (businessUsername && businessUsername === cleanUsername) {
-        throw new Error(t('validation.usernameIsBusiness'));
+        throw new Error(t('empleados.validation.usernameIsBusiness'));
       }
 
       const createdEmployee = await createEmployeeWithRpc({
@@ -255,11 +255,11 @@ function Empleados({ businessId }: DashboardModuleProps) {
       setShowCodeModal(true);
       setFormData(INITIAL_EMPLOYEE_FORM);
       setShowForm(false);
-      showSuccess('Éxito', t('success.employeeCreated'));
+      showSuccess('Éxito', t('empleados.success.employeeCreated'));
       loadEmployees().catch((err) => { logger.warn('empleados:create_reload failed', err); });
       
     } catch (err) {
-      showError('Error', (err as Error).message || t('errors.creatingEmployee'));
+      showError('Error', (err as Error).message || t('empleados.errors.creatingEmployee'));
     } finally {
       setIsSubmitting(false);
     }
@@ -279,13 +279,13 @@ function Empleados({ businessId }: DashboardModuleProps) {
         businessId
       });
 
-      showSuccess('Éxito', t('success.employeeDeleted'));
+      showSuccess('Éxito', t('empleados.success.employeeDeleted'));
       setEmployees((prev) => prev.filter((employee) => employee.id !== employeeToDelete.id));
       loadEmployees().catch((err) => { logger.warn('empleados:confirm_delete_reload failed', err); });
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
     } catch {
-      showError('Error', t('errors.deletingEmployee'));
+      showError('Error', t('empleados.errors.deletingEmployee'));
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
     }
@@ -348,7 +348,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
               className="flex items-center gap-2 px-6 py-3 gradient-primary text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300"
             >
               <UserPlus className="w-5 h-5" />
-              {t('buttons.newEmployee')}
+              {t('empleados.buttons.newEmployee')}
             </button>
           </div>
         </motion.div>
@@ -365,7 +365,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
                 <Users className="w-5 h-5 text-gray-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">{t('labels.total')}</p>
+                <p className="text-sm text-gray-600">{t('empleados.labels.total')}</p>
                 <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
               </div>
             </div>
@@ -412,9 +412,9 @@ function Empleados({ businessId }: DashboardModuleProps) {
             onRetry={loadEmployees}
             skeletonType="empleados"
             hasFilters={Boolean(searchTerm.trim())}
-            noResultsTitle={t('messages.noEmployeesFound')}
-            emptyTitle={t('messages.noEmployeesYet')}
-            emptyDescription={t('messages.clickNewEmployeeToCreateFirst')}
+            noResultsTitle={t('empleados.messages.noEmployeesFound')}
+            emptyTitle={t('empleados.messages.noEmployeesYet')}
+            emptyDescription={t('empleados.messages.clickNewEmployeeToCreateFirst')}
             actionProcessing={isSubmitting}
           >
             <div className="overflow-x-auto">
@@ -425,16 +425,16 @@ function Empleados({ businessId }: DashboardModuleProps) {
                       {t('roles.employee')}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      {t('labels.user')}
+                      {t('empleados.labels.user')}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      {t('labels.status')}
+                      {t('empleados.labels.status')}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      {t('labels.role')}
+                      {t('empleados.labels.role')}
                     </th>
                     <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      {t('labels.actions')}
+                      {t('empleados.labels.actions')}
                     </th>
                   </tr>
                 </thead>
@@ -485,7 +485,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
                             className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
                           >
                             <Trash2 className="w-4 h-4" />
-                            {t('buttons.delete')}
+                            {t('empleados.buttons.delete')}
                           </button>
                         </td>
                       </tr>
@@ -507,7 +507,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
                 {loadingMore ? (
                   <>
                     <Clock className="w-4 h-4 animate-spin" />
-                    {t('buttons.loading')}
+                    {t('empleados.buttons.loading')}
                   </>
                 ) : (
                   <>{t('empleados.buttons.loadMoreEmployees')}</>
@@ -538,7 +538,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
               <div className="p-6 border-b border-accent-100 bg-gradient-to-r from-primary-50 to-accent-50 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                   <UserPlus className="w-6 h-6 text-accent-500" />
-                  {t('buttons.newEmployee')}
+              {t('empleados.buttons.newEmployee')}
                 </h2>
                 <button
                   type="button"
@@ -568,7 +568,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('labels.user')}
+                    {t('empleados.labels.user')}
                   </label>
                   <input
                     type="text"
@@ -580,7 +580,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    {t('validation.usernameFormat')}
+                    {t('empleados.validation.usernameFormat')}
                   </p>
                 </div>
 
@@ -599,7 +599,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
                     minLength={6}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    {t('validation.passwordHelp')}
+                    {t('empleados.validation.passwordHelp')}
                   </p>
                 </div>
 
@@ -617,12 +617,12 @@ function Empleados({ businessId }: DashboardModuleProps) {
                   {isSubmitting ? (
                     <>
                       <Clock className="h-4 w-4 animate-spin" />
-                      {t('buttons.creatingEmployee')}
+                      {t('empleados.buttons.creatingEmployee')}
                     </>
                   ) : (
                     <>
                       <UserPlus className="h-4 w-4" />
-                      {t('buttons.createEmployee')}
+                      {t('empleados.buttons.createEmployee')}
                     </>
                   )}
                 </button>
@@ -655,16 +655,16 @@ function Empleados({ businessId }: DashboardModuleProps) {
                 </div>
                 
                 <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                  {t('success.employeeCreated')}
+                  {t('empleados.success.employeeCreated')}
                 </h3>
                 
                 <p className="text-gray-600 mb-6">
-                  {t('success.shareCredentials')} {generatedCode.fullName}
+                  {t('empleados.success.shareCredentials')} {generatedCode.fullName}
                 </p>
 
                 <div className="space-y-4 mb-6">
                   <div className="bg-gray-50 rounded-xl p-4">
-                    <p className="text-sm text-gray-600 mb-1">{t('labels.user')}</p>
+                    <p className="text-sm text-gray-600 mb-1">{t('empleados.labels.user')}</p>
                     <div className="flex items-center justify-center gap-2">
                       <code className="text-lg font-mono font-semibold text-gray-600">
                         {generatedCode.username}
@@ -701,7 +701,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
 
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
                   <p className="text-sm text-yellow-800">
-                    {t('messages.employeeCanLoginImmediately')}
+                    {t('empleados.messages.employeeCanLoginImmediately')}
                   </p>
                 </div>
 
@@ -709,7 +709,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
                     onClick={() => setShowCodeModal(false)}
                     className="w-full px-6 py-3 gradient-primary text-white rounded-xl font-semibold hover:shadow-lg transition-all"
                   >
-                    {t('buttons.understood')}
+                    {t('empleados.buttons.understood')}
                   </button>
               </div>
             </motion.div>
@@ -740,11 +740,11 @@ function Empleados({ businessId }: DashboardModuleProps) {
                 </div>
                 
                 <h3 className="text-xl font-bold text-gray-800 mb-2">
-                  {t('messages.confirmDelete')}
+                  {t('empleados.messages.confirmDelete')}
                 </h3>
                 
                 <p className="text-gray-600 mb-6">
-                  {t('messages.actionCannotBeUndone')}
+                  {t('empleados.messages.actionCannotBeUndone')}
                 </p>
 
                 <div className="flex gap-3">
@@ -752,13 +752,13 @@ function Empleados({ businessId }: DashboardModuleProps) {
                     onClick={cancelDelete}
                     className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                   >
-                    {t('buttons.cancel')}
+                    {t('empleados.buttons.cancel')}
                   </button>
                   <button
                     onClick={confirmDelete}
                     className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                   >
-                    {t('buttons.delete')}
+                    {t('empleados.buttons.delete')}
                   </button>
                 </div>
               </div>

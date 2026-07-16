@@ -859,8 +859,14 @@
       "delete": "Delete"
     },
     "buttons": {
+      "cancel": "Cancel",
+      "createEmployee": "Create employee",
       "creatingEmployee": "Creating employee...",
-      "loadMoreEmployees": "Load more employees"
+      "delete": "Delete",
+      "loading": "Loading...",
+      "loadMoreEmployees": "Load more employees",
+      "newEmployee": "New employee",
+      "understood": "Understood"
     },
     "errors": {
       "businessNotFound": "Business not found",
@@ -869,13 +875,22 @@
       "loadingEmployees": "Error loading employees"
     },
     "labels": {
+      "actions": "Actions",
       "employees": "Employees",
       "of": "of",
-      "showing": "Showing"
+      "role": "Role",
+      "showing": "Showing",
+      "status": "Status",
+      "total": "Total",
+      "user": "User"
     },
     "messages": {
+      "actionCannotBeUndone": "This action cannot be undone",
+      "clickNewEmployeeToCreateFirst": "Click New employee to create the first one",
+      "confirmDelete": "Confirm deletion",
       "employeeCanLoginImmediately": "The employee can log in immediately with these credentials.",
-      "noEmployeesFound": "No employees found"
+      "noEmployeesFound": "No employees found",
+      "noEmployeesYet": "No employees yet"
     },
     "placeholders": {
       "searchByNameUserOrCode": "Search by name, user or code..."
@@ -892,8 +907,10 @@
       "nameNeedsLetter": "Name must contain at least one letter",
       "nameNotOnlyNumbers": "Name cannot be only numbers",
       "nameRequired": "Name is required",
+      "passwordHelp": "Minimum 6 characters",
       "passwordMinLength": "Password must be at least 6 characters",
       "passwordRequired": "Password is required",
+      "usernameFormat": "Format: letters, numbers and underscores",
       "usernameInvalidFormat": "Invalid username format",
       "usernameIsBusiness": "This username is reserved for the business",
       "usernameNotOnlyNumbers": "Username cannot be only numbers",
