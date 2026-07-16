@@ -93,7 +93,9 @@
         "totalPerAccount": "Total por cuenta",
         "grandTotal": "Total general",
         "confirm": "Confirmar división",
-        "maxAccounts": "Máximo {{count}} cuentas"
+        "maxAccounts": "Máximo {{count}} cuentas",
+        "quantityMismatch": "Corrige las cantidades: la suma por producto debe coincidir con el total.",
+        "assignProductHint": "Asigna al menos un producto a alguna sub-cuenta."
     },
     "closeOrder": {
         "title": "¿Cómo cerrar la orden?",

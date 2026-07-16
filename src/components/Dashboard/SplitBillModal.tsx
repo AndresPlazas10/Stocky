@@ -445,14 +445,14 @@ export default function SplitBillModal({ orderItems = [], onConfirm, onCancel }:
             </div>
             {validationErrors.length > 0 && (
               <p className="text-sm text-amber-700 text-center font-medium">
-                Corrige las cantidades: la suma por producto debe coincidir con el total.
+                {t('mesas:splitBill.quantityMismatch')}
               </p>
             )}
             {!canConfirm && validationErrors.length === 0 && (
               <p className="text-sm text-amber-700 text-center font-medium">
                 {hasCashValidationErrors
                   ? t('mesas:labels.insufficientAmount')
-                  : 'Asigna al menos un producto a alguna sub-cuenta.'}
+                  : t('mesas:splitBill.assignProductHint')}
               </p>
             )}
           </div>

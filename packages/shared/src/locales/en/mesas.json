@@ -93,7 +93,9 @@
     "totalPerAccount": "Total per account",
     "grandTotal": "Grand total",
     "confirm": "Confirm split",
-    "maxAccounts": "Maximum {{count}} accounts"
+    "maxAccounts": "Maximum {{count}} accounts",
+    "quantityMismatch": "Fix the quantities: the sum per product must match the total.",
+    "assignProductHint": "Assign at least one product to a sub-account."
   },
   "closeOrder": {
     "title": "How to close the order?",

@@ -2210,6 +2210,8 @@ export declare const resources: {
                 grandTotal: string;
                 confirm: string;
                 maxAccounts: string;
+                quantityMismatch: string;
+                assignProductHint: string;
             };
             closeOrder: {
                 title: string;
