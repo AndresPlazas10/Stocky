@@ -1149,7 +1149,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
         items: emailItems,
         businessName: businessName || 'Stocky',
         businessId,
-        issuedAt: selectedSale?.created_at || new Date().toISOString()
+        issuedAt: new Date(selectedSale?.created_at || Date.now()).toISOString()
       });
 
       if (emailResult.success) {
