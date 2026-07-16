@@ -2321,7 +2321,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                     onClick={cancelDelete}
                     className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
                   >
-                    {t('buttons.cancel')}
+                    {t('common:buttons.cancel')}
                   </button>
                   <button
                     onClick={confirmDeleteSale}
@@ -2329,7 +2329,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
                     className="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Trash2 className="w-4 h-4" />
-                    {loading ? t('buttons.loading') : t('buttons.delete')}
+                    {loading ? t('common:buttons.loading') : t('common:buttons.delete')}
                   </button>
                 </div>
               </div>
