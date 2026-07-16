@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { parsePriceInput } from '../../../utils/formatters';
+import i18n from '../../../i18n';
 import {
   createProductWithFallback,
   deleteProductById,
@@ -111,16 +112,16 @@ export function useInventoryCrud({ businessId, loadProducts, setProductsWithSnap
         const normalizedSalePrice = parsePriceInput(formData.sale_price, NaN);
         const normalizedPurchasePrice = parsePriceInput(formData.purchase_price, 0);
 
-        if (!formData.name?.trim()) { showError('Error', 'El nombre del producto es requerido'); return; }
-        if (!formData.category?.trim()) { showError('Error', 'La categoría del producto es requerida'); return; }
+        if (!formData.name?.trim()) { showError(i18n.t('common:inventoryService.errors.nameRequired')); return; }
+        if (!formData.category?.trim()) { showError(i18n.t('common:inventoryService.errors.categoryRequired')); return; }
         if (!formData.sale_price || !Number.isFinite(normalizedSalePrice) || normalizedSalePrice <= 0) {
-          showError('Error', 'El precio de venta debe ser mayor a 0'); return;
+          showError(i18n.t('common:inventoryService.errors.salePricePositive')); return;
         }
         if (formData.purchase_price && normalizedPurchasePrice < 0) {
-          showError('Error', 'El precio de compra no puede ser negativo'); return;
+          showError(i18n.t('common:inventoryService.errors.purchasePriceNegative')); return;
         }
         if (formData.sale_price && formData.purchase_price && normalizedSalePrice < normalizedPurchasePrice) {
-          showError('Error', 'El precio de venta no puede ser menor al precio de compra'); return;
+          showError(i18n.t('common:inventoryService.errors.salePriceLowerThanPurchase')); return;
         }
 
         if (editingProduct) {
@@ -157,15 +158,15 @@ export function useInventoryCrud({ businessId, loadProducts, setProductsWithSnap
             });
           });
         } else {
-          await loadProducts();
-        }
+        await loadProducts();
+      }
 
-        setShowForm(false);
-        resetForm();
-        showSuccess('Éxito', 'Producto creado');
-      } catch (err) {
-        showError('Error', (err as Error)?.message || 'Error al crear el producto');
-      } finally {
+      setShowForm(false);
+      resetForm();
+      showSuccess(i18n.t('common:inventoryService.success.updated'));
+    } catch (err) {
+      showError(i18n.t('common:inventoryService.errors.updateFailed'), (err as Error)?.message);
+    } finally {
         setIsSubmitting(false);
       }
     },
