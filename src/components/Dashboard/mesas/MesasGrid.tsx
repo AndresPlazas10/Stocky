@@ -137,9 +137,6 @@ const MesasGrid = memo(function MesasGrid({
                       <p className="text-lg font-bold text-primary-900">
                         {fmtPrice(parseFloat(String(mesa.orders.total || '0')))}
                       </p>
-                      <p className="text-sm text-primary-600">
-                        {units} {t('mesas:labels.products')}
-                      </p>
                     </div>
                   )}
 

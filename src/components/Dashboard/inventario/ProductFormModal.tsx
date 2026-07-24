@@ -138,7 +138,7 @@ export function ProductFormModal({
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       <DollarSign className="w-4 h-4" />
-                      {t('form.price')} *
+                      {t('labels.purchasePrice')} *
                     </label>
                     <Input
                       name="purchase_price"
@@ -156,7 +156,7 @@ export function ProductFormModal({
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       <TrendingUp className="w-4 h-4" />
-                      {t('form.price')} *
+                      {t('labels.salePrice')} *
                     </label>
                     <Input
                       name="sale_price"

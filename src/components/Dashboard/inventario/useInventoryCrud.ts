@@ -163,9 +163,9 @@ export function useInventoryCrud({ businessId, loadProducts, setProductsWithSnap
 
       setShowForm(false);
       resetForm();
-      showSuccess(i18n.t('common:inventoryService.success.updated'));
+      showSuccess(i18n.t('common:success.created'));
     } catch (err) {
-      showError(i18n.t('common:inventoryService.errors.updateFailed'), (err as Error)?.message);
+      showError(i18n.t('common:errors.createFailed'), (err as Error)?.message);
     } finally {
         setIsSubmitting(false);
       }
