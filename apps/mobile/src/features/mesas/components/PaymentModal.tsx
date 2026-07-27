@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { StockyModal } from '../../../ui/StockyModal';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
@@ -48,7 +48,7 @@ export const PaymentModal = React.memo(function PaymentModal({
     const availableMethods = config.country.paymentMethods;
     return availableMethods.map((method) => ({
       value: method as PaymentMethod,
-      label: t(`paymentMethods.${method}`, { defaultValue: method }),
+      label: t(`common:paymentMethods.${method}`, { defaultValue: method }),
     }));
   }, [config.country.paymentMethods, t]);
 
@@ -104,12 +104,16 @@ export const PaymentModal = React.memo(function PaymentModal({
               end={{ x: 1, y: 0 }}
               style={styles.confirmButton}
             >
-              <Ionicons name="checkmark-circle-outline" size={22} color="#C4B5FD" />
-              <Text style={styles.confirmText}>
-                {isClosing
-                  ? t('print.printing', { defaultValue: 'Procesando...' })
-                  : t('success.paymentProcessed', { defaultValue: 'Confirmar Venta' })}
-              </Text>
+              {isClosing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle-outline" size={22} color="#C4B5FD" />
+                  <Text style={styles.confirmText}>
+                    {t('success.paymentProcessed', { defaultValue: 'Confirmar Venta' })}
+                  </Text>
+                </>
+              )}
             </LinearGradient>
           </Pressable>
         </View>

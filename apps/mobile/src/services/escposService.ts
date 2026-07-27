@@ -111,7 +111,7 @@ export function buildSaleEscPos(
 
   const payment = receipt.payment;
   const methodText = cleanText(payment?.methodText || receipt.notSpecified || 'No especificado');
-  twoColumns(out, (receipt.methodLabel || 'Metodo') + ':', methodText, columns);
+  twoColumns(out, cleanText(receipt.methodLabel || 'Metodo') + ':', methodText, columns);
 
   feed(out, 3);
 

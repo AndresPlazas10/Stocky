@@ -38,6 +38,7 @@ export function useMesasRefs({
   const heldMesaLockRef = useRef(null);
   const mesaLockHeartbeatTimerRef = useRef(null);
   const justCompletedSaleRef = useRef(false);
+  const emptyReleaseInProgressRef = useRef(null);
 
   const isOfflineFirstRuntime = isOfflineMode() && isOfflinePersistenceEnabled();
 
@@ -186,6 +187,7 @@ export function useMesasRefs({
     heldMesaLockRef,
     mesaLockHeartbeatTimerRef,
     justCompletedSaleRef,
+    emptyReleaseInProgressRef,
     isOfflineFirstRuntime,
     setPendingQuantityUpdatesSafe,
     setMesaOpenDebugStage,

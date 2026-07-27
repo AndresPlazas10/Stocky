@@ -19,8 +19,10 @@ import { type PaymentMethod, type SplitSubAccount } from '../../../services/mesa
 import {
   compareMesaTableIdentifiers,
   openCloseMesa,
+  resolveMesaSyncVersion,
   type MesaRecord,
 } from '../../../services/mesasService';
+import { resetAuxiliaryModals, resetOrderFlow } from '../utils/mesaHelpers';
 
 type UseMesaOrderStateSnapshot = {
   showOrderModal: boolean;
@@ -96,146 +98,151 @@ type UseMesaOrderStateSnapshot = {
 type UseMesaOrderMutationsParams = {
   order: UseMesaOrderStateSnapshot;
 
-  businessId: string | null | undefined;
-  source?: string | null;
-  session: { access_token: string | null; user: { id: string } };
-  heldMesaLockRef: React.MutableRefObject<{
-    businessId: string;
-    tableId: string;
-    lockToken: string | null;
-  } | null>;
-  publishMesaLockBroadcast: (input: {
-    businessId: string;
-    tableId: string;
-    locked: boolean;
-    mode?: 'optimistic' | 'confirmed' | 'rollback';
-    lockToken?: string | null;
-    lockExpiresAt?: string | null;
-  }) => void;
-  publishMesaStateBroadcast: (
-    mesa: MesaRecord,
-    options?: {
-      previousOrderId?: string | null;
-      mode?: 'optimistic' | 'confirmed' | 'rollback';
-      orderUnits?: number | null;
-    },
-  ) => void;
-  acquireMesaLockForEdition: (mesa: MesaRecord) => Promise<boolean>;
-  releaseHeldMesaLock: (
-    lockSnapshot?: {
+  auth: {
+    businessId: string | null | undefined;
+    source?: string | null;
+    session: { access_token: string | null; user: { id: string } };
+  };
+
+  lockOps: {
+    heldMesaLockRef: React.MutableRefObject<{
       businessId: string;
       tableId: string;
       lockToken: string | null;
-    } | null,
-  ) => Promise<void>;
-  bumpMesaActionVersion: (mesaId: string) => number;
-  isMesaActionVersionCurrent: (mesaId: string, version: number) => boolean;
+    } | null>;
+    publishMesaLockBroadcast: (input: {
+      businessId: string;
+      tableId: string;
+      locked: boolean;
+      mode?: 'optimistic' | 'confirmed' | 'rollback';
+      lockToken?: string | null;
+      lockExpiresAt?: string | null;
+    }) => void;
+    acquireMesaLockForEdition: (mesa: MesaRecord) => Promise<boolean>;
+    releaseHeldMesaLock: (
+      lockSnapshot?: {
+        businessId: string;
+        tableId: string;
+        lockToken: string | null;
+      } | null,
+    ) => Promise<void>;
+  };
 
-  loadOpenOrderSnapshot: (
-    orderId: string,
-    options?: { forceRefresh?: boolean },
-  ) => Promise<{ items: MesaOrderItem[]; total: number }>;
-  addCatalogItemToOrder: (params: {
-    orderId: string;
-    catalogItem: MesaOrderCatalogItem;
-    quantity: number;
-  }) => Promise<{ item: MesaOrderItem }>;
-  syncOrderItemQuantity: (params: {
-    orderId: string;
-    itemId: string;
-    quantity: number;
-    price: number;
-    total: number;
-  }) => Promise<void>;
-  removeOrderItemFromOrder: (params: {
-    orderId: string;
-    itemId: string;
-  }) => Promise<{ items: MesaOrderItem[]; total: number }>;
-  persistOrderSnapshot: (params: {
-    orderId: string;
-    items: MesaOrderItem[];
-    skipReload?: boolean;
-  }) => Promise<{ items: MesaOrderItem[]; total: number }>;
-  closeOrderSingle: (params: {
-    businessId: string;
-    orderId: string;
-    tableId: string;
-    paymentMethod: PaymentMethod;
-    amountReceived: number | null;
-    changeBreakdown: { denomination: number; count: number }[];
-    orderItems: MesaOrderItem[];
-  }) => Promise<{ saleId?: string | null }>;
-  closeOrderAsSplit: (params: {
-    businessId: string;
-    orderId: string;
-    tableId: string;
-    subAccounts: SplitSubAccount[];
-  }) => Promise<{ saleIds?: string[] | null }>;
+  broadcastOps: {
+    publishMesaStateBroadcast: (
+      mesa: MesaRecord,
+      options?: {
+        previousOrderId?: string | null;
+        mode?: 'optimistic' | 'confirmed' | 'rollback';
+        orderUnits?: number | null;
+      },
+    ) => void;
+    bumpMesaActionVersion: (mesaId: string) => number;
+    isMesaActionVersionCurrent: (mesaId: string, version: number) => boolean;
+    beginPendingEmptyRelease: (mesaId: string, syncVersion: number) => void;
+    endPendingEmptyRelease: (mesaId: string) => void;
+    isPendingEmptyRelease: (mesaId: string) => boolean;
+  };
 
-  patchMesaOrderTotal: (mesaId: string, orderId: string, total: number) => void;
-  publishRealtimeOrderSummary: (
-    mesa: MesaRecord | null | undefined,
-    orderId: string,
-    total: number,
-    units: number,
-    mode?: 'optimistic' | 'confirmed' | 'rollback',
-  ) => void;
+  orderServices: {
+    loadOpenOrderSnapshot: (
+      orderId: string,
+      options?: { forceRefresh?: boolean },
+    ) => Promise<{ items: MesaOrderItem[]; total: number }>;
+    addCatalogItemToOrder: (params: {
+      orderId: string;
+      catalogItem: MesaOrderCatalogItem;
+      quantity: number;
+    }) => Promise<{ item: MesaOrderItem }>;
+    syncOrderItemQuantity: (params: {
+      orderId: string;
+      itemId: string;
+      quantity: number;
+      price: number;
+      total: number;
+    }) => Promise<void>;
+    removeOrderItemFromOrder: (params: {
+      orderId: string;
+      itemId: string;
+    }) => Promise<{ items: MesaOrderItem[]; total: number }>;
+    persistOrderSnapshot: (params: {
+      orderId: string;
+      items: MesaOrderItem[];
+      skipReload?: boolean;
+    }) => Promise<{ items: MesaOrderItem[]; total: number }>;
+    closeOrderSingle: (params: {
+      businessId: string;
+      orderId: string;
+      tableId: string;
+      paymentMethod: PaymentMethod;
+      amountReceived: number | null;
+      changeBreakdown: { denomination: number; count: number }[];
+      orderItems: MesaOrderItem[];
+    }) => Promise<{ saleId?: string | null }>;
+    closeOrderAsSplit: (params: {
+      businessId: string;
+      orderId: string;
+      tableId: string;
+      subAccounts: SplitSubAccount[];
+    }) => Promise<{ saleIds?: string[] | null }>;
+  };
 
-  setError: (v: string | null) => void;
-  setMesas: (v: MesaRecord[] | ((prev: MesaRecord[]) => MesaRecord[])) => void;
-  markMesaAsAvailableAfterSale: (mesaId: string) => void;
-  loadData: () => Promise<void>;
+  dataLoader: {
+    patchMesaOrderTotal: (mesaId: string, orderId: string, total: number) => void;
+    publishRealtimeOrderSummary: (
+      mesa: MesaRecord | null | undefined,
+      orderId: string,
+      total: number,
+      units: number,
+      mode?: 'optimistic' | 'confirmed' | 'rollback',
+    ) => void;
+    loadData: () => Promise<void>;
+  };
 
-  beginPrintFlow: () => boolean;
-  endPrintFlow: () => void;
-  buildCashBreakdown: (change: number) => {
-    denomination: number;
-    count: number;
-  }[];
+  globalSetters: {
+    setError: (v: string | null) => void;
+    setMesas: (v: MesaRecord[] | ((prev: MesaRecord[]) => MesaRecord[])) => void;
+    markMesaAsAvailableAfterSale: (mesaId: string) => void;
+  };
 
-  onOrderSaved?: () => void;
-  onOrderClosed?: (mesaLabel: string, total: number) => void;
-  onKitchenPrinted?: () => void;
-  onNoKitchenItems?: () => void;
-  onNoPrinterConnected?: () => void;
-  onPrintError?: (error: string) => void;
+  printOps: {
+    beginPrintFlow: () => boolean;
+    endPrintFlow: () => void;
+    buildCashBreakdown: (change: number) => {
+      denomination: number;
+      count: number;
+    }[];
+  };
+
+  callbacks?: {
+    onOrderSaved?: () => void;
+    onOrderClosed?: (mesaLabel: string, total: number) => void;
+    onKitchenPrinted?: () => void;
+    onNoKitchenItems?: () => void;
+    onNoPrinterConnected?: () => void;
+    onPrintError?: (error: string) => void;
+  };
 };
 
 export function useMesaOrderMutations({
   order,
-  businessId,
-  source,
-  session,
-  heldMesaLockRef,
-  publishMesaLockBroadcast: _publishMesaLockBroadcast,
-  publishMesaStateBroadcast,
-  acquireMesaLockForEdition,
-  releaseHeldMesaLock,
-  bumpMesaActionVersion,
-  isMesaActionVersionCurrent,
-  loadOpenOrderSnapshot,
-  addCatalogItemToOrder,
-  syncOrderItemQuantity,
-  removeOrderItemFromOrder,
-  persistOrderSnapshot,
-  closeOrderSingle,
-  closeOrderAsSplit,
-  patchMesaOrderTotal,
-  publishRealtimeOrderSummary,
-  setError,
-  setMesas,
-  markMesaAsAvailableAfterSale,
-  loadData,
-  beginPrintFlow,
-  endPrintFlow,
-  buildCashBreakdown,
-  onOrderSaved,
-  onOrderClosed,
-  onKitchenPrinted,
-  onNoKitchenItems,
-  onNoPrinterConnected,
-  onPrintError,
+  auth,
+  lockOps,
+  broadcastOps,
+  orderServices,
+  dataLoader,
+  globalSetters,
+  printOps,
+  callbacks,
 }: UseMesaOrderMutationsParams) {
+  const { businessId, source, session } = auth;
+  const { heldMesaLockRef, publishMesaLockBroadcast: _publishMesaLockBroadcast, acquireMesaLockForEdition, releaseHeldMesaLock } = lockOps;
+  const { publishMesaStateBroadcast, bumpMesaActionVersion, isMesaActionVersionCurrent, beginPendingEmptyRelease, endPendingEmptyRelease, isPendingEmptyRelease } = broadcastOps;
+  const { loadOpenOrderSnapshot, addCatalogItemToOrder, syncOrderItemQuantity, removeOrderItemFromOrder, persistOrderSnapshot, closeOrderSingle, closeOrderAsSplit } = orderServices;
+  const { patchMesaOrderTotal, publishRealtimeOrderSummary, loadData } = dataLoader;
+  const { setError, setMesas, markMesaAsAvailableAfterSale } = globalSetters;
+  const { beginPrintFlow, endPrintFlow, buildCashBreakdown } = printOps;
+  const { onOrderSaved, onOrderClosed, onKitchenPrinted, onNoKitchenItems, onNoPrinterConnected, onPrintError } = callbacks ?? {};
   const { t } = useTranslation('mesas');
   const { timezone } = useBusinessConfig();
   const {
@@ -291,18 +298,8 @@ export function useMesaOrderMutations({
   } = order;
 
   const closeAuxiliaryOrderModals = useCallback(() => {
-    setShowCloseOrderChoiceModal(false);
-    setShowPaymentModal(false);
-    setShowSplitBillModal(false);
-    setPaymentMethod('cash');
-    setAmountReceived('');
-  }, [
-    setShowCloseOrderChoiceModal,
-    setShowPaymentModal,
-    setShowSplitBillModal,
-    setPaymentMethod,
-    setAmountReceived,
-  ]);
+    resetAuxiliaryModals(order);
+  }, [order]);
 
   const closeOrderModal = useCallback(() => {
     const held = heldMesaLockRef.current;
@@ -310,26 +307,12 @@ export function useMesaOrderMutations({
       void releaseHeldMesaLock(held);
     }
     orderModalOpenIntentRef.current = false;
-    closeAuxiliaryOrderModals();
-    setShowOrderModal(false);
-    setSelectedMesa(null);
-    setOrderItems([]);
-    setOrderModalError(null);
-    setSearchCatalog('');
-    setIsSearchFocused(false);
-    setMutatingOrderItemId(null);
+    resetOrderFlow(order);
   }, [
-    closeAuxiliaryOrderModals,
     heldMesaLockRef,
     releaseHeldMesaLock,
     orderModalOpenIntentRef,
-    setShowOrderModal,
-    setSelectedMesa,
-    setOrderItems,
-    setOrderModalError,
-    setSearchCatalog,
-    setIsSearchFocused,
-    setMutatingOrderItemId,
+    order,
   ]);
 
   const releaseEmptyOrderAndClose = useCallback(async () => {
@@ -347,17 +330,16 @@ export function useMesaOrderMutations({
     const mesaId = selectedMesa.id;
     const closeActionVersion = bumpMesaActionVersion(mesaId);
     const orderId = String(selectedMesa.current_order_id || '').trim() || null;
-    const optimisticMesa: MesaRecord = {
-      ...mesaSnapshot,
-      status: 'available',
-      current_order_id: null,
-      orders: null,
-    };
+    let optimisticSyncVersion = resolveMesaSyncVersion(mesaSnapshot) + 1;
 
     setReleasingEmptyOrder(true);
     setOrderModalError(null);
-    setMesas((prev: MesaRecord[]) =>
-      prev
+    setMesas((prev: MesaRecord[]) => {
+      const currentRow = prev.find((row) => row.id === mesaId) || null;
+      optimisticSyncVersion =
+        Math.max(resolveMesaSyncVersion(mesaSnapshot), resolveMesaSyncVersion(currentRow)) + 1;
+      beginPendingEmptyRelease(mesaId, optimisticSyncVersion);
+      return prev
         .map((row) =>
           row.id === mesaId
             ? {
@@ -365,11 +347,21 @@ export function useMesaOrderMutations({
                 status: 'available',
                 current_order_id: null,
                 orders: null,
+                sync_version: optimisticSyncVersion,
               }
             : row,
         )
-        .sort(compareMesaTableIdentifiers),
-    );
+        .sort(compareMesaTableIdentifiers);
+    });
+
+    const optimisticMesa: MesaRecord = {
+      ...mesaSnapshot,
+      status: 'available',
+      current_order_id: null,
+      orders: null,
+      sync_version: optimisticSyncVersion,
+    };
+
     if (orderId) {
       orderItemsCacheRef.current.delete(orderId);
     }
@@ -388,16 +380,24 @@ export function useMesaOrderMutations({
       });
 
       if (!isMesaActionVersionCurrent(mesaId, closeActionVersion)) {
+        endPendingEmptyRelease(mesaId);
         return;
       }
+
+      const confirmedSyncVersion =
+        updatedMesa.sync_version !== undefined
+          ? Math.max(Number(updatedMesa.sync_version) || 0, optimisticSyncVersion)
+          : optimisticSyncVersion;
 
       const mergedMesa: MesaRecord = {
         ...mesaSnapshot,
         ...updatedMesa,
-        orders: {
-          ...(mesaSnapshot.orders || {}),
-          ...(updatedMesa.orders || {}),
-        },
+        status: 'available',
+        current_order_id: null,
+        orders: null,
+        sync_version: confirmedSyncVersion,
+        table_number: mesaSnapshot.table_number ?? null,
+        table_name: mesaSnapshot.table_name ?? null,
       };
 
       setMesas((prev: MesaRecord[]) =>
@@ -409,10 +409,13 @@ export function useMesaOrderMutations({
         previousOrderId: orderId,
         mode: 'confirmed',
       });
+      endPendingEmptyRelease(mesaId);
     } catch (err) {
       if (!isMesaActionVersionCurrent(mesaId, closeActionVersion)) {
+        endPendingEmptyRelease(mesaId);
         return;
       }
+      endPendingEmptyRelease(mesaId);
       setMesas((prev: MesaRecord[]) =>
         prev
           .map((row) => (row.id === mesaSnapshot.id ? mesaSnapshot : row))
@@ -427,8 +430,10 @@ export function useMesaOrderMutations({
       setReleasingEmptyOrder(false);
     }
   }, [
+    beginPendingEmptyRelease,
     bumpMesaActionVersion,
     closeOrderModal,
+    endPendingEmptyRelease,
     isMesaActionVersionCurrent,
     publishMesaStateBroadcast,
     selectedMesa,
@@ -920,19 +925,25 @@ export function useMesaOrderMutations({
           }
         : null;
       const cachedItems = providedItems || inMemoryCache || serviceCache?.items || null;
+      const hasCachedItems = Array.isArray(cachedItems) && cachedItems.length > 0;
       const skipOrderItemsFetch = options?.skipOrderItemsFetch === true;
 
       setSelectedMesa(mesa);
       setShowOrderModal(true);
-      setLoadingOrder(!cachedItems && !skipOrderItemsFetch);
+      setLoadingOrder(true);
       setOrderModalError(null);
 
-      if (cachedItems) {
+      if (hasCachedItems) {
         setOrderItems(cachedItems);
         if (orderId) {
           orderItemsCacheRef.current.set(orderId, cachedItems);
         }
         patchMesaOrderTotal(mesa.id, orderId, calculateOrderTotal(cachedItems));
+      } else if (providedItems) {
+        setOrderItems(providedItems);
+        if (orderId) {
+          orderItemsCacheRef.current.set(orderId, providedItems);
+        }
       }
 
       const skipLockAcquire = options?.skipLockAcquire === true;
@@ -940,7 +951,7 @@ export function useMesaOrderMutations({
       void ensureCatalogLoaded(businessId).catch(() => {});
 
       if (skipOrderItemsFetch) {
-        if (!cachedItems) {
+        if (!hasCachedItems && !providedItems) {
           setOrderItems([]);
           orderItemsCacheRef.current.set(orderId, []);
         }
@@ -962,7 +973,7 @@ export function useMesaOrderMutations({
       if (!skipLockAcquire) {
         const lockPromise = acquireMesaLockForEdition(mesa);
         const snapshotPromise = loadOpenOrderSnapshot(orderId, {
-          forceRefresh: Boolean(cachedItems),
+          forceRefresh: hasCachedItems,
         });
 
         Promise.all([lockPromise, snapshotPromise])
@@ -979,19 +990,28 @@ export function useMesaOrderMutations({
               return;
             }
 
+            if (isPendingEmptyRelease(mesa.id) || !orderModalOpenIntentRef.current) {
+              setLoadingOrder(false);
+              return;
+            }
+
             if (snapshot) {
-              const previousItems = cachedItems || orderItemsCacheRef.current.get(orderId) || [];
+              const previousItems = hasCachedItems
+                ? cachedItems
+                : orderItemsCacheRef.current.get(orderId) || [];
               const mergedItems = reconcileOrderItemsFromServer(previousItems, snapshot.items);
               setOrderItems(mergedItems);
               orderItemsCacheRef.current.set(orderId, mergedItems);
               setOrderItemsCacheSnapshot(orderId, mergedItems);
-              patchMesaOrderTotal(mesa.id, orderId, calculateOrderTotal(mergedItems));
+              if (mergedItems.length > 0) {
+                patchMesaOrderTotal(mesa.id, orderId, calculateOrderTotal(mergedItems));
+              }
             }
 
             setLoadingOrder(false);
           })
           .catch((err) => {
-            if (!cachedItems) {
+            if (!hasCachedItems) {
               setOrderModalError(
                 err instanceof Error ? err.message : 'No se pudo cargar la orden.',
               );
@@ -1003,17 +1023,27 @@ export function useMesaOrderMutations({
       }
 
       try {
+        if (isPendingEmptyRelease(mesa.id) || !orderModalOpenIntentRef.current) {
+          return true;
+        }
         const snapshot = await loadOpenOrderSnapshot(orderId, {
-          forceRefresh: Boolean(cachedItems),
+          forceRefresh: hasCachedItems,
         });
-        const previousItems = cachedItems || orderItemsCacheRef.current.get(orderId) || [];
+        if (isPendingEmptyRelease(mesa.id) || !orderModalOpenIntentRef.current) {
+          return true;
+        }
+        const previousItems = hasCachedItems
+          ? cachedItems
+          : orderItemsCacheRef.current.get(orderId) || [];
         const mergedItems = reconcileOrderItemsFromServer(previousItems, snapshot.items);
         setOrderItems(mergedItems);
         orderItemsCacheRef.current.set(orderId, mergedItems);
         setOrderItemsCacheSnapshot(orderId, mergedItems);
-        patchMesaOrderTotal(mesa.id, orderId, calculateOrderTotal(mergedItems));
+        if (mergedItems.length > 0) {
+          patchMesaOrderTotal(mesa.id, orderId, calculateOrderTotal(mergedItems));
+        }
       } catch (err) {
-        if (!cachedItems) {
+        if (!hasCachedItems) {
           setOrderModalError(err instanceof Error ? err.message : 'No se pudo cargar la orden.');
         }
       } finally {
@@ -1025,6 +1055,7 @@ export function useMesaOrderMutations({
       acquireMesaLockForEdition,
       businessId,
       ensureCatalogLoaded,
+      isPendingEmptyRelease,
       loadOpenOrderSnapshot,
       orderItemsCacheRef,
       orderModalOpenIntentRef,
@@ -1348,8 +1379,6 @@ export function useMesaOrderMutations({
     closeAuxiliaryOrderModals,
     closeOrderModal,
     releaseEmptyOrderAndClose,
-    flushPendingQuantityUpdates,
-    scheduleQuantitySync,
     handleAddCatalogItem,
     handleUpdateOrderItemQuantity,
     handleRemoveOrderItem,

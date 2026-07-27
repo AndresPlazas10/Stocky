@@ -121,7 +121,7 @@
         "printFailed": "No se pudo imprimir la orden"
     },
     "receipt": {
-        "title": "COMPROBANTE DE VENTA",
+        "title": "COMPROBANTE",
         "receiptNumber": "Comprobante",
         "seller": "Vendedor",
         "sellerDefault": "Empleado",

@@ -37,6 +37,7 @@ type Props = PropsWithChildren<{
   dismissable?: boolean;
   hideCloseButton?: boolean;
   entryAnimation?: boolean;
+  scrollViewRef?: React.RefObject<ScrollView | null>;
 }>;
 
 const MODAL_HEIGHT_REDUCTION_FACTOR = 0.95;
@@ -78,6 +79,7 @@ export function StockyModal({
   dismissable = false,
   hideCloseButton = false,
   entryAnimation = true,
+  scrollViewRef,
 }: Props) {
   const isCentered = layout === 'centered';
   const centeredShift = Math.max(0, centeredOffsetY);
@@ -218,10 +220,11 @@ export function StockyModal({
 
               {shouldFlexBody ? (
                 <ScrollView
+                  ref={scrollViewRef}
                   style={[styles.content, contentStyle]}
                   contentContainerStyle={[styles.contentContainer, contentContainerStyle]}
                   keyboardShouldPersistTaps="always"
-                  keyboardDismissMode="on-drag"
+                  keyboardDismissMode="none"
                 >
                   {shouldUnmountContent && !contentReady ? (deferFallback ?? null) : children}
                 </ScrollView>
@@ -266,10 +269,11 @@ export function StockyModal({
 
               {shouldFlexBody ? (
                 <ScrollView
+                  ref={scrollViewRef}
                   style={[styles.content, contentStyle]}
                   contentContainerStyle={[styles.contentContainer, contentContainerStyle]}
                   keyboardShouldPersistTaps="always"
-                  keyboardDismissMode="on-drag"
+                  keyboardDismissMode="none"
                 >
                   {shouldUnmountContent && !contentReady ? (deferFallback ?? null) : children}
                 </ScrollView>

@@ -20,21 +20,16 @@ export function useProgressiveList(
   const prevResetKeyRef = useRef(resetKey);
 
   useEffect(() => {
-    const prevLength = prevLengthRef.current;
     const prevResetKey = prevResetKeyRef.current;
     const resetKeyChanged = prevResetKey !== resetKey;
-    const lengthChanged = safeItems.length !== prevLength;
-    const shouldReset = resetKeyChanged
-      || (!preserveOnGrow && lengthChanged)
-      || (preserveOnGrow && safeItems.length < prevLength);
 
-    if (shouldReset) {
+    if (resetKeyChanged) {
       setVisibleCount(initialCount);
     }
 
     prevLengthRef.current = safeItems.length;
     prevResetKeyRef.current = resetKey;
-  }, [initialCount, resetKey, safeItems.length, preserveOnGrow]);
+  }, [initialCount, resetKey, safeItems.length]);
 
   const hasMore = visibleCount < safeItems.length;
 

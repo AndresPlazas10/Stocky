@@ -4,7 +4,7 @@ import type { MesaOrderCatalogItem } from '../../../services/mesaOrderService';
 export const CATALOG_LOCAL_TTL_MS = 180_000;
 export const CATALOG_STORAGE_PREFIX = 'stocky:mesa-catalog:';
 
-type StoredCatalogSnapshot = {
+export type StoredCatalogSnapshot = {
   cachedAt: number;
   items: MesaOrderCatalogItem[];
 };

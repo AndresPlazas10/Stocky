@@ -1,12 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Session } from '@supabase/supabase-js';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { STOCKY_COLORS } from '../../theme/tokens';
+import { Keyboard, StyleSheet, Text, View } from 'react-native';
 import { formatCop } from '../../utils/money';
+import { readCatalogFromStorage } from './utils/catalogCache';
 
 import { useToastContext } from '../../hooks/useToastContext';
 import { useToastMessages } from '../../hooks/useToastMessages';
@@ -34,7 +31,7 @@ import {
   type MesaEditLock,
   type MesaRecord,
 } from '../../services/mesasService';
-import { SplitBillModalRN } from './SplitBillModalRN';
+import { SplitBillModalRN } from './split-bill/SplitBillModal';
 
 import { useMesaOrderState } from './hooks/useMesaOrderState';
 import { useMesaEditLock } from './hooks/useMesaEditLock';
@@ -42,7 +39,6 @@ import { useMesaRealtime } from './hooks/useMesaRealtime';
 import { useMesaOrderMutations } from './hooks/useMesaOrderMutations';
 import { useMesaPrint } from './hooks/useMesaPrint';
 import { useMesaCreate } from './hooks/useMesaCreate';
-import { useMesaRefSync } from './hooks/useMesaRefSync';
 import { useMesaKeyboard } from './hooks/useMesaKeyboard';
 import { useMesaDeleteModal } from './hooks/useMesaDeleteModal';
 import { usePaymentFlow } from './hooks/usePaymentFlow';
@@ -66,51 +62,14 @@ import {
   compareMesaTableIdentifiers,
   buildCashBreakdown,
   getDenominationsForCountry,
+  resetAuxiliaryModals,
+  resetOrderFlow,
 } from './utils/mesaHelpers';
 
 type Props = {
   session: Session;
   businessContext?: BusinessContext | null;
 };
-
-const CATALOG_LOCAL_TTL_MS = 180_000;
-const CATALOG_STORAGE_PREFIX = 'stocky:mesa-catalog:';
-const MESA_SYNC_TRACE_ENABLED = __DEV__;
-
-function traceMesaSync(label: string, data: Record<string, unknown>) {
-  if (!MESA_SYNC_TRACE_ENABLED) return;
-  const safeData = Object.entries(data || {}).reduce<Record<string, unknown>>(
-    (acc, [key, value]) => {
-      if (value === undefined) return acc;
-      acc[key] = value;
-      return acc;
-    },
-    {},
-  );
-  if (__DEV__) console.warn(`[mesa-sync] ${label}`, safeData);
-}
-
-type StoredCatalogSnapshot = {
-  cachedAt: number;
-  items: MesaOrderCatalogItem[];
-};
-
-async function readCatalogFromStorage(businessId: string): Promise<StoredCatalogSnapshot | null> {
-  const storageKey = `${CATALOG_STORAGE_PREFIX}${businessId}`;
-  try {
-    const raw = await AsyncStorage.getItem(storageKey);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredCatalogSnapshot;
-    if (!parsed || !Array.isArray(parsed.items)) return null;
-    const cachedAt = Number(parsed.cachedAt || 0);
-    return {
-      cachedAt: Number.isFinite(cachedAt) ? cachedAt : 0,
-      items: parsed.items,
-    };
-  } catch {
-    return null;
-  }
-}
 
 export function MesasPanel({ session, businessContext }: Props) {
   const { t } = useTranslation('mesas');
@@ -197,22 +156,8 @@ export function MesasPanel({ session, businessContext }: Props) {
     actorDisplayName,
     onError: (msg) => setError(msg),
     isOrderFlowActive,
-    onLockLost: () => {
-      setShowOrderModal(false);
-      setSelectedMesa(null);
-      setOrderItems([]);
-      setOrderModalError(null);
-      setSearchCatalog('');
-      setIsSearchFocused(false);
-      setMutatingOrderItemId(null);
-    },
-    onCloseAuxiliaryOrderModals: () => {
-      setShowCloseOrderChoiceModal(false);
-      setShowPaymentModal(false);
-      setShowSplitBillModal(false);
-      setPaymentMethod('cash');
-      setAmountReceived('');
-    },
+    onLockLost: () => resetOrderFlow(orderState),
+    onCloseAuxiliaryOrderModals: () => resetAuxiliaryModals(orderState),
     sendBroadcastRef,
   });
 
@@ -250,6 +195,18 @@ export function MesasPanel({ session, businessContext }: Props) {
     handleCreateMesa,
   } = mesaCreate;
 
+  const emptyReleaseGuardsRef = useRef<{
+    isPendingEmptyRelease: (mesaId: string) => boolean;
+    shouldIgnoreStaleOccupiedDuringEmptyRelease: (
+      mesaId: string,
+      incomingStatus?: string | null,
+      incomingSyncVersion?: number | null,
+    ) => boolean;
+  }>({
+    isPendingEmptyRelease: () => false,
+    shouldIgnoreStaleOccupiedDuringEmptyRelease: () => false,
+  });
+
   const realtime = useMesaRealtime({
     businessId: String(context?.businessId || ''),
     userId: session.user.id,
@@ -257,21 +214,16 @@ export function MesasPanel({ session, businessContext }: Props) {
     setMesas,
     setMesaLocksByTableId,
     setSelectedMesa,
-    setShowOrderModal,
-    setShowCloseOrderChoiceModal,
-    setShowPaymentModal,
-    setShowSplitBillModal,
-    setShowPaymentMethodMenu,
-    setPaymentMethod,
-    setAmountReceived,
-    setOrderItems,
-    setSearchCatalog,
-    setIsSearchFocused,
-    setMutatingOrderItemId,
-    setOrderModalError,
     publishMesaLockBroadcast,
     selectedMesaIdRef,
     heldMesaLockRef,
+    isPendingEmptyRelease: (mesaId) => emptyReleaseGuardsRef.current.isPendingEmptyRelease(mesaId),
+    shouldIgnoreStaleOccupiedDuringEmptyRelease: (mesaId, incomingStatus, incomingSyncVersion) =>
+      emptyReleaseGuardsRef.current.shouldIgnoreStaleOccupiedDuringEmptyRelease(
+        mesaId,
+        incomingStatus,
+        incomingSyncVersion,
+      ),
   });
 
   const {
@@ -286,11 +238,20 @@ export function MesasPanel({ session, businessContext }: Props) {
   const {
     bumpMesaActionVersion,
     isMesaActionVersionCurrent,
+    beginPendingEmptyRelease,
+    endPendingEmptyRelease,
+    isPendingEmptyRelease,
+    shouldIgnoreStaleOccupiedDuringEmptyRelease,
     sendMesaSyncBroadcast,
   } = useMesaActionBroadcast({
     mesasSyncBroadcastChannelRef,
     mesasSyncBroadcastReadyRef,
   });
+
+  emptyReleaseGuardsRef.current = {
+    isPendingEmptyRelease,
+    shouldIgnoreStaleOccupiedDuringEmptyRelease,
+  };
 
   // Set sendBroadcastRef so useMesaEditLock can send broadcasts via the realtime channel
   useEffect(() => {
@@ -301,19 +262,30 @@ export function MesasPanel({ session, businessContext }: Props) {
     };
   }, [mesasSyncBroadcastChannelRef]);
 
-  useMesaRefSync({
-    selectedMesaId: selectedMesa?.id ?? undefined,
-    mesas,
-    orderItems,
-    catalogItems,
-    currentOrderId: selectedMesa?.current_order_id ?? undefined,
-    pendingUiTraceRef,
-    latestOrderItemsRef,
-    catalogItemsRef,
-    orderItemsCacheRef,
-    selectedMesaIdRef,
-    mesasLengthRef,
-  });
+  // Sync external refs with state
+  useEffect(() => {
+    selectedMesaIdRef.current = String(selectedMesa?.id || '').trim();
+  }, [selectedMesa?.id]);
+
+  useEffect(() => {
+    mesasLengthRef.current = Array.isArray(mesas) ? mesas.length : 0;
+  }, [mesas]);
+
+  useEffect(() => {
+    const trace = pendingUiTraceRef.current;
+    if (!trace) return;
+    const uiLagMs = Math.max(0, Date.now() - trace.receivedAt);
+    if (__DEV__) {
+      console.warn('[mesa-sync] ui_painted', {
+        source: trace.source,
+        eventType: trace.eventType,
+        rowRef: trace.rowRef,
+        commitLagMs: trace.commitLagMs,
+        uiLagMs,
+      });
+    }
+    pendingUiTraceRef.current = null;
+  }, [mesas]);
 
   const publishMesaStateBroadcast = useCallback(
     (
@@ -434,18 +406,7 @@ export function MesasPanel({ session, businessContext }: Props) {
           if (result.lost) {
             setError(MESA_IN_USE_MESSAGE);
             void releaseHeldMesaLock(current);
-            setShowOrderModal(false);
-            setShowCloseOrderChoiceModal(false);
-            setShowPaymentModal(false);
-            setShowSplitBillModal(false);
-            setShowPaymentMethodMenu(false);
-            setPaymentMethod('cash');
-            setAmountReceived('');
-            setSelectedMesa(null);
-            setOrderItems([]);
-            setSearchCatalog('');
-            setIsSearchFocused(false);
-            setMutatingOrderItemId(null);
+            resetOrderFlow(orderState);
             void refreshMesaLocks(current.businessId);
           }
         })
@@ -462,22 +423,11 @@ export function MesasPanel({ session, businessContext }: Props) {
     actorDisplayName,
     heldMesaLockRef,
     isOrderFlowActive,
+    orderState,
     refreshMesaLocks,
     releaseHeldMesaLock,
     session.user.id,
-    setAmountReceived,
-    setIsSearchFocused,
     setMesaLocksByTableId,
-    setMutatingOrderItemId,
-    setOrderItems,
-    setPaymentMethod,
-    setSearchCatalog,
-    setSelectedMesa,
-    setShowCloseOrderChoiceModal,
-    setShowOrderModal,
-    setShowPaymentMethodMenu,
-    setShowPaymentModal,
-    setShowSplitBillModal,
   ]);
 
   const catalogNameByIdentity = useMemo(() => {
@@ -529,31 +479,12 @@ export function MesasPanel({ session, businessContext }: Props) {
     publishRealtimeOrderSummary,
     markMesaAsAvailableAfterSale,
   } = useMesaDataLoader({
-    session,
-    businessContext,
-    sessionDisplayName,
-    setContext,
-    setMesas,
-    setLoading,
-    setError,
-    setActorDisplayName,
-    setCatalogItems,
-    setMesaLocksByTableId,
-    ensureCatalogLoaded,
-    publishMesaStateBroadcast,
-    traceAsyncDuration,
-    readCatalogFromStorage,
-    refreshMesaLocks,
-    heldMesaLockRef,
-    releaseHeldMesaLock,
-    catalogBusinessIdRef,
-    catalogUpdatedAtRef,
-    catalogItemsRef,
-    orderItemsCacheRef,
-    mesasLengthRef,
-    hasLoadedOnceRef,
-    realtimeClientInstanceIdRef,
-    actorDisplayName,
+    auth: { session, businessContext, sessionDisplayName, actorDisplayName },
+    setters: { setContext, setMesas, setLoading, setError, setActorDisplayName, setCatalogItems },
+    lockOps: { setMesaLocksByTableId, refreshMesaLocks, heldMesaLockRef, releaseHeldMesaLock },
+    catalogOps: { ensureCatalogLoaded, readCatalogFromStorage, catalogBusinessIdRef, catalogUpdatedAtRef, catalogItemsRef },
+    broadcast: { publishMesaStateBroadcast, traceAsyncDuration, realtimeClientInstanceIdRef },
+    sharedRefs: { orderItemsCacheRef, mesasLengthRef, hasLoadedOnceRef, isPendingEmptyRelease },
   });
 
   useEffect(() => {
@@ -564,64 +495,47 @@ export function MesasPanel({ session, businessContext }: Props) {
 
   const mutations = useMesaOrderMutations({
     order: orderState,
-    businessId: context?.businessId,
-    source: context?.source,
-    session,
-    heldMesaLockRef,
-    publishMesaLockBroadcast,
-    publishMesaStateBroadcast,
-    acquireMesaLockForEdition,
-    releaseHeldMesaLock,
-    bumpMesaActionVersion,
-    isMesaActionVersionCurrent,
-    loadOpenOrderSnapshot,
-    addCatalogItemToOrder,
-    syncOrderItemQuantity,
-    removeOrderItemFromOrder,
-    persistOrderSnapshot,
-    closeOrderSingle,
-    closeOrderAsSplit,
-    patchMesaOrderTotal,
-    publishRealtimeOrderSummary,
-    setError,
-    setMesas,
-    markMesaAsAvailableAfterSale,
-    loadData,
-    beginPrintFlow,
-    endPrintFlow,
-    buildCashBreakdown: buildCashBreakdownForCountry,
-    onOrderSaved: () => {
-      toast.showSuccess(toastMessages.mesas.updated());
-    },
-    onOrderClosed: (mesaLabel, total) => {
-      toast.showSuccess(toastMessages.ventas.confirmed(mesaLabel, formatCop(total)));
-    },
-    onKitchenPrinted: () => {
-      toast.showSuccess(toastMessages.mesas.orderSent());
-    },
-    onNoKitchenItems: () => {
-      toast.showWarning({
-        title: t('mesas:toast.noKitchenItems.title', 'Sin productos de cocina'),
-        message: t(
-          'mesas:toast.noKitchenItems.message',
-          "No hay productos de la categoría 'Platos' para imprimir",
-        ),
-      });
-    },
-    onNoPrinterConnected: () => {
-      toast.showError({
-        title: t('mesas:toast.noPrinter.title', 'Sin impresora'),
-        message: t(
-          'mesas:toast.noPrinter.message',
-          'No hay una impresora conectada. Ve a Configuración > Impresión para conectar una.',
-        ),
-      });
-    },
-    onPrintError: (error: string) => {
-      toast.showError({
-        title: t('mesas:toast.printError.title', 'Error de impresión'),
-        message: error,
-      });
+    auth: { businessId: context?.businessId, source: context?.source, session },
+    lockOps: { heldMesaLockRef, publishMesaLockBroadcast, acquireMesaLockForEdition, releaseHeldMesaLock },
+    broadcastOps: { publishMesaStateBroadcast, bumpMesaActionVersion, isMesaActionVersionCurrent, beginPendingEmptyRelease, endPendingEmptyRelease, isPendingEmptyRelease },
+    orderServices: { loadOpenOrderSnapshot, addCatalogItemToOrder, syncOrderItemQuantity, removeOrderItemFromOrder, persistOrderSnapshot, closeOrderSingle, closeOrderAsSplit },
+    dataLoader: { patchMesaOrderTotal, publishRealtimeOrderSummary, loadData },
+    globalSetters: { setError, setMesas, markMesaAsAvailableAfterSale },
+    printOps: { beginPrintFlow, endPrintFlow, buildCashBreakdown: buildCashBreakdownForCountry },
+    callbacks: {
+      onOrderSaved: () => {
+        toast.showSuccess(toastMessages.mesas.updated());
+      },
+      onOrderClosed: (mesaLabel, total) => {
+        toast.showSuccess(toastMessages.ventas.confirmed(mesaLabel, formatCop(total)));
+      },
+      onKitchenPrinted: () => {
+        toast.showSuccess(toastMessages.mesas.orderSent());
+      },
+      onNoKitchenItems: () => {
+        toast.showWarning({
+          title: t('mesas:toast.noKitchenItems.title', 'Sin productos de cocina'),
+          message: t(
+            'mesas:toast.noKitchenItems.message',
+            "No hay productos de la categoría 'Platos' para imprimir",
+          ),
+        });
+      },
+      onNoPrinterConnected: () => {
+        toast.showError({
+          title: t('mesas:toast.noPrinter.title', 'Sin impresora'),
+          message: t(
+            'mesas:toast.noPrinter.message',
+            'No hay una impresora conectada. Ve a Configuración > Impresión para conectar una.',
+          ),
+        });
+      },
+      onPrintError: (error: string) => {
+        toast.showError({
+          title: t('mesas:toast.printError.title', 'Error de impresión'),
+          message: error,
+        });
+      },
     },
   });
 
@@ -741,6 +655,7 @@ export function MesasPanel({ session, businessContext }: Props) {
     publishMesaStateBroadcast,
     bumpMesaActionVersion,
     isMesaActionVersionCurrent,
+    isPendingEmptyRelease,
     orderItemsCacheRef,
     orderModalOpenIntentRef,
   });
@@ -770,13 +685,10 @@ export function MesasPanel({ session, businessContext }: Props) {
 
   const handleCatalogItemPress = useCallback(
     (item: MesaOrderCatalogItem) => {
-      if (isKeyboardVisible) {
-        Keyboard.dismiss();
-        return;
-      }
+      Keyboard.dismiss();
       void handleAddCatalogItem(item);
     },
-    [handleAddCatalogItem, isKeyboardVisible],
+    [handleAddCatalogItem],
   );
 
   const handleOpenAddMesa = useCallback(() => {
@@ -854,7 +766,7 @@ export function MesasPanel({ session, businessContext }: Props) {
   return (
     <>
       <View style={styles.mesasContainer}>
-        <MesasPanelHeader isCreatingMesa={isCreatingMesa} onOpenAddMesa={handleOpenAddMesa} />
+        <MesasPanelHeader isCreatingMesa={isCreatingMesa} onOpenAddMesa={handleOpenAddMesa} canCreateMesa={canDeleteMesas} />
 
         <View style={styles.mesasPanelDivider} />
 
@@ -928,64 +840,6 @@ const styles = StyleSheet.create({
     borderColor: '#D9DEE8',
     backgroundColor: 'rgba(255, 255, 255, 0.92)',
     overflow: 'hidden',
-  },
-  mesasPanelHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  mesasPanelTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-    minWidth: 0,
-  },
-  mesasPanelIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#5B33D6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  mesasPanelTitle: {
-    color: '#0F172A',
-    fontSize: 18,
-    fontWeight: '800',
-    lineHeight: 24,
-    flexShrink: 1,
-  },
-  addMesaButtonWrap: {
-    minWidth: 136,
-    flexShrink: 0,
-    marginLeft: 8,
-  },
-  addMesaButton: {
-    minHeight: 40,
-    borderRadius: 12,
-    paddingHorizontal: 11,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    shadowColor: '#5B33D6',
-    shadowOffset: { width: 0, height: 7 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  addMesaButtonText: {
-    color: STOCKY_COLORS.white,
-    fontSize: 14,
-    fontWeight: '700',
   },
   mesasPanelDivider: {
     height: 1,

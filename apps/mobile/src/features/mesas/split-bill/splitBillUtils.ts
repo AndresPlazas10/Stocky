@@ -1,4 +1,5 @@
 import type { MesaOrderItem } from '../../../services/mesaOrderService';
+import { calculateCashChange as validateCashPayment } from '../../../services/mesaOrderService';
 import type { PaymentMethod, SplitSubAccount } from '../../../services/mesaCheckoutService';
 import { getDenominationsForCountry } from '../utils/mesaHelpers';
 
@@ -34,50 +35,19 @@ export function getPaymentOptionLabel(method: PaymentMethod, t?: (key: string) =
   return labels[method] || method;
 }
 
-export function parseCopAmount(value: string | number | null | undefined): number {
-  if (value === null || value === undefined) return NaN;
-  if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value) : NaN;
-
-  const raw = String(value).trim().replace(/\s/g, '').replace(/\$/g, '');
-  if (!raw) return NaN;
-
-  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(raw)) {
-    const parsed = Number(raw.replace(/\./g, '').replace(',', '.'));
-    return Number.isFinite(parsed) ? Math.round(parsed) : NaN;
-  }
-
-  if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(raw)) {
-    const parsed = Number(raw.replace(/,/g, ''));
-    return Number.isFinite(parsed) ? Math.round(parsed) : NaN;
-  }
-
-  const simpleParsed = Number(raw.replace(',', '.'));
-  if (Number.isFinite(simpleParsed)) return Math.round(simpleParsed);
-
-  const digitsOnly = raw.replace(/[^\d]/g, '');
-  if (!digitsOnly) return NaN;
-  const digitsParsed = Number(digitsOnly);
-  return Number.isFinite(digitsParsed) ? Math.round(digitsParsed) : NaN;
-}
-
 export function calculateCashChange(
   total: number,
   paidValue: string | number | null | undefined,
   countryCode?: string,
 ) {
-  const normalizedTotal = Math.round(Number(total) || 0);
-  const normalizedPaid = parseCopAmount(paidValue);
-
-  if (
-    normalizedTotal <= 0 ||
-    !Number.isFinite(normalizedPaid) ||
-    normalizedPaid < normalizedTotal
-  ) {
+  const validation = validateCashPayment(total, paidValue);
+  if (!validation.isValid) {
     return { isValid: false, change: 0, breakdown: [], paid: null as number | null };
   }
 
+  const change = validation.change;
   const denominations = getDenominationsForCountry(countryCode || 'CO');
-  let remaining = normalizedPaid - normalizedTotal;
+  let remaining = change;
   const breakdown: { denomination: number; count: number }[] = [];
   for (const denomination of denominations) {
     const count = Math.floor(remaining / denomination);
@@ -89,9 +59,9 @@ export function calculateCashChange(
 
   return {
     isValid: true,
-    change: normalizedPaid - normalizedTotal,
+    change,
     breakdown,
-    paid: normalizedPaid,
+    paid: validation.paid,
   };
 }
 

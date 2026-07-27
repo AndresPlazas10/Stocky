@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "app.stockypos",
-      "versionCode": 32,
+      "versionCode": 36,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

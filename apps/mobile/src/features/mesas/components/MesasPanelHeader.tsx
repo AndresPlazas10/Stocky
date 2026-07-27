@@ -8,11 +8,13 @@ import { STOCKY_COLORS } from '../../../theme/tokens';
 type Props = {
   isCreatingMesa: boolean;
   onOpenAddMesa: () => void;
+  canCreateMesa: boolean;
 };
 
 export const MesasPanelHeader = React.memo(function MesasPanelHeader({
   isCreatingMesa,
   onOpenAddMesa,
+  canCreateMesa,
 }: Props) {
   const { t } = useTranslation('mesas');
 
@@ -32,17 +34,19 @@ export const MesasPanelHeader = React.memo(function MesasPanelHeader({
         </Text>
       </View>
 
-      <Pressable style={styles.addButtonWrap} onPress={onOpenAddMesa} disabled={isCreatingMesa}>
-        <LinearGradient
-          colors={isCreatingMesa ? ['#7D8AA7', '#9CA3AF'] : ['#4F46E5', '#7C3AED']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.addButton}
-        >
-          <Ionicons name="add" size={16} color={STOCKY_COLORS.white} />
-          <Text style={styles.addButtonText}>{t('buttons.addTable')}</Text>
-        </LinearGradient>
-      </Pressable>
+      {canCreateMesa ? (
+        <Pressable style={styles.addButtonWrap} onPress={onOpenAddMesa} disabled={isCreatingMesa}>
+          <LinearGradient
+            colors={isCreatingMesa ? ['#7D8AA7', '#9CA3AF'] : ['#4F46E5', '#7C3AED']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.addButton}
+          >
+            <Ionicons name="add" size={16} color={STOCKY_COLORS.white} />
+            <Text style={styles.addButtonText}>{t('buttons.addTable')}</Text>
+          </LinearGradient>
+        </Pressable>
+      ) : null}
     </View>
   );
 });

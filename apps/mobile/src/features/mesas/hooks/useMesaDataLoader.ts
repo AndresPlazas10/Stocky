@@ -8,66 +8,84 @@ import {
   type BusinessContext,
   type MesaRecord,
 } from '../../../services/mesasService';
-import { loadOpenOrderSnapshot } from '../../../services/mesaOrderService';
+import { loadOpenOrderSnapshot, type MesaOrderItem } from '../../../services/mesaOrderService';
 import { compareMesaTableIdentifiers } from '../utils/mesaHelpers';
+import type { StoredCatalogSnapshot } from '../utils/catalogCache';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+type HeldMesaLock = {
+  businessId: string;
+  tableId: string;
+  lockToken: string | null;
+};
+
+type MesaEditLock = {
+  table_id: string;
+  business_id: string;
+  lock_owner_user_id: string;
+  lock_owner_name: string;
+  lock_token: string | null;
+  lock_expires_at: string | null;
+  updated_at: string | null;
+};
+
 type UseMesaDataLoaderParams = {
-  session: Session;
-  businessContext?: BusinessContext | null;
-  sessionDisplayName: string;
-  setContext: (ctx: BusinessContext | null) => void;
-  setMesas: (v: MesaRecord[] | ((prev: MesaRecord[]) => MesaRecord[])) => void;
-  setLoading: (v: boolean) => void;
-  setError: (v: string | null) => void;
-  setActorDisplayName: (v: string) => void;
-  setCatalogItems: any;
-  setMesaLocksByTableId: any;
-  ensureCatalogLoaded: (businessId: string) => Promise<any[]>;
-  publishMesaStateBroadcast: (mesa: MesaRecord, options?: Record<string, unknown>) => void;
-  traceAsyncDuration: (label: string, start: number, data?: Record<string, unknown>) => void;
-  readCatalogFromStorage: (businessId: string) => Promise<any>;
-  refreshMesaLocks: (businessId: string) => Promise<void>;
-  heldMesaLockRef: React.MutableRefObject<any>;
-  releaseHeldMesaLock: (held?: any) => void;
-  catalogBusinessIdRef: React.MutableRefObject<string | null>;
-  catalogUpdatedAtRef: React.MutableRefObject<number>;
-  catalogItemsRef: React.MutableRefObject<any[]>;
-  orderItemsCacheRef: React.MutableRefObject<Map<string, any>>;
-  mesasLengthRef: React.MutableRefObject<number>;
-  hasLoadedOnceRef: React.MutableRefObject<boolean>;
-  realtimeClientInstanceIdRef: React.MutableRefObject<string>;
-  actorDisplayName: string;
+  auth: {
+    session: Session;
+    businessContext?: BusinessContext | null;
+    sessionDisplayName: string;
+    actorDisplayName: string;
+  };
+  setters: {
+    setContext: (ctx: BusinessContext | null) => void;
+    setMesas: (v: MesaRecord[] | ((prev: MesaRecord[]) => MesaRecord[])) => void;
+    setLoading: (v: boolean) => void;
+    setError: (v: string | null) => void;
+    setActorDisplayName: (v: string) => void;
+    setCatalogItems: (v: any[]) => void;
+  };
+  lockOps: {
+    setMesaLocksByTableId: React.Dispatch<React.SetStateAction<Record<string, MesaEditLock>>>;
+    refreshMesaLocks: (businessId: string) => Promise<void>;
+    heldMesaLockRef: React.MutableRefObject<HeldMesaLock | null>;
+    releaseHeldMesaLock: (held?: HeldMesaLock | null) => void;
+  };
+  catalogOps: {
+    ensureCatalogLoaded: (businessId: string) => Promise<any[]>;
+    readCatalogFromStorage: (businessId: string) => Promise<StoredCatalogSnapshot | null>;
+    catalogBusinessIdRef: React.MutableRefObject<string | null>;
+    catalogUpdatedAtRef: React.MutableRefObject<number>;
+    catalogItemsRef: React.MutableRefObject<any[]>;
+  };
+  broadcast: {
+    publishMesaStateBroadcast: (mesa: MesaRecord, options?: Record<string, unknown>) => void;
+    traceAsyncDuration: (label: string, start: number, data?: Record<string, unknown>) => void;
+    realtimeClientInstanceIdRef: React.MutableRefObject<string>;
+  };
+  sharedRefs: {
+    orderItemsCacheRef: React.MutableRefObject<Map<string, MesaOrderItem[]>>;
+    mesasLengthRef: React.MutableRefObject<number>;
+    hasLoadedOnceRef: React.MutableRefObject<boolean>;
+    isPendingEmptyRelease?: (mesaId: string) => boolean;
+  };
 };
 
 export function useMesaDataLoader({
-  session,
-  businessContext,
-  sessionDisplayName,
-  setContext,
-  setMesas,
-  setLoading,
-  setError,
-  setActorDisplayName,
-  setCatalogItems,
-  setMesaLocksByTableId,
-  ensureCatalogLoaded,
-  publishMesaStateBroadcast,
-  traceAsyncDuration,
-  readCatalogFromStorage,
-  refreshMesaLocks,
-  heldMesaLockRef,
-  releaseHeldMesaLock,
-  catalogBusinessIdRef,
-  catalogUpdatedAtRef,
-  catalogItemsRef,
-  orderItemsCacheRef,
-  mesasLengthRef,
-  hasLoadedOnceRef,
-  realtimeClientInstanceIdRef,
-  actorDisplayName,
+  auth,
+  setters,
+  lockOps,
+  catalogOps,
+  broadcast,
+  sharedRefs,
 }: UseMesaDataLoaderParams) {
+  const { session, businessContext, sessionDisplayName, actorDisplayName } = auth;
+  const { setContext, setMesas, setLoading, setError, setActorDisplayName, setCatalogItems } = setters;
+  const { setMesaLocksByTableId, refreshMesaLocks, heldMesaLockRef, releaseHeldMesaLock } = lockOps;
+  const { ensureCatalogLoaded, readCatalogFromStorage, catalogBusinessIdRef, catalogUpdatedAtRef, catalogItemsRef } = catalogOps;
+  const { publishMesaStateBroadcast, traceAsyncDuration } = broadcast;
+  const { orderItemsCacheRef, mesasLengthRef, hasLoadedOnceRef, isPendingEmptyRelease } = sharedRefs;
+
   const { t } = useTranslation('mesas');
   const actorDisplayNameRef = useRef(actorDisplayName);
   actorDisplayNameRef.current = actorDisplayName;
@@ -112,7 +130,7 @@ export function useMesaDataLoader({
         orderItemsCacheRef.current.clear();
       }
       void readCatalogFromStorage(nextContext.businessId)
-        .then((cached: any) => {
+        .then((cached) => {
           if (!cached) return;
           if (
             catalogBusinessIdRef.current === nextContext.businessId &&
@@ -182,9 +200,24 @@ export function useMesaDataLoader({
 
   const patchMesaOrderTotal = useCallback(
     (mesaId: string, orderId: string, total: number) => {
+      if (isPendingEmptyRelease?.(mesaId)) return;
+
+      const safeTotal = Number(total || 0);
       setMesas((prev: MesaRecord[]) =>
         prev.map((mesa: MesaRecord) => {
           if (mesa.id !== mesaId) return mesa;
+          if (isPendingEmptyRelease?.(mesaId)) return mesa;
+
+          const isCurrentlyAvailable =
+            String(mesa.status || '')
+              .trim()
+              .toLowerCase() === 'available' && !mesa.current_order_id;
+
+          // Never re-occupy an available/empty table with a $0 patch (empty save/open race).
+          if (isCurrentlyAvailable && safeTotal <= 0.0001) {
+            return mesa;
+          }
+
           return {
             ...mesa,
             status: 'occupied',
@@ -192,13 +225,13 @@ export function useMesaDataLoader({
             orders: {
               ...(mesa.orders || {}),
               id: orderId,
-              total,
+              total: safeTotal,
             },
           };
         }),
       );
     },
-    [setMesas],
+    [isPendingEmptyRelease, setMesas],
   );
 
   const publishRealtimeOrderSummary = useCallback(
@@ -213,6 +246,11 @@ export function useMesaDataLoader({
       const normalizedOrderId = String(orderId || '').trim();
       const normalizedBusinessId = String(mesa?.business_id || '').trim();
       if (!normalizedMesaId || !normalizedOrderId || !normalizedBusinessId) return;
+      if (isPendingEmptyRelease?.(normalizedMesaId)) return;
+
+      const safeTotal = Number(total || 0);
+      const safeUnits = Math.max(0, Math.floor(Number(units || 0)));
+      if (safeTotal <= 0.0001 && safeUnits <= 0) return;
 
       publishMesaStateBroadcast(
         {
@@ -225,17 +263,17 @@ export function useMesaDataLoader({
           orders: {
             id: normalizedOrderId,
             status: 'open',
-            total: Number(total || 0),
+            total: safeTotal,
           },
         } as unknown as MesaRecord,
         {
           previousOrderId: normalizedOrderId,
           mode,
-          orderUnits: Math.max(0, Math.floor(Number(units || 0))),
+          orderUnits: safeUnits,
         },
       );
     },
-    [publishMesaStateBroadcast],
+    [isPendingEmptyRelease, publishMesaStateBroadcast],
   );
 
   const markMesaAsAvailableAfterSale = useCallback(

@@ -121,7 +121,7 @@
     "printFailed": "Failed to print order"
   },
   "receipt": {
-    "title": "SALE RECEIPT",
+    "title": "RECEIPT",
     "receiptNumber": "Receipt",
     "seller": "Seller",
     "sellerDefault": "Employee",

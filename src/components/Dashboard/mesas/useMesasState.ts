@@ -74,7 +74,7 @@ export function useMesasState(businessId: string, userRole: string = 'admin') {
   } = useProgressiveList(mesas, {
     initialCount: lowMotionMode ? 12 : 20,
     step: lowMotionMode ? 12 : 20,
-    resetKey: `${mesas.length}:${lowMotionMode ? 'low' : 'full'}`,
+    resetKey: lowMotionMode ? 'low' : 'full',
   });
 
   const getCurrentUser = useCallback(async () => {

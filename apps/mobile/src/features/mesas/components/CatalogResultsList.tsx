@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { FlatList, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
@@ -13,12 +13,9 @@ interface CatalogResultsListProps {
   onItemPress: (item: MesaOrderCatalogItem) => void;
   loading?: boolean;
   disabled?: boolean;
-  isKeyboardVisible?: boolean;
 }
 
 const CatalogItemSeparator = () => <View style={styles.catalogResultRowDivider} />;
-
-const catalogKeyExtractor = (item: MesaOrderCatalogItem) => `${item.item_type}:${item.id}`;
 
 export const CatalogResultsList = React.memo(function CatalogResultsList({
   catalog,
@@ -27,7 +24,6 @@ export const CatalogResultsList = React.memo(function CatalogResultsList({
   onItemPress,
   loading = false,
   disabled = false,
-  isKeyboardVisible = false,
 }: CatalogResultsListProps) {
   const { t } = useTranslation('mesas');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -36,15 +32,18 @@ export const CatalogResultsList = React.memo(function CatalogResultsList({
   const renderItem = useCallback(
     ({ item }: { item: MesaOrderCatalogItem }) => (
       <Pressable
-        style={[styles.catalogResultRow, disabled && styles.disabled]}
-        disabled={disabled}
+        style={({ pressed }) => [
+          styles.catalogResultRow,
+          disabled && styles.disabled,
+          pressed && { opacity: 0.7 },
+        ]}
         onPress={() => {
-          if (isKeyboardVisible) {
+          if (!disabled) {
+            onItemPress(item);
             Keyboard.dismiss();
-            return;
           }
-          onItemPress(item);
         }}
+        disabled={disabled}
       >
         <View style={styles.catalogResultLeft}>
           <Text style={styles.catalogResultName}>{item.name}</Text>
@@ -57,7 +56,7 @@ export const CatalogResultsList = React.memo(function CatalogResultsList({
         <StockyMoneyText value={Number(item.sale_price || 0)} style={styles.catalogResultPrice} />
       </Pressable>
     ),
-    [disabled, isKeyboardVisible, onItemPress],
+    [disabled, onItemPress],
   );
 
   return (
@@ -89,20 +88,19 @@ export const CatalogResultsList = React.memo(function CatalogResultsList({
         </Text>
       ) : hasCatalogQuery ? (
         <View style={styles.catalogResultsCard}>
-          <FlatList
-            data={catalog}
-            keyExtractor={catalogKeyExtractor}
+          <ScrollView
             nestedScrollEnabled
-            keyboardShouldPersistTaps="never"
+            keyboardShouldPersistTaps="always"
             showsVerticalScrollIndicator
             style={styles.catalogResultsScroll}
-            ItemSeparatorComponent={CatalogItemSeparator}
-            removeClippedSubviews
-            initialNumToRender={8}
-            maxToRenderPerBatch={6}
-            windowSize={5}
-            renderItem={renderItem}
-          />
+          >
+            {catalog.map((item, index) => (
+              <React.Fragment key={`${item.item_type}:${item.id}`}>
+                {index > 0 && <CatalogItemSeparator />}
+                {renderItem({ item })}
+              </React.Fragment>
+            ))}
+          </ScrollView>
         </View>
       ) : null}
     </>

@@ -8,8 +8,11 @@ import {
   type MesaEditLock,
   type MesaRecord,
 } from '../../../services/mesasService';
-
-const MESA_IN_USE_MESSAGE = 'Alguien esta usando esta mesa.';
+import {
+  mergeMesaLocks,
+  createMesaLocksRefresher,
+  MESA_IN_USE_MESSAGE,
+} from '../utils/mesaHelpers';
 
 type HeldMesaLock = {
   businessId: string;
@@ -43,53 +46,21 @@ export function useMesaEditLock({
   const [mesaLocksByTableId, setMesaLocksByTableId] = useState<Record<string, MesaEditLock>>({});
   const [heldMesaLock, setHeldMesaLock] = useState<HeldMesaLock | null>(null);
   const heldMesaLockRef = useRef<HeldMesaLock | null>(null);
-  const orderModalOpenIntentRef = useRef(false);
   const [clientInstanceId] = useState(
     () => `mesa-client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   );
   const clientInstanceIdRef = useRef(clientInstanceId);
 
-  const applyMesaLocks = useCallback((locks: MesaEditLock[]) => {
-    const next: Record<string, MesaEditLock> = {};
-    (Array.isArray(locks) ? locks : []).forEach((lock) => {
-      const tableId = String(lock?.table_id || '').trim();
-      if (!tableId) return;
-      next[tableId] = lock;
-    });
-    setMesaLocksByTableId((prev) => {
-      if (!prev || Object.keys(prev).length === 0) return next;
-      const nowMs = Date.now();
-      Object.entries(prev).forEach(([tableId, lock]) => {
-        if (next[tableId]) return;
-        const token = String(lock?.lock_token || '').trim();
-        const expiresAtMs = Date.parse(String(lock?.lock_expires_at || '').trim());
-        if (!Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs) return;
-        const isPending = token.startsWith('pending-') || token.startsWith('broadcast-');
-        const updatedAtMs = Date.parse(String(lock?.updated_at || '').trim());
-        const isFresh = Number.isFinite(updatedAtMs) && nowMs - updatedAtMs <= 4000;
-        if (isPending || isFresh) {
-          next[tableId] = lock;
-        }
-      });
-      return next;
-    });
-  }, []);
+  const applyMesaLocks = useCallback(
+    (locks: MesaEditLock[]) => {
+      setMesaLocksByTableId((prev) => mergeMesaLocks(prev, locks, { preservePendingPrefix: true }));
+    },
+    [],
+  );
 
   const refreshMesaLocks = useCallback(
-    async (businessId: string) => {
-      const normalizedBusinessId = String(businessId || '').trim();
-      if (!normalizedBusinessId) {
-        setMesaLocksByTableId({});
-        return;
-      }
-      try {
-        const locks = await listActiveMesaEditLocks(normalizedBusinessId);
-        applyMesaLocks(locks);
-      } catch {
-        // no-op
-      }
-    },
-    [applyMesaLocks],
+    createMesaLocksRefresher(setMesaLocksByTableId, listActiveMesaEditLocks, { preservePendingPrefix: true }),
+    [],
   );
 
   const publishMesaLockBroadcast = useCallback(
@@ -297,7 +268,6 @@ export function useMesaEditLock({
     if (held) {
       void releaseHeldMesaLock(held);
     }
-    orderModalOpenIntentRef.current = false;
     closeAuxiliaryOrderModals();
     if (onLockLost) {
       onLockLost();

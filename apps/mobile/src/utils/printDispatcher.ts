@@ -139,7 +139,7 @@ export async function printSaleReceipt(
     ? buildReceiptLabels(opts.t)
     : buildReceiptLabels((key: string) => {
         const fallbacks: Record<string, string> = {
-          'mesas:receipt.title': 'COMPROBANTE DE VENTA',
+          'mesas:receipt.title': 'COMPROBANTE',
           'mesas:receipt.receiptNumber': 'Comprobante',
           'mesas:receipt.seller': 'Vendedor',
           'mesas:receipt.sellerDefault': 'Empleado',

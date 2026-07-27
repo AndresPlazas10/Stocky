@@ -29,6 +29,7 @@ export function useMesasEffects({
   mesasSnapshotTimerRef,
   mesaLockHeartbeatTimerRef,
   publishMesaLockBroadcast,
+  emptyReleaseInProgressRef,
 }) {
   // Initial Load
   useEffect(() => {
@@ -82,6 +83,7 @@ export function useMesasEffects({
     const syncFromRemote = () => {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      if (emptyReleaseInProgressRef?.current) return;
       loadMesas().catch((err) => { logger.warn('mesas:effects:remote_sync_poll failed', err); });
     };
     const handleVisibility = () => {

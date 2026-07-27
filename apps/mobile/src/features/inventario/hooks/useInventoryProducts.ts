@@ -74,14 +74,14 @@ export function useInventoryProducts(businessId: string) {
 
   const refreshProductsSilently = useCallback(async () => {
     try {
+      const currentLimit = page * INVENTORY_PAGE_SIZE;
       const nextProducts = await listInventoryProducts(businessId, {
         includeSuppliers: false,
-        limit: INVENTORY_PAGE_SIZE,
+        limit: currentLimit,
         offset: 0,
       });
       setProducts(hydrateProductsWithSuppliers(nextProducts, suppliersRef.current));
-      setHasMoreProducts(nextProducts.length === INVENTORY_PAGE_SIZE);
-      setPage(1);
+      setHasMoreProducts(nextProducts.length === currentLimit);
     } catch (err) {
       if (__DEV__)
         console.error(
@@ -89,7 +89,7 @@ export function useInventoryProducts(businessId: string) {
           getErrorMessage(err),
         );
     }
-  }, [businessId]);
+  }, [businessId, page]);
 
   const refreshSuppliersSilently = useCallback(async () => {
     try {

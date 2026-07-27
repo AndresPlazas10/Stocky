@@ -31,6 +31,7 @@ import {
   normalizeTableIdentifier,
   compareTableIdentifiers,
   applyPendingQuantities,
+  areMesaArraysEquivalent,
   buildDiagnosticAlertMessage,
   sanitizeMesaOrderAssociation,
   reconcileTablesWithOpenOrders,
@@ -138,6 +139,7 @@ interface UseMesaOrderOperationsParams {
   showAddForm: boolean;
   setShowAddForm: SetState<boolean>;
   isOpeningTableRef: React.MutableRefObject<boolean>;
+  emptyReleaseInProgressRef: React.MutableRefObject<string | null>;
   showError: (title: string, message?: string) => void;
   showSuccess: (title: string, message?: string) => void;
 }
@@ -207,6 +209,7 @@ export function useMesaOrderOperations({
     showAddForm,
     setShowAddForm,
     isOpeningTableRef,
+    emptyReleaseInProgressRef,
     showError,
     showSuccess,
   }: UseMesaOrderOperationsParams) {
@@ -257,12 +260,12 @@ export function useMesaOrderOperations({
         const reconciledSnapshot = await reconcileClosedOrdersFromOutbox(withOpenOrdersFromSnapshot);
         const finalSnapshot = reconciledSnapshot.map(normalizeTableRecord).sort(compareTableIdentifiers);
         const sanitizedSnapshot = finalSnapshot.map(sanitizeMesaOrderAssociation).sort(compareTableIdentifiers);
-        setMesas(sanitizedSnapshot);
+        setMesas((prev) => areMesaArraysEquivalent(prev, sanitizedSnapshot) ? prev : sanitizedSnapshot);
         saveOfflineSnapshot(offlineSnapshotKey, sanitizedSnapshot);
         return;
       }
 
-      setMesas(sanitizedMesas);
+      setMesas((prev) => areMesaArraysEquivalent(prev, sanitizedMesas) ? prev : sanitizedMesas);
       if (!offline || hasLocalData) {
         saveOfflineSnapshot(offlineSnapshotKey, sanitizedMesas);
       }
@@ -277,7 +280,7 @@ export function useMesaOrderOperations({
         const reconciledCached = await reconcileClosedOrdersFromOutbox(withOpenOrdersCached);
         const finalCached = reconciledCached.map(normalizeTableRecord).sort(compareTableIdentifiers);
         const sanitizedCached = finalCached.map(sanitizeMesaOrderAssociation).sort(compareTableIdentifiers);
-        setMesas(sanitizedCached);
+        setMesas((prev) => areMesaArraysEquivalent(prev, sanitizedCached) ? prev : sanitizedCached);
         saveOfflineSnapshot(offlineSnapshotKey, sanitizedCached);
         return;
       }
@@ -468,9 +471,6 @@ export function useMesaOrderOperations({
       setPendingQuantityUpdatesSafe({});
       setModalOpenIntent(true);
       setShowOrderDetails(true);
-      if (!newOrder?.__localOnly) {
-        loadMesas().catch((err: unknown) => { logger.warn('mesas:order_operations:create_order_load_mesas failed', err); });
-      }
       setTimeout(() => { isOpeningTableRef.current = false; }, 50);
     } catch (error: unknown) {
       setTimeout(() => { isOpeningTableRef.current = false; }, 50);
@@ -988,6 +988,11 @@ export function useMesaOrderOperations({
   const releaseEmptyOrderAndCloseModal = useCallback((mesaSnapshot: any) => {
     const normalizedTableId = normalizeEntityId(mesaSnapshot?.id);
     const normalizedOrderId = normalizeEntityId(mesaSnapshot?.current_order_id);
+
+    if (normalizedTableId) {
+      emptyReleaseInProgressRef.current = normalizedTableId;
+    }
+
     if (normalizedOrderId) {
       delete pendingRemoteOrderTotalsRef.current[normalizedOrderId];
       delete lastSyncedOrderTotalsRef.current[normalizedOrderId];
@@ -1021,22 +1026,24 @@ export function useMesaOrderOperations({
       setPendingQuantityUpdatesSafe({});
       setSearchProduct('');
     }, async () => {
-      if (!normalizedOrderId || !normalizedTableId) return;
+      if (!normalizedOrderId || !normalizedTableId) {
+        emptyReleaseInProgressRef.current = null;
+        return;
+      }
       try {
-        const releaseResult = await deleteOrderAndReleaseTable({
+        await deleteOrderAndReleaseTable({
           orderId: normalizedOrderId,
           tableId: normalizedTableId,
           businessId,
           userId: currentUser?.id || null
         });
-        if (!releaseResult?.__localOnly) {
-          await loadMesas();
-        }
       } catch {
         try { await loadMesas(); } catch (err: unknown) { logger.warn('mesas:order_operations:load_mesas_recovery failed', err); }
+      } finally {
+        emptyReleaseInProgressRef.current = null;
       }
     });
-  }, [businessId, clearClosedMesaCache, currentUser?.id, loadMesas, setPendingQuantityUpdatesSafe, setMesas, setShowOrderDetails, setModalOpenIntent, setSelectedMesa, setOrderItems, setSearchProduct, pendingRemoteOrderTotalsRef, lastSyncedOrderTotalsRef, orderItemsDirtyRef, orderItemsRef]);
+  }, [businessId, clearClosedMesaCache, currentUser?.id, emptyReleaseInProgressRef, loadMesas, setPendingQuantityUpdatesSafe, setMesas, setShowOrderDetails, setModalOpenIntent, setSelectedMesa, setOrderItems, setSearchProduct, pendingRemoteOrderTotalsRef, lastSyncedOrderTotalsRef, orderItemsDirtyRef, orderItemsRef]);
 
   const removeItem = useCallback(async (itemId: string) => {
     if (pendingOrderItemOpsRef.current > 0) {
@@ -1217,12 +1224,8 @@ export function useMesaOrderOperations({
         try {
           await persistPendingQuantityUpdates(mesaSnapshot.current_order_id!, { refreshItems: false });
           await updateOrderTotal(mesaSnapshot.current_order_id, effectiveOrderItemsSnapshot, { skipMesaState: true });
-
-          if (typeof navigator === 'undefined' || navigator.onLine) {
-            loadMesas().catch((err: unknown) => { logger.warn('mesas:order_operations:refresh_mesas_after_persist failed', err); });
-          }
         } catch {
-        try { await loadMesas(); } catch (err: unknown) { logger.warn('mesas:order_operations:load_mesas_recovery failed', err); }
+          // no-op: optimistic state is already correct, polling will sync
         }
       })();
     } catch {

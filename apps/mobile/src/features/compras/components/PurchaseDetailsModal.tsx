@@ -30,7 +30,7 @@ export const PurchaseDetailsModal = React.memo(function PurchaseDetailsModal({
   onClose,
 }: PurchaseDetailsModalProps) {
   const { t } = useTranslation();
-  const { timezone } = useBusinessConfig();
+  const { timezone, locale } = useBusinessConfig();
   const selectedPurchaseItemsCount = useMemo(
     () =>
       selectedPurchaseDetails.reduce(
@@ -125,7 +125,7 @@ export const PurchaseDetailsModal = React.memo(function PurchaseDetailsModal({
             <View style={s.purchaseDetailsHeroMetaItem}>
               <Ionicons name="calendar-outline" size={14} color="#64748B" />
               <Text style={s.purchaseDetailsHeroMetaText}>
-                {formatDateTime(selectedPurchase.created_at, { timezone })}
+                {formatDateTime(selectedPurchase.created_at, { timezone, locale })}
               </Text>
             </View>
             <View style={s.purchaseDetailsHeroMetaItem}>

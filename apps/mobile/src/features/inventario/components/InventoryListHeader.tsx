@@ -46,17 +46,16 @@ export const InventoryListHeader = memo(function InventoryListHeader({
           </View>
         </View>
 
-        <Pressable
-          style={[
-            styles.heroCreateButton,
-            (!canManageProducts || checkingPermissions) && styles.buttonDisabled,
-          ]}
-          onPress={openCreateModal}
-          disabled={!canManageProducts || checkingPermissions}
-        >
-          <Ionicons name="add" size={22} color="rgba(255,255,255,0.88)" />
-          <Text style={styles.heroCreateButtonText}>{t('inventory.addProduct')}</Text>
-        </Pressable>
+        {canManageProducts ? (
+          <Pressable
+            style={[styles.heroCreateButton, checkingPermissions && styles.buttonDisabled]}
+            onPress={openCreateModal}
+            disabled={checkingPermissions}
+          >
+            <Ionicons name="add" size={22} color="rgba(255,255,255,0.88)" />
+            <Text style={styles.heroCreateButtonText}>{t('inventory.addProduct')}</Text>
+          </Pressable>
+        ) : null}
       </LinearGradient>
 
       {!canManageProducts ? (

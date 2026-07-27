@@ -28,12 +28,12 @@ export const SaleCard = memo(function SaleCard({
   onDelete,
 }: SaleCardProps) {
   const { t } = useTranslation();
-  const { timezone } = useBusinessConfig();
+  const { timezone, locale } = useBusinessConfig();
   return (
     <View style={s.saleCard}>
       <View style={s.saleDateRow}>
         <Ionicons name="calendar-outline" size={26} color="#111827" />
-        <Text style={s.saleDateText}>{formatDateTime(venta.created_at, { timezone })}</Text>
+        <Text style={s.saleDateText}>{formatDateTime(venta.created_at, { timezone, locale })}</Text>
       </View>
 
       <View style={s.saleInfoGrid}>

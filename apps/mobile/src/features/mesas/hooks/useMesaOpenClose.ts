@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { Session } from '@supabase/supabase-js';
 import {
   openCloseMesa,
+  resolveMesaSyncVersion,
   type BusinessContext,
   type MesaRecord,
 } from '../../../services/mesasService';
@@ -29,6 +30,7 @@ type UseMesaOpenCloseParams = {
   publishMesaStateBroadcast: (mesa: MesaRecord, options?: Record<string, unknown>) => void;
   bumpMesaActionVersion: (mesaId: string) => number;
   isMesaActionVersionCurrent: (mesaId: string, version: number) => boolean;
+  isPendingEmptyRelease?: (mesaId: string) => boolean;
   orderItemsCacheRef: React.MutableRefObject<Map<string, MesaOrderItem[]>>;
   orderModalOpenIntentRef: React.MutableRefObject<boolean>;
 };
@@ -53,6 +55,7 @@ export function useMesaOpenClose({
   publishMesaStateBroadcast,
   bumpMesaActionVersion,
   isMesaActionVersionCurrent,
+  isPendingEmptyRelease,
   orderItemsCacheRef,
   orderModalOpenIntentRef,
 }: UseMesaOpenCloseParams) {
@@ -88,6 +91,7 @@ export function useMesaOpenClose({
               status: 'available',
               current_order_id: null,
               orders: null,
+              sync_version: resolveMesaSyncVersion(mesa) + 1,
             };
 
       publishMesaStateBroadcast(optimisticMesa, {
@@ -121,7 +125,7 @@ export function useMesaOpenClose({
               : []),
           ]);
 
-          if (!isMesaActionVersionCurrent(mesa.id, actionVersion)) {
+          if (!isMesaActionVersionCurrent(mesa.id, actionVersion) || isPendingEmptyRelease?.(mesa.id)) {
             return;
           }
 
@@ -130,10 +134,21 @@ export function useMesaOpenClose({
             ...updatedMesa,
             table_number: updatedMesa.table_number ?? mesa.table_number,
             table_name: updatedMesa.table_name ?? mesa.table_name,
-            orders: {
-              ...(mesa.orders || {}),
-              ...(updatedMesa.orders || {}),
-            },
+            status: updatedMesa.status || 'occupied',
+            current_order_id: updatedMesa.current_order_id ?? null,
+            orders: updatedMesa.current_order_id
+              ? {
+                  ...(mesa.orders || {}),
+                  ...(updatedMesa.orders || {}),
+                  id: String(updatedMesa.current_order_id),
+                  status: String(updatedMesa.orders?.status || 'open'),
+                  total: Number(updatedMesa.orders?.total || 0),
+                }
+              : null,
+            sync_version:
+              updatedMesa.sync_version !== undefined
+                ? updatedMesa.sync_version
+                : resolveMesaSyncVersion(mesa) + 1,
           };
 
           if (!lockAcquired) {
@@ -162,7 +177,7 @@ export function useMesaOpenClose({
               orderItemsCacheRef.current.set(openedOrderId, []);
               setActiveOrderId(openedOrderId);
             }
-            if (orderModalOpenIntentRef.current) {
+            if (orderModalOpenIntentRef.current && !isPendingEmptyRelease?.(mesa.id)) {
               void openOrderModal(mergedMesa, {
                 skipOrderItemsFetch: true,
                 initialItems: [],
@@ -190,10 +205,13 @@ export function useMesaOpenClose({
             ...updatedMesa,
             table_number: updatedMesa.table_number ?? mesa.table_number,
             table_name: updatedMesa.table_name ?? mesa.table_name,
-            orders: {
-              ...(mesa.orders || {}),
-              ...(updatedMesa.orders || {}),
-            },
+            status: 'available',
+            current_order_id: null,
+            orders: null,
+            sync_version:
+              updatedMesa.sync_version !== undefined
+                ? updatedMesa.sync_version
+                : resolveMesaSyncVersion(mesa) + 1,
           };
 
           setMesas((prev) =>
@@ -230,6 +248,7 @@ export function useMesaOpenClose({
       context,
       ensureCatalogLoaded,
       isMesaActionVersionCurrent,
+      isPendingEmptyRelease,
       openOrderModal,
       orderItemsCacheRef,
       orderModalOpenIntentRef,

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { ToastOptions, ToastType } from '../ui/StockyToast';
 
 type ToastState = ToastOptions & { visible: boolean };
@@ -25,12 +25,16 @@ function resolveArgs(type: ToastType, args: ShowArgs): ToastOptions {
 
 export function useToast() {
   const [toast, setToast] = useState<ToastState>(INITIAL_STATE);
+  const isShowingRef = useRef(false);
 
   const showToast = useCallback((options: ToastOptions) => {
+    if (isShowingRef.current) return;
+    isShowingRef.current = true;
     setToast({ ...options, visible: true });
   }, []);
 
   const hideToast = useCallback(() => {
+    isShowingRef.current = false;
     setToast((prev) => ({ ...prev, visible: false }));
   }, []);
 

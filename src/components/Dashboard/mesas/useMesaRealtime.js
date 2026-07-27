@@ -38,6 +38,7 @@ export function useMesaRealtime({
   loadCombos,
   comboCatalogByIdRef,
   isOpeningTableRef,
+  emptyReleaseInProgressRef,
 }) {
   const orderRealtimeRefreshTimersRef = useRef({});
 
@@ -55,6 +56,11 @@ export function useMesaRealtime({
   const handleTableUpdate = useCallback((updatedTable) => {
     const normalizedTable = normalizeTableRecord(updatedTable);
     if (justCompletedSaleRef.current) {
+      return;
+    }
+
+    const releasingTableId = emptyReleaseInProgressRef?.current;
+    if (releasingTableId && normalizedTable.id === releasingTableId) {
       return;
     }
 
@@ -87,7 +93,7 @@ export function useMesaRealtime({
       }
       return prev;
     });
-  }, [justCompletedSaleRef, setMesas, setSelectedMesa, setShowOrderDetails, setModalOpenIntent, isOpeningTableRef]);
+  }, [justCompletedSaleRef, emptyReleaseInProgressRef, setMesas, setSelectedMesa, setShowOrderDetails, setModalOpenIntent, isOpeningTableRef]);
 
   const handleTableDelete = useCallback((deletedTable) => {
     setMesas(prev => {

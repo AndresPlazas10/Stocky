@@ -165,6 +165,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     showAddForm: state.showAddForm,
     setShowAddForm: state.setShowAddForm,
     isOpeningTableRef,
+    emptyReleaseInProgressRef: refs.emptyReleaseInProgressRef,
     showError,
     showSuccess,
   });
@@ -189,6 +190,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     loadCombos,
     comboCatalogByIdRef: refs.comboCatalogByIdRef,
     isOpeningTableRef,
+    emptyReleaseInProgressRef: refs.emptyReleaseInProgressRef,
   });
 
   const {
@@ -328,6 +330,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     mesasSnapshotTimerRef: refs.mesasSnapshotTimerRef,
     mesaLockHeartbeatTimerRef: refs.mesaLockHeartbeatTimerRef,
     publishMesaLockBroadcast: refs.publishMesaLockBroadcast,
+    emptyReleaseInProgressRef: refs.emptyReleaseInProgressRef,
   });
 
   const handleRetry = async () => {

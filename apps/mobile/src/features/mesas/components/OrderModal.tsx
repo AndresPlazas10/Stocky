@@ -1,7 +1,7 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { Session } from '@supabase/supabase-js';
 
@@ -52,8 +52,6 @@ export type OrderModalProps = {
     onSearchChange: (query: string) => void;
     resolveOrderItemDisplayName: (item: MesaOrderItem) => string;
   };
-
-  isKeyboardVisible: boolean;
 };
 
 const OrderItemSeparator = () => <View style={styles.orderItemSeparator} />;
@@ -64,7 +62,6 @@ export const OrderModal = React.memo(function OrderModal({
   visible,
   orderState,
   actions,
-  isKeyboardVisible,
 }: OrderModalProps) {
   const { t } = useTranslation('mesas');
   const {
@@ -95,6 +92,16 @@ export const OrderModal = React.memo(function OrderModal({
     onSearchChange,
     resolveOrderItemDisplayName,
   } = actions;
+
+  const scrollViewRef = useRef<ScrollView | null>(null);
+
+  useEffect(() => {
+    if (orderItems.length > 0) {
+      requestAnimationFrame(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      });
+    }
+  }, [orderItems.length]);
 
   const renderOrderItem = useCallback(
     ({ item }: { item: MesaOrderItem }) => {
@@ -132,6 +139,7 @@ export const OrderModal = React.memo(function OrderModal({
       deferBehavior="hide"
       deferFallback={<View style={styles.orderModalDeferred}></View>}
       sheetStyle={styles.orderModalSheet}
+      scrollViewRef={scrollViewRef}
       headerSlot={
         <View style={styles.orderModalHeader}>
           <LinearGradient
@@ -153,7 +161,11 @@ export const OrderModal = React.memo(function OrderModal({
         <View style={styles.orderFooterContainer}>
           <View style={styles.orderFooterTotalBlock}>
             <Text style={styles.orderFooterTotalLabel}>{t('labels.totalToPay')}:</Text>
-            <StockyMoneyText value={orderTotal} style={styles.orderFooterTotalValue} />
+            {loadingOrder ? (
+              <ActivityIndicator size="small" color="#6366F1" />
+            ) : (
+              <StockyMoneyText value={orderTotal} style={styles.orderFooterTotalValue} />
+            )}
           </View>
 
           <Pressable
@@ -238,7 +250,6 @@ export const OrderModal = React.memo(function OrderModal({
         onItemPress={onCatalogItemPress}
         loading={isCatalogLoading}
         disabled={loadingOrder || isClosingOrder || releasingEmptyOrder}
-        isKeyboardVisible={isKeyboardVisible}
       />
 
       <Text style={styles.orderItemsTitle}>{t('labels.orderItems')}</Text>
@@ -308,17 +319,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     lineHeight: 28,
     fontWeight: '800',
-  },
-  autoSaveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-  },
-  autoSaveBadgeText: {
-    color: '#6366F1',
-    fontSize: 12,
-    fontWeight: '600',
   },
   orderModalContent: {
     paddingHorizontal: 14,

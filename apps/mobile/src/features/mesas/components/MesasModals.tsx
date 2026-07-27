@@ -9,7 +9,7 @@ import { CreateMesaModal } from './CreateMesaModal';
 import { DeleteMesaModal } from './DeleteMesaModal';
 import { CloseOrderChoiceModal } from './CloseOrderChoiceModal';
 import { PaymentModal } from './PaymentModal';
-import { SplitBillModalRN } from '../SplitBillModalRN';
+import { SplitBillModalRN } from '../split-bill/SplitBillModal';
 import type { ComboComponentShortage, StockShortage } from '../../../services/mesaOrderService';
 
 type OrderState = {
@@ -127,7 +127,6 @@ export const MesasModals = React.memo(function MesasModals(props: MesasModalsPro
         context={props.context}
         orderState={props.orderState}
         actions={props.actions}
-        isKeyboardVisible={props.isKeyboardVisible}
       />
 
       <CloseOrderChoiceModal

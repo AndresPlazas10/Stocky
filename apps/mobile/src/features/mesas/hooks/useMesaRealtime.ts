@@ -10,10 +10,9 @@ import {
 } from '../../../services/mesasService';
 import {
   loadOpenOrderSnapshot,
-  normalizeOrderItemQuantity,
-  normalizeOrderItemSubtotal,
   normalizeOrderReference,
 } from '../../../services/mesaOrderService';
+import { mergeMesaLocks, createMesaLocksRefresher } from '../utils/mesaHelpers';
 
 const MESA_SYNC_TRACE_ENABLED = __DEV__;
 
@@ -38,18 +37,6 @@ export interface UseMesaRealtimeParams {
   setMesas: React.Dispatch<React.SetStateAction<MesaRecord[]>>;
   setMesaLocksByTableId: React.Dispatch<React.SetStateAction<Record<string, MesaEditLock>>>;
   setSelectedMesa: React.Dispatch<React.SetStateAction<MesaRecord | null>>;
-  setShowOrderModal?: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowCloseOrderChoiceModal?: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowPaymentModal?: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowSplitBillModal?: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowPaymentMethodMenu?: React.Dispatch<React.SetStateAction<boolean>>;
-  setPaymentMethod?: React.Dispatch<React.SetStateAction<any>>;
-  setAmountReceived?: React.Dispatch<React.SetStateAction<string>>;
-  setOrderItems?: React.Dispatch<React.SetStateAction<any[]>>;
-  setSearchCatalog?: React.Dispatch<React.SetStateAction<string>>;
-  setIsSearchFocused?: React.Dispatch<React.SetStateAction<boolean>>;
-  setMutatingOrderItemId?: React.Dispatch<React.SetStateAction<string | null>>;
-  setOrderModalError?: React.Dispatch<React.SetStateAction<string | null>>;
   publishMesaLockBroadcast?: (input: {
     businessId: string;
     tableId: string;
@@ -60,6 +47,12 @@ export interface UseMesaRealtimeParams {
   }) => void;
   selectedMesaIdRef: React.MutableRefObject<string>;
   heldMesaLockRef: React.MutableRefObject<HeldMesaLock | null>;
+  shouldIgnoreStaleOccupiedDuringEmptyRelease?: (
+    mesaId: string,
+    incomingStatus?: string | null,
+    incomingSyncVersion?: number | null,
+  ) => boolean;
+  isPendingEmptyRelease?: (mesaId: string) => boolean;
 }
 
 export interface UseMesaRealtimeReturn {
@@ -115,6 +108,8 @@ export function useMesaRealtime({
   setSelectedMesa,
   selectedMesaIdRef,
   heldMesaLockRef,
+  shouldIgnoreStaleOccupiedDuringEmptyRelease,
+  isPendingEmptyRelease,
 }: UseMesaRealtimeParams): UseMesaRealtimeReturn {
   const mesasRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mesaLocksRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -182,31 +177,9 @@ export function useMesaRealtime({
 
   const applyMesaLocks = useCallback(
     (locks: MesaEditLock[]) => {
-      const next: Record<string, MesaEditLock> = {};
-      (Array.isArray(locks) ? locks : []).forEach((lock) => {
-        const tableId = String(lock?.table_id || '').trim();
-        if (!tableId) return;
-        next[tableId] = lock;
-      });
-      setMesaLocksByTableId((prev) => {
-        if (!prev || Object.keys(prev).length === 0) return next;
-        const nowMs = Date.now();
-        Object.entries(prev).forEach(([tableId, lock]) => {
-          if (next[tableId]) return;
-          const token = String(lock?.lock_token || '').trim();
-          const expiresAtMs = Date.parse(String(lock?.lock_expires_at || '').trim());
-          if (!Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs) return;
-          const isPending = token.startsWith('broadcast-');
-          const updatedAtMs = Date.parse(String(lock?.updated_at || '').trim());
-          const isFresh = Number.isFinite(updatedAtMs) && nowMs - updatedAtMs <= 4000;
-          if (isPending || isFresh) {
-            next[tableId] = lock;
-          }
-        });
-        return next;
-      });
+      setMesaLocksByTableId((prev) => mergeMesaLocks(prev, locks));
     },
-    [setMesaLocksByTableId],
+    [],
   );
 
   // -------------------------------------------------------------------
@@ -266,20 +239,8 @@ export function useMesaRealtime({
   // -------------------------------------------------------------------
 
   const refreshMesaLocks = useCallback(
-    async (lockBusinessId: string) => {
-      const normalizedBusinessId = String(lockBusinessId || '').trim();
-      if (!normalizedBusinessId) {
-        setMesaLocksByTableId({});
-        return;
-      }
-      try {
-        const locks = await listActiveMesaEditLocks(normalizedBusinessId);
-        applyMesaLocks(locks);
-      } catch {
-        // no-op: no bloquear flujo principal por locks
-      }
-    },
-    [applyMesaLocks, setMesaLocksByTableId],
+    createMesaLocksRefresher(setMesaLocksByTableId, listActiveMesaEditLocks),
+    [],
   );
 
   // -------------------------------------------------------------------
@@ -509,7 +470,30 @@ export function useMesaRealtime({
           const incomingMesa = incomingById.get(mesaId);
 
           if (selectedMesaId && mesaId === selectedMesaId) {
-            return incomingMesa || previousById.get(selectedMesaId) || mesa;
+            if (!incomingMesa) return previousById.get(selectedMesaId) || mesa;
+            const previousSyncVersion = resolveMesaSyncVersion(
+              previousById.get(selectedMesaId) || mesa,
+            );
+            const incomingSyncVersion = resolveMesaSyncVersion(incomingMesa);
+            if (previousSyncVersion > incomingSyncVersion) {
+              traceMesaSync('refresh_drop_stale_selected', {
+                mesaId,
+                previousSyncVersion,
+                incomingSyncVersion,
+              });
+              return previousById.get(selectedMesaId) || mesa;
+            }
+            if (
+              shouldIgnoreStaleOccupiedDuringEmptyRelease?.(
+                mesaId,
+                incomingMesa.status,
+                incomingSyncVersion,
+              )
+            ) {
+              traceMesaSync('refresh_drop_occupied_during_empty_release_selected', { mesaId });
+              return previousById.get(selectedMesaId) || mesa;
+            }
+            return incomingMesa;
           }
 
           if (!incomingMesa) {
@@ -524,6 +508,17 @@ export function useMesaRealtime({
               previousSyncVersion,
               incomingSyncVersion,
             });
+            return mesa;
+          }
+
+          if (
+            shouldIgnoreStaleOccupiedDuringEmptyRelease?.(
+              mesaId,
+              incomingMesa.status,
+              incomingSyncVersion,
+            )
+          ) {
+            traceMesaSync('refresh_drop_occupied_during_empty_release', { mesaId });
             return mesa;
           }
 
@@ -542,7 +537,14 @@ export function useMesaRealtime({
     } catch {
       // no-op
     }
-  }, [businessId, isOrderFlowActive, selectedMesaIdRef, setMesas, traceAsyncDuration]);
+  }, [
+    businessId,
+    isOrderFlowActive,
+    selectedMesaIdRef,
+    setMesas,
+    shouldIgnoreStaleOccupiedDuringEmptyRelease,
+    traceAsyncDuration,
+  ]);
 
   // -------------------------------------------------------------------
   // scheduleMesasRealtimeRefresh
@@ -594,6 +596,7 @@ export function useMesaRealtime({
           let changed = false;
           const next = prev.map((mesa) => {
             if (normalizeOrderReference(mesa?.current_order_id) !== normalizedOrderId) return mesa;
+            if (isPendingEmptyRelease?.(mesa.id)) return mesa;
             changed = true;
             return {
               ...mesa,
@@ -612,6 +615,7 @@ export function useMesaRealtime({
         setSelectedMesa((prev) => {
           if (!prev || normalizeOrderReference(prev?.current_order_id) !== normalizedOrderId)
             return prev;
+          if (isPendingEmptyRelease?.(prev.id)) return prev;
           return {
             ...prev,
             status: 'occupied',
@@ -627,7 +631,7 @@ export function useMesaRealtime({
         // no-op
       }
     },
-    [setMesas, setSelectedMesa, traceAsyncDuration],
+    [isPendingEmptyRelease, setMesas, setSelectedMesa, traceAsyncDuration],
   );
 
   const scheduleOrderRealtimeSummaryHydration = useCallback(
@@ -734,10 +738,27 @@ export function useMesaRealtime({
             return prev;
           }
         }
+
         const resolvedCurrentOrderId = hasNextCurrentOrderId
           ? nextCurrentOrderId
           : (current.current_order_id ?? null);
         const resolvedStatus = String(nextStatus || current.status || 'available');
+        if (
+          shouldIgnoreStaleOccupiedDuringEmptyRelease?.(
+            mesaId,
+            resolvedStatus,
+            hasNextSyncVersion ? nextSyncVersion : null,
+          )
+        ) {
+          traceMesaSync('drop_occupied_during_empty_release', {
+            mesaId,
+            resolvedStatus,
+            nextSyncVersion,
+            eventType,
+          });
+          return prev;
+        }
+
         const nextMesa: MesaRecord = {
           ...current,
           status: resolvedStatus,
@@ -779,6 +800,15 @@ export function useMesaRealtime({
           ? nextCurrentOrderId
           : (prev.current_order_id ?? null);
         const resolvedStatus = String(nextStatus || prev.status || 'available');
+        if (
+          shouldIgnoreStaleOccupiedDuringEmptyRelease?.(
+            mesaId,
+            resolvedStatus,
+            hasNextSyncVersion ? nextSyncVersion : null,
+          )
+        ) {
+          return prev;
+        }
         return {
           ...prev,
           status: resolvedStatus,
@@ -842,6 +872,7 @@ export function useMesaRealtime({
       setMesas,
       setMesaLocksByTableId,
       setSelectedMesa,
+      shouldIgnoreStaleOccupiedDuringEmptyRelease,
     ],
   );
 
@@ -920,122 +951,6 @@ export function useMesaRealtime({
       setMesas,
       setMesaLocksByTableId,
     ],
-  );
-
-  // -------------------------------------------------------------------
-  // applyRealtimeOrderItemDelta
-  // -------------------------------------------------------------------
-
-  const applyRealtimeOrderItemDelta = useCallback(
-    (payload: any) => {
-      const eventType = String(payload?.eventType || '')
-        .trim()
-        .toUpperCase();
-      const nextRow = payload?.new && typeof payload.new === 'object' ? payload.new : null;
-      const prevRow = payload?.old && typeof payload.old === 'object' ? payload.old : null;
-
-      const deltasByOrderId = new Map<string, { deltaUnits: number; deltaTotal: number }>();
-      const pushDelta = (orderId: unknown, deltaUnits: number, deltaTotal: number) => {
-        const normalizedOrderId = normalizeOrderReference(orderId);
-        if (!normalizedOrderId) return;
-        const previous = deltasByOrderId.get(normalizedOrderId) || { deltaUnits: 0, deltaTotal: 0 };
-        deltasByOrderId.set(normalizedOrderId, {
-          deltaUnits: previous.deltaUnits + deltaUnits,
-          deltaTotal: previous.deltaTotal + deltaTotal,
-        });
-      };
-
-      const nextOrderId = normalizeOrderReference(nextRow?.order_id);
-      const previousOrderId = normalizeOrderReference(prevRow?.order_id);
-
-      if (eventType === 'INSERT') {
-        pushDelta(
-          nextOrderId,
-          normalizeOrderItemQuantity(nextRow?.quantity),
-          normalizeOrderItemSubtotal(nextRow),
-        );
-      } else if (eventType === 'DELETE') {
-        pushDelta(
-          previousOrderId,
-          -normalizeOrderItemQuantity(prevRow?.quantity),
-          -normalizeOrderItemSubtotal(prevRow),
-        );
-      } else {
-        const nextQuantity = normalizeOrderItemQuantity(nextRow?.quantity);
-        const previousQuantity = normalizeOrderItemQuantity(prevRow?.quantity);
-        const nextSubtotal = normalizeOrderItemSubtotal(nextRow);
-        const previousSubtotal = normalizeOrderItemSubtotal(prevRow);
-
-        if (nextOrderId && previousOrderId && nextOrderId !== previousOrderId) {
-          pushDelta(previousOrderId, -previousQuantity, -previousSubtotal);
-          pushDelta(nextOrderId, nextQuantity, nextSubtotal);
-        } else {
-          pushDelta(
-            nextOrderId || previousOrderId,
-            nextQuantity - previousQuantity,
-            nextSubtotal - previousSubtotal,
-          );
-        }
-      }
-
-      if (deltasByOrderId.size === 0) return;
-
-      const normalizeTotal = (value: number) => Math.max(0, Math.round(value * 100) / 100);
-
-      setMesas((prev) => {
-        let changed = false;
-        const next = prev.map((mesa) => {
-          const orderId = normalizeOrderReference(mesa?.current_order_id);
-          if (!orderId) return mesa;
-          const delta = deltasByOrderId.get(orderId);
-          if (!delta) return mesa;
-
-          const currentTotal = Number(mesa?.orders?.total || 0);
-          const safeCurrentTotal = Number.isFinite(currentTotal) ? currentTotal : 0;
-          const nextTotal = normalizeTotal(safeCurrentTotal + delta.deltaTotal);
-
-          if (nextTotal === safeCurrentTotal) return mesa;
-          changed = true;
-          return {
-            ...mesa,
-            status: 'occupied',
-            orders: {
-              ...(mesa.orders || {}),
-              id: orderId,
-              status: String(mesa?.orders?.status || 'open'),
-              total: nextTotal,
-            },
-          };
-        });
-        return changed ? next : prev;
-      });
-
-      setSelectedMesa((prev) => {
-        if (!prev) return prev;
-        const selectedOrderId = normalizeOrderReference(prev?.current_order_id);
-        if (!selectedOrderId) return prev;
-        const delta = deltasByOrderId.get(selectedOrderId);
-        if (!delta) return prev;
-
-        const currentTotal = Number(prev?.orders?.total || 0);
-        const safeCurrentTotal = Number.isFinite(currentTotal) ? currentTotal : 0;
-        const nextTotal = normalizeTotal(safeCurrentTotal + delta.deltaTotal);
-
-        if (nextTotal === safeCurrentTotal) return prev;
-
-        return {
-          ...prev,
-          status: 'occupied',
-          orders: {
-            ...(prev.orders || {}),
-            id: selectedOrderId,
-            status: String(prev?.orders?.status || 'open'),
-            total: nextTotal,
-          },
-        };
-      });
-    },
-    [setMesas, setSelectedMesa],
   );
 
   // -------------------------------------------------------------------
@@ -1206,16 +1121,23 @@ export function useMesaRealtime({
       })
       .on('broadcast', { event: 'mesa_state_changed' }, ({ payload }: { payload: any }) => {
         if (cancelled) return;
+        const broadcastSenderClientId = String(payload?.sender_client_id || '').trim();
+        const isOwnBroadcast =
+          broadcastSenderClientId &&
+          broadcastSenderClientId === String(realtimeClientInstanceIdRef.current || '').trim();
         traceMesaSync('realtime_in', {
           source: 'mesa_broadcast',
           rowRef: String(payload?.mesa_id || '').trim() || 'unknown',
           syncMode: String(payload?.sync_mode || '').trim() || null,
+          isOwnBroadcast,
           emittedLagMs: Number.isFinite(Number(payload?.emitted_at))
             ? Math.max(0, Date.now() - Number(payload.emitted_at))
             : null,
         });
         applyRealtimeMesaBroadcast(payload);
-        scheduleRefresh();
+        if (!isOwnBroadcast) {
+          scheduleRefresh();
+        }
       });
 
     channel.subscribe((status: string) => {
@@ -1307,11 +1229,6 @@ export function useMesaRealtime({
       (payload: any) => {
         if (cancelled) return;
         markRealtimeIngress('order_items', payload);
-        // Don't apply delta-based updates - they can be incorrect when local state
-        // is ahead of server state due to rapid quantity changes.
-        // Instead, rely on broadcast (publishRealtimeOrderSummary) for immediate updates
-        // and hydration (scheduleOrderRealtimeSummaryHydration) for server-confirmed data.
-        // applyRealtimeOrderItemDelta(payload);
 
         const newRow = payload?.new as Record<string, unknown> | undefined;
         const oldRow = payload?.old as Record<string, unknown> | undefined;
@@ -1337,7 +1254,6 @@ export function useMesaRealtime({
   }, [
     activeOrderId,
     businessId,
-    applyRealtimeOrderItemDelta,
     markRealtimeIngress,
     scheduleOrderRealtimeSummaryHydration,
   ]);

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Audio } from 'expo-av';
 import type { ToastType } from '../ui/StockyToast';
 
@@ -21,7 +21,7 @@ export function useToastSound() {
     };
   }, []);
 
-  const playSound = async (type: ToastType) => {
+  const playSound = useCallback(async (type: ToastType) => {
     try {
       let sound = soundsRef.current.get(type);
 
@@ -38,7 +38,7 @@ export function useToastSound() {
     } catch {
       // Silently ignore — sound is non-critical
     }
-  };
+  }, []);
 
   return { playSound };
 }

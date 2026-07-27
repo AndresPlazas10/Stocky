@@ -581,7 +581,7 @@ async function runLegacyOpenCloseWithSupabaseClient({
   const client = getSupabaseClient();
   let { data: tableRow, error: tableError } = await client
     .from('tables')
-    .select('id,business_id,table_number,table_name,current_order_id,status')
+    .select('id,business_id,table_number,table_name,current_order_id,status,sync_version')
     .eq('id', tableId)
     .maybeSingle();
 
@@ -649,6 +649,12 @@ async function runLegacyOpenCloseWithSupabaseClient({
     if (updateTableError) throw updateTableError;
   }
 
+  const { data: updatedTable } = await client
+    .from('tables')
+    .select('sync_version')
+    .eq('id', tableId)
+    .maybeSingle();
+
   return {
     id: String(tableRow.id),
     business_id: businessId,
@@ -656,7 +662,7 @@ async function runLegacyOpenCloseWithSupabaseClient({
     current_order_id: action === 'open' ? nextOrderId : null,
     table_number: tableRow.table_number ?? null,
     table_name: tableRow.table_name ?? null,
-    sync_version: undefined,
+    sync_version: updatedTable?.sync_version ?? tableRow.sync_version ?? undefined,
     orders: null,
   };
 }

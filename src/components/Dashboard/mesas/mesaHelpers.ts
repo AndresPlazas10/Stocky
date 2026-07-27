@@ -236,6 +236,22 @@ export const compareTableIdentifiers = (left: Mesa, right: Mesa): number => {
   return a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' });
 };
 
+export function areMesaArraysEquivalent(prev: Mesa[], next: Mesa[]): boolean {
+  if (prev.length !== next.length) return false;
+  for (let i = 0; i < prev.length; i++) {
+    const a = prev[i];
+    const b = next[i];
+    if (a?.id !== b?.id) return false;
+    if (a?.table_number !== b?.table_number) return false;
+    if (a?.status !== b?.status) return false;
+    if (normalizeEntityId(a?.current_order_id) !== normalizeEntityId(b?.current_order_id)) return false;
+    const aTotal = Number(a?.orders?.total || 0);
+    const bTotal = Number(b?.orders?.total || 0);
+    if (Math.abs(aTotal - bTotal) > 0.01) return false;
+  }
+  return true;
+}
+
 export const applyPendingQuantities = (items: OrderItem[] = [], pendingUpdates: Record<string, number> = {}): OrderItem[] => {
   if (!Array.isArray(items) || items.length === 0) return [];
   if (!pendingUpdates || Object.keys(pendingUpdates).length === 0) {

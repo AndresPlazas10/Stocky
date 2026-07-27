@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useDeferredValue, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useDeferredValue, useMemo, useReducer, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
 import {
@@ -6,22 +6,128 @@ import {
   calculateCashChange,
   calculateOrderTotal,
   evaluateOrderStockShortagesWithLookup,
-  type ComboComponentShortage,
   type MesaOrderCatalogItem,
   type MesaOrderItem,
-  type StockShortage,
 } from '../../../services/mesaOrderService';
 import { mesaDisplayName, type MesaRecord } from '../../../services/mesasService';
 import type { PaymentMethod } from '../../../services/mesaCheckoutService';
 import { onCatalogInvalidated } from '../../../utils/catalogEvents';
+import {
+  CATALOG_STORAGE_PREFIX,
+  CATALOG_LOCAL_TTL_MS,
+  type StoredCatalogSnapshot,
+} from '../utils/catalogCache';
 
-const CATALOG_STORAGE_PREFIX = 'stocky:mesa-catalog:';
-const CATALOG_LOCAL_TTL_MS = 180_000;
+// ---------------------------------------------------------------------------
+// State & Action types
+// ---------------------------------------------------------------------------
 
-type StoredCatalogSnapshot = {
-  cachedAt: number;
-  items: MesaOrderCatalogItem[];
+type OrderState = {
+  showOrderModal: boolean;
+  selectedMesa: MesaRecord | null;
+  catalogItems: MesaOrderCatalogItem[];
+  isCatalogLoading: boolean;
+  orderItems: MesaOrderItem[];
+  loadingOrder: boolean;
+  orderModalError: string | null;
+  searchCatalog: string;
+  isSearchFocused: boolean;
+  mutatingOrderItemId: string | null;
+  releasingEmptyOrder: boolean;
+  isSavingOrder: boolean;
+  showCloseOrderChoiceModal: boolean;
+  showPaymentModal: boolean;
+  showSplitBillModal: boolean;
+  showPaymentMethodMenu: boolean;
+  isClosingOrder: boolean;
+  paymentMethod: PaymentMethod;
+  amountReceived: string;
+  hasPendingChanges: boolean;
 };
+
+type OrderAction =
+  | { type: 'SET_FIELD'; key: keyof OrderState; value: OrderState[keyof OrderState] }
+  | { type: 'SET_MULTIPLE'; patch: Partial<OrderState> }
+  | { type: 'CLOSE_ALL_MODALS' }
+  | { type: 'CLOSE_AUX_MODALS' }
+  | { type: 'RESET_ORDER' };
+
+const initialState: OrderState = {
+  showOrderModal: false,
+  selectedMesa: null,
+  catalogItems: [],
+  isCatalogLoading: false,
+  orderItems: [],
+  loadingOrder: false,
+  orderModalError: null,
+  searchCatalog: '',
+  isSearchFocused: false,
+  mutatingOrderItemId: null,
+  releasingEmptyOrder: false,
+  isSavingOrder: false,
+  showCloseOrderChoiceModal: false,
+  showPaymentModal: false,
+  showSplitBillModal: false,
+  showPaymentMethodMenu: false,
+  isClosingOrder: false,
+  paymentMethod: 'cash',
+  amountReceived: '',
+  hasPendingChanges: false,
+};
+
+function orderReducer(state: OrderState, action: OrderAction): OrderState {
+  switch (action.type) {
+    case 'SET_FIELD':
+      return { ...state, [action.key]: action.value };
+    case 'SET_MULTIPLE':
+      return { ...state, ...action.patch };
+    case 'CLOSE_ALL_MODALS':
+      return {
+        ...state,
+        showOrderModal: false,
+        showCloseOrderChoiceModal: false,
+        showPaymentModal: false,
+        showSplitBillModal: false,
+        showPaymentMethodMenu: false,
+        selectedMesa: null,
+        orderItems: [],
+        orderModalError: null,
+        searchCatalog: '',
+        isSearchFocused: false,
+        mutatingOrderItemId: null,
+        paymentMethod: 'cash',
+        amountReceived: '',
+      };
+    case 'CLOSE_AUX_MODALS':
+      return {
+        ...state,
+        showCloseOrderChoiceModal: false,
+        showPaymentModal: false,
+        showSplitBillModal: false,
+        paymentMethod: 'cash',
+        amountReceived: '',
+      };
+    case 'RESET_ORDER':
+      return {
+        ...state,
+        orderItems: [],
+        orderModalError: null,
+        searchCatalog: '',
+        isSearchFocused: false,
+        mutatingOrderItemId: null,
+        releasingEmptyOrder: false,
+        isSavingOrder: false,
+        isClosingOrder: false,
+        paymentMethod: 'cash',
+        amountReceived: '',
+        hasPendingChanges: false,
+      };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pending quantity update type
+// ---------------------------------------------------------------------------
 
 type PendingQuantityUpdate = {
   orderId: string;
@@ -31,12 +137,20 @@ type PendingQuantityUpdate = {
   total: number;
 };
 
+// ---------------------------------------------------------------------------
+// Params
+// ---------------------------------------------------------------------------
+
 type UseMesaOrderStateParams = {
   listCatalogItems: (
     businessId: string,
     options?: { forceRefresh?: boolean },
   ) => Promise<MesaOrderCatalogItem[]>;
 };
+
+// ---------------------------------------------------------------------------
+// Catalog storage helper
+// ---------------------------------------------------------------------------
 
 async function writeCatalogToStorage(businessId: string, items: MesaOrderCatalogItem[]) {
   const storageKey = `${CATALOG_STORAGE_PREFIX}${businessId}`;
@@ -51,30 +165,49 @@ async function writeCatalogToStorage(businessId: string, items: MesaOrderCatalog
   }
 }
 
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
+
 export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams) {
   const { t } = useTranslation('mesas');
-  const [showOrderModal, setShowOrderModal] = useState(false);
-  const [selectedMesa, setSelectedMesa] = useState<MesaRecord | null>(null);
-  const [catalogItems, setCatalogItems] = useState<MesaOrderCatalogItem[]>([]);
-  const [isCatalogLoading, setIsCatalogLoading] = useState(false);
-  const [orderItems, setOrderItems] = useState<MesaOrderItem[]>([]);
-  const [loadingOrder, setLoadingOrder] = useState(false);
-  const [orderModalError, setOrderModalError] = useState<string | null>(null);
-  const [searchCatalog, setSearchCatalog] = useState('');
-  const deferredSearch = useDeferredValue(searchCatalog);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [mutatingOrderItemId, setMutatingOrderItemId] = useState<string | null>(null);
-  const [releasingEmptyOrder, setReleasingEmptyOrder] = useState(false);
-  const [isSavingOrder, setIsSavingOrder] = useState(false);
-  const [showCloseOrderChoiceModal, setShowCloseOrderChoiceModal] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showSplitBillModal, setShowSplitBillModal] = useState(false);
-  const [showPaymentMethodMenu, setShowPaymentMethodMenu] = useState(false);
-  const [isClosingOrder, setIsClosingOrder] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
-  const [amountReceived, setAmountReceived] = useState('');
-  const [hasPendingChanges, setHasPendingChanges] = useState(false);
+  const [state, dispatch] = useReducer(orderReducer, initialState);
 
+  // Stable setter wrappers that dispatch actions (backward compatible)
+  const setShowOrderModal = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'showOrderModal', value: v }), []);
+  const setSelectedMesa = useCallback((v: MesaRecord | null | ((prev: MesaRecord | null) => MesaRecord | null)) => {
+    const resolved = typeof v === 'function' ? v(state.selectedMesa) : v;
+    dispatch({ type: 'SET_FIELD', key: 'selectedMesa', value: resolved });
+  }, [state.selectedMesa]);
+  const setCatalogItems = useCallback((v: MesaOrderCatalogItem[]) => dispatch({ type: 'SET_FIELD', key: 'catalogItems', value: v }), []);
+  const setIsCatalogLoading = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'isCatalogLoading', value: v }), []);
+  const setOrderItems = useCallback((v: MesaOrderItem[] | ((prev: MesaOrderItem[]) => MesaOrderItem[])) => {
+    if (typeof v === 'function') {
+      dispatch({ type: 'SET_FIELD', key: 'orderItems', value: v(state.orderItems) });
+    } else {
+      dispatch({ type: 'SET_FIELD', key: 'orderItems', value: v });
+    }
+  }, [state.orderItems]);
+  const setLoadingOrder = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'loadingOrder', value: v }), []);
+  const setOrderModalError = useCallback((v: string | null) => dispatch({ type: 'SET_FIELD', key: 'orderModalError', value: v }), []);
+  const setSearchCatalog = useCallback((v: string) => dispatch({ type: 'SET_FIELD', key: 'searchCatalog', value: v }), []);
+  const setIsSearchFocused = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'isSearchFocused', value: v }), []);
+  const setMutatingOrderItemId = useCallback((v: string | null) => dispatch({ type: 'SET_FIELD', key: 'mutatingOrderItemId', value: v }), []);
+  const setReleasingEmptyOrder = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'releasingEmptyOrder', value: v }), []);
+  const setIsSavingOrder = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'isSavingOrder', value: v }), []);
+  const setShowCloseOrderChoiceModal = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'showCloseOrderChoiceModal', value: v }), []);
+  const setShowPaymentModal = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'showPaymentModal', value: v }), []);
+  const setShowSplitBillModal = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'showSplitBillModal', value: v }), []);
+  const setShowPaymentMethodMenu = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
+    const resolved = typeof v === 'function' ? v(state.showPaymentMethodMenu) : v;
+    dispatch({ type: 'SET_FIELD', key: 'showPaymentMethodMenu', value: resolved });
+  }, [state.showPaymentMethodMenu]);
+  const setIsClosingOrder = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'isClosingOrder', value: v }), []);
+  const setPaymentMethod = useCallback((v: PaymentMethod) => dispatch({ type: 'SET_FIELD', key: 'paymentMethod', value: v }), []);
+  const setAmountReceived = useCallback((v: string) => dispatch({ type: 'SET_FIELD', key: 'amountReceived', value: v }), []);
+  const setHasPendingChanges = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'hasPendingChanges', value: v }), []);
+
+  // Refs (unchanged)
   const addCatalogQueueRef = useRef<Promise<void>>(Promise.resolve());
   const latestOrderItemsRef = useRef<MesaOrderItem[]>([]);
   const orderItemsCacheRef = useRef(new Map<string, MesaOrderItem[]>());
@@ -86,6 +219,7 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
   const pendingQuantityUpdatesRef = useRef(new Map<string, PendingQuantityUpdate>());
   const quantitySyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Effects
   useEffect(() => {
     const unsubscribe = onCatalogInvalidated(() => {
       catalogUpdatedAtRef.current = 0;
@@ -93,6 +227,21 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    latestOrderItemsRef.current = state.orderItems;
+  }, [state.orderItems]);
+
+  useEffect(() => {
+    catalogItemsRef.current = state.catalogItems;
+  }, [state.catalogItems]);
+
+  useEffect(() => {
+    const orderId = String(state.selectedMesa?.current_order_id || '').trim();
+    if (!orderId) return;
+    orderItemsCacheRef.current.set(orderId, state.orderItems);
+  }, [state.orderItems, state.selectedMesa?.current_order_id]);
+
+  // Catalog loading (unchanged logic)
   const ensureCatalogLoaded = useCallback(
     async (businessId: string, options?: { forceRefresh?: boolean }) => {
       const normalizedBusinessId = String(businessId || '').trim();
@@ -156,11 +305,14 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
       catalogLoadPromiseRef.current = promise;
       return promise;
     },
-    [listCatalogItems],
+    [listCatalogItems, setCatalogItems, setIsCatalogLoading],
   );
 
+  // Derived values
+  const deferredSearch = useDeferredValue(state.searchCatalog);
+
   const filteredCatalog = useMemo(() => {
-    const source = Array.isArray(catalogItems) ? catalogItems : [];
+    const source = Array.isArray(state.catalogItems) ? state.catalogItems : [];
     const search = String(deferredSearch || '')
       .trim()
       .toLowerCase();
@@ -177,24 +329,22 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
         return byName;
       })
       .slice(0, 80);
-  }, [catalogItems, deferredSearch]);
+  }, [state.catalogItems, deferredSearch]);
 
-  const hasCatalogQuery = String(searchCatalog || '').trim().length > 0;
-
-  const catalogLookup = useMemo(() => buildCatalogLookup(catalogItems), [catalogItems]);
+  const catalogLookup = useMemo(() => buildCatalogLookup(state.catalogItems), [state.catalogItems]);
 
   const { insufficientItems, insufficientComboComponents } = useMemo(() => {
-    if (loadingOrder) {
+    if (state.loadingOrder) {
       return { insufficientItems: [], insufficientComboComponents: [] };
     }
-    if (catalogItems.length === 0) {
+    if (state.catalogItems.length === 0) {
       return { insufficientItems: [], insufficientComboComponents: [] };
     }
     return evaluateOrderStockShortagesWithLookup({
-      orderItems,
+      orderItems: state.orderItems,
       lookup: catalogLookup,
     });
-  }, [catalogItems.length, catalogLookup, loadingOrder, orderItems]);
+  }, [state.catalogItems.length, catalogLookup, state.loadingOrder, state.orderItems]);
 
   const getStockValidationMessage = useCallback(() => {
     if (insufficientItems.length > 0) {
@@ -210,72 +360,71 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
     return null;
   }, [insufficientComboComponents, insufficientItems]);
 
-  const orderTotal = useMemo(() => calculateOrderTotal(orderItems), [orderItems]);
+  const orderTotal = useMemo(() => calculateOrderTotal(state.orderItems), [state.orderItems]);
 
-  const orderModalTitle = selectedMesa
-    ? `${mesaDisplayName(selectedMesa, t('labels.table'))} - ${t('labels.orderDetails')}`
+  const orderModalTitle = state.selectedMesa
+    ? `${mesaDisplayName(state.selectedMesa, t('labels.table'))} - ${t('labels.orderDetails')}`
     : `${t('labels.table')} - ${t('labels.orderDetails')}`;
 
   const isOrderFlowActive =
-    showOrderModal ||
-    showCloseOrderChoiceModal ||
-    showPaymentModal ||
-    showSplitBillModal ||
-    showPaymentMethodMenu;
+    state.showOrderModal ||
+    state.showCloseOrderChoiceModal ||
+    state.showPaymentModal ||
+    state.showSplitBillModal ||
+    state.showPaymentMethodMenu;
 
   const cashChangeData = useMemo(() => {
-    if (paymentMethod !== 'cash') return null;
-    if (String(amountReceived || '').trim() === '')
+    if (state.paymentMethod !== 'cash') return null;
+    if (String(state.amountReceived || '').trim() === '')
       return {
         isValid: false,
         reason: 'empty' as const,
         change: 0,
         paid: 0,
       };
-    return calculateCashChange(orderTotal, amountReceived);
-  }, [amountReceived, orderTotal, paymentMethod]);
+    return calculateCashChange(orderTotal, state.amountReceived);
+  }, [state.amountReceived, orderTotal, state.paymentMethod]);
 
+  // Return same interface as before (backward compatible)
   return {
-    showOrderModal,
+    showOrderModal: state.showOrderModal,
     setShowOrderModal,
-    selectedMesa,
+    selectedMesa: state.selectedMesa,
     setSelectedMesa,
-    catalogItems,
+    catalogItems: state.catalogItems,
     setCatalogItems,
-    isCatalogLoading,
-    setIsCatalogLoading,
-    orderItems,
+    isCatalogLoading: state.isCatalogLoading,
+    orderItems: state.orderItems,
     setOrderItems,
-    loadingOrder,
+    loadingOrder: state.loadingOrder,
     setLoadingOrder,
-    orderModalError,
+    orderModalError: state.orderModalError,
     setOrderModalError,
-    searchCatalog,
+    searchCatalog: state.searchCatalog,
     setSearchCatalog,
-    deferredSearch,
-    isSearchFocused,
+    isSearchFocused: state.isSearchFocused,
     setIsSearchFocused,
-    mutatingOrderItemId,
+    mutatingOrderItemId: state.mutatingOrderItemId,
     setMutatingOrderItemId,
-    releasingEmptyOrder,
+    releasingEmptyOrder: state.releasingEmptyOrder,
     setReleasingEmptyOrder,
-    isSavingOrder,
+    isSavingOrder: state.isSavingOrder,
     setIsSavingOrder,
-    showCloseOrderChoiceModal,
+    showCloseOrderChoiceModal: state.showCloseOrderChoiceModal,
     setShowCloseOrderChoiceModal,
-    showPaymentModal,
+    showPaymentModal: state.showPaymentModal,
     setShowPaymentModal,
-    showSplitBillModal,
+    showSplitBillModal: state.showSplitBillModal,
     setShowSplitBillModal,
-    showPaymentMethodMenu,
+    showPaymentMethodMenu: state.showPaymentMethodMenu,
     setShowPaymentMethodMenu,
-    isClosingOrder,
+    isClosingOrder: state.isClosingOrder,
     setIsClosingOrder,
-    paymentMethod,
+    paymentMethod: state.paymentMethod,
     setPaymentMethod,
-    amountReceived,
+    amountReceived: state.amountReceived,
     setAmountReceived,
-    hasPendingChanges,
+    hasPendingChanges: state.hasPendingChanges,
     setHasPendingChanges,
 
     addCatalogQueueRef,
@@ -290,8 +439,6 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
     quantitySyncTimerRef,
 
     filteredCatalog,
-    hasCatalogQuery,
-    catalogLookup,
     insufficientItems,
     insufficientComboComponents,
     getStockValidationMessage,
@@ -301,6 +448,7 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
     cashChangeData,
 
     ensureCatalogLoaded,
+    dispatch,
   };
 }
 
