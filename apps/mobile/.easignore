@@ -1,14 +1,24 @@
+# Dependencies (EAS will install them)
+node_modules/
+
 # Build artifacts
 android/
+android/app/build/
+android/app/.cxx/
 outputs/
 apk/
 debug/
 release/
 bundle/
 coverage/
+build/
 
-# Build tarballs
+# Downloaded/old build artifacts
 build-*.tar.gz
+build-*.apk
+build-*.aab
+*.apk
+*.aab
 
 # Credentials (keep secure)
 @andres_plazas__stocky-mobile.jks
@@ -18,3 +28,7 @@ google-services.json
 
 # Debug files
 build-output.txt
+
+# Other
+.DS_Store
+*.log

@@ -1,20 +1,49 @@
 # Dependencies (EAS will install them)
 node_modules/
+**/node_modules/
 
-# Build artifacts
+# Build artifacts - mobile
 apps/mobile/android/
+apps/mobile/android/app/build/
+apps/mobile/android/app/.cxx/
 apps/mobile/outputs/
 apps/mobile/apk/
 apps/mobile/debug/
 apps/mobile/release/
 apps/mobile/bundle/
 apps/mobile/coverage/
+apps/mobile/build/
 
-# Build tarballs
+# Downloaded/old build artifacts
 apps/mobile/build-*.tar.gz
+apps/mobile/build-*.apk
+apps/mobile/build-*.aab
+apps/mobile/*.apk
+apps/mobile/*.aab
+
+# Build artifacts - print bridge
+apps/print-bridge-windows/release/
+apps/print-bridge-windows/node_modules/
+apps/print-bridge-android/build/
+apps/print-bridge-android/app/build/
+
+# Web build artifacts
+dist/
+dist-ssr/
+
+# Public APK downloads (not needed for mobile build)
+public/apk/*.apk
+!public/apk/stocky-print-bridge.apk
 
 # Sensitive files (keystore managed by EAS)
 credentials.json
+apps/mobile/credentials.json
+apps/mobile/android-upload.keystore
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
 
 # Debug files
 apps/mobile/build-output.txt
@@ -23,3 +52,5 @@ apps/mobile/build-output.txt
 .git/
 .vercel
 .archive/
+.DS_Store
+*.log
