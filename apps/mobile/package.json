@@ -16,6 +16,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
     "check": "npm run typecheck && npm run lint && npm run test",
+    "build:shared": "npm run build --prefix ../../packages/shared",
+    "eas-build-post-install": "npm run build:shared",
     "optimize-assets": "node scripts/optimize-assets.js"
   },
   "dependencies": {
