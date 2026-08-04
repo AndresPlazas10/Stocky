@@ -13,6 +13,17 @@ export type { Purchase, PurchaseItem, PurchaseFilters } from './purchase';
 // Adapter types
 export type { ReadAdapter, WriteAdapter, AdapterResult } from './adapters';
 
+// Supabase / infra types
+export type {
+  PostgrestError,
+  SupabaseResponse,
+  SupabaseListResponse,
+  RpcResult,
+  MutationResult,
+  ServiceListResult,
+  TFunction,
+} from './supabase';
+
 // Config types
 export type { LocalSyncConfig, LocalWritesConfig, LocalReadsConfig } from './config';
 

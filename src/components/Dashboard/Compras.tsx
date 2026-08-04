@@ -49,6 +49,8 @@ import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../../utils/offlineSnapshot.js';
 import { formatLoadError } from '../../utils/connectivity';
 import { getPaymentMethodLabel } from '../ui/PaymentMethodBankLogo';
+import { useComprasLoader } from './compras/useComprasLoader';
+import { usePurchaseCart } from './compras/usePurchaseCart';
 
 
 function Compras({ businessId }: DashboardModuleProps) {
@@ -60,258 +62,49 @@ function Compras({ businessId }: DashboardModuleProps) {
   const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
   const fmtDateOnly = (timestamp) => formatDateOnly(timestamp, dateConfig);
   
-  const [purchases, setPurchases] = useState([]);
-  const [pagePurchases, setPagePurchases] = useState(1);
-  const [limitPurchases] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 768 ? 20 : 30));
-  const [totalCountPurchases, setTotalCountPurchases] = useState(0);
-  const [currentFiltersPurchases, setCurrentFiltersPurchases] = useState({});
-  const [loading, setLoading] = useState(true);
+  const {
+    purchases, setPurchases,
+    pagePurchases, setPagePurchases,
+    limitPurchases,
+    totalCountPurchases, setTotalCountPurchases,
+    currentFiltersPurchases, setCurrentFiltersPurchases,
+    loading, setLoading,
+    products, setProducts,
+    suppliers, setSuppliers,
+    loadingSuppliers,
+    error, setError,
+    loadCompras, loadProductos, loadProveedores,
+  } = useComprasLoader(businessId, t);
+
+  const {
+    supplierId, setSupplierId,
+    paymentMethod, setPaymentMethod,
+    notes, setNotes,
+    cart, setCart,
+    addToCart, removeFromCart, updateQuantity, updatePrice,
+    total,
+    resetForm: resetFormHook,
+  } = usePurchaseCart();
+
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState(null);
-  const [products, setProducts] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
-  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [supplierId, setSupplierId] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [notes, setNotes] = useState('');
-  const [cart, setCart] = useState([]);
   const [isCreatingPurchase, setIsCreatingPurchase] = useState(false);
+  const isAdmin = true;
   
   // Estados para eliminación
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [purchaseToDelete, setPurchaseToDelete] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const lowMotionMode = useLowMotionMode();
   const { showError, showSuccess, showLoading, ToastComponent } = useAppToast();
 
-  const loadCompras = useCallback(async (filters = currentFiltersPurchases, pagination: any = {}) => {
-    const offline = isOfflineMode();
-    const offlineSnapshotKey = `compras.list:${businessId}`;
-    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
-
-    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
-      setPurchases(offlineSnapshot);
-      setTotalCountPurchases(offlineSnapshot.length);
-    }
-
-    try {
-      setLoading(true);
-      const lim = Number(pagination.limit ?? limitPurchases);
-      const off = Number(pagination.offset ?? ((pagePurchases - 1) * lim));
-      const includeCount = typeof pagination.includeCount === 'boolean'
-        ? pagination.includeCount
-        : off === 0;
-      const countMode = pagination.countMode || 'planned';
-      const { data: purchasesData, count, error: purchasesError } = await getFilteredPurchases(businessId, filters, {
-        limit: lim,
-        offset: off,
-        includeCount,
-        countMode
-      });
-      if (purchasesError) {
-        throw new Error(purchasesError);
-      }
-
-      if (!purchasesData || purchasesData.length === 0) {
-        if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
-          setPurchases(offlineSnapshot);
-          setTotalCountPurchases(offlineSnapshot.length);
-          return;
-        }
-        setPurchases([]);
-        if (typeof count === 'number') {
-          setTotalCountPurchases(count);
-        } else if (!includeCount) {
-          setTotalCountPurchases(off);
-        }
-        return;
-      }
-
-      const alreadyEnriched = Array.isArray(purchasesData) && purchasesData.length > 0
-        && !!purchasesData[0].supplier
-        && !!purchasesData[0].employees;
-
-      if (alreadyEnriched) {
-        setPurchases(purchasesData);
-        if (!offline || purchasesData.length > 0) {
-          saveOfflineSnapshot(offlineSnapshotKey, purchasesData);
-        }
-        if (typeof count === 'number') {
-          setTotalCountPurchases(count);
-        } else if (!includeCount) {
-          setTotalCountPurchases(off + purchasesData.length);
-        }
-        return;
-      }
-
-      // Obtener business y datos relacionados
-      const [business, employeesData, suppliersData] = await Promise.all([
-        getBusinessOwnerById(businessId),
-        getEmployeesByBusiness(businessId),
-        getSuppliersForBusiness(businessId)
-      ]);
-
-      const employeeMap = new Map();
-      employeesData.forEach((emp: any) => employeeMap.set(emp.user_id, { full_name: emp.full_name || t('compras:labels.unknownUser'), role: emp.role }));
-
-      const supplierMap = new Map();
-      suppliersData.forEach(s => supplierMap.set(s.id, s));
-
-      const purchasesWithEmployees = (purchasesData || []).map(purchase => {
-        const employee = employeeMap.get(purchase.user_id);
-        const supplier = supplierMap.get(purchase.supplier_id) || purchase.supplier || null;
-        const userId = String(purchase.user_id || '').trim();
-        const createdBy = String(business?.created_by || '').trim();
-        const isOwner = userId === createdBy;
-        const isAdmin = employee?.role === 'admin';
-
-        return {
-          ...purchase,
-          supplier,
-          employees: isOwner ? { full_name: t('compras:labels.administrator'), role: 'owner' } : isAdmin ? { full_name: t('compras:labels.administrator'), role: 'admin' } : employee || { full_name: t('compras:labels.unknownResponsible'), role: 'employee' }
-        };
-      });
-
-      setPurchases(purchasesWithEmployees);
-      if (!offline || purchasesWithEmployees.length > 0) {
-        saveOfflineSnapshot(offlineSnapshotKey, purchasesWithEmployees);
-      }
-      if (typeof count === 'number') {
-        setTotalCountPurchases(count);
-      } else if (!includeCount) {
-        setTotalCountPurchases(off + purchasesWithEmployees.length);
-      }
-    } catch (error) {
-      if (offline) {
-        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
-        const safe = Array.isArray(cached) ? cached : [];
-        setPurchases(safe);
-        setTotalCountPurchases(safe.length);
-      } else {
-        const msg = formatLoadError(t('compras:errors.loadFailed'), error);
-        setError(msg);
-        showError(msg);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [businessId, pagePurchases, limitPurchases, currentFiltersPurchases, t]);
-
-  const loadProductos = useCallback(async () => {
-    const offline = isOfflineMode();
-    const offlineSnapshotKey = `compras.productos:${businessId}`;
-    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
-
-    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
-      setProducts(offlineSnapshot);
-    }
-
-    try {
-      const data = await getProductsForPurchase(businessId);
-      const normalizedData = Array.isArray(data) ? data : [];
-      const hasLocalData = normalizedData.length > 0;
-
-      if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
-        setProducts(offlineSnapshot);
-        return;
-      }
-
-      setProducts(normalizedData);
-      if (!offline || hasLocalData) {
-        saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
-      }
-    } catch {
-      if (offline) {
-        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
-        setProducts(Array.isArray(cached) ? cached : []);
-      }
-    }
-  }, [businessId]);
-
-  const loadProveedores = useCallback(async () => {
-    const offline = isOfflineMode();
-    const offlineSnapshotKey = `compras.proveedores:${businessId}`;
-    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
-
-    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
-      setSuppliers(offlineSnapshot);
-    }
-
-    try {
-      setLoadingSuppliers(true);
-      const data = await getSuppliersForBusiness(businessId);
-      const normalizedData = Array.isArray(data) ? data : [];
-      const hasLocalData = normalizedData.length > 0;
-
-      if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
-        setSuppliers(offlineSnapshot);
-        return;
-      }
-
-      setSuppliers(normalizedData);
-      if (!offline || hasLocalData) {
-        saveOfflineSnapshot(offlineSnapshotKey, normalizedData);
-      }
-    } catch (error) {
-      if (offline) {
-        const cached = readOfflineSnapshot(offlineSnapshotKey, []);
-        setSuppliers(Array.isArray(cached) ? cached : []);
-      } else {
-        setSuppliers([]);
-        const msg = formatLoadError(t('compras:errors.loadSuppliersFailed'), error);
-        setError(msg);
-        showError(msg);
-      }
-    } finally {
-      setLoadingSuppliers(false);
-    }
-  }, [businessId, t]);
-
-  // Verificar permisos de admin
   useEffect(() => {
-    const checkAdminRole = async () => {
-      try {
-        const user = await getAuthenticatedUser();
-        if (!user || !businessId) return;
-
-        const [business, employeeRole] = await Promise.all([
-          getBusinessOwnerById(businessId),
-          getEmployeeRoleByBusinessAndUser({
-            businessId,
-            userId: user.id
-          })
-        ]);
-
-        const isOwner = user.id === business?.created_by;
-        const isAdminRole = employeeRole === 'admin';
-        
-        setIsAdmin(isOwner || isAdminRole);
-      } catch (err) {
-        logger.warn('compras:check_admin_role failed', err);
-      }
-    };
-
-    checkAdminRole();
+    if (!businessId) return;
+    loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: 0 });
+    loadProductos();
+    loadProveedores();
   }, [businessId]);
-
-  useEffect(() => {
-    if (businessId) {
-      loadCompras(currentFiltersPurchases, { limit: limitPurchases, offset: (pagePurchases - 1) * limitPurchases });
-      loadProductos();
-      loadProveedores();
-    }
-  }, [
-    businessId,
-    currentFiltersPurchases,
-    limitPurchases,
-    pagePurchases,
-    loadCompras,
-    loadProductos,
-    loadProveedores
-  ]);
 
   // 🔥 TIEMPO REAL: Suscripción a cambios en compras
   useRealtimeSubscription('purchases', {
@@ -327,8 +120,9 @@ function Compras({ businessId }: DashboardModuleProps) {
 
       // Crear mapa de empleados
       const employeeMap = new Map();
-      employeesData?.forEach((emp: any) => {
-        employeeMap.set(emp.user_id, { full_name: emp.full_name || t('compras:labels.unknownUser'), role: emp.role });
+      employeesData?.forEach((emp) => {
+        const displayName = (emp as { full_name?: string; name: string }).full_name || emp.name || t('compras:labels.unknownUser');
+        employeeMap.set(emp.user_id, { full_name: displayName, role: emp.role });
       });
 
       const employee = employeeMap.get(newPurchase.user_id);
@@ -382,80 +176,6 @@ function Compras({ businessId }: DashboardModuleProps) {
     },
     onDelete: () => {}
   });
-
-  const addToCart = useCallback((product) => {
-    if (product?.manage_stock === false) {
-      showError(t('compras:errors.stockNotManaged'));
-      return;
-    }
-
-    setCart(prevCart => {
-      const existing = prevCart.find(item => item.product_id === product.id);
-      
-      if (existing) {
-        return prevCart.map(item =>
-          item.product_id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      
-      return [...prevCart, {
-        product_id: product.id,
-        product_name: product.name,
-        quantity: 1,
-        unit_price: product.purchase_price || 0,
-        manage_stock: product.manage_stock !== false
-      }];
-    });
-  }, [t]);
-
-  const removeFromCart = useCallback((productId) => {
-    setCart(prevCart => prevCart.filter(item => item.product_id !== productId));
-  }, []);
-
-  const updateQuantity = useCallback((productId, newQuantity) => {
-    setCart(prevCart => prevCart.map(item =>
-      item.product_id !== productId
-        ? item
-        : (() => {
-          const rawValue = String(newQuantity ?? '').trim();
-          if (rawValue === '') {
-            return { ...item, quantity: '' };
-          }
-          const parsedValue = Number(rawValue);
-          if (!Number.isFinite(parsedValue)) return item;
-          return { ...item, quantity: parsedValue };
-        })()
-    ));
-  }, []);
-
-  const updatePrice = useCallback((productId, newPrice) => {
-    setCart(prevCart => prevCart.map(item =>
-      item.product_id !== productId
-        ? item
-        : (() => {
-          const rawValue = String(newPrice ?? '').trim();
-          if (rawValue === '') {
-            return { ...item, unit_price: '' };
-          }
-          const parsedValue = Number(rawValue);
-          if (!Number.isFinite(parsedValue)) return item;
-          return { ...item, unit_price: parsedValue };
-        })()
-    ));
-  }, []);
-
-  // Memoizar cálculo de total
-  const total = useMemo(() => {
-    return cart.reduce((sum, item) => {
-      const quantity = Number(item.quantity);
-      const unitPrice = Number(item.unit_price);
-      const safeQuantity = Number.isFinite(quantity) ? quantity : 0;
-      const safeUnitPrice = Number.isFinite(unitPrice) ? unitPrice : 0;
-      return sum + (safeQuantity * safeUnitPrice);
-    }, 0);
-  }, [cart]);
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
@@ -531,12 +251,7 @@ function Compras({ businessId }: DashboardModuleProps) {
     t
   ]);
 
-  const resetForm = () => {
-    setSupplierId('');
-    setPaymentMethod('cash');
-    setNotes('');
-    setCart([]);
-  };
+  const resetForm = resetFormHook;
 
   const viewDetails = useCallback(async (purchase) => {
     setSelectedPurchase(purchase);
@@ -685,7 +400,7 @@ function Compras({ businessId }: DashboardModuleProps) {
 
         {/* Filtros */}
         <PurchaseFilters
-          {...({ businessId } as any)}
+          _businessId={businessId}
           onApply={(filters) => {
             setCurrentFiltersPurchases(filters || {});
             setPagePurchases(1);

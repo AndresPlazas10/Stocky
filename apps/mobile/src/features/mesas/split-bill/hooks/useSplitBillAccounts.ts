@@ -38,7 +38,7 @@ export function useSplitBillAccounts({ visible, orderItems }: UseSplitBillAccoun
       {
         ...createInitialAccount(),
         id: nextId,
-        name: `${t('splitBill.accountName', { number: nextId, defaultValue: `Cuenta ${nextId}` })}`,
+        name: `${t('splitBill.accountName', { number: nextId })}`,
       },
     ]);
   };

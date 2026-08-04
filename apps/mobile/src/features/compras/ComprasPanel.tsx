@@ -400,7 +400,9 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
       if (showPurchaseDetailsRef.current && currentPurchaseId) {
         void listCompraDetails(currentPurchaseId)
           .then((details) => setSelectedPurchaseDetails(details))
-          .catch(() => {});
+          .catch((err: unknown) => {
+            if (__DEV__) console.warn('[compras] details_refresh_failed', (err as Error)?.message || err);
+          });
       }
     }, 120);
   }, [

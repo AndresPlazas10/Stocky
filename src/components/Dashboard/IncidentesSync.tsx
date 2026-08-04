@@ -15,127 +15,8 @@ import {
 } from '../../sync/syncBootstrap.js';
 import { LOCAL_SYNC_CONFIG } from '../../config/localSync.js';
 import { Button } from '../ui/button.jsx';
-
-const CRITICAL_ALERT_DISMISS_STORAGE_PREFIX = 'stocky.sync.critical_alert.dismissed_at.v1';
-const ALERT_AUDIT_PREFERENCES_STORAGE_PREFIX = 'stocky.sync.alert_audit.preferences.v1';
-
-function canUseLocalStorage() {
-  return typeof window !== 'undefined' && !!window.localStorage;
-}
-
-function getCriticalAlertDismissKey(businessId) {
-  const normalizedBusinessId = String(businessId || '').trim() || 'global';
-  return `${CRITICAL_ALERT_DISMISS_STORAGE_PREFIX}:${normalizedBusinessId}`;
-}
-
-function getAlertAuditPreferencesKey(businessId) {
-  const normalizedBusinessId = String(businessId || '').trim() || 'global';
-  return `${ALERT_AUDIT_PREFERENCES_STORAGE_PREFIX}:${normalizedBusinessId}`;
-}
-
-function readCriticalAlertDismissedAt(businessId) {
-  if (!canUseLocalStorage()) return '';
-  try {
-    const value = window.localStorage.getItem(getCriticalAlertDismissKey(businessId));
-    return String(value || '').trim();
-  } catch (err) {
-    logger.warn('incidentes_sync:read_critical_alert_dismissed failed', err);
-    return '';
-  }
-}
-
-function readCriticalAlertDismissState(businessId) {
-  const raw = readCriticalAlertDismissedAt(businessId);
-  if (!raw) {
-    return {
-      dismissedAt: '',
-      cooldownUntil: ''
-    };
-  }
-
-  if (raw.startsWith('{')) {
-    try {
-      const parsed = JSON.parse(raw);
-      return {
-        dismissedAt: String(parsed?.dismissedAt || '').trim(),
-        cooldownUntil: String(parsed?.cooldownUntil || '').trim()
-      };
-    } catch (err) {
-      logger.warn('incidentes_sync:parse_critical_alert_state failed', err);
-      return {
-        dismissedAt: '',
-        cooldownUntil: ''
-      };
-    }
-  }
-
-  return {
-    dismissedAt: raw,
-    cooldownUntil: ''
-  };
-}
-
-function writeCriticalAlertDismissedAt(businessId, value) {
-  if (!canUseLocalStorage()) return;
-  try {
-    const key = getCriticalAlertDismissKey(businessId);
-    const normalized = String(value || '').trim();
-    if (!normalized) {
-      window.localStorage.removeItem(key);
-      return;
-    }
-    window.localStorage.setItem(key, normalized);
-  } catch (err) {
-    logger.warn('incidentes_sync:write_critical_alert_dismissed failed', err);
-  }
-}
-
-function readAlertAuditPreferences(businessId) {
-  if (!canUseLocalStorage()) {
-    return {
-      action: 'all',
-      fromDate: '',
-      toDate: '',
-      pageSize: 10
-    };
-  }
-
-  try {
-    const raw = window.localStorage.getItem(getAlertAuditPreferencesKey(businessId));
-    const parsed = raw ? JSON.parse(raw) : null;
-    return {
-      action: String(parsed?.action || 'all').trim() || 'all',
-      fromDate: String(parsed?.fromDate || '').trim(),
-      toDate: String(parsed?.toDate || '').trim(),
-      pageSize: [10, 25, 50].includes(Number(parsed?.pageSize)) ? Number(parsed?.pageSize) : 10
-    };
-  } catch (err) {
-    logger.warn('incidentes_sync:read_audit_preferences failed', err);
-    return {
-      action: 'all',
-      fromDate: '',
-      toDate: '',
-      pageSize: 10
-    };
-  }
-}
-
-function writeAlertAuditPreferences(businessId: string, preferences: Record<string, unknown> = {}) {
-  if (!canUseLocalStorage()) return;
-  try {
-    window.localStorage.setItem(
-      getAlertAuditPreferencesKey(businessId),
-      JSON.stringify({
-        action: String(preferences?.action || 'all').trim() || 'all',
-        fromDate: String(preferences?.fromDate || '').trim(),
-        toDate: String(preferences?.toDate || '').trim(),
-        pageSize: [10, 25, 50].includes(Number(preferences?.pageSize)) ? Number(preferences?.pageSize) : 10
-      })
-    );
-  } catch (err) {
-    logger.warn('incidentes_sync:write_audit_preferences failed', err);
-  }
-}
+import { useSyncIncidentsLoader } from './incidentes/useSyncIncidentsLoader';
+import { readCriticalAlertDismissState, writeCriticalAlertDismissedAt, readAlertAuditPreferences, writeAlertAuditPreferences } from './incidentes/syncStorage';
 
 function formatDate(value, locale = 'es-CO') {
   if (!value) return '-';
@@ -286,13 +167,22 @@ function getHealthMeta(status) {
 export default function IncidentesSync({ businessId }: DashboardModuleProps) {
   const { t, i18n } = useTranslation('common');
   const currentLocale = i18n.language === 'en' ? 'en-US' : 'es-CO';
-  const [incidents, setIncidents] = useState([]);
-  const [syncMetric, setSyncMetric] = useState(null);
-  const [metricTimeline, setMetricTimeline] = useState([]);
-  const [alertAuditRows, setAlertAuditRows] = useState([]);
-  const [loading, setLoading] = useState(true);
+  
+  const {
+    incidents, setIncidents,
+    syncMetric, setSyncMetric,
+    metricTimeline, setMetricTimeline,
+    alertAuditRows, setAlertAuditRows,
+    loading, setLoading,
+    error, setError,
+    loadIncidents,
+  } = useSyncIncidentsLoader(businessId);
+
+  useEffect(() => {
+    loadIncidents().catch((err) => { logger.warn('incidentes_sync:load_incidents failed', err); });
+  }, [loadIncidents, businessId]);
+
   const [workingAction, setWorkingAction] = useState(null);
-  const [error, setError] = useState('');
   const [criticalAlertDismissedAt, setCriticalAlertDismissedAt] = useState('');
   const [criticalAlertCooldownUntil, setCriticalAlertCooldownUntil] = useState('');
   const [search, setSearch] = useState('');
@@ -309,33 +199,6 @@ export default function IncidentesSync({ businessId }: DashboardModuleProps) {
   const criticalThreshold = Math.max(1, Number(LOCAL_SYNC_CONFIG?.criticalAlertConsecutiveThreshold || 3));
   const criticalCooldownMinutes = Math.max(0, Number(LOCAL_SYNC_CONFIG?.criticalAlertCooldownMinutes || 15));
   const auditPageSizeOptions = [10, 25, 50];
-
-  const loadIncidents = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [rows, metrics] = await Promise.all([
-        listConflictEvents({ limit: 500 }),
-        listConvergenceMetrics()
-      ]);
-      const [timeline, auditRows] = await Promise.all([
-        listConvergenceTimeline({ limit: 20 }),
-        listSyncAlertAudit({ businessId, limit: 20 })
-      ]);
-      setIncidents(Array.isArray(rows) ? rows : []);
-      setSyncMetric(Array.isArray(metrics) && metrics.length > 0 ? metrics[0] : null);
-      setMetricTimeline(Array.isArray(timeline) ? timeline : []);
-      setAlertAuditRows(Array.isArray(auditRows) ? auditRows : []);
-      setError('');
-    } catch (loadError) {
-      setError(loadError?.message || t('syncIncidents.loadError'));
-    } finally {
-      setLoading(false);
-    }
-  }, [businessId]);
-
-  useEffect(() => {
-    loadIncidents().catch((err) => { logger.warn('incidentes_sync:load_incidents failed', err); });
-  }, [loadIncidents, businessId]);
 
   useEffect(() => {
     const state = readCriticalAlertDismissState(businessId);

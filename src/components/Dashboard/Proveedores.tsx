@@ -29,100 +29,32 @@ import { useLowMotionMode } from '../../hooks/useLowMotionMode.js';
 import { useProgressiveList } from '../../hooks/useProgressiveList.js';
 import type { DashboardModuleProps } from '@/types/components';
 import { INITIAL_SUPPLIER_FORM } from './proveedores/supplierFormConstants';
+import { useSupplierData } from './proveedores/useSupplierData';
 
 const SUPPLIERS_PAGE_SIZE = 50;
 
 function Proveedores({ businessId }: DashboardModuleProps) {
   const { t } = useTranslation('common');
   const config = useBusinessConfig();
-  const [suppliers, setSuppliers] = useState<Array<{ id: string; business_name: string; contact_name?: string; email?: string; phone?: string; address?: string; nit?: string; notes?: string }>>([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [editingSupplier, setEditingSupplier] = useState<{ id: string; business_name: string; contact_name?: string; email?: string; phone?: string; address?: string; nit?: string; notes?: string } | null>(null);
   const { showError, showSuccess, ToastComponent } = useAppToast();
   const [searchTerm, setSearchTerm] = useState('');
   
+  const {
+    suppliers, setSuppliers,
+    loading, setLoading,
+    loadingMore, hasMoreSuppliers,
+    supplierTaxColumn, setSupplierTaxColumn,
+    loadProveedores, fetchMoreSuppliers,
+  } = useSupplierData(businessId, showError, t);
+
+  const [showModal, setShowModal] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<any>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [supplierToDelete, setSupplierToDelete] = useState<string | null>(null);
-  const [supplierTaxColumn, setSupplierTaxColumn] = useState('nit');
-  const [page, setPage] = useState(1);
-  const [hasMoreSuppliers, setHasMoreSuppliers] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const lowMotionMode = useLowMotionMode();
 
   const [formData, setFormData] = useState(INITIAL_SUPPLIER_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const loadProveedores = useCallback(async ({ nextPage = 1, append = false } = {}) => {
-    const offline = isOfflineMode();
-    const offlineSnapshotKey = `proveedores.list:${businessId}`;
-    const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []) as Array<{ id: string; business_name: string; contact_name?: string; email?: string; phone?: string; address?: string; nit?: string; notes?: string }> | null;
-
-    if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
-      setSuppliers(offlineSnapshot);
-      setHasMoreSuppliers(false);
-      setPage(1);
-    }
-
-    try {
-      if (append) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
-      }
-      const offset = (nextPage - 1) * SUPPLIERS_PAGE_SIZE;
-      const { suppliers, taxColumn, hasMore } = await getSuppliersForManagementPage({
-        businessId,
-        preferredTaxColumn: supplierTaxColumn,
-        limit: SUPPLIERS_PAGE_SIZE,
-        offset
-      });
-
-      if (taxColumn !== supplierTaxColumn) setSupplierTaxColumn(taxColumn);
-      const normalizedSuppliers = Array.isArray(suppliers) ? suppliers : [];
-      const hasLocalData = normalizedSuppliers.length > 0;
-
-      if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
-        setSuppliers(offlineSnapshot);
-        setHasMoreSuppliers(false);
-        setPage(1);
-        return;
-      }
-
-      setSuppliers((prev) => {
-        const nextSuppliers = append ? [...prev, ...normalizedSuppliers] : normalizedSuppliers;
-        if (!offline || hasLocalData) {
-          saveOfflineSnapshot(offlineSnapshotKey, nextSuppliers);
-        }
-        return nextSuppliers;
-      });
-      setHasMoreSuppliers(Boolean(hasMore));
-      setPage(nextPage);
-    } catch (err) {
-      if (offline) {
-        const cached = readOfflineSnapshot(offlineSnapshotKey, []) as Array<{ id: string; business_name: string; contact_name?: string; email?: string; phone?: string; address?: string; nit?: string; notes?: string }> | null;
-        setSuppliers(Array.isArray(cached) ? cached : []);
-        setHasMoreSuppliers(false);
-        setPage(1);
-      } else {
-        showError(t('errors.loadingSuppliers'), (err as Error)?.message || t('errors.unknown'));
-      }
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [businessId, supplierTaxColumn, t]);
-
-  useEffect(() => {
-    if (businessId) {
-      loadProveedores({ nextPage: 1, append: false });
-    }
-  }, [businessId, loadProveedores]);
-
-  const fetchMoreSuppliers = useCallback(() => {
-    if (loadingMore || !hasMoreSuppliers) return;
-    loadProveedores({ nextPage: page + 1, append: true });
-  }, [hasMoreSuppliers, loadingMore, loadProveedores, page]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();

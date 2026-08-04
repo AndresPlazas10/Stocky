@@ -82,7 +82,7 @@ export const CloseOrderChoiceModal = React.memo(function CloseOrderChoiceModal({
         disabled={isClosingOrder || releasingEmptyOrder}
       >
         <Text style={styles.cancelText}>
-          {t('buttons.closeOrder', { defaultValue: 'Cancelar' })}
+          {t('buttons.closeOrder')}
         </Text>
       </Pressable>
     </StockyModal>

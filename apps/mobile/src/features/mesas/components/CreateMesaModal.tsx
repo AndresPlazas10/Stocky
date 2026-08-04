@@ -43,7 +43,7 @@ export const CreateMesaModal = React.memo(function CreateMesaModal({
         <View style={styles.footerRow}>
           <Pressable style={styles.cancelButton} onPress={onCancel} disabled={isCreatingMesa}>
             <Text style={styles.cancelText}>
-              {t('buttons.closeOrder', { defaultValue: 'Cancelar' })}
+              {t('buttons.closeOrder')}
             </Text>
           </Pressable>
 
@@ -67,8 +67,8 @@ export const CreateMesaModal = React.memo(function CreateMesaModal({
               <Ionicons name="add" size={16} color={STOCKY_COLORS.white} />
               <Text style={styles.primaryText}>
                 {isCreatingMesa
-                  ? t('print.printing', { defaultValue: 'Creando...' })
-                  : t('buttons.createTable', { defaultValue: 'Agregar' })}
+                  ? t('print.printing')
+                  : t('buttons.createTable')}
               </Text>
             </LinearGradient>
           </Pressable>
@@ -87,7 +87,7 @@ export const CreateMesaModal = React.memo(function CreateMesaModal({
           </LinearGradient>
           <View style={styles.heroText}>
             <Text style={styles.heroTitle}>
-              {t('buttons.createTable', { defaultValue: 'Nueva mesa' })}
+              {t('buttons.createTable')}
             </Text>
           </View>
         </View>
@@ -100,12 +100,12 @@ export const CreateMesaModal = React.memo(function CreateMesaModal({
           <View style={styles.previewStatus}>
             <View style={styles.previewDot} />
             <Text style={styles.previewStatusText}>
-              {t('labels.available', { defaultValue: 'Disponible' })}
+              {t('labels.available')}
             </Text>
           </View>
         </View>
 
-        <Text style={styles.label}>{t('labels.table', { defaultValue: 'Identificador' })}</Text>
+        <Text style={styles.label}>{t('labels.table')}</Text>
       </View>
       <View style={styles.inputShell}>
         <Ionicons name="pricetag-outline" size={18} color="#64748B" />
@@ -114,7 +114,6 @@ export const CreateMesaModal = React.memo(function CreateMesaModal({
           onChangeText={onChangeNumber}
           placeholder={t('labels.tableNumber', {
             number: '',
-            defaultValue: 'Identificador de mesa',
           })}
           placeholderTextColor={STOCKY_COLORS.textMuted}
           style={styles.inputField}

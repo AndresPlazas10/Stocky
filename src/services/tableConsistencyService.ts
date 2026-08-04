@@ -1,7 +1,7 @@
 import { getOpenOrdersByBusiness, getTablesWithCurrentOrderByBusiness } from '../data/queries/ordersQueries';
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { logger } from '../utils/logger';
-import { detectTableOrderInconsistencies } from './tableConsistencyDetect.js';
+import { detectTableOrderInconsistencies } from './tableConsistencyDetect';
 import { appendConflictLogRecord } from '../localdb/conflictLogStore.js';
 import type { Table, Order } from '../types';
 

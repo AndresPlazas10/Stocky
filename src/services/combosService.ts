@@ -40,7 +40,7 @@ interface ComboCreateInput {
   }>;
 }
 
-interface ComboListItem {
+export interface ComboListItem {
   id: string;
   business_id: string;
   nombre: string;

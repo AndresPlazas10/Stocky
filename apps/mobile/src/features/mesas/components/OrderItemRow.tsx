@@ -34,11 +34,11 @@ export const OrderItemRow = memo(function OrderItemRow({
         <View style={styles.orderItemUnitChip}>
           <Text style={styles.orderItemUnitChipText}>
             <StockyMoneyText value={Number(item.price || 0)} style={styles.orderItemUnitChipText} />{' '}
-            {t('labels.perUnit', { defaultValue: 'por unidad' })}
+            {t('labels.perUnit')}
           </Text>
         </View>
         <Text style={styles.orderItemSubtotalLabel}>
-          {t('labels.subtotal', { defaultValue: 'Subtotal' })}
+          {t('labels.subtotal')}
         </Text>
       </View>
 

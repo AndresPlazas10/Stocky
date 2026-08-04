@@ -81,6 +81,53 @@ export function getDeviceInfo(): DeviceInfo {
   };
 }
 
+const DEFAULT_PLAY_STORE_URL =
+  'https://play.google.com/store/apps/details?id=app.stockypos&hl=es_CO';
+
+/**
+ * Redirige al usuario después de crear un negocio o iniciar sesión.
+ * - Android: Play Store para descargar la app móvil.
+ * - iOS / Desktop: dashboard web (versión web móvil en iOS).
+ */
+export function redirectAfterRegistration(): void {
+  if (typeof window === 'undefined') return;
+
+  const userAgent = window.navigator?.userAgent || '';
+  const userAgentData = (window.navigator as Navigator & { userAgentData?: { platform?: string } })?.userAgentData;
+  const platformHint = userAgentData?.platform || '';
+  const isAndroidDevice = isAndroid() || /android/i.test(platformHint);
+
+  const playStoreUrl =
+    String(import.meta.env?.VITE_PLAY_STORE_URL || '').trim() || DEFAULT_PLAY_STORE_URL;
+
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.log('[redirectAfterRegistration]', {
+      userAgent,
+      platformHint,
+      isAndroid: isAndroidDevice,
+      playStoreUrl,
+    });
+  }
+
+  if (isAndroidDevice) {
+    // Usar assign con fallback por si href falla en algún contexto de Android
+    if (typeof window.location.assign === 'function') {
+      window.location.assign(playStoreUrl);
+    } else {
+      window.location.href = playStoreUrl;
+    }
+    return;
+  }
+
+  // iOS y desktop usan la versión web
+  if (typeof window.location.assign === 'function') {
+    window.location.assign('/dashboard');
+  } else {
+    window.location.href = '/dashboard';
+  }
+}
+
 /**
  * Detecta si el dispositivo soporta instalación PWA
  */

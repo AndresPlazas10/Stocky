@@ -75,9 +75,7 @@ export const PaymentModal = React.memo(function PaymentModal({
             <View style={styles.headerTextWrap}>
               <Text style={styles.headerTitle}>{t('labels.confirmPayment')}</Text>
               <Text style={styles.headerSubtitle}>
-                {t('closeOrder.subtitle', {
-                  defaultValue: 'Revisa el cierre antes de confirmar la venta.',
-                })}
+                {t('closeOrder.subtitle')}
               </Text>
             </View>
           </View>
@@ -90,7 +88,7 @@ export const PaymentModal = React.memo(function PaymentModal({
         <View style={styles.footerRow}>
           <Pressable style={styles.cancelButton} onPress={onClose} disabled={isClosing}>
             <Text style={styles.cancelText}>
-              {t('buttons.closeOrder', { defaultValue: 'Cancelar' })}
+              {t('buttons.closeOrder')}
             </Text>
           </Pressable>
           <Pressable
@@ -110,7 +108,7 @@ export const PaymentModal = React.memo(function PaymentModal({
                 <>
                   <Ionicons name="checkmark-circle-outline" size={22} color="#C4B5FD" />
                   <Text style={styles.confirmText}>
-                    {t('success.paymentProcessed', { defaultValue: 'Confirmar Venta' })}
+                    {t('success.paymentProcessed')}
                   </Text>
                 </>
               )}
@@ -126,7 +124,7 @@ export const PaymentModal = React.memo(function PaymentModal({
         style={styles.summaryCard}
       >
         <Text style={styles.summaryTitle}>
-          {t('labels.totalToPay', { defaultValue: 'TOTAL A PAGAR' }).toUpperCase()}
+          {t('labels.totalToPay').toUpperCase()}
         </Text>
         <StockyMoneyText value={orderTotal} style={styles.summaryTotal} />
         <View style={styles.summaryMetaRow}>

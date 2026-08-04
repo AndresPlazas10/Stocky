@@ -410,8 +410,8 @@ export function MesasPanel({ session, businessContext }: Props) {
             void refreshMesaLocks(current.businessId);
           }
         })
-        .catch(() => {
-          // no-op
+        .catch((err: unknown) => {
+          if (__DEV__) console.warn('[mesas] panel_heartbeat_failed', (err as Error)?.message || err);
         });
     }, 9000);
 

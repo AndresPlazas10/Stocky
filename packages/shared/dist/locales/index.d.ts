@@ -296,6 +296,7 @@ export declare const resources: {
                 venmo: string;
                 cashapp: string;
                 zelle: string;
+                other: string;
             };
             roles: {
                 admin: string;
@@ -1482,6 +1483,17 @@ export declare const resources: {
                 reactivationNote: string;
                 needHelp: string;
                 supportMessage: string;
+            };
+            businessService: {
+                success: {
+                    businessLoaded: string;
+                    businessesLoaded: string;
+                };
+                errors: {
+                    loadBusinessFailed: string;
+                    loadBusinessesFailed: string;
+                    userNotAuthenticated: string;
+                };
             };
             deleteConfirm: {
                 selectedItem: string;
@@ -2697,6 +2709,7 @@ export declare const resources: {
                 venmo: string;
                 cashapp: string;
                 zelle: string;
+                other: string;
             };
             roles: {
                 admin: string;
@@ -3883,6 +3896,17 @@ export declare const resources: {
                 reactivationNote: string;
                 needHelp: string;
                 supportMessage: string;
+            };
+            businessService: {
+                success: {
+                    businessLoaded: string;
+                    businessesLoaded: string;
+                };
+                errors: {
+                    loadBusinessFailed: string;
+                    loadBusinessesFailed: string;
+                    userNotAuthenticated: string;
+                };
             };
             deleteConfirm: {
                 selectedItem: string;

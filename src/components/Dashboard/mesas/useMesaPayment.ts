@@ -25,12 +25,16 @@ import { logger } from '@/utils/logger';
 
 type SetState<T> = React.Dispatch<React.SetStateAction<T>>;
 
+// Datos dinámicos de Supabase/realtime/offline — el acceso por índice a propiedades es intencional
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type MesaRecord = Record<string, any>;
 type OrderItem = Record<string, any>;
 type SaleRecord = Record<string, any>;
 type SubAccount = Record<string, any>;
 type PrintBundle = Record<string, any>;
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+type StockShortageItem = Record<string, unknown>;
 
 const MODAL_REOPEN_GUARD_MS = 600;
 
@@ -48,7 +52,7 @@ function clearClosedMesaCache({ tableId, orderId = null, businessId }: { tableId
         status: 'available',
         current_order_id: null,
         orders: null
-      } as any);
+      } as unknown as Parameters<typeof normalizeTableRecord>[0]);
     });
     saveOfflineSnapshot(snapshotKey, sanitized);
   }
@@ -57,10 +61,10 @@ function clearClosedMesaCache({ tableId, orderId = null, businessId }: { tableId
     businessId,
     tableId: normalizedTableId,
     orderId: normalizeEntityId(orderId)
-  }).catch((err: Error) => { logger.warn('mesas:payment:invalidate_order_cache failed', err); });
+  }).catch((err: unknown) => { logger.warn('mesas:payment:invalidate_order_cache failed', err); });
 }
 
-function buildStockConsumptionFromItems(items: OrderItem[] = [], comboCatalogByIdRef: React.MutableRefObject<Map<string, any>>) {
+function buildStockConsumptionFromItems(items: OrderItem[] = [], comboCatalogByIdRef: React.MutableRefObject<Map<string, Record<string, unknown>>>) {
   const consumptionByProduct = new Map<string, number>();
   const source = Array.isArray(items) ? items : [];
 
@@ -81,7 +85,8 @@ function buildStockConsumptionFromItems(items: OrderItem[] = [], comboCatalogByI
     const combo = comboCatalogByIdRef.current.get(comboId);
     if (!combo) return;
 
-    (combo.combo_items || []).forEach((component: Record<string, any>) => {
+    const comboRecord = combo as Record<string, unknown>;
+    (Array.isArray(comboRecord?.combo_items) ? comboRecord.combo_items : []).forEach((component: Record<string, unknown>) => {
       const componentProductId = normalizeEntityId(component?.producto_id);
       if (!componentProductId) return;
 
@@ -102,7 +107,7 @@ function applyLocalStockConsumption(consumptionByProduct: Map<string, number>, {
 
   setProducts((prevProducts: any[]) => {
     const source = Array.isArray(prevProducts) ? prevProducts : [];
-    const nextProducts = source.map((product: Record<string, any>) => {
+    const nextProducts = source.map((product: Record<string, unknown>) => {
       if (product?.manage_stock === false) return product;
 
       const productId = normalizeEntityId(product?.id);
@@ -150,7 +155,7 @@ function appendPendingSalesToVentasSnapshot(pendingSales: SaleRecord[] = [], bus
       const amountReceived = Number(sale?.amount_received);
       const resolvedAmountReceived = Number.isFinite(amountReceived) ? amountReceived : null;
       const changeBreakdown = Array.isArray(sale?.change_breakdown) ? sale.change_breakdown : [];
-      const changeFromBreakdown = changeBreakdown.reduce((sum: number, entry: Record<string, any>) => {
+      const changeFromBreakdown = changeBreakdown.reduce((sum: number, entry: Record<string, unknown>) => {
         const denomination = Number(entry?.denomination || 0);
         const count = Number(entry?.count || 0);
         if (!Number.isFinite(denomination) || !Number.isFinite(count) || count <= 0) return sum;
@@ -241,7 +246,7 @@ function buildLocalPrintBundle({
   paymentMethod: string;
   createdAt: string;
   amountReceived: number | null;
-  changeBreakdown: Record<string, any>[];
+  changeBreakdown: Record<string, unknown>[];
   orderItems: OrderItem[];
   sellerName?: string;
 }) {
@@ -318,8 +323,8 @@ interface UseMesaPaymentParams {
   setAmountReceivedError: SetState<string>;
   selectedCustomer: string;
   setSelectedCustomer: SetState<string>;
-  customers: any[];
-  setCustomers: SetState<any[]>;
+  customers: Record<string, unknown>[];
+  setCustomers: SetState<Record<string, unknown>[]>;
   isClosingOrder: boolean;
   setIsClosingOrder: SetState<boolean>;
   setIsGeneratingSplitSales: SetState<boolean>;
@@ -345,28 +350,28 @@ interface UseMesaPaymentParams {
   acquireMesaEditLockWeb: (params: { targetBusinessId: string; tableId: string; lockToken: string }) => Promise<{ unsupported?: boolean; ok?: boolean; lockToken?: string }>;
   releaseMesaEditLockWeb: (params: { targetBusinessId: string; tableId: string; lockToken: string }) => Promise<void>;
   refreshMesaLocks: () => Promise<void>;
-  applyRealtimeMesaLockRow: (row: Record<string, any>) => void;
-  priceConfig: Record<string, any>;
-  sendMesaSyncBroadcast: (params: { tableId: string; action: string; data?: Record<string, any> }) => void;
+  applyRealtimeMesaLockRow: (row: Record<string, unknown>) => void;
+  priceConfig: Record<string, unknown>;
+  sendMesaSyncBroadcast: (params: { tableId: string; action: string; data?: Record<string, unknown> }) => void;
   publishMesaLockBroadcast: (params: { tableId: string; locked: boolean; mode: string; lockToken: string | null }) => void;
   loadMesas: () => Promise<void>;
   loadOrderDetails: (mesa: MesaRecord) => Promise<void>;
-  updateOrderTotal: (...args: any[]) => Promise<void>;
+  updateOrderTotal: (...args: unknown[]) => Promise<void>;
   flushPendingRemoteOrderTotals: () => Promise<void>;
   waitForPendingOrderItemOps: () => Promise<boolean>;
-  persistPendingQuantityUpdates: (...args: any[]) => Promise<void>;
-  releaseEmptyOrderAndCloseModal: (...args: any[]) => any;
-  productCatalogByIdRef: React.MutableRefObject<Map<string, any>>;
-  comboCatalogByIdRef: React.MutableRefObject<Map<string, any>>;
+  persistPendingQuantityUpdates: (...args: unknown[]) => Promise<void>;
+  releaseEmptyOrderAndCloseModal: (...args: unknown[]) => unknown;
+  productCatalogByIdRef: React.MutableRefObject<Map<string, Record<string, unknown>>>;
+  comboCatalogByIdRef: React.MutableRefObject<Map<string, Record<string, unknown>>>;
   pendingQuantityUpdatesRef: React.MutableRefObject<Record<string, number>>;
   orderItemsDirtyRef: React.MutableRefObject<boolean>;
   orderItemsRef: React.MutableRefObject<OrderItem[]>;
   setModalOpenIntent: SetState<boolean>;
   setShowOrderDetails: SetState<boolean>;
   setCanShowOrderModal: SetState<boolean>;
-  insufficientItems: Record<string, any>[];
+  insufficientItems: StockShortageItem[];
   hasInsufficientComboStock: boolean;
-  insufficientComboComponents: Record<string, any>[];
+  insufficientComboComponents: StockShortageItem[];
   orderTotal: number;
   setPendingQuantityUpdatesSafe: SetState<Record<string, number>>;
   setProducts: SetState<any[]>;
@@ -590,7 +595,7 @@ export function useMesaPayment({
       const printResult = await printSaleReceipt({
         sale: saleRow,
         saleDetails,
-        sellerName: (saleRow as any).seller_name || t('mesas:defaults.employee'),
+        sellerName: ((saleRow as unknown) as Record<string, unknown>).seller_name as string || t('mesas:defaults.employee'),
         businessName: await getBusinessNameById(businessId),
         customerName: t('mesas:defaults.generalSale'),
       });
@@ -693,10 +698,12 @@ export function useMesaPayment({
 
     try {
       const closeResult = await closeOrderAsSplit(businessId, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         subAccounts: subAccounts as any,
         orderId: mesaSnapshot.current_order_id,
         tableId: mesaSnapshot.id
-      }) as any;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as Record<string, any>;
       const {
         saleIds = []
       } = closeResult || {};
@@ -773,7 +780,7 @@ export function useMesaPayment({
     const amountReceivedSnapshot = amountReceived;
     const normalizedAmountReceived = parseCopAmount(amountReceivedSnapshot);
     const cashChangeData = paymentSnapshot === 'cash'
-      ? calcularCambio(orderTotal, amountReceivedSnapshot, priceConfig?.currency || 'COP')
+      ? calcularCambio(orderTotal, amountReceivedSnapshot, String(priceConfig?.currency || 'COP'))
       : null;
 
     if (paymentSnapshot === 'cash') {
@@ -848,7 +855,8 @@ export function useMesaPayment({
           amountReceived: paymentSnapshot === 'cash' ? normalizedAmountReceived : null,
           changeBreakdown: paymentSnapshot === 'cash' ? cashChangeData?.breakdown || [] : [],
           orderItems: orderItemsSnapshot
-        }) as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as Record<string, any>;
         const { saleId } = closeResult || {};
 
         if (closeResult?.pending_sync && saleId) {
@@ -869,7 +877,7 @@ export function useMesaPayment({
             paymentMethod: paymentSnapshot,
             createdAt: closeResult?.created_at || new Date().toISOString(),
             amountReceived: paymentSnapshot === 'cash' ? normalizedAmountReceived : null,
-            changeBreakdown: paymentSnapshot === 'cash' ? (cashChangeData?.breakdown || []) : [],
+            changeBreakdown: (paymentSnapshot === 'cash' ? (cashChangeData?.breakdown || []) : []) as unknown as Record<string, unknown>[],
             orderItems: orderItemsSnapshot,
             sellerName: t('mesas:defaults.offlineSale')
           })

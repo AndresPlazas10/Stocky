@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
 @config "../tailwind.config.js";
 
 @theme {
@@ -53,6 +53,15 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    touch-action: manipulation;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
@@ -199,6 +208,16 @@
   animation: spotlight 2s ease forwards;
 }
 
+@utility animate-float { animation: float 4s ease-in-out infinite; }
+@utility animate-fade-in-up { animation: fade-in-up 0.5s ease-out backwards; }
+@utility animate-line-draw { animation: line-draw 0.8s ease-out forwards; transform-origin: top; }
+@utility animate-dot-pulse { animation: dot-pulse 2s ease-in-out infinite; }
+@utility animate-glow-pulse { animation: glow-pulse 2.5s ease-in-out infinite; }
+@utility animate-gradient-shift { 
+  background-size: 200% 200%;
+  animation: gradient-shift 15s ease infinite;
+}
+
 @utility pt-safe { padding-top: env(safe-area-inset-top); }
 @utility pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 @utility pl-safe { padding-left: env(safe-area-inset-left); }
@@ -207,6 +226,47 @@
 @keyframes shimmer {
   0% { background-position: -1000px 0; }
   100% { background-position: 1000px 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes line-draw {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+@keyframes dot-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.8); opacity: 1; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(0,59,70,0.15); }
+  50% { box-shadow: 0 0 32px rgba(0,59,70,0.35); }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes slide-up-fade {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-down-fade {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(100%); }
 }
 
 @keyframes spotlight {

@@ -293,7 +293,8 @@
         "mercadopago": "Mercado Pago",
         "venmo": "Venmo",
         "cashapp": "Cash App",
-        "zelle": "Zelle"
+        "zelle": "Zelle",
+        "other": "Otro"
     },
     "roles": {
         "admin": "Administrador",
@@ -1480,6 +1481,17 @@
         "reactivationNote": "Tu acceso se restablecerá en menos de 24 horas después del pago.",
         "needHelp": "¿Necesitas ayuda?",
         "supportMessage": "Escríbenos a soporte@stockypos.app"
+    },
+    "businessService": {
+        "success": {
+            "businessLoaded": "Información del negocio obtenida exitosamente",
+            "businessesLoaded": "Negocios obtenidos exitosamente"
+        },
+        "errors": {
+            "loadBusinessFailed": "Error al obtener la información del negocio",
+            "loadBusinessesFailed": "Error al obtener los negocios",
+            "userNotAuthenticated": "Usuario no autenticado"
+        }
     },
     "deleteConfirm": {
         "selectedItem": "Elemento seleccionado"

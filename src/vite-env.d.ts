@@ -49,6 +49,7 @@ interface ImportMetaEnv {
   readonly VITE_LOCAL_SYNC_READ_INVENTORY_ENABLED: string;
   readonly VITE_LOCAL_SYNC_READ_INVOICES_ENABLED: string;
   readonly VITE_DISABLE_SALES_RPC: string;
+  readonly VITE_EMAIL_PROVIDER: string;
   readonly DEV: boolean;
   readonly PROD: boolean;
   readonly MODE: string;

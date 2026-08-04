@@ -30,6 +30,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Validate i18n
+        run: npm run validate:i18n
+
       - name: Type check
         run: npm run typecheck
 

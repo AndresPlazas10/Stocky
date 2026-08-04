@@ -80,11 +80,11 @@ export const CatalogResultsList = React.memo(function CatalogResultsList({
 
       {hasCatalogQuery && loading ? (
         <Text style={styles.emptyState}>
-          {t('print.printing', { defaultValue: 'Cargando productos...' })}
+          {t('print.printing')}
         </Text>
       ) : hasCatalogQuery && catalog.length === 0 ? (
         <Text style={styles.emptyState}>
-          {t('empty.noItems', { defaultValue: 'No hay resultados en el catalogo.' })}
+          {t('empty.noItems')}
         </Text>
       ) : hasCatalogQuery ? (
         <View style={styles.catalogResultsCard}>

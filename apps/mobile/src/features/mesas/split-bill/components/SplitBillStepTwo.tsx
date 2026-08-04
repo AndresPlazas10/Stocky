@@ -155,7 +155,7 @@ export const SplitBillStepTwo = React.memo(function SplitBillStepTwo({
       ) : null}
 
       <Text style={styles.fieldLabel}>
-        {t('splitBill.assignItems', { defaultValue: 'Productos que paga esta cuenta' })}
+        {t('splitBill.assignItems')}
       </Text>
       {orderItems.map((item) => {
         const expected = Math.max(0, Math.floor(Number(item.quantity || 0)));
@@ -173,7 +173,7 @@ export const SplitBillStepTwo = React.memo(function SplitBillStepTwo({
                   {resolveItemName ? resolveItemName(item) : getOrderItemName(item)}
                 </Text>
                 <Text style={styles.assignmentInfoText}>
-                  {t('labels.showing', { defaultValue: 'Máximo disponible' })}: {maxForSelected}
+                  {t('labels.showing')}: {maxForSelected}
                 </Text>
               </View>
               <View style={styles.assignmentControls}>
@@ -207,7 +207,7 @@ export const SplitBillStepTwo = React.memo(function SplitBillStepTwo({
 
       <View style={styles.accountTotalDueRow}>
         <Text style={styles.accountTotalDueLabel}>
-          {t('labels.orderTotal', { defaultValue: 'Total de esta cuenta' })}
+          {t('labels.orderTotal')}
         </Text>
         <Text style={styles.accountTotalDueValue}>
           {formatCopAmount(currentAccount?.total || 0)}

@@ -27,7 +27,9 @@ import {
   AlertCircle
 } from 'lucide-react';
 import type { DashboardModuleProps } from '@/types/components';
+import type { Employee } from '@/types';
 import { INITIAL_EMPLOYEE_FORM } from './empleados/employeeFormConstants';
+import { useEmployeeData } from './empleados/useEmployeeData';
 
 const EMPLOYEE_PAGE_SIZE = 50;
 
@@ -38,61 +40,27 @@ function isOwnerRole(role: string) {
 
 function Empleados({ businessId }: DashboardModuleProps) {
   const { t } = useTranslation('common');
-  const [employees, setEmployees] = useState<Array<{ id: string; full_name?: string; username?: string; role?: string; is_active?: boolean; status?: string }>>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const { showError, showSuccess, ToastComponent } = useAppToast();
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const {
+    employees, setEmployees,
+    loading, setLoading,
+    error, setError,
+    hasMoreEmployees, loadingMore,
+    loadEmployees, loadMoreEmployees,
+  } = useEmployeeData(businessId, t);
+
+  const [showForm, setShowForm] = useState(false);
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [generatedCode, setGeneratedCode] = useState<{ username: string; password: string; fullName: string } | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMoreEmployees, setHasMoreEmployees] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<{ id: string; full_name?: string } | null>(null);
   
   const [formData, setFormData] = useState(INITIAL_EMPLOYEE_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const loadEmployees = useCallback(async ({ nextPage = 1, append = false } = {}) => {
-    try {
-      if (append) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
-      }
-
-      const offset = (nextPage - 1) * EMPLOYEE_PAGE_SIZE;
-      const { employees, hasMore } = await getEmployeesForManagementPage({
-        businessId,
-        limit: EMPLOYEE_PAGE_SIZE,
-        offset
-      });
-      const normalized = (employees || []).filter((employee: { role?: string }) => !isOwnerRole(employee?.role));
-      setEmployees((prev) => (append ? [...prev, ...normalized] : normalized));
-      setPage(nextPage);
-      setHasMoreEmployees(Boolean(hasMore));
-    } catch {
-      setError(t('empleados.errors.loadingEmployees'));
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [businessId, t]);
-
-  const loadMoreEmployees = useCallback(() => {
-    if (loadingMore || !hasMoreEmployees || searchTerm.trim()) return;
-    loadEmployees({ nextPage: page + 1, append: true });
-  }, [hasMoreEmployees, loadingMore, loadEmployees, page, searchTerm]);
-
-  useEffect(() => {
-    if (businessId) {
-      loadEmployees({ nextPage: 1, append: false });
-    }
-  }, [businessId, loadEmployees]);
 
   useRealtimeSubscription('employees', {
     filter: { business_id: businessId },
@@ -114,12 +82,12 @@ function Empleados({ businessId }: DashboardModuleProps) {
         ...newEmployee,
         is_active: newEmployee?.is_active !== false,
         status: newEmployee?.is_active !== false ? 'active' : 'inactive'
-      };
+      } as Partial<Employee> & { status: string };
       setEmployees((prev) => {
-        const exists = prev.some((employee) => employee.id === (normalizedEmployee as any).id);
+        const exists = prev.some((employee) => employee.id === normalizedEmployee.id);
         if (exists) {
           return prev.map((employee) => (
-            employee.id === (normalizedEmployee as any).id ? { ...employee, ...normalizedEmployee } : employee
+            employee.id === normalizedEmployee.id ? { ...employee, ...normalizedEmployee } : employee
           ));
         }
         return [normalizedEmployee, ...prev] as typeof prev;
@@ -138,9 +106,9 @@ function Empleados({ businessId }: DashboardModuleProps) {
         ...updatedEmployee,
         is_active: updatedEmployee?.is_active !== false,
         status: updatedEmployee?.is_active !== false ? 'active' : 'inactive'
-      };
+      } as Partial<Employee> & { status: string };
       setEmployees((prev) => prev.map((employee) => (
-        employee.id === (normalizedEmployee as any).id ? { ...employee, ...normalizedEmployee } : employee
+        employee.id === normalizedEmployee.id ? { ...employee, ...normalizedEmployee } : employee
       )));
     },
     onDelete: (deletedEmployee: Record<string, unknown>) => {
@@ -150,6 +118,8 @@ function Empleados({ businessId }: DashboardModuleProps) {
       }
       setEmployees((prev) => prev.filter((employee) => employee.id !== deletedEmployee?.id));
     }
+  // useRealtimeSubscription es un archivo JS sin tipos — el cast es necesario
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

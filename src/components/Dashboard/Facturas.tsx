@@ -24,6 +24,8 @@ import {
 } from '../../data/queries/invoicesQueries';
 import { getAuthenticatedUser } from '../../data/queries/authQueries';
 import { getPaymentMethodLabel } from '../ui/PaymentMethodBankLogo';
+import { useFacturasLoader } from './facturas/useFacturasLoader';
+import { useInvoiceForm } from './facturas/useInvoiceForm';
 
 const INVOICE_LIST_COLUMNS = `
   id,
@@ -65,23 +67,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
   const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
   const fmtDate = (timestamp, options = {}) => formatDate(timestamp, options, dateConfig);
   
-  const [invoices, setInvoices] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const { showError, showSuccess, ToastComponent } = useAppToast();
-  
-  // Refs
-  const formRef = useRef(null);
-  
-  // Estados del formulario
   const [showForm, setShowForm] = useState(false);
-  const [selectedCustomer, setSelectedCliente] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [notes, setNotes] = useState('');
-  const [items, setItems] = useState([]);
-  const [sendEmailOnCreate, setSendEmailOnCreate] = useState(true); // Enviar email automáticamente
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
   
   // Estados del modal de cancelación
@@ -92,81 +78,34 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState(null);
   
-  // Búsqueda de productos
-  const [searchProduct, setSearchProduct] = useState('');
-  const [showProductSearch, setShowProductSearch] = useState(false);
-  
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
 
-  const loadFacturas = useCallback(async (businessId) => {
-    setInvoices(await getInvoicesWithItemsByBusiness({
-      businessId,
-      invoiceColumns: INVOICE_LIST_COLUMNS,
-      invoiceItemsColumns: INVOICE_ITEM_LIST_COLUMNS
-    }));
-  }, []);
+  const {
+    invoices, setInvoices,
+    products, setProducts,
+    loading, setLoading,
+    error, setError,
+    loadFacturas, loadData, resolveBusinessContext,
+  } = useFacturasLoader(businessIdProp, t);
 
-  const resolveBusinessContext = useCallback(async () => {
-    if (businessIdProp) {
-      return {
-        userId: null,
-        businessId: businessIdProp,
-        employeeId: null
-      };
-    }
+  const { showError, showSuccess, ToastComponent } = useAppToast();
+  const formRef = useRef(null);
+  const customers: any[] = [];
 
-    const user = await getAuthenticatedUser();
+  const {
+    items, setItems,
+    searchProduct, setSearchProduct,
+    showProductSearch, setShowProductSearch,
+    selectedCustomer, setSelectedCliente,
+    paymentMethod, setPaymentMethod,
+    notes, setNotes,
+    sendEmailOnCreate, setSendEmailOnCreate,
+    handleAddProduct, handleRemoveItem, updateQuantity,
+    totalFactura, resetForm: resetFormHook,
+  } = useInvoiceForm(showError, t);
 
-    if (!user) {
-      const sessionError = new Error(t('facturas:errors.sessionRequired'));
-      (sessionError as Error & { code: string }).code = 'SESSION_EXPIRED';
-      throw sessionError;
-    }
-
-    const { businessId, employeeId } = await getBusinessContextByUserId(user.id);
-    if (!businessId) {
-      throw new Error(t('facturas:errors.loadFailed'));
-    }
-
-    return {
-      userId: user.id,
-      businessId,
-      employeeId
-    };
-  }, [businessIdProp, t]);
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { businessId } = await resolveBusinessContext();
-
-      // Cargar facturas
-      const [, productsData] = await Promise.all([
-        loadFacturas(businessId),
-        getProductsForInvoicesByBusiness(businessId, PRODUCT_INVOICE_COLUMNS)
-      ]);
-
-      setProducts(productsData);
-
-      // Tabla customers eliminada - no cargar clientes
-      setCustomers([]);
-
-    } catch (error) {
-      if (error?.code === 'SESSION_EXPIRED') {
-        setTimeout(() => {
-          navigate('/login');
-        }, 2000);
-      }
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [loadFacturas, resolveBusinessContext, navigate]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const loadFacturasLocal = loadFacturas;
 
   // Scroll al formulario cuando se abre (especialmente útil en móvil)
   useEffect(() => {
@@ -176,80 +115,6 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
       }, 100);
     }
   }, [showForm]);
-
-  const handleAddProduct = useCallback((producto) => {
-    if (!producto.stock || producto.stock <= 0) {
-      showError('Error', t('facturas:errors.noStock', { name: producto.name }));
-      return;
-    }
-
-    if (!producto.sale_price || producto.sale_price <= 0) {
-      showError('Error', t('facturas:errors.noPrice', { name: producto.name }));
-      return;
-    }
-
-    setItems(prevItems => {
-      const existingItem = prevItems.find(item => item.product_id === producto.id);
-      
-      if (existingItem) {
-        if (existingItem.quantity >= producto.stock) {
-          showError('Error', t('facturas:errors.insufficientStock', { stock: producto.stock, name: producto.name }));
-          return prevItems;
-        }
-
-        return prevItems.map(item =>
-          item.product_id === producto.id
-            ? { 
-              ...item, 
-              quantity: item.quantity + 1, 
-              total: (item.quantity + 1) * item.unit_price,
-              max_stock: producto.stock
-            }
-          : item
-        );
-      } else {
-        return [...prevItems, {
-          product_id: producto.id,
-          product_name: producto.name,
-          quantity: 1,
-          unit_price: producto.sale_price || 0,
-          total: producto.sale_price || 0,
-          max_stock: producto.stock
-        }];
-      }
-    });
-    
-    setSearchProduct('');
-    setShowProductSearch(false);
-  }, [t]);
-
-  const handleRemoveItem = useCallback((productId) => {
-    setItems(prevItems => prevItems.filter(item => item.product_id !== productId));
-  }, []);
-
-  const updateQuantity = useCallback((productId, newQuantity) => {
-    setItems((prevItems) => prevItems.map((item) => {
-      if (item.product_id !== productId) return item;
-
-      const rawValue = String(newQuantity ?? '').trim();
-      if (rawValue === '') {
-        return { ...item, quantity: '', total: 0 };
-      }
-
-      const parsedValue = Number(rawValue);
-      if (!Number.isFinite(parsedValue)) return item;
-      if (parsedValue <= 0) {
-        return { ...item, quantity: '', total: 0 };
-      }
-
-      return { ...item, quantity: parsedValue, total: parsedValue * item.unit_price };
-    }));
-  }, []);
-
-  // Memoizar cálculo de total
-  const totalFactura = useMemo(() => {
-    return items.reduce((sum, item) => sum + item.total, 0);
-  }, [items]);
 
   const handleCreateInvoice = async (e) => {
     e.preventDefault();
@@ -370,14 +235,7 @@ export default function Facturas({ userRole = 'admin', businessId: businessIdPro
     }
   };
 
-  const resetForm = () => {
-    setSelectedCliente('');
-    setPaymentMethod('cash');
-    setNotes('');
-    setItems([]);
-    setSearchProduct('');
-    setSendEmailOnCreate(true); // Reset a true por defecto
-  };
+  const resetForm = resetFormHook;
 
   const handleSendToClient = async (facturaId) => {
     setLoading(true);

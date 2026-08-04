@@ -476,8 +476,8 @@ export function useMesaOrderMutations({
         try {
           const freshItems = await listOrderItems(latestUpdate.orderId);
           setOrderItems(freshItems);
-        } catch {
-          // no-op
+        } catch (err: unknown) {
+          if (__DEV__) console.warn('[mesas] refresh_order_items_failed', (err as Error)?.message || err);
         }
       });
 
@@ -948,7 +948,11 @@ export function useMesaOrderMutations({
 
       const skipLockAcquire = options?.skipLockAcquire === true;
 
-      void ensureCatalogLoaded(businessId).catch(() => {});
+      void ensureCatalogLoaded(businessId).catch((err) => {
+        if (__DEV__) {
+          console.warn('[mesas] ensure_catalog_failed', err?.message || err);
+        }
+      });
 
       if (skipOrderItemsFetch) {
         if (!hasCachedItems && !providedItems) {

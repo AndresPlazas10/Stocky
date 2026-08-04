@@ -1,10 +1,10 @@
 export function enqueueOutboxMutation(opts?: {
   businessId?: string | null;
   mutationType?: string;
-  payload?: Record<string, any>;
+  payload?: Record<string, unknown>;
   mutationId?: string;
-  baseVersions?: any;
-}): Promise<any>;
+  baseVersions?: Record<string, number>;
+}): Promise<{ ok: boolean }>;
 
 declare const _default: {
   enqueueOutboxMutation: typeof enqueueOutboxMutation;

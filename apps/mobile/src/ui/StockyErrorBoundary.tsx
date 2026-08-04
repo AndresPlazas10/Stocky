@@ -24,6 +24,15 @@ class StockyErrorBoundaryInner extends React.Component<Props, State> {
       console.error('[StockyErrorBoundary] error', error);
       console.error('[StockyErrorBoundary] component stack', info.componentStack);
     }
+    try {
+      const { perfMark } = require('../utils/perfAudit');
+      perfMark('error_boundary_caught', {
+        component: 'StockyErrorBoundary',
+        message: error.message,
+      });
+    } catch {
+      // best-effort perf audit
+    }
   }
 
   render() {

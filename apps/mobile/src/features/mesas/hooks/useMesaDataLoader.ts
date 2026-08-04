@@ -120,7 +120,8 @@ export function useMesaDataLoader({
         .then((name: string) => {
           setActorDisplayName(name);
         })
-        .catch(() => {
+        .catch((err: unknown) => {
+          if (__DEV__) console.warn('[mesas] resolve_editor_name_failed', (err as Error)?.message || err);
           setActorDisplayName(fallbackName);
         });
       if (catalogBusinessIdRef.current !== nextContext.businessId) {
@@ -142,11 +143,11 @@ export function useMesaDataLoader({
           catalogUpdatedAtRef.current = cached.cachedAt || 0;
           setCatalogItems(cached.items);
         })
-        .catch(() => {
-          // no-op
+        .catch((err: unknown) => {
+          if (__DEV__) console.warn('[mesas] storage_read_catalog_failed', (err as Error)?.message || err);
         });
-      void ensureCatalogLoaded(nextContext.businessId).catch(() => {
-        // no-op: no bloquear carga de mesas por catalogo
+      void ensureCatalogLoaded(nextContext.businessId).catch((err: unknown) => {
+        if (__DEV__) console.warn('[mesas] ensure_catalog_failed', (err as Error)?.message || err);
       });
 
       const initialFetchStart = Date.now();

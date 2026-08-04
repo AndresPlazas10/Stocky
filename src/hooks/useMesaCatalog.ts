@@ -2,12 +2,13 @@ import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '../utils/offlineSnapshot.js';
 import { getProductsForOrdersByBusiness } from '../data/queries/ordersQueries';
-import { fetchComboCatalog } from '../services/combosService';
+import { fetchComboCatalog, type ComboListItem } from '../services/combosService';
+import type { ProductWithSupplier } from '@/types/product';
 
 interface UseMesaCatalogProps {
   businessId: string;
-  setProducts: (products: any[]) => void;
-  setCombos: (combos: any[]) => void;
+  setProducts: (products: ProductWithSupplier[]) => void;
+  setCombos: (combos: ComboListItem[]) => void;
   showError: (title: string, message?: string) => void;
 }
 

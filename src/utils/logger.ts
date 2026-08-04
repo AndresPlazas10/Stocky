@@ -20,13 +20,15 @@ class Logger {
       console.warn(...args); // eslint-disable-line no-console
     }
     const joined = args.map(a => String(a)).join(' ');
-    const keyPrefixes = ['[perf]', '[realtime]', '[sync]', '[db]'];
-    if (keyPrefixes.some(p => joined.startsWith(p))) {
-      try {
-        Sentry.captureMessage(joined, { level: 'warning' });
-      } catch {
-        // no-op
-      }
+    try {
+      Sentry.addBreadcrumb({
+        category: 'logger.warn',
+        message: joined.slice(0, 500),
+        level: 'warning',
+      });
+      Sentry.captureMessage(joined, { level: 'warning' });
+    } catch {
+      // no-op
     }
   }
 

@@ -22,11 +22,11 @@ export function SplitBillStepOne({
     <>
       <Text style={styles.sectionTitle}>1. {t('splitBill.addAccount')}</Text>
       <Text style={styles.helper}>
-        {t('splitBill.subtitle', { defaultValue: 'Define cuántas cuentas pagarán esta orden.' })}
+        {t('splitBill.subtitle')}
       </Text>
       <View style={styles.counterCard}>
         <Text style={styles.counterLabel}>
-          {t('splitBill.addAccount', { defaultValue: 'Número de cuentas' })}
+          {t('splitBill.addAccount')}
         </Text>
         <View style={styles.counterRow}>
           <Pressable

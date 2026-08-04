@@ -16,7 +16,10 @@ export function useVentaCatalog(businessId: string) {
       try {
         const [catalog, firstDay] = await Promise.all([
           listVentasCatalog(businessId, forceRefresh ? { forceRefresh: true } : { ttlMs: 90_000 }),
-          getFirstVentaDayKey(businessId, { ttlMs: 5 * 60_000 }).catch(() => null),
+          getFirstVentaDayKey(businessId, { ttlMs: 5 * 60_000 }).catch((err: unknown) => {
+            if (__DEV__) console.warn('[ventas] first_day_key_failed', (err as Error)?.message || err);
+            return null;
+          }),
         ]);
         setCatalogItems(catalog);
         setFirstVentaDayKey(firstDay);

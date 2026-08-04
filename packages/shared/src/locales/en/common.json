@@ -293,7 +293,8 @@
     "mercadopago": "Mercado Pago",
     "venmo": "Venmo",
     "cashapp": "Cash App",
-    "zelle": "Zelle"
+    "zelle": "Zelle",
+    "other": "Other"
   },
   "roles": {
     "admin": "Administrator",
@@ -416,7 +417,57 @@
     "terms": "Terms",
     "privacy": "Privacy",
     "deleteAccount": "Delete account",
-    "allRightsReserved": "All rights reserved."
+    "allRightsReserved": "All rights reserved.",
+    "heroBadge": "POS for restaurants and bars",
+    "trustTitle": "They trust us",
+    "trustNegocios": "+500",
+    "trustNegociosLabel": "Active businesses",
+    "trustUptime": "99.9%",
+    "trustUptimeLabel": "Availability",
+    "trustVentas": "+50K",
+    "trustVentasLabel": "Sales processed",
+    "featuresTitle": "Everything you need",
+    "featuresSubtitle": "Six tools in one platform",
+    "howItWorksTitle": "Start in 3 steps",
+    "testimonialsTitle": "What our clients say",
+    "faqTitle": "Frequently asked questions",
+    "ctaTitle": "Ready to start?",
+    "ctaSubtitle": "Create your free account in 2 minutes and start selling today.",
+    "ctaButton": "Start free now",
+    "scrollDown": "Scroll to learn more",
+    "bottomBarSignIn": "Sign In",
+    "bottomBarSignUp": "Sign Up",
+    "testimonial1": {
+      "text": "Since we started using Stocky, we close the day in minutes instead of hours. My waiters collect faster and we have fewer errors.",
+      "name": "María García",
+      "role": "Owner, La Esquina Restaurant"
+    },
+    "testimonial2": {
+      "text": "Real-time inventory control changed our lives. Now we know exactly what we have and when to order more.",
+      "name": "Carlos López",
+      "role": "Manager, Café Central"
+    },
+    "testimonial3": {
+      "text": "The best part is it works offline. At my bar the signal sometimes drops and Stocky keeps running without issues.",
+      "name": "Ana Martínez",
+      "role": "Manager, Bar El Rincón"
+    },
+    "faq1": {
+      "question": "How do I start using Stocky?",
+      "answer": "Create a free account in 2 minutes. Add your products, create users for your team and start selling. No complicated installations or long configurations."
+    },
+    "faq2": {
+      "question": "Does it work without internet?",
+      "answer": "Yes. Stocky was designed to work even when there is no connection. All your sales are saved locally and sync automatically when the signal returns."
+    },
+    "faq3": {
+      "question": "What payment methods does it accept?",
+      "answer": "Cash, cards, transfers and digital payments like Nequi. Stocky records the payment method for each sale so you can keep clear control of your cash register."
+    },
+    "faq4": {
+      "question": "Can I cancel anytime?",
+      "answer": "Of course. There are no forced contracts or minimum commitments. You can cancel your account at any time from the settings."
+    }
   },
   "login": {
     "enterUsernamePassword": "Please enter username and password",
@@ -1480,6 +1531,17 @@
     "reactivationNote": "Your access will be restored in less than 24 hours after payment.",
     "needHelp": "Need help?",
     "supportMessage": "Write to us at support@stockypos.app"
+  },
+  "businessService": {
+    "success": {
+      "businessLoaded": "Business information loaded successfully",
+      "businessesLoaded": "Businesses loaded successfully"
+    },
+    "errors": {
+      "loadBusinessFailed": "Error loading business information",
+      "loadBusinessesFailed": "Error loading businesses",
+      "userNotAuthenticated": "User not authenticated"
+    }
   },
   "deleteConfirm": {
     "selectedItem": "Selected item"

@@ -27,6 +27,7 @@ import { SaleSuccessAlert } from '@/components/ui/SaleSuccessAlert';
 
 import { Store, Building2, MapPin, Phone, User, Lock, ArrowLeft, Loader2, Eye, EyeOff, Globe, Clock } from 'lucide-react';
 import { COUNTRIES } from '../config/countries';
+import { redirectAfterRegistration } from '../utils/deviceDetection';
 
 
 interface RegisterForm {
@@ -59,6 +60,7 @@ function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [redirectMessage, setRedirectMessage] = useState(t('register.redirectingToDashboard'));
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -194,12 +196,17 @@ function Register() {
       sessionStorage.setItem('justCreatedBusiness', businessData.id);
       sessionStorage.setItem('businessCreatedAt', Date.now().toString());
       setError('');
+      setRedirectMessage(
+        /android/i.test(navigator.userAgent)
+          ? t('register.redirectingToPlayStore')
+          : t('register.redirectingToDashboard')
+      );
       setSuccess(true);
-      
+
       setTimeout(() => {
-        navigate('/dashboard');
+        redirectAfterRegistration();
       }, 1500);
-      
+
     } catch (err) {
       setError((err as Error).message || t('register.errorCreatingBusiness'));
     } finally {
@@ -220,9 +227,9 @@ function Register() {
             : Promise.resolve(null)
         ]);
         const business = ownedBusiness || emailBusiness || null;
-        
+
         if (business) {
-          navigate('/dashboard');
+          redirectAfterRegistration();
         }
       }
     };
@@ -238,21 +245,16 @@ function Register() {
   };
 
   return (
-    <div className="min-h-screen relative overflow-x-hidden overflow-y-auto flex items-start md:items-center justify-center p-3 bg-background">
+    <div className="min-h-screen relative overflow-x-hidden overflow-y-auto flex items-start md:items-center justify-center p-3">
 
-      <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute -top-32 -right-32 h-[28rem] w-[28rem] rounded-full bg-primary-100/40 blur-3xl animate-[drift_14s_ease-in-out_infinite]" />
-        <div className="absolute top-1/3 -left-32 h-[22rem] w-[22rem] rounded-full bg-primary-50/50 blur-3xl animate-[drift_18s_ease-in-out_infinite_3s]" />
-        <div className="absolute -bottom-20 right-1/4 h-[20rem] w-[20rem] rounded-full bg-secondary-100/30 blur-3xl animate-[drift_20s_ease-in-out_infinite_6s]" />
-      </div>
-
-      <style>{`
-        @keyframes drift {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(30px, -40px) scale(1.08); }
-          66% { transform: translate(-20px, 20px) scale(0.95); }
-        }
-      `}</style>
+      <div
+        className="pointer-events-none fixed inset-0 -z-10 bg-cover bg-center bg-no-repeat md:hidden"
+        style={{ backgroundImage: "url('/images/fondo_login.webp')" }}
+      />
+      <div
+        className="pointer-events-none fixed inset-0 -z-10 bg-cover bg-center bg-no-repeat hidden md:block"
+        style={{ backgroundImage: "url('/images/fondo_ordenador.webp')" }}
+      />
 
       <motion.div
         initial={{ opacity: 0, x: -20 }}
@@ -306,7 +308,7 @@ function Register() {
               isVisible={success}
               onClose={() => setSuccess(false)}
               title={t('register.businessRegistered')}
-              details={[{ label: t('labels.status'), value: t('register.redirectingToDashboard') }]}
+              details={[{ label: t('labels.status'), value: redirectMessage }]}
               duration={2000}
             />
 

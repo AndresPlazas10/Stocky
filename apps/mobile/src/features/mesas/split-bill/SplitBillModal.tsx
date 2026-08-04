@@ -85,9 +85,7 @@ export const SplitBillModalRN = React.memo(function SplitBillModalRN({
           <View style={styles.modalHeaderTextWrap}>
             <Text style={styles.modalHeaderTitle}>{t('splitBill.title')}</Text>
             <Text style={styles.modalHeaderSubtitle}>
-              {t('splitBill.subtitle', {
-                defaultValue: 'Distribuye productos por cuenta y confirma.',
-              })}
+              {t('splitBill.subtitle')}
             </Text>
           </View>
         </View>

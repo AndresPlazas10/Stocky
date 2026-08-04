@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+if ((!SUPABASE_URL || !SUPABASE_ANON_KEY) && import.meta.env.DEV) {
   console.warn(
     '⚠️ Supabase env vars missing. Some features may not work.\n' +
     `VITE_SUPABASE_URL: ${SUPABASE_URL ? '✓' : '✗ FALTA'}\n` +

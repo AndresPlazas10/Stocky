@@ -24,11 +24,9 @@ export const DeleteMesaModal = React.memo(function DeleteMesaModal({
   return (
     <StockyDeleteConfirmModal
       visible={visible}
-      title={t('alerts.confirmDeleteTable', { defaultValue: 'Eliminar mesa' })}
-      message={t('alerts.confirmDeleteTable', {
-        defaultValue: 'Se eliminará la mesa y sus ordenes asociadas.',
-      })}
-      warning={t('alerts.confirmDeleteTableWarning', { defaultValue: 'No se puede deshacer.' })}
+      title={t('alerts.confirmDeleteTable')}
+      message={t('alerts.confirmDeleteTable')}
+      warning={t('alerts.confirmDeleteTableWarning')}
       itemLabel={mesaToDelete ? mesaDisplayName(mesaToDelete, t('labels.table')) : null}
       loading={isDeletingMesa}
       onCancel={onCancel}
