@@ -1,6 +1,6 @@
 {
   "name": "stocky-print-bridge-windows",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "description": "Stocky Print Bridge para impresoras termicas Bluetooth ESC/POS en Windows",
   "private": true,
   "main": "main.cjs",

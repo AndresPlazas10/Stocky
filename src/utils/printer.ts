@@ -1,5 +1,6 @@
 const PRINTER_WIDTH_KEY = 'stocky_printer_paper_width_mm';
 const AUTO_PRINT_RECEIPT_KEY = 'stocky_auto_print_receipt_enabled';
+const AUTO_CUT_KEY = 'stocky_printer_auto_cut_enabled';
 const ALLOWED_WIDTHS = new Set([58, 80, 104]);
 const DEFAULT_WIDTH = 58;
 
@@ -38,6 +39,25 @@ export const isAutoPrintReceiptEnabled = (): boolean => {
 export const setAutoPrintReceiptEnabled = (enabled: boolean): boolean => {
   try {
     window.localStorage.setItem(AUTO_PRINT_RECEIPT_KEY, enabled ? 'true' : 'false');
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const isAutoCutEnabled = (): boolean => {
+  try {
+    const stored = window.localStorage.getItem(AUTO_CUT_KEY);
+    if (stored === null) return false;
+    return stored === 'true';
+  } catch {
+    return false;
+  }
+};
+
+export const setAutoCutEnabled = (enabled: boolean): boolean => {
+  try {
+    window.localStorage.setItem(AUTO_CUT_KEY, enabled ? 'true' : 'false');
     return true;
   } catch {
     return false;

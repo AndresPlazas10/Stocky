@@ -2,11 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Download, ShieldCheck, Smartphone, Monitor, BellRing, Share, PlusSquare, AppWindow, Printer, ArrowLeft } from 'lucide-react';
+import { Download, ShieldCheck, Smartphone, Monitor, BellRing, Share, PlusSquare, AppWindow, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getApkDownloadUrl } from '../utils/apkDownload.js';
 import { getWindowsDownloadUrl } from '../utils/windowsDownload.js';
-import { getPrintBridgeWindowsUrl } from '../utils/printBridgeDownload.js';
 import {
   getWebPushSupportStatus,
   registerPwaPushSubscription,
@@ -63,10 +62,8 @@ function DownloadPage() {
 
   const apkUrl = getApkDownloadUrl();
   const windowsUrl = getWindowsDownloadUrl();
-  const printBridgeUrl = getPrintBridgeWindowsUrl();
   const apkVersion = String(import.meta.env?.VITE_APK_VERSION || '').trim();
   const windowsVersion = String(import.meta.env?.VITE_WINDOWS_VERSION || '').trim();
-  const printBridgeVersion = String(import.meta.env?.VITE_PRINT_BRIDGE_VERSION || '').trim();
 
   const [enablingPush, setEnablingPush] = useState(false);
   const [testingPush, setTestingPush] = useState(false);
@@ -174,16 +171,7 @@ function DownloadPage() {
       label: t('download.downloadBtn'),
       note: t('download.smartscreenWarning'),
     },
-    {
-      icon: Printer,
-      title: t('download.printBridgeTitle'),
-      subtitle: printBridgeVersion ? `v${printBridgeVersion}` : t('download.latestVersion'),
-      description: t('download.printBridgeDescription'),
-      href: printBridgeUrl,
-      label: t('download.downloadBtn'),
-      note: t('download.smartscreenWarning'),
-    },
-  ], [apkVersion, apkUrl, windowsVersion, windowsUrl, printBridgeVersion, printBridgeUrl, t]);
+  ], [apkVersion, apkUrl, windowsVersion, windowsUrl, t]);
 
   const toggleIOsSteps = useCallback(() => setShowIOsSteps((v) => !v), []);
 

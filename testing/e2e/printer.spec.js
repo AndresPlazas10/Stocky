@@ -4,7 +4,7 @@ import { signIn, waitForPageReady } from './helpers/test-utils.js';
 const TEST_EMAIL = process.env.E2E_TEST_EMAIL;
 const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD;
 
-test.describe('Impresora termica (Print Bridge)', () => {
+test.describe('Impresora (Web Serial)', () => {
   test.beforeEach(async ({ page }) => {
     if (TEST_EMAIL && TEST_PASSWORD) {
       await signIn(page, TEST_EMAIL, TEST_PASSWORD);
@@ -25,25 +25,37 @@ test.describe('Impresora termica (Print Bridge)', () => {
     }
   };
 
-  test('muestra la seccion de impresora termica en Configuracion', async ({ page }) => {
+  test('muestra la seccion de impresora en Configuracion', async ({ page }) => {
     await openPrinterSection(page);
 
-    const section = page.locator('text=Impresora termica').first();
+    const section = page.locator('text=Impresión, text=Impresion').first();
     const visible = await section.isVisible({ timeout: 8000 }).catch(() => false);
     expect(visible).toBeTruthy();
   });
 
-  test('muestra los controles de configuracion del bridge', async ({ page }) => {
+  test('muestra el boton de escanear impresora', async ({ page }) => {
     await openPrinterSection(page);
 
-    const endpointInput = page.locator('input[placeholder="http://127.0.0.1:41780"]').first();
-    const testPrintButton = page.locator('button:has-text("Imprimir prueba"), button:has-text("Imprimir prueba")').first();
+    const scanButton = page.locator('button:has-text("Escanear"), button:has-text("Escanear impresora")').first();
+    const visible = await scanButton.isVisible({ timeout: 8000 }).catch(() => false);
+    expect(visible).toBeTruthy();
+  });
 
-    const endpointVisible = await endpointInput.isVisible({ timeout: 8000 }).catch(() => false);
-    const buttonVisible = await testPrintButton.isVisible({ timeout: 3000 }).catch(() => false);
+  test('muestra los controles de ancho de papel y corte', async ({ page }) => {
+    await openPrinterSection(page);
 
-    expect(endpointVisible).toBeTruthy();
-    expect(buttonVisible).toBeTruthy();
+    const width58 = page.locator('button:has-text("58mm")').first();
+    const width80 = page.locator('button:has-text("80mm")').first();
+    const cutToggle = page.locator('[role="switch"]').first();
+
+    const widthVisible = await width58.isVisible({ timeout: 8000 }).catch(() => false);
+    expect(widthVisible).toBeTruthy();
+
+    const width80Visible = await width80.isVisible({ timeout: 3000 }).catch(() => false);
+    expect(width80Visible).toBeTruthy();
+
+    const toggleCount = await cutToggle.count();
+    expect(toggleCount >= 1).toBeTruthy();
   });
 
   test('permite cambiar el ancho de papel', async ({ page }) => {

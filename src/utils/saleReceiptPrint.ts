@@ -1,6 +1,7 @@
-import { getThermalPaperWidthMm } from './printer.js';
+import { getThermalPaperWidthMm, isAutoCutEnabled } from './printer.js';
 import { buildSaleReceiptTemplate, validateSaleReceiptTemplate } from './receiptTemplate.js';
-import { sendReceiptToPrintBridge, getPrintBridgeSettings, getBridgePrinterLabel } from './printBridgeClient';
+import { buildSaleEscPos } from './escposService';
+import { connectPrinter, printBytes } from '@/services/webSerialPrinterService';
 import { logger } from '@/utils/logger';
 
 const escapeHtml = (value) => String(value ?? '')
@@ -72,7 +73,7 @@ const buildReceiptHtml = (receipt, printerWidthMm) => `<!DOCTYPE html>
 
 export type SaleReceiptPrintResult =
   | { ok: false; error: string }
-  | { ok: true; via: 'bridge'; printerLabel: string }
+  | { ok: true; via: 'printer' }
   | { ok: true; via: 'browser'; fallbackReason: string | null | undefined };
 
 export async function printSaleReceipt({
@@ -100,15 +101,16 @@ export async function printSaleReceipt({
     return { ok: false, error: validation.error || 'Recibo de venta invalido.' };
   }
 
-  const settings = getPrintBridgeSettings();
   let fallbackReason = null;
-  if (settings.enabled) {
-    const bridgeResult = await sendReceiptToPrintBridge({ receipt, paperWidthMm: printerWidthMm });
-    if (bridgeResult.ok) {
-      return { ok: true, via: 'bridge', printerLabel: getBridgePrinterLabel() };
+  const printer = await connectPrinter();
+  if (printer.ok) {
+    const escposData = buildSaleEscPos(receipt, printerWidthMm, isAutoCutEnabled());
+    const printResult = await printBytes(escposData);
+    if (printResult.ok) {
+      return { ok: true, via: 'printer' };
     }
-    fallbackReason = bridgeResult.reason;
-    logger.info('utils:saleReceiptPrint:bridge_fallback', bridgeResult.reason);
+    fallbackReason = printResult.error || 'printer_unavailable';
+    logger.info('utils:saleReceiptPrint:printer_fallback', fallbackReason);
   }
 
   const html = buildReceiptHtml(receipt, printerWidthMm);

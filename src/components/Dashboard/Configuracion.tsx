@@ -32,25 +32,26 @@ import {
   ExternalLink,
   Printer,
   RefreshCw,
-  Plug
+  ScanLine,
+  Unplug
 } from 'lucide-react';
 import type { RefObject } from 'react';
 import {
-  isPrintBridgeEnabled,
-  setPrintBridgeEnabled,
-  getPrintBridgeEndpoint,
-  setPrintBridgeEndpoint,
-  getPrintBridgeToken,
-  setPrintBridgeToken,
-  checkPrintBridgeStatus,
-  sendReceiptToPrintBridge,
-  type BridgeStatus,
-} from '@/utils/printBridgeClient';
+  isWebSerialSupported,
+  scanPrinter,
+  connectPrinter,
+  disconnectPrinter,
+  printBytes,
+  isPrinterConnected,
+} from '@/services/webSerialPrinterService';
+import { buildSaleEscPos } from '@/utils/escposService';
 import {
   getThermalPaperWidthMm,
   setThermalPaperWidthMm,
   isAutoPrintReceiptEnabled,
   setAutoPrintReceiptEnabled,
+  isAutoCutEnabled,
+  setAutoCutEnabled,
 } from '@/utils/printer';
 
 interface Business {
@@ -84,13 +85,15 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
     address: ''
   });
 
-  const [bridgeEnabled, setBridgeEnabledState] = useState(isPrintBridgeEnabled());
-  const [bridgeEndpoint, setBridgeEndpointState] = useState(getPrintBridgeEndpoint());
-  const [bridgeToken, setBridgeTokenState] = useState(getPrintBridgeToken());
   const [paperWidth, setPaperWidthState] = useState(getThermalPaperWidthMm());
   const [autoPrint, setAutoPrintState] = useState(isAutoPrintReceiptEnabled());
-  const [bridgeCheck, setBridgeCheck] = useState<{ status: 'idle' | 'checking' | 'done'; result?: BridgeStatus }>({ status: 'idle' });
+  const [autoCut, setAutoCutState] = useState(isAutoCutEnabled());
+  const [printerConnected, setPrinterConnected] = useState(isPrinterConnected());
+  const [printerLabel, setPrinterLabel] = useState('');
+  const [isScanningPrinter, setIsScanningPrinter] = useState(false);
+  const [isConnectingPrinter, setIsConnectingPrinter] = useState(false);
   const [testingPrint, setTestingPrint] = useState(false);
+  const webSerialSupported = isWebSerialSupported();
 
   useEffect(() => {
     if (business) {
@@ -189,13 +192,13 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
     version: 1,
     requiredSections: ['items', 'totals'],
     header: {
-      title: 'PRUEBA STOCKY',
+      title: 'PRUEBA DE IMPRESION',
       businessName: business?.name || 'Sistema Stocky',
       dateText: new Date().toLocaleString('es-CO'),
       alignment: 'center',
     },
     metadata: [
-      { label: 'Bridge', value: 'Web' },
+      { label: 'Estado', value: 'Conexion exitosa' },
     ],
     items: [
       {
@@ -219,74 +222,113 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
       methodText: 'Prueba',
     },
     footer: {
-      message: 'Gracias por su compra',
+      message: 'Conexion exitosa',
       alignment: 'center',
     },
     itemsHeader: 'Producto       Cant.      Total',
     tipLabel: 'Propina',
     totalLabel: 'TOTAL',
-    methodLabel: 'Método',
+    methodLabel: 'Metodo',
     notSpecified: 'No especificado',
   }), [business]);
 
-  const runBridgeCheck = useCallback(async () => {
-    setBridgeCheck({ status: 'checking' });
-    const result = await checkPrintBridgeStatus();
-    setBridgeCheck({ status: 'done', result });
-  }, []);
-
-  const handleToggleBridge = useCallback((enabled: boolean) => {
-    setPrintBridgeEnabled(enabled);
-    setBridgeEnabledState(enabled);
-    if (enabled) {
-      runBridgeCheck();
-    } else {
-      setBridgeCheck({ status: 'idle' });
+  const handleScanPrinter = useCallback(async () => {
+    if (isScanningPrinter) return;
+    setIsScanningPrinter(true);
+    try {
+      const result = await scanPrinter();
+      if (result.ok) {
+        setPrinterConnected(true);
+        setPrinterLabel(result.label || '');
+        showSuccess(t('common:impresion.connectionSuccess'), '');
+      } else {
+        showWarning(t('common:impresion.printError'), result.error || '');
+      }
+    } catch {
+      showError(t('common:impresion.printError'), '');
+    } finally {
+      setIsScanningPrinter(false);
     }
-  }, [runBridgeCheck]);
+  }, [isScanningPrinter, showSuccess, showWarning, showError, t]);
 
-  const handleEndpointChange = useCallback((value: string) => {
-    setPrintBridgeEndpoint(value);
-    setBridgeEndpointState(value);
-  }, []);
+  const handleReconnectPrinter = useCallback(async () => {
+    if (isConnectingPrinter) return;
+    setIsConnectingPrinter(true);
+    try {
+      const result = await connectPrinter();
+      if (result.ok) {
+        setPrinterConnected(true);
+        setPrinterLabel(result.label || '');
+        showSuccess(t('common:impresion.connectionSuccess'), '');
+      } else {
+        showWarning(t('common:impresion.printError'), result.error || '');
+      }
+    } catch {
+      showError(t('common:impresion.printError'), '');
+    } finally {
+      setIsConnectingPrinter(false);
+    }
+  }, [isConnectingPrinter, showSuccess, showWarning, showError, t]);
 
-  const handleTokenChange = useCallback((value: string) => {
-    setPrintBridgeToken(value);
-    setBridgeTokenState(value);
+  const handleDisconnectPrinter = useCallback(async () => {
+    await disconnectPrinter();
+    setPrinterConnected(false);
+    setPrinterLabel('');
   }, []);
 
   const handlePaperWidthChange = useCallback((value: number) => {
     setThermalPaperWidthMm(value);
     setPaperWidthState(value);
-    showSuccess(t('common:printBridge.saved'), '');
+    showSuccess(t('common:impresion.saved'), '');
   }, [t, showSuccess]);
 
   const handleAutoPrintChange = useCallback((enabled: boolean) => {
     setAutoPrintReceiptEnabled(enabled);
     setAutoPrintState(enabled);
-    showSuccess(t('common:printBridge.saved'), '');
+    showSuccess(t('common:impresion.saved'), '');
+  }, [t, showSuccess]);
+
+  const handleAutoCutChange = useCallback((enabled: boolean) => {
+    setAutoCutEnabled(enabled);
+    setAutoCutState(enabled);
+    showSuccess(t('common:impresion.saved'), '');
   }, [t, showSuccess]);
 
   const handleTestPrint = useCallback(async () => {
     if (testingPrint) return;
     setTestingPrint(true);
     try {
-      const result = await sendReceiptToPrintBridge({
-        receipt: buildTestReceipt(),
-        paperWidthMm: paperWidth,
-      });
+      const escposData = buildSaleEscPos(buildTestReceipt(), paperWidth, autoCut);
+      const result = await printBytes(escposData);
 
       if (result.ok) {
-        showSuccess(t('common:printBridge.testPrintSuccess'), '');
+        showSuccess(t('common:impresion.testPrintSuccess'), '');
       } else {
-        showWarning(t('common:printBridge.testPrintFailed'), result.reason || '');
+        showWarning(t('common:impresion.printError'), result.error || '');
       }
     } catch {
-      showError(t('common:printBridge.testPrintFailed'), '');
+      showError(t('common:impresion.printError'), '');
     } finally {
       setTestingPrint(false);
     }
-  }, [testingPrint, buildTestReceipt, paperWidth, showSuccess, showWarning, showError, t]);
+  }, [testingPrint, buildTestReceipt, paperWidth, autoCut, showSuccess, showWarning, showError, t]);
+
+  useEffect(() => {
+    if (!webSerialSupported) return;
+    let active = true;
+
+    (async () => {
+      const result = await connectPrinter();
+      if (active && result.ok) {
+        setPrinterConnected(true);
+        setPrinterLabel(result.label || '');
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [webSerialSupported]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#C4DFE6]/10 p-4 md:p-6">
@@ -564,7 +606,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
           </div>
         </motion.div>
 
-        {/* Impresora Térmica */}
+        {/* Impresora */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -577,124 +619,86 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                 <Printer className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-xl font-bold">{t('common:printBridge.title')}</h2>
-                <p className="text-white/80">{t('common:printBridge.subtitle')}</p>
+                <h2 className="text-xl font-bold">{t('common:impresion.title')}</h2>
+                <p className="text-white/80">{t('common:impresion.settings')}</p>
               </div>
             </div>
           </div>
 
           <div className="p-6 space-y-6">
-            {/* Conexión del bridge */}
+            {!webSerialSupported && (
+              <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-xl border border-amber-200">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800">{t('common:impresion.webSerialUnavailable')}</p>
+              </div>
+            )}
+
+            {/* Impresora conectada / escaneo */}
             <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="font-semibold text-gray-800">{t('common:printBridge.enable')}</p>
-                  <p className="text-sm text-gray-600 mt-1">{t('common:printBridge.enableDescription')}</p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={bridgeEnabled}
-                  onClick={() => handleToggleBridge(!bridgeEnabled)}
-                  className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${bridgeEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                >
-                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${bridgeEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                    <Plug className="w-4 h-4 text-accent-600" />
-                    {t('common:printBridge.endpoint')}
-                  </label>
-                  <input
-                    type="text"
-                    value={bridgeEndpoint}
-                    onChange={(e) => handleEndpointChange(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all text-sm font-mono"
-                    placeholder={t('common:printBridge.endpointPlaceholder')}
-                  />
-                </div>
-
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                    <Shield className="w-4 h-4 text-accent-600" />
-                    {t('common:printBridge.token')}
-                  </label>
-                  <input
-                    type="password"
-                    value={bridgeToken}
-                    onChange={(e) => handleTokenChange(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#C4DFE6] focus:border-transparent transition-all text-sm font-mono"
-                    placeholder={t('common:printBridge.tokenPlaceholder')}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={runBridgeCheck}
-                  disabled={bridgeCheck.status === 'checking'}
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-all text-sm disabled:opacity-50"
-                >
-                  {bridgeCheck.status === 'checking' ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      {t('common:printBridge.checkingConnection')}
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="w-4 h-4" />
-                      {t('common:printBridge.checkConnection')}
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleTestPrint}
-                  disabled={testingPrint}
-                  className="flex items-center gap-2 px-4 py-2 gradient-primary hover:from-[#99D3DB] hover:to-[#66A5AD] text-black rounded-lg font-medium transition-all text-sm disabled:opacity-50"
-                >
-                  <Printer className="w-4 h-4" />
-                  {testingPrint ? t('buttons.loading') : t('common:printBridge.testPrint')}
-                </button>
-              </div>
-
-              {bridgeCheck.status === 'done' && (
-                bridgeCheck.result?.ok ? (
-                  <div className="mt-4 flex items-start gap-2 p-3 bg-green-50 rounded-xl border border-green-200">
-                    <CheckCircle className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+              {printerConnected ? (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle className="w-6 h-6 text-green-600" />
                     <div>
-                      <p className="text-sm font-semibold text-green-800">{t('common:printBridge.connected')}</p>
-                      <p className="text-sm text-green-700">
-                        {t('common:printBridge.connectedTo', { printer: bridgeCheck.result.name || bridgeCheck.result.portPath || '-' })}
-                      </p>
+                      <p className="font-semibold text-gray-800">{t('common:impresion.printer')}</p>
+                      <p className="text-sm text-gray-600">{printerLabel || t('common:impresion.connected')}</p>
                     </div>
                   </div>
-                ) : (
-                  <div className="mt-4 flex items-start gap-2 p-3 bg-amber-50 rounded-xl border border-amber-200">
-                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-amber-800">{t('common:printBridge.notConnected')}</p>
-                      <p className="text-sm text-amber-700">{t('common:printBridge.notConnectedMessage')}</p>
-                    </div>
+                  <button
+                    type="button"
+                    onClick={handleDisconnectPrinter}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-medium transition-all text-sm"
+                  >
+                    <Unplug className="w-4 h-4" />
+                    {t('common:impresion.disconnect')}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="font-semibold text-gray-800 mb-1">{t('common:impresion.noPrinter')}</p>
+                  <p className="text-sm text-gray-600 mb-4">{t('common:impresion.usbNote')}</p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleScanPrinter}
+                      disabled={isScanningPrinter || !webSerialSupported}
+                      className="flex items-center gap-2 px-4 py-2 gradient-primary hover:from-[#99D3DB] hover:to-[#66A5AD] text-black rounded-lg font-medium transition-all text-sm disabled:opacity-50"
+                    >
+                      {isScanningPrinter ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          {t('buttons.loading')}
+                        </>
+                      ) : (
+                        <>
+                          <ScanLine className="w-4 h-4" />
+                          {t('common:impresion.scan')}
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleReconnectPrinter}
+                      disabled={isConnectingPrinter || !webSerialSupported}
+                      className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-all text-sm disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isConnectingPrinter ? 'animate-spin' : ''}`} />
+                      {t('common:impresion.reconnect')}
+                    </button>
                   </div>
-                )
+                </>
               )}
             </div>
 
             {/* Preferencias de impresión */}
             <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
-              <p className="font-semibold text-gray-800 mb-3">{t('common:printBridge.sections.receipt')}</p>
+              <p className="font-semibold text-gray-800 mb-3">{t('common:impresion.settings')}</p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                     <Printer className="w-4 h-4 text-accent-600" />
-                    {t('common:printBridge.paperWidth')}
+                    {t('common:impresion.paperSize')}
                   </label>
                   <div className="flex gap-2">
                     {[58, 80, 104].map((width) => (
@@ -712,47 +716,58 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-800 text-sm">{t('common:printBridge.autoPrint')}</p>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-gray-800 text-sm">{t('common:impresion.autoCut')}</p>
+                      <p className="text-xs text-gray-500">{t('common:impresion.autoCutNote')}</p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={autoCut}
+                      onClick={() => handleAutoCutChange(!autoCut)}
+                      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${autoCut ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                    >
+                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${autoCut ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={autoPrint}
-                    onClick={() => handleAutoPrintChange(!autoPrint)}
-                    className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${autoPrint ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                  >
-                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${autoPrint ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-gray-800 text-sm">{t('common:labels.autoPrint')}</p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={autoPrint}
+                      onClick={() => handleAutoPrintChange(!autoPrint)}
+                      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${autoPrint ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                    >
+                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${autoPrint ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Instrucciones y descarga */}
+            {/* Imprimir prueba + nota de fallback */}
             <div className="p-4 bg-gradient-to-br from-violet-50 to-white rounded-xl border border-violet-100">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="font-semibold text-gray-800">{t('common:printBridge.download')}</p>
-                  <p className="text-sm text-gray-600 mt-1">{t('common:printBridge.downloadDescription')}</p>
+                  <p className="font-semibold text-gray-800">{t('common:impresion.printTest')}</p>
+                  <p className="text-sm text-gray-600 mt-1">{t('common:impresion.printFallbackNote')}</p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => window.open('/descargar', '_blank')}
-                  className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium transition-all text-sm"
+                  onClick={handleTestPrint}
+                  disabled={testingPrint || !printerConnected}
+                  className="flex items-center gap-2 px-5 py-2.5 gradient-primary hover:from-[#99D3DB] hover:to-[#66A5AD] text-black rounded-lg font-medium transition-all text-sm disabled:opacity-50"
                 >
-                  <Download className="w-4 h-4" />
-                  {t('buttons.download')}
-                  <ExternalLink className="w-4 h-4" />
+                  <Printer className="w-4 h-4" />
+                  {testingPrint ? t('buttons.loading') : t('common:impresion.printTest')}
                 </button>
               </div>
-              <p className="text-sm font-semibold text-gray-700 mb-2">{t('common:printBridge.howTo')}</p>
-              <ol className="text-sm text-gray-600 list-decimal list-inside space-y-1">
-                <li>{t('common:printBridge.howToStep1')}</li>
-                <li>{t('common:printBridge.howToStep2')}</li>
-                <li>{t('common:printBridge.howToStep3')}</li>
-                <li>{t('common:printBridge.howToStep4')}</li>
-              </ol>
             </div>
           </div>
         </motion.div>

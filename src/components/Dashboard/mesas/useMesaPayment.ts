@@ -560,10 +560,10 @@ export function useMesaPayment({
 
           if (!printResult.ok) {
             showError('Error',t('mesas:errors.printFailed'));
-          } else if (printResult.via === 'bridge') {
-            showSuccess(t('common:printBridge.printedInBridge'), `${printResult.printerLabel || ''}`);
+          } else if (printResult.via === 'printer') {
+            showSuccess(t('common:impresion.salePrinted'), '');
           } else if (printResult.fallbackReason) {
-            showWarning(t('common:printBridge.fallbackUsed'), '');
+            showWarning(t('common:impresion.fallbackUsed'), '');
           }
         } catch {
           showError('Error',t('mesas:errors.printFailed'));
@@ -953,10 +953,10 @@ export function useMesaPayment({
         if (msg) showError('Error', msg);
       },
       onBridgeFallback: () => {
-        showWarning(t('common:printBridge.fallbackUsed'), '');
+        showWarning(t('common:impresion.fallbackUsed'), '');
       },
-      onBridgeSuccess: (printerLabel) => {
-        showSuccess(t('common:printBridge.kitchenPrintedInBridge'), printerLabel || '');
+      onBridgeSuccess: () => {
+        showSuccess(t('common:impresion.kitchenPrinted'), '');
       },
     });
   };

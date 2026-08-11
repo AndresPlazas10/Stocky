@@ -35,10 +35,10 @@ export function usePrintReceipt(
 
       if (!printResult.ok) {
         showError('Error', t('ventas:errors.printFailed'));
-      } else if (printResult.via === 'bridge') {
-        showSuccess(t('common:printBridge.printedInBridge'), printResult.printerLabel || '');
+      } else if (printResult.via === 'printer') {
+        showSuccess(t('common:impresion.salePrinted'), '');
       } else if (printResult.fallbackReason) {
-        showWarning(t('common:printBridge.fallbackUsed'), '');
+        showWarning(t('common:impresion.fallbackUsed'), '');
       }
     } catch (err) {
       logger.error('print_receipt_failed', err);
@@ -84,10 +84,10 @@ export function usePrintReceipt(
 
     if (!printResult.ok) {
       showError('Error', t('ventas:errors.printWindowFailed'));
-    } else if (printResult.via === 'bridge') {
-      showSuccess(t('common:printBridge.printedInBridge'), printResult.printerLabel || '');
+    } else if (printResult.via === 'printer') {
+      showSuccess(t('common:impresion.salePrinted'), '');
     } else if (printResult.fallbackReason) {
-      showWarning(t('common:printBridge.fallbackUsed'), '');
+      showWarning(t('common:impresion.fallbackUsed'), '');
     }
   }, [businessId, showError, showWarning, showSuccess, t]);
 
