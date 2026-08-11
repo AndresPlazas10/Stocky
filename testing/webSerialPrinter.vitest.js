@@ -14,13 +14,14 @@ const installLocalStorageMock = () => {
   Object.defineProperty(window, 'localStorage', { value: createLocalStorageMock(), configurable: true, writable: true });
 };
 
-const createFakePort = ({ vendorId = 0x1234, productId = 0x5678 } = {}) => {
+const createFakePort = ({ vendorId = 0x1234, productId = 0x5678, openImpl } = {}) => {
   const written = [];
   const port = {
     isOpen: false,
     openedAt: 0,
     getInfo: () => ({ usbVendorId: vendorId, usbProductId: productId }),
     open: vi.fn(async () => {
+      if (openImpl) return openImpl(port);
       port.isOpen = true;
     }),
     close: vi.fn(async () => {
@@ -146,6 +147,66 @@ describe('webSerialPrinterService', () => {
     const result = await service.printBytes(new Uint8Array([0x1b, 0x40]));
     expect(result.ok).toBe(false);
     expect(result.error).toContain('impresora');
+  });
+
+  it('tolerates "port is already open" during scan and reuses the active wrapper', async () => {
+    const { port: first } = createFakePort();
+    installSerial([first], () => Promise.resolve(first));
+    const firstResult = await service.scanPrinter();
+    expect(firstResult.ok).toBe(true);
+    expect(first.isOpen).toBe(true);
+
+    const { port: second } = createFakePort({
+      openImpl: () => {
+        const err = new Error("Failed to execute 'open' on 'SerialPort': The port is already open.");
+        return Promise.reject(err);
+      },
+    });
+    const serial = navigator.serial;
+    serial.requestPort = vi.fn(() => Promise.resolve(second));
+
+    const result = await service.scanPrinter();
+
+    expect(result.ok).toBe(true);
+    expect(service.isPrinterConnected()).toBe(true);
+    expect(second.open).toHaveBeenCalled();
+    expect(service.getActivePort()).toBe(first);
+  });
+
+  it('tolerates "port is already open" when reconnecting after a stale wrapper', async () => {
+    const { port: first } = createFakePort();
+    installSerial([first]);
+    window.localStorage.setItem('stocky_serial_printer_id', '1234:5678');
+    const firstResult = await service.connectPrinter();
+    expect(firstResult.ok).toBe(true);
+
+    const { port: second } = createFakePort({
+      openImpl: () => {
+        const err = new Error("Failed to execute 'open' on 'SerialPort': The port is already open.");
+        return Promise.reject(err);
+      },
+    });
+    const serial = navigator.serial;
+    serial.getPorts = vi.fn(async () => [second]);
+
+    const result = await service.connectPrinter();
+
+    expect(result.ok).toBe(true);
+    expect(service.isPrinterConnected()).toBe(true);
+  });
+
+  it('prints through the already-open wrapper without reopening', async () => {
+    const { port, written } = createFakePort();
+    installSerial([port]);
+    window.localStorage.setItem('stocky_serial_printer_id', '1234:5678');
+    await service.connectPrinter();
+    const openCalls = port.open.mock.calls.length;
+
+    const result = await service.printBytes(new Uint8Array([0x1b, 0x40]));
+
+    expect(result.ok).toBe(true);
+    expect(port.open).toHaveBeenCalledTimes(openCalls);
+    expect(written[0]).toEqual([0x1b, 0x40]);
   });
 
   it('disconnects and clears the saved printer', async () => {

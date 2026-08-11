@@ -72,9 +72,20 @@ const portLabel = (port: MinimalSerialPort): string => {
   return 'Impresora termica';
 };
 
-const openPort = async (port: MinimalSerialPort): Promise<void> => {
-  if (!port.isOpen) {
+const isAlreadyOpenError = (err: unknown): boolean =>
+  /already open/i.test(String((err as Error)?.message || ''));
+
+const openWithTolerance = async (port: MinimalSerialPort): Promise<MinimalSerialPort | null> => {
+  if (port.isOpen) return port;
+
+  try {
     await port.open({ baudRate: BAUD_RATE });
+    return port;
+  } catch (err) {
+    if (isAlreadyOpenError(err)) {
+      return activePort || port;
+    }
+    throw err;
   }
 };
 
@@ -90,15 +101,18 @@ export const scanPrinter = async (): Promise<PrinterConnectionResult> => {
 
   try {
     const port = await serial.requestPort();
-    await openPort(port);
-    activePort = port;
+    const opened = await openWithTolerance(port);
+    if (!opened) {
+      return { ok: false, error: 'No se pudo conectar la impresora.' };
+    }
+    activePort = opened;
 
-    const info = port.getInfo() || {};
+    const info = opened.getInfo() || {};
     const vendor = info.usbVendorId?.toString(16) || '';
     const product = info.usbProductId?.toString(16) || '';
     savePrinterId(`${vendor}:${product}`);
 
-    return { ok: true, label: portLabel(port) };
+    return { ok: true, label: portLabel(opened) };
   } catch (err) {
     const name = (err as Error)?.name || '';
     if (name === 'NotFoundError') {
@@ -134,8 +148,13 @@ const getSavedPort = async (): Promise<MinimalSerialPort | null> => {
 };
 
 export const connectPrinter = async (): Promise<PrinterConnectionResult> => {
-  if (activePort?.isOpen) {
-    return { ok: true, label: portLabel(activePort) };
+  if (activePort) {
+    const opened = await openWithTolerance(activePort);
+    if (opened) {
+      activePort = opened;
+      return { ok: true, label: portLabel(opened) };
+    }
+    return { ok: false, error: 'No se pudo conectar la impresora.' };
   }
 
   const port = await getSavedPort();
@@ -144,9 +163,12 @@ export const connectPrinter = async (): Promise<PrinterConnectionResult> => {
   }
 
   try {
-    await openPort(port);
-    activePort = port;
-    return { ok: true, label: portLabel(port) };
+    const opened = await openWithTolerance(port);
+    if (!opened) {
+      return { ok: false, error: 'No se pudo conectar la impresora.' };
+    }
+    activePort = opened;
+    return { ok: true, label: portLabel(opened) };
   } catch (err) {
     return { ok: false, error: `No se pudo conectar la impresora: ${(err as Error)?.message || String(err)}` };
   }
@@ -169,12 +191,20 @@ export const printBytes = async (
 ): Promise<{ ok: boolean; error?: string }> => {
   let port = activePort;
 
-  if (!port || !port.isOpen) {
+  if (!port) {
     const reconnect = await connectPrinter();
     if (!reconnect.ok || !activePort) {
       return { ok: false, error: reconnect.error || 'No hay una impresora conectada. Ve a Configuracion > Impresora para conectar una.' };
     }
     port = activePort;
+  }
+
+  if (!port.isOpen) {
+    const opened = await openWithTolerance(port);
+    if (!opened) {
+      return { ok: false, error: 'No se pudo conectar la impresora.' };
+    }
+    port = opened;
   }
 
   const writer = port.writer || (port.writable && port.writable.getWriter());

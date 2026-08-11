@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
@@ -94,6 +94,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
   const [isConnectingPrinter, setIsConnectingPrinter] = useState(false);
   const [testingPrint, setTestingPrint] = useState(false);
   const webSerialSupported = isWebSerialSupported();
+  const printerActionTakenRef = useRef(false);
 
   useEffect(() => {
     if (business) {
@@ -234,6 +235,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
 
   const handleScanPrinter = useCallback(async () => {
     if (isScanningPrinter) return;
+    printerActionTakenRef.current = true;
     setIsScanningPrinter(true);
     try {
       const result = await scanPrinter();
@@ -253,6 +255,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
 
   const handleReconnectPrinter = useCallback(async () => {
     if (isConnectingPrinter) return;
+    printerActionTakenRef.current = true;
     setIsConnectingPrinter(true);
     try {
       const result = await connectPrinter();
@@ -271,6 +274,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
   }, [isConnectingPrinter, showSuccess, showWarning, showError, t]);
 
   const handleDisconnectPrinter = useCallback(async () => {
+    printerActionTakenRef.current = true;
     await disconnectPrinter();
     setPrinterConnected(false);
     setPrinterLabel('');
@@ -314,7 +318,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
   }, [testingPrint, buildTestReceipt, paperWidth, autoCut, showSuccess, showWarning, showError, t]);
 
   useEffect(() => {
-    if (!webSerialSupported) return;
+    if (!webSerialSupported || printerActionTakenRef.current) return;
     let active = true;
 
     (async () => {
