@@ -47,10 +47,20 @@ const validateOrigin = (config, request) => {
 };
 
 const validateReceipt = (receipt) => {
-  if (!receipt || receipt.type !== 'sale') return 'Tipo de recibo no soportado';
-  if (!Array.isArray(receipt.items) || receipt.items.length === 0) return 'El recibo no tiene items';
-  if (!receipt.totals || !receipt.totals.totalText) return 'El recibo no tiene total';
-  return '';
+  if (!receipt) return 'Recibo vacio';
+
+  if (receipt.type === 'sale') {
+    if (!Array.isArray(receipt.items) || receipt.items.length === 0) return 'El recibo no tiene items';
+    if (!receipt.totals || !receipt.totals.totalText) return 'El recibo no tiene total';
+    return '';
+  }
+
+  if (receipt.type === 'kitchen') {
+    if (!Array.isArray(receipt.items) || receipt.items.length === 0) return 'El recibo no tiene items';
+    return '';
+  }
+
+  return 'Tipo de recibo no soportado';
 };
 
 class PrintBridgeServer {
@@ -125,7 +135,7 @@ class PrintBridgeServer {
           }
         };
 
-        if (config.receipt?.showVoluntaryTip) {
+        if (receipt.type === 'sale' && config.receipt?.showVoluntaryTip) {
           const tipValue = Number(config.receipt?.voluntaryTipValue || 0);
           receipt.totals = {
             ...(receipt.totals || {}),

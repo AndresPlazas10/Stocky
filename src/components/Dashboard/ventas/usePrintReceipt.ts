@@ -7,6 +7,8 @@ import { logger } from '@/utils/logger';
 export function usePrintReceipt(
   businessId: string,
   showError: (title: string, message?: string) => void,
+  showWarning: (title: string, message?: string) => void,
+  showSuccess: (title: string, message?: string) => void,
   t: (key: string, options?: any) => string,
 ) {
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -33,6 +35,10 @@ export function usePrintReceipt(
 
       if (!printResult.ok) {
         showError('Error', t('ventas:errors.printFailed'));
+      } else if (printResult.via === 'bridge') {
+        showSuccess(t('common:printBridge.printedInBridge'), printResult.printerLabel || '');
+      } else if (printResult.fallbackReason) {
+        showWarning(t('common:printBridge.fallbackUsed'), '');
       }
     } catch (err) {
       logger.error('print_receipt_failed', err);
@@ -43,7 +49,7 @@ export function usePrintReceipt(
       setPrintSaleData(null);
       setPrintSaleDetails([]);
     }
-  }, [printSaleData, printSaleDetails, printCustomerName, businessId, showError, t]);
+  }, [printSaleData, printSaleDetails, printCustomerName, businessId, showError, showWarning, showSuccess, t]);
 
   const handlePrintCancel = useCallback(() => {
     setShowPrintModal(false);
@@ -78,8 +84,12 @@ export function usePrintReceipt(
 
     if (!printResult.ok) {
       showError('Error', t('ventas:errors.printWindowFailed'));
+    } else if (printResult.via === 'bridge') {
+      showSuccess(t('common:printBridge.printedInBridge'), printResult.printerLabel || '');
+    } else if (printResult.fallbackReason) {
+      showWarning(t('common:printBridge.fallbackUsed'), '');
     }
-  }, [businessId, showError, t]);
+  }, [businessId, showError, showWarning, showSuccess, t]);
 
   return {
     showPrintModal,

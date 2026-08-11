@@ -10,7 +10,9 @@ const DEFAULT_CONFIG = {
       'http://localhost:5173',
       'http://127.0.0.1:5173',
       'https://stocky.app',
-      'https://www.stocky.app'
+      'https://www.stocky.app',
+      'https://stockypos.app',
+      'https://www.stockypos.app'
     ]
   },
   printer: {

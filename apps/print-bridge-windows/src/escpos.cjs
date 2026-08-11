@@ -124,9 +124,49 @@ const serializeSaleReceipt = ({ receipt, paperWidthMm }) => {
   return Buffer.concat(chunks);
 };
 
+const serializeKitchenReceipt = ({ receipt, paperWidthMm }) => {
+  const columns = PAPER_COLUMNS[Number(paperWidthMm)] || PAPER_COLUMNS[80];
+  const chunks = [
+    command(ESC, 0x40),
+    command(ESC, 0x74, 0x10),
+    align(receipt.header?.alignment || 'center'),
+    bold(true),
+    size('large'),
+    line(receipt.header?.title || 'KITCHEN ORDER'),
+    size('normal'),
+    line(receipt.header?.businessName || 'Stocky System'),
+    bold(false),
+    line(receipt.header?.dateText || ''),
+    align('left'),
+    separator(columns)
+  ];
+
+  (receipt.metadata || []).forEach((row) => {
+    chunks.push(...twoColumns(`${row.label}:`, row.value, columns));
+  });
+
+  chunks.push(separator(columns));
+  chunks.push(bold(true), line(receipt.itemsHeader || 'PRODUCT'), bold(false));
+  (receipt.items || []).forEach((item) => {
+    chunks.push(...itemLines(item, columns));
+  });
+
+  chunks.push(separator(columns));
+  chunks.push(feed(2));
+  chunks.push(align(receipt.footer?.alignment || 'center'));
+  chunks.push(line(receipt.footer?.message || 'Kitchen order'));
+  chunks.push(align('left'), feed(3), cut());
+
+  return Buffer.concat(chunks);
+};
+
 const serializeReceipt = ({ receipt, paperWidthMm }) => {
   if (receipt?.type === 'sale') {
     return serializeSaleReceipt({ receipt, paperWidthMm });
+  }
+
+  if (receipt?.type === 'kitchen') {
+    return serializeKitchenReceipt({ receipt, paperWidthMm });
   }
 
   throw new Error('Tipo de recibo no soportado');

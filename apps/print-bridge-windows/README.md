@@ -64,6 +64,13 @@ X-Stocky-Bridge-Token: <token>
 X-Stocky-Origin: <origen>
 ```
 
+Tipos de recibo soportados:
+
+```txt
+sale      -> comprobante de venta (items + totals obligatorios)
+kitchen   -> orden de cocina (items obligatorios, sin totals)
+```
+
 ## Notas
 
 - Si `serialport` no esta instalado, la app abre pero no puede listar ni imprimir en puertos COM.

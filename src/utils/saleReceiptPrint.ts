@@ -1,5 +1,6 @@
 import { getThermalPaperWidthMm } from './printer.js';
 import { buildSaleReceiptTemplate, validateSaleReceiptTemplate } from './receiptTemplate.js';
+import { sendReceiptToPrintBridge, getPrintBridgeSettings, getBridgePrinterLabel } from './printBridgeClient';
 import { logger } from '@/utils/logger';
 
 const escapeHtml = (value) => String(value ?? '')
@@ -69,6 +70,11 @@ const buildReceiptHtml = (receipt, printerWidthMm) => `<!DOCTYPE html>
 </body>
 </html>`;
 
+export type SaleReceiptPrintResult =
+  | { ok: false; error: string }
+  | { ok: true; via: 'bridge'; printerLabel: string }
+  | { ok: true; via: 'browser'; fallbackReason: string | null | undefined };
+
 export async function printSaleReceipt({
   sale,
   saleDetails = [],
@@ -77,7 +83,7 @@ export async function printSaleReceipt({
   footerMessage = 'Gracias por su compra',
   voluntaryTip = null,
   customerName = 'Venta general',
-}) {
+}): Promise<SaleReceiptPrintResult> {
   if (!sale?.id) {
     return { ok: false, error: 'No se pudo imprimir: venta sin id.' };
   }
@@ -90,7 +96,20 @@ export async function printSaleReceipt({
     sale, saleDetails, sellerName, businessName, footerMessage, voluntaryTip, customerName,
   });
   const validation = validateSaleReceiptTemplate(receipt);
-  if (!validation.ok) return validation;
+  if (!validation.ok) {
+    return { ok: false, error: validation.error || 'Recibo de venta invalido.' };
+  }
+
+  const settings = getPrintBridgeSettings();
+  let fallbackReason = null;
+  if (settings.enabled) {
+    const bridgeResult = await sendReceiptToPrintBridge({ receipt, paperWidthMm: printerWidthMm });
+    if (bridgeResult.ok) {
+      return { ok: true, via: 'bridge', printerLabel: getBridgePrinterLabel() };
+    }
+    fallbackReason = bridgeResult.reason;
+    logger.info('utils:saleReceiptPrint:bridge_fallback', bridgeResult.reason);
+  }
 
   const html = buildReceiptHtml(receipt, printerWidthMm);
 
@@ -108,7 +127,7 @@ export async function printSaleReceipt({
     // Called from main window's click handler — preserves user gesture
     win.print();
 
-    const done = () => resolve({ ok: true });
+    const done = () => resolve({ ok: true, via: 'browser', fallbackReason });
     const timer = setInterval(() => {
       if (win.closed) { clearInterval(timer); done(); }
     }, 500);

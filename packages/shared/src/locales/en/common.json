@@ -580,6 +580,8 @@
     "networkErrorSending": "Network error sending test notification.",
     "latestVersion": "Latest version",
     "androidCompatible": "Compatible with Android 7.0 or higher.",
+    "printBridgeTitle": "Stocky Print Bridge (Windows)",
+    "printBridgeDescription": "Print sale receipts and kitchen orders from Stocky Web on Bluetooth thermal printers (ESC/POS) connected to your Windows PC.",
     "downloadBtn": "Download",
     "smartscreenWarning": "SmartScreen may show a warning...",
     "activateInSettings": "After installing, activate it in Settings → Printing → Stocky print.",
@@ -1725,6 +1727,43 @@
       "salePricePositive": "Sale price must be greater than 0",
       "purchasePriceNegative": "Purchase price cannot be negative",
       "salePriceLowerThanPurchase": "Sale price cannot be lower than purchase price"
+    }
+  },
+  "printBridge": {
+    "title": "Thermal printer",
+    "subtitle": "Print receipts and kitchen orders from this device with Stocky Print Bridge.",
+    "enable": "Use Stocky Print Bridge",
+    "enableDescription": "Sends receipts to a Bluetooth thermal printer connected to this device (Windows).",
+    "endpoint": "Bridge endpoint",
+    "endpointPlaceholder": "http://127.0.0.1:41780",
+    "token": "Pairing token",
+    "tokenPlaceholder": "Paste the token shown by Stocky Print Bridge",
+    "paperWidth": "Paper width",
+    "autoPrint": "Print receipt automatically when closing sale",
+    "checkConnection": "Check connection",
+    "checkingConnection": "Checking...",
+    "connected": "Bridge connected",
+    "connectedTo": "Printer: {{printer}}",
+    "notConnected": "Bridge not detected",
+    "notConnectedMessage": "Make sure Stocky Print Bridge is open on this device and the Bluetooth printer is paired.",
+    "testPrint": "Test print",
+    "testPrintSuccess": "Test print sent",
+    "testPrintFailed": "Could not print the test. Check the bridge and the printer.",
+    "download": "Download Stocky Print Bridge",
+    "downloadDescription": "Install the bridge on this Windows device and pair your Bluetooth thermal printer.",
+    "howTo": "How to set it up?",
+    "howToStep1": "Download and install Stocky Print Bridge from the downloads page.",
+    "howToStep2": "Connect your thermal printer via Bluetooth (it must appear as a COM port on Windows).",
+    "howToStep3": "Copy the token shown by the bridge and paste it here.",
+    "howToStep4": "Check the connection and run a test print.",
+    "saved": "Printer settings saved",
+    "printedInBridge": "Receipt sent to the thermal printer",
+    "kitchenPrintedInBridge": "Kitchen order sent to the printer",
+    "fallbackUsed": "Bridge unavailable. Using the browser print dialog.",
+    "invalidEndpoint": "Invalid endpoint",
+    "sections": {
+      "bridge": "Bridge connection",
+      "receipt": "Print preferences"
     }
   }
 }

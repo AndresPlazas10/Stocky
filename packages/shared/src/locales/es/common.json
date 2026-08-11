@@ -580,6 +580,8 @@
     "networkErrorSending": "Error de red enviando notificación de prueba.",
     "latestVersion": "Última versión",
     "androidCompatible": "Compatible con Android 7.0 o superior.",
+    "printBridgeTitle": "Stocky Print Bridge (Windows)",
+    "printBridgeDescription": "Imprime comprobantes de venta y órdenes de cocina desde Stocky Web en impresoras térmicas Bluetooth (ESC/POS) conectadas a tu PC Windows.",
     "downloadBtn": "Descargar",
     "smartscreenWarning": "SmartScreen puede mostrar un aviso...",
     "activateInSettings": "Después de instalar activalo en Ajustes → Impresión → Stocky print.",
@@ -1725,6 +1727,43 @@
       "salePricePositive": "El precio de venta debe ser mayor a 0",
       "purchasePriceNegative": "El precio de compra no puede ser negativo",
       "salePriceLowerThanPurchase": "El precio de venta no puede ser menor al precio de compra"
+    }
+  },
+  "printBridge": {
+    "title": "Impresora térmica",
+    "subtitle": "Imprime comprobantes y órdenes de cocina desde este equipo con Stocky Print Bridge.",
+    "enable": "Usar Stocky Print Bridge",
+    "enableDescription": "Envía los comprobantes a una impresora térmica Bluetooth conectada a este equipo (Windows).",
+    "endpoint": "Endpoint del bridge",
+    "endpointPlaceholder": "http://127.0.0.1:41780",
+    "token": "Token de emparejamiento",
+    "tokenPlaceholder": "Pega el token que muestra Stocky Print Bridge",
+    "paperWidth": "Ancho de papel",
+    "autoPrint": "Imprimir automáticamente al cerrar venta",
+    "checkConnection": "Verificar conexión",
+    "checkingConnection": "Verificando...",
+    "connected": "Bridge conectado",
+    "connectedTo": "Impresora: {{printer}}",
+    "notConnected": "Bridge no detectado",
+    "notConnectedMessage": "Asegúrate de que Stocky Print Bridge esté abierto en este equipo y que la impresora Bluetooth esté emparejada.",
+    "testPrint": "Imprimir prueba",
+    "testPrintSuccess": "Impresión de prueba enviada",
+    "testPrintFailed": "No se pudo imprimir la prueba. Revisa el bridge y la impresora.",
+    "download": "Descargar Stocky Print Bridge",
+    "downloadDescription": "Instala el bridge en este equipo Windows y empareja tu impresora térmica Bluetooth.",
+    "howTo": "¿Cómo configurarlo?",
+    "howToStep1": "Descarga e instala Stocky Print Bridge desde la página de descargas.",
+    "howToStep2": "Conecta tu impresora térmica por Bluetooth (debe aparecer como puerto COM en Windows).",
+    "howToStep3": "Copia el token que muestra el bridge y pégalo aquí.",
+    "howToStep4": "Verifica la conexión y haz una impresión de prueba.",
+    "saved": "Configuración de impresora guardada",
+    "printedInBridge": "Comprobante enviado a la impresora térmica",
+    "kitchenPrintedInBridge": "Orden de cocina enviada a la impresora",
+    "fallbackUsed": "Bridge no disponible. Se usó la impresión del navegador.",
+    "invalidEndpoint": "El endpoint no es válido",
+    "sections": {
+      "bridge": "Conexión del bridge",
+      "receipt": "Preferencias de impresión"
     }
   }
 }

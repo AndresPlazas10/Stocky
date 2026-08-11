@@ -1,5 +1,8 @@
 import { getThermalPaperWidthMm } from '../utils/printer.js';
 import { formatDateTimeTicket, formatPrice } from '../utils/formatters';
+import { buildKitchenReceiptTemplate } from './receiptTemplate';
+import { sendReceiptToPrintBridge, getPrintBridgeSettings, getBridgePrinterLabel } from './printBridgeClient';
+import { logger } from '@/utils/logger';
 
 const buildKitchenOrderHtml = (itemsParaCocina, tableNumber, status, orderTotal) => {
   const printerWidthMm = getThermalPaperWidthMm();
@@ -61,7 +64,39 @@ const buildKitchenOrderHtml = (itemsParaCocina, tableNumber, status, orderTotal)
 </html>`;
 };
 
-export function printKitchenOrder({ itemsParaCocina, tableNumber, status, orderTotal, onError }) {
+export async function printKitchenOrder({
+  itemsParaCocina,
+  tableNumber,
+  status,
+  orderTotal,
+  onError,
+  onBridgeFallback,
+  onBridgeSuccess,
+}: {
+  itemsParaCocina: any[];
+  tableNumber: number;
+  status: 'occupied' | 'available';
+  orderTotal: number;
+  onError?: (msg: string | null) => void;
+  onBridgeFallback?: (reason?: string) => void;
+  onBridgeSuccess?: (printerLabel?: string) => void;
+}) {
+  const printerWidthMm = getThermalPaperWidthMm();
+  const settings = getPrintBridgeSettings();
+
+  if (settings.enabled) {
+    const receipt = buildKitchenReceiptTemplate({ itemsParaCocina, tableNumber, status, orderTotal });
+    const bridgeResult = await sendReceiptToPrintBridge({ receipt, paperWidthMm: printerWidthMm });
+
+    if (bridgeResult.ok) {
+      if (onBridgeSuccess) onBridgeSuccess(getBridgePrinterLabel());
+      return;
+    }
+
+    logger.info('utils:kitchenOrderPrint:bridge_fallback', bridgeResult.reason);
+    if (onBridgeFallback) onBridgeFallback(bridgeResult.reason);
+  }
+
   const printContent = buildKitchenOrderHtml(itemsParaCocina, tableNumber, status, orderTotal);
 
   const printWindow = window.open('', '_blank', 'width=300,height=600');

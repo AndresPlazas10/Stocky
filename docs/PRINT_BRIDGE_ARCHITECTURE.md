@@ -51,18 +51,28 @@ Respuesta esperada:
 
 ## Estado En El Repo
 
-- `src/utils/printer.js`: guarda configuracion local del bridge, token, endpoint, nombre de impresora y ancho `58/80/104mm`.
-- `src/utils/receiptTemplate.js`: genera el recibo estructurado de venta.
-- `src/utils/printBridgeClient.js`: envia recibos al bridge local y expone la etiqueta de impresora configurada.
-- `src/utils/saleReceiptPrint.js`: intenta imprimir con bridge y conserva `window.print()` como respaldo.
-- `src/pages/Download.jsx`: muestra descargas de Stocky Print Bridge Android y Windows.
+- `src/utils/printer.ts`: guarda ancho de papel `58/80/104mm` y auto-impresion.
+- `src/utils/printBridgeClient.ts`: settings del bridge (enabled, endpoint, token), `checkPrintBridgeStatus` (`GET /v1/status`) y `sendReceiptToPrintBridge` (`POST /v1/print`) con errores clasificados.
+- `src/utils/receiptTemplate.ts`: genera el recibo estructurado de venta (`buildSaleReceiptTemplate`) y de cocina (`buildKitchenReceiptTemplate`, `type: 'kitchen'`).
+- `src/utils/saleReceiptPrint.ts`: intenta imprimir con bridge y conserva `window.print()` como respaldo (fallback con aviso).
+- `src/utils/kitchenOrderPrint.ts`: misma estrategia para ordenes de cocina.
+- `src/components/Dashboard/Configuracion.tsx`: seccion "Impresora termica" (endpoint, token, ancho de papel, auto-impresion, verificar conexion, impresion de prueba).
+- `src/pages/Download.tsx`: muestra descargas de Stocky Print Bridge Android y Windows.
+
+## Contrato de Recibos
+
+El bridge acepta dos tipos de recibo:
+
+| type | Validacion | Contenido |
+|---|---|---|
+| `sale` | items obligatorios + `totals.totalText` | Comprobante de venta completo |
+| `kitchen` | items obligatorios (totals opcionales) | Orden de cocina: mesa, estado, items |
 
 ## Siguiente Bloque
 
-1. Instalar dependencias y probar `apps/print-bridge-windows` en una maquina Windows con una impresora Bluetooth emparejada.
-2. Crear `apps/print-bridge-android` con Kotlin y Bluetooth clasico.
-3. Mover recibos de cocina al mismo contrato estructurado.
-4. Agregar editor de recibos con campos permitidos y vista previa termica.
+1. Probar `apps/print-bridge-windows` v0.2.0 en una maquina Windows con impresora Bluetooth emparejada (venta + cocina).
+2. Agregar editor de recibos con campos permitidos y vista previa termica.
+3. (Opcional) Soporte de impresoras de red ESC/POS (raw TCP 9100) en el bridge.
 
 ## Bridge Windows
 

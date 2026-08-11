@@ -127,3 +127,57 @@ export const validateSaleReceiptTemplate = (receipt) => {
 
   return { ok: true };
 };
+
+export const buildKitchenReceiptTemplate = ({
+  itemsParaCocina,
+  tableNumber,
+  status,
+  orderTotal,
+}) => {
+  const totalQuantity = itemsParaCocina.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0);
+
+  return {
+    type: 'kitchen',
+    version: 1,
+    requiredSections: ['items'],
+    header: {
+      title: 'ORDEN DE COCINA',
+      businessName: 'Sistema Stocky',
+      dateText: formatDateTimeTicket(new Date()),
+      alignment: 'center',
+    },
+    metadata: [
+      { label: 'Mesa', value: `#${tableNumber}` },
+      { label: 'Estado', value: status === 'occupied' ? 'Ocupada' : 'Disponible' },
+      { label: 'Productos', value: String(totalQuantity) },
+    ],
+    items: itemsParaCocina.map((item) => ({
+      name: item?.products?.name || item?.combos?.nombre || item?.name || 'Item',
+      quantity: Number(item?.quantity || 0),
+      unitPrice: 0,
+      subtotal: 0,
+      subtotalText: '',
+    })),
+    totals: {
+      subtotal: 0,
+      subtotalText: '',
+      voluntaryTip: 0,
+      voluntaryTipText: '',
+      total: Number(orderTotal || 0),
+      totalText: formatPrice(Number(orderTotal || 0)),
+    },
+    payment: {
+      method: '',
+      methodText: '',
+    },
+    footer: {
+      message: '*** ORDEN PARA COCINA ***',
+      alignment: 'center',
+    },
+    itemsHeader: 'Producto       Cant.',
+    tipLabel: 'Propina',
+    totalLabel: 'TOTAL',
+    methodLabel: 'Método',
+    notSpecified: 'No especificado',
+  };
+};

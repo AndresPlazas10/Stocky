@@ -100,7 +100,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
   const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
   const dateConfig = { timezone: config.timezone, locale: config.locale };
   
-  const { showError, showSuccess, showLoading, ToastComponent } = useAppToast();
+  const { showError, showSuccess, showWarning, showLoading, ToastComponent } = useAppToast();
   const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
   const fmtDate = (timestamp, options = {}) => formatDate(timestamp, options, dateConfig);
   const fmtDateOnly = (timestamp) => formatDateOnly(timestamp, dateConfig);
@@ -137,7 +137,7 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
   const invoiceHook = useInvoice(businessId, fetchSaleDetails, showSuccess, showError, t);
   const { showInvoiceModal, invoiceCustomerName, setInvoiceCustomerName, invoiceCustomerEmail, setInvoiceCustomerEmail, invoiceCustomerIdNumber, setInvoiceCustomerIdNumber, generatingInvoice, generateInvoiceFromSale } = invoiceHook;
 
-  const printHook = usePrintReceipt(businessId, showError, t);
+  const printHook = usePrintReceipt(businessId, showError, showWarning, showSuccess, t);
   const { showPrintModal, setShowPrintModal, printSaleData, setPrintSaleData, printSaleDetails, setPrintSaleDetails, isPrintingReceipt, printCustomerName, setPrintCustomerName, handlePrintConfirm, handlePrintCancel, handlePrintInvoice } = printHook;
 
   const comboById = useMemo(() => {

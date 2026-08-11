@@ -1,0 +1,75 @@
+name: Print Bridge Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version del instalador (ej: 0.2.0)'
+        required: true
+        default: '0.2.0'
+  push:
+    tags:
+      - 'print-bridge-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows installer
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="${GITHUB_REF_NAME#print-bridge-v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set package version
+        working-directory: apps/print-bridge-windows
+        run: npm pkg set version=${{ steps.version.outputs.version }} && npm install --package-lock-only
+
+      - name: Install dependencies
+        working-directory: apps/print-bridge-windows
+        run: npm ci
+
+      - name: Build installer
+        working-directory: apps/print-bridge-windows
+        run: npm run build
+
+      - name: Create GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "print-bridge-v${{ steps.version.outputs.version }}" \
+            "apps/print-bridge-windows/release/Stocky-Print-Bridge-Setup-${{ steps.version.outputs.version }}-x64.exe" \
+            --repo "${{ github.repository }}" \
+            --title "Stocky Print Bridge v${{ steps.version.outputs.version }}" \
+            --notes "Instalador de Stocky Print Bridge para Windows.
+
+          Imprime comprobantes de venta y ordenes de cocina desde Stocky Web en impresoras termicas Bluetooth ESC/POS (aparecen como puerto COM en Windows).
+
+          1. Instala el bridge en la PC con la impresora.
+          2. Empareja la impresora Bluetooth en Windows.
+          3. Copia el token que muestra el bridge en Stocky > Configuracion > Impresora termica.
+          4. Verifica la conexion e imprime una prueba."
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stocky-print-bridge-${{ steps.version.outputs.version }}
+          path: apps/print-bridge-windows/release/Stocky-Print-Bridge-Setup-${{ steps.version.outputs.version }}-x64.exe
+          if-no-files-found: error
