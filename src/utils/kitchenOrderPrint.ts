@@ -1,9 +1,5 @@
-import { getThermalPaperWidthMm, isAutoCutEnabled } from '../utils/printer.js';
+import { getThermalPaperWidthMm } from '../utils/printer.js';
 import { formatDateTimeTicket, formatPrice } from '../utils/formatters';
-import { buildKitchenReceiptTemplate } from './receiptTemplate';
-import { buildKitchenEscPos } from './escposService';
-import { connectPrinter, printBytes } from '@/services/webSerialPrinterService';
-import { logger } from '@/utils/logger';
 
 const buildKitchenOrderHtml = (itemsParaCocina, tableNumber, status, orderTotal) => {
   const printerWidthMm = getThermalPaperWidthMm();
@@ -71,33 +67,14 @@ export async function printKitchenOrder({
   status,
   orderTotal,
   onError,
-  onBridgeFallback,
-  onBridgeSuccess,
 }: {
   itemsParaCocina: any[];
   tableNumber: number;
   status: 'occupied' | 'available';
   orderTotal: number;
   onError?: (msg: string | null) => void;
-  onBridgeFallback?: (reason?: string) => void;
-  onBridgeSuccess?: (printerLabel?: string) => void;
 }) {
   const printerWidthMm = getThermalPaperWidthMm();
-
-  const printer = await connectPrinter();
-  if (printer.ok) {
-    const receipt = buildKitchenReceiptTemplate({ itemsParaCocina, tableNumber, status, orderTotal });
-    const escposData = buildKitchenEscPos(receipt, printerWidthMm, isAutoCutEnabled());
-    const printResult = await printBytes(escposData);
-
-    if (printResult.ok) {
-      if (onBridgeSuccess) onBridgeSuccess('');
-      return;
-    }
-
-    logger.info('utils:kitchenOrderPrint:printer_fallback', printResult.error);
-    if (onBridgeFallback) onBridgeFallback(printResult.error);
-  }
 
   const printContent = buildKitchenOrderHtml(itemsParaCocina, tableNumber, status, orderTotal);
 

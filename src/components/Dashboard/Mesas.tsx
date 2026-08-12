@@ -34,7 +34,7 @@ import { PrintReceiptConfirmModal } from '../ui/PrintReceiptConfirmModal';
 function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRole?: string }) {
   const { t } = useTranslation(['mesas', 'common']);
   const config = useBusinessConfig();
-  const { showError, showSuccess, showWarning, ToastComponent } = useAppToast();
+  const { showError, showSuccess, ToastComponent } = useAppToast();
   const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
   
   const state = useMesasState(businessId, userRole);
@@ -274,7 +274,6 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     priceConfig,
     showError,
     showSuccess,
-    showWarning,
   });
 
   useEffect(() => {

@@ -28,7 +28,7 @@ const saleDetails = [
   { quantity: 1, unit_price: 10000, subtotal: 10000, products: { name: 'Producto A', category: 'plato' } },
 ];
 
-describe('print fallback to browser dialog (sin impresora configurada)', () => {
+describe('impresion via dialogo del navegador (driver del sistema)', () => {
   beforeEach(() => {
     Object.defineProperty(window, 'localStorage', { value: createLocalStorageMock(), configurable: true, writable: true });
     window.localStorage.clear();
@@ -39,7 +39,7 @@ describe('print fallback to browser dialog (sin impresora configurada)', () => {
     window.localStorage.clear();
   });
 
-  it('printSaleReceipt cae al dialogo del navegador sin impresora', async () => {
+  it('printSaleReceipt abre el dialogo del navegador con el recibo', async () => {
     const fakeWin = createFakePrintWindow();
     const openSpy = vi.fn(() => fakeWin);
     vi.stubGlobal('open', openSpy);
@@ -47,27 +47,23 @@ describe('print fallback to browser dialog (sin impresora configurada)', () => {
     const result = await printSaleReceipt({ sale, saleDetails });
 
     expect(result.ok).toBe(true);
-    expect(result.via).toBe('browser');
     expect(openSpy).toHaveBeenCalledTimes(1);
     expect(fakeWin.document.write).toHaveBeenCalled();
     expect(fakeWin.print).toHaveBeenCalled();
   });
 
-  it('printKitchenOrder cae al dialogo del navegador sin impresora', async () => {
+  it('printKitchenOrder abre el dialogo del navegador con la orden', async () => {
     const fakeWin = createFakePrintWindow();
     vi.stubGlobal('open', vi.fn(() => fakeWin));
-    const onBridgeFallback = vi.fn();
 
     await printKitchenOrder({
       itemsParaCocina: [{ quantity: 2, products: { name: 'Bandeja paisa', category: 'plato' } }],
       tableNumber: 3,
       status: 'occupied',
       orderTotal: 20000,
-      onBridgeFallback,
     });
 
     expect(fakeWin.print).toHaveBeenCalled();
-    expect(onBridgeFallback).not.toHaveBeenCalled();
   });
 
   it('devuelve error cuando la ventana de impresion esta bloqueada', async () => {

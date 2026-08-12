@@ -377,7 +377,6 @@ interface UseMesaPaymentParams {
   setProducts: SetState<any[]>;
   showError: (title: string, message?: string) => void;
   showSuccess: (title: string, message?: string) => void;
-  showWarning: (title: string, message?: string) => void;
 }
 
 export function useMesaPayment({
@@ -452,7 +451,6 @@ export function useMesaPayment({
   setProducts,
   showError,
   showSuccess,
-  showWarning,
 }: UseMesaPaymentParams) {
   const { t } = useTranslation(['mesas', 'common']);
   const fmtPrice = (value: number, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig || {});
@@ -560,10 +558,6 @@ export function useMesaPayment({
 
           if (!printResult.ok) {
             showError('Error',t('mesas:errors.printFailed'));
-          } else if (printResult.via === 'printer') {
-            showSuccess(t('common:impresion.salePrinted'), '');
-          } else if (printResult.fallbackReason) {
-            showWarning(t('common:impresion.fallbackUsed'), '');
           }
         } catch {
           showError('Error',t('mesas:errors.printFailed'));
@@ -951,12 +945,6 @@ export function useMesaPayment({
       orderTotal,
       onError: (msg: string) => {
         if (msg) showError('Error', msg);
-      },
-      onBridgeFallback: () => {
-        showWarning(t('common:impresion.fallbackUsed'), '');
-      },
-      onBridgeSuccess: () => {
-        showSuccess(t('common:impresion.kitchenPrinted'), '');
       },
     });
   };

@@ -7,8 +7,6 @@ import { logger } from '@/utils/logger';
 export function usePrintReceipt(
   businessId: string,
   showError: (title: string, message?: string) => void,
-  showWarning: (title: string, message?: string) => void,
-  showSuccess: (title: string, message?: string) => void,
   t: (key: string, options?: any) => string,
 ) {
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -35,10 +33,6 @@ export function usePrintReceipt(
 
       if (!printResult.ok) {
         showError('Error', t('ventas:errors.printFailed'));
-      } else if (printResult.via === 'printer') {
-        showSuccess(t('common:impresion.salePrinted'), '');
-      } else if (printResult.fallbackReason) {
-        showWarning(t('common:impresion.fallbackUsed'), '');
       }
     } catch (err) {
       logger.error('print_receipt_failed', err);
@@ -49,7 +43,7 @@ export function usePrintReceipt(
       setPrintSaleData(null);
       setPrintSaleDetails([]);
     }
-  }, [printSaleData, printSaleDetails, printCustomerName, businessId, showError, showWarning, showSuccess, t]);
+  }, [printSaleData, printSaleDetails, printCustomerName, businessId, showError, t]);
 
   const handlePrintCancel = useCallback(() => {
     setShowPrintModal(false);
@@ -84,12 +78,8 @@ export function usePrintReceipt(
 
     if (!printResult.ok) {
       showError('Error', t('ventas:errors.printWindowFailed'));
-    } else if (printResult.via === 'printer') {
-      showSuccess(t('common:impresion.salePrinted'), '');
-    } else if (printResult.fallbackReason) {
-      showWarning(t('common:impresion.fallbackUsed'), '');
     }
-  }, [businessId, showError, showWarning, showSuccess, t]);
+  }, [businessId, showError, t]);
 
   return {
     showPrintModal,

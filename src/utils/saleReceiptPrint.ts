@@ -1,7 +1,5 @@
-import { getThermalPaperWidthMm, isAutoCutEnabled } from './printer.js';
+import { getThermalPaperWidthMm } from './printer.js';
 import { buildSaleReceiptTemplate, validateSaleReceiptTemplate } from './receiptTemplate.js';
-import { buildSaleEscPos } from './escposService';
-import { connectPrinter, printBytes } from '@/services/webSerialPrinterService';
 import { logger } from '@/utils/logger';
 
 const escapeHtml = (value) => String(value ?? '')
@@ -73,8 +71,7 @@ const buildReceiptHtml = (receipt, printerWidthMm) => `<!DOCTYPE html>
 
 export type SaleReceiptPrintResult =
   | { ok: false; error: string }
-  | { ok: true; via: 'printer' }
-  | { ok: true; via: 'browser'; fallbackReason: string | null | undefined };
+  | { ok: true };
 
 export async function printSaleReceipt({
   sale,
@@ -101,18 +98,6 @@ export async function printSaleReceipt({
     return { ok: false, error: validation.error || 'Recibo de venta invalido.' };
   }
 
-  let fallbackReason = null;
-  const printer = await connectPrinter();
-  if (printer.ok) {
-    const escposData = buildSaleEscPos(receipt, printerWidthMm, isAutoCutEnabled());
-    const printResult = await printBytes(escposData);
-    if (printResult.ok) {
-      return { ok: true, via: 'printer' };
-    }
-    fallbackReason = printResult.error || 'printer_unavailable';
-    logger.info('utils:saleReceiptPrint:printer_fallback', fallbackReason);
-  }
-
   const html = buildReceiptHtml(receipt, printerWidthMm);
 
   return new Promise((resolve) => {
@@ -129,7 +114,7 @@ export async function printSaleReceipt({
     // Called from main window's click handler — preserves user gesture
     win.print();
 
-    const done = () => resolve({ ok: true, via: 'browser', fallbackReason });
+    const done = () => resolve({ ok: true });
     const timer = setInterval(() => {
       if (win.closed) { clearInterval(timer); done(); }
     }, 500);

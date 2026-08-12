@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AnimatePresence } from 'framer-motion';
@@ -30,30 +30,14 @@ import {
   Bell,
   Download,
   ExternalLink,
-  Printer,
-  RefreshCw,
-  ScanLine,
-  Unplug
+  Printer
 } from 'lucide-react';
 import type { RefObject } from 'react';
-import {
-  isWebSerialSupported,
-  scanPrinter,
-  connectPrinter,
-  disconnectPrinter,
-  printBytes,
-  isPrinterConnected,
-} from '@/services/webSerialPrinterService';
-import { buildSaleEscPos } from '@/utils/escposService';
 import {
   getThermalPaperWidthMm,
   setThermalPaperWidthMm,
   isAutoPrintReceiptEnabled,
   setAutoPrintReceiptEnabled,
-  isAutoCutEnabled,
-  setAutoCutEnabled,
-  getPrinterBaudRate,
-  setPrinterBaudRate,
 } from '@/utils/printer';
 
 interface Business {
@@ -88,16 +72,8 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
   });
 
   const [paperWidth, setPaperWidthState] = useState(getThermalPaperWidthMm());
-  const [baudRate, setBaudRateState] = useState(getPrinterBaudRate());
   const [autoPrint, setAutoPrintState] = useState(isAutoPrintReceiptEnabled());
-  const [autoCut, setAutoCutState] = useState(isAutoCutEnabled());
-  const [printerConnected, setPrinterConnected] = useState(isPrinterConnected());
-  const [printerLabel, setPrinterLabel] = useState('');
-  const [isScanningPrinter, setIsScanningPrinter] = useState(false);
-  const [isConnectingPrinter, setIsConnectingPrinter] = useState(false);
   const [testingPrint, setTestingPrint] = useState(false);
-  const webSerialSupported = isWebSerialSupported();
-  const printerActionTakenRef = useRef(false);
 
   useEffect(() => {
     if (business) {
@@ -236,52 +212,55 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
     notSpecified: 'No especificado',
   }), [business]);
 
-  const handleScanPrinter = useCallback(async () => {
-    if (isScanningPrinter) return;
-    printerActionTakenRef.current = true;
-    setIsScanningPrinter(true);
-    try {
-      const result = await scanPrinter();
-      if (result.ok) {
-        setPrinterConnected(true);
-        setPrinterLabel(result.label || '');
-        showSuccess(t('common:impresion.connectionSuccess'), '');
-      } else {
-        showWarning(t('common:impresion.printError'), result.error || '');
-      }
-    } catch {
-      showError(t('common:impresion.printError'), '');
-    } finally {
-      setIsScanningPrinter(false);
-    }
-  }, [isScanningPrinter, showSuccess, showWarning, showError, t]);
-
-  const handleReconnectPrinter = useCallback(async () => {
-    if (isConnectingPrinter) return;
-    printerActionTakenRef.current = true;
-    setIsConnectingPrinter(true);
-    try {
-      const result = await connectPrinter();
-      if (result.ok) {
-        setPrinterConnected(true);
-        setPrinterLabel(result.label || '');
-        showSuccess(t('common:impresion.connectionSuccess'), '');
-      } else {
-        showWarning(t('common:impresion.printError'), result.error || '');
-      }
-    } catch {
-      showError(t('common:impresion.printError'), '');
-    } finally {
-      setIsConnectingPrinter(false);
-    }
-  }, [isConnectingPrinter, showSuccess, showWarning, showError, t]);
-
-  const handleDisconnectPrinter = useCallback(async () => {
-    printerActionTakenRef.current = true;
-    await disconnectPrinter();
-    setPrinterConnected(false);
-    setPrinterLabel('');
-  }, []);
+  const buildTestReceiptHtml = useCallback((receipt, printerWidthMm) => `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Prueba de impresion</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; color:#000 !important; border-color:#000 !important; }
+  @media print {
+    @page { size:${printerWidthMm}mm auto; margin:1mm; }
+    html,body { width:${printerWidthMm}mm !important; margin:0; padding:0; background:#fff !important; }
+  }
+  body { width:${printerWidthMm}mm; max-width:${printerWidthMm}mm; margin:0 auto; padding:1mm;
+    font-family:'Courier New',monospace; font-size:18px; line-height:1.4; font-weight:700; background:#fff; color:#000;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .hdr { text-align:center; border-bottom:2px dashed #000; padding-bottom:6px; margin-bottom:6px; }
+  .hdr h1 { font-size:28px; font-weight:900; margin-bottom:4px; }
+  .hdr p { font-size:18px; font-weight:700; margin:2px 0; }
+  .row { display:flex; justify-content:space-between; margin:2px 0; font-size:17px; font-weight:700; }
+  .sep { border-top:2px dashed #000; margin:8px 0; }
+  .item { display:flex; justify-content:space-between; margin:4px 0; padding:2px 0; border-bottom:1px dashed #ccc; }
+  .item-name { flex:1; padding-right:4px; font-weight:800; }
+  .item-qty { width:50px; text-align:center; font-weight:800; }
+  .item-price { width:100px; text-align:right; font-weight:800; }
+  .total { margin-top:8px; border-top:2px solid #000; padding-top:8px; font-size:24px; font-weight:900; display:flex; justify-content:space-between; }
+  .ftr { text-align:center; margin-top:12px; padding-top:8px; border-top:2px dashed #000; font-size:15px; font-weight:800; }
+</style></head>
+<body>
+  <div class="hdr">
+    <h1>${receipt.header.title}</h1>
+    <p>${receipt.header.businessName}</p>
+    <p style="font-size:16px;">${receipt.header.dateText}</p>
+  </div>
+  ${receipt.metadata.map((row) => `
+    <div class="row"><span><strong>${row.label}:</strong></span><span>${row.value}</span></div>
+  `).join('')}
+  <div class="sep"></div>
+  ${receipt.items.map((item) => `
+    <div class="item">
+      <div class="item-name">${item.name}</div>
+      <div class="item-qty">x${item.quantity}</div>
+      <div class="item-price">${item.subtotalText}</div>
+    </div>
+  `).join('')}
+  <div class="total"><span>TOTAL:</span><span>${receipt.totals.totalText}</span></div>
+  <div class="sep"></div>
+  <div class="ftr">
+    <p><strong>Metodo:</strong> ${receipt.payment.methodText}</p>
+    <p style="margin-top:3px;">${receipt.footer.message}</p>
+  </div>
+</body>
+</html>`, []);
 
   const handlePaperWidthChange = useCallback((value: number) => {
     setThermalPaperWidthMm(value);
@@ -295,53 +274,26 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
     showSuccess(t('common:impresion.saved'), '');
   }, [t, showSuccess]);
 
-  const handleAutoCutChange = useCallback((enabled: boolean) => {
-    setAutoCutEnabled(enabled);
-    setAutoCutState(enabled);
-    showSuccess(t('common:impresion.saved'), '');
-  }, [t, showSuccess]);
-
-  const handleBaudRateChange = useCallback((value: number) => {
-    setPrinterBaudRate(value);
-    setBaudRateState(value);
-    showSuccess(t('common:impresion.saved'), '');
-  }, [t, showSuccess]);
-
   const handleTestPrint = useCallback(async () => {
     if (testingPrint) return;
     setTestingPrint(true);
     try {
-      const escposData = buildSaleEscPos(buildTestReceipt(), paperWidth, autoCut);
-      const result = await printBytes(escposData);
-
-      if (result.ok) {
-        showSuccess(t('common:impresion.testPrintSuccess'), '');
-      } else {
-        showWarning(t('common:impresion.printError'), result.error || '');
+      const html = buildTestReceiptHtml(buildTestReceipt(), paperWidth);
+      const win = window.open('', '_blank');
+      if (!win) {
+        showWarning(t('common:impresion.printError'), t('common:impresion.popupBlocked'));
+        return;
       }
+      win.document.write(html);
+      win.document.close();
+      win.focus();
+      win.print();
     } catch {
       showError(t('common:impresion.printError'), '');
     } finally {
       setTestingPrint(false);
     }
-  }, [testingPrint, buildTestReceipt, paperWidth, autoCut, showSuccess, showWarning, showError, t]);
-
-  useEffect(() => {
-    if (!webSerialSupported || printerActionTakenRef.current) return;
-    let active = true;
-
-    (async () => {
-      const result = await connectPrinter();
-      if (active && result.ok) {
-        setPrinterConnected(true);
-        setPrinterLabel(result.label || '');
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [webSerialSupported]);
+  }, [testingPrint, buildTestReceipt, paperWidth, showSuccess, showWarning, showError, t]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#C4DFE6]/10 p-4 md:p-6">
@@ -639,68 +591,18 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
           </div>
 
           <div className="p-6 space-y-6">
-            {!webSerialSupported && (
-              <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-xl border border-amber-200">
-                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                <p className="text-sm text-amber-800">{t('common:impresion.webSerialUnavailable')}</p>
-              </div>
-            )}
-
-            {/* Impresora conectada / escaneo */}
+            {/* Guía del driver */}
             <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
-              {printerConnected ? (
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
-                    <div>
-                      <p className="font-semibold text-gray-800">{t('common:impresion.printer')}</p>
-                      <p className="text-sm text-gray-600">{printerLabel || t('common:impresion.connected')}</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleDisconnectPrinter}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-medium transition-all text-sm"
-                  >
-                    <Unplug className="w-4 h-4" />
-                    {t('common:impresion.disconnect')}
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <p className="font-semibold text-gray-800 mb-1">{t('common:impresion.noPrinter')}</p>
-                  <p className="text-sm text-gray-600 mb-4">{t('common:impresion.usbNote')}</p>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={handleScanPrinter}
-                      disabled={isScanningPrinter || !webSerialSupported}
-                      className="flex items-center gap-2 px-4 py-2 gradient-primary hover:from-[#99D3DB] hover:to-[#66A5AD] text-black rounded-lg font-medium transition-all text-sm disabled:opacity-50"
-                    >
-                      {isScanningPrinter ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          {t('buttons.loading')}
-                        </>
-                      ) : (
-                        <>
-                          <ScanLine className="w-4 h-4" />
-                          {t('common:impresion.scan')}
-                        </>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleReconnectPrinter}
-                      disabled={isConnectingPrinter || !webSerialSupported}
-                      className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-all text-sm disabled:opacity-50"
-                    >
-                      <RefreshCw className={`w-4 h-4 ${isConnectingPrinter ? 'animate-spin' : ''}`} />
-                      {t('common:impresion.reconnect')}
-                    </button>
-                  </div>
-                </>
-              )}
+              <p className="font-semibold text-gray-800 mb-1">{t('common:impresion.driverGuideTitle')}</p>
+              <p className="text-sm text-gray-600 mb-3">{t('common:impresion.driverGuideIntro')}</p>
+              <ol className="text-sm text-gray-600 list-decimal list-inside space-y-1">
+                <li>{t('common:impresion.driverStep1')}</li>
+                <li>{t('common:impresion.driverStep2')}</li>
+                <li>{t('common:impresion.driverStep3')}</li>
+                <li>{t('common:impresion.driverStep4')}</li>
+                <li>{t('common:impresion.driverStep5')}</li>
+              </ol>
+              <p className="text-xs text-gray-500 mt-3">{t('common:impresion.driverNote')}</p>
             </div>
 
             {/* Preferencias de impresión */}
@@ -729,74 +631,34 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                   </div>
                 </div>
 
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                    <Settings className="w-4 h-4 text-accent-600" />
-                    {t('common:impresion.baudRate')}
-                  </label>
-                  <div className="flex gap-2 flex-wrap">
-                    {[9600, 19200, 38400, 115200].map((baud) => (
-                      <button
-                        key={baud}
-                        type="button"
-                        onClick={() => handleBaudRateChange(baud)}
-                        className={`px-4 py-2 rounded-lg font-medium text-sm border transition-all ${baudRate === baud
-                          ? 'gradient-primary text-black border-transparent shadow'
-                          : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}
-                      >
-                        {baud}
-                      </button>
-                    ))}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-800 text-sm">{t('common:labels.autoPrint')}</p>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">{t('common:impresion.baudHint')}</p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-gray-800 text-sm">{t('common:impresion.autoCut')}</p>
-                      <p className="text-xs text-gray-500">{t('common:impresion.autoCutNote')}</p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={autoCut}
-                      onClick={() => handleAutoCutChange(!autoCut)}
-                      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${autoCut ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                    >
-                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${autoCut ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-gray-800 text-sm">{t('common:labels.autoPrint')}</p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={autoPrint}
-                      onClick={() => handleAutoPrintChange(!autoPrint)}
-                      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${autoPrint ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                    >
-                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${autoPrint ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={autoPrint}
+                    onClick={() => handleAutoPrintChange(!autoPrint)}
+                    className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${autoPrint ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${autoPrint ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
                 </div>
               </div>
             </div>
 
-            {/* Imprimir prueba + nota de fallback */}
+            {/* Imprimir prueba */}
             <div className="p-4 bg-gradient-to-br from-violet-50 to-white rounded-xl border border-violet-100">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="font-semibold text-gray-800">{t('common:impresion.printTest')}</p>
-                  <p className="text-sm text-gray-600 mt-1">{t('common:impresion.printFallbackNote')}</p>
+                  <p className="text-sm text-gray-600 mt-1">{t('common:impresion.driverTestNote')}</p>
                 </div>
                 <button
                   type="button"
                   onClick={handleTestPrint}
-                  disabled={testingPrint || !printerConnected}
+                  disabled={testingPrint}
                   className="flex items-center gap-2 px-5 py-2.5 gradient-primary hover:from-[#99D3DB] hover:to-[#66A5AD] text-black rounded-lg font-medium transition-all text-sm disabled:opacity-50"
                 >
                   <Printer className="w-4 h-4" />
