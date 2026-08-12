@@ -52,6 +52,8 @@ import {
   setAutoPrintReceiptEnabled,
   isAutoCutEnabled,
   setAutoCutEnabled,
+  getPrinterBaudRate,
+  setPrinterBaudRate,
 } from '@/utils/printer';
 
 interface Business {
@@ -86,6 +88,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
   });
 
   const [paperWidth, setPaperWidthState] = useState(getThermalPaperWidthMm());
+  const [baudRate, setBaudRateState] = useState(getPrinterBaudRate());
   const [autoPrint, setAutoPrintState] = useState(isAutoPrintReceiptEnabled());
   const [autoCut, setAutoCutState] = useState(isAutoCutEnabled());
   const [printerConnected, setPrinterConnected] = useState(isPrinterConnected());
@@ -295,6 +298,12 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
   const handleAutoCutChange = useCallback((enabled: boolean) => {
     setAutoCutEnabled(enabled);
     setAutoCutState(enabled);
+    showSuccess(t('common:impresion.saved'), '');
+  }, [t, showSuccess]);
+
+  const handleBaudRateChange = useCallback((value: number) => {
+    setPrinterBaudRate(value);
+    setBaudRateState(value);
     showSuccess(t('common:impresion.saved'), '');
   }, [t, showSuccess]);
 
@@ -718,6 +727,28 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                    <Settings className="w-4 h-4 text-accent-600" />
+                    {t('common:impresion.baudRate')}
+                  </label>
+                  <div className="flex gap-2 flex-wrap">
+                    {[9600, 19200, 38400, 115200].map((baud) => (
+                      <button
+                        key={baud}
+                        type="button"
+                        onClick={() => handleBaudRateChange(baud)}
+                        className={`px-4 py-2 rounded-lg font-medium text-sm border transition-all ${baudRate === baud
+                          ? 'gradient-primary text-black border-transparent shadow'
+                          : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                      >
+                        {baud}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">{t('common:impresion.baudHint')}</p>
                 </div>
 
                 <div className="space-y-4">

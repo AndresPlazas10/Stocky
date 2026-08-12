@@ -1525,7 +1525,9 @@
     "salePrinted": "Receipt sent to the printer",
     "kitchenPrinted": "Kitchen order sent to the printer",
     "fallbackUsed": "Printer unavailable. Using the browser print dialog.",
-    "saved": "Printer settings saved"
+    "saved": "Printer settings saved",
+    "baudRate": "Baud rate",
+    "baudHint": "If the test does not print, try another baud rate (19200, 38400, 115200) depending on your model. The printer light turns blue while printing; green while idle is normal."
   },
   "businessDisabled": {
     "yourBusiness": "your business",

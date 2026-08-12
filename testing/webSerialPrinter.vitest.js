@@ -209,6 +209,54 @@ describe('webSerialPrinterService', () => {
     expect(written[0]).toEqual([0x1b, 0x40]);
   });
 
+  it('opens the port with the configured baud rate', async () => {
+    const { port } = createFakePort();
+    installSerial([port]);
+    window.localStorage.setItem('stocky_serial_printer_id', '1234:5678');
+    window.localStorage.setItem('stocky_printer_baud_rate', '19200');
+
+    await service.connectPrinter();
+
+    expect(port.open).toHaveBeenCalledWith({ baudRate: 19200 });
+  });
+
+  it('retries the print after closing and reopening the port on write failure', async () => {
+    const { port, written } = createFakePort();
+    let writeCalls = 0;
+    port.writer.write = vi.fn(async (chunk) => {
+      writeCalls += 1;
+      if (writeCalls === 1) {
+        throw new Error('write failed');
+      }
+      written.push(Array.from(chunk));
+    });
+    installSerial([port]);
+    window.localStorage.setItem('stocky_serial_printer_id', '1234:5678');
+    await service.connectPrinter();
+
+    const result = await service.printBytes(new Uint8Array([0x1b, 0x40]));
+
+    expect(result.ok).toBe(true);
+    expect(writeCalls).toBe(2);
+    expect(port.close).toHaveBeenCalled();
+    expect(written[0]).toEqual([0x1b, 0x40]);
+  });
+
+  it('fails with the last error when both write attempts fail', async () => {
+    const { port } = createFakePort();
+    port.writer.write = vi.fn(async () => {
+      throw new Error('write failed');
+    });
+    installSerial([port]);
+    window.localStorage.setItem('stocky_serial_printer_id', '1234:5678');
+    await service.connectPrinter();
+
+    const result = await service.printBytes(new Uint8Array([0x1b, 0x40]));
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('write failed');
+  });
+
   it('disconnects and clears the saved printer', async () => {
     const { port } = createFakePort();
     installSerial([port]);

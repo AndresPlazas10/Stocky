@@ -1,6 +1,9 @@
-const BAUD_RATE = 9600;
+import { getPrinterBaudRate } from '@/utils/printer';
+
 const CHUNK_SIZE = 256;
 const CHUNK_DELAY_MS = 100;
+const CONNECT_DELAY_MS = 300;
+const MAX_WRITE_ATTEMPTS = 2;
 const SAVED_PRINTER_KEY = 'stocky_serial_printer_id';
 
 export interface SerialPortInfo {
@@ -79,7 +82,7 @@ const openWithTolerance = async (port: MinimalSerialPort): Promise<MinimalSerial
   if (port.isOpen) return port;
 
   try {
-    await port.open({ baudRate: BAUD_RATE });
+    await port.open({ baudRate: getPrinterBaudRate() });
     return port;
   } catch (err) {
     if (isAlreadyOpenError(err)) {
@@ -88,6 +91,8 @@ const openWithTolerance = async (port: MinimalSerialPort): Promise<MinimalSerial
     throw err;
   }
 };
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const getActivePort = (): MinimalSerialPort | null => activePort;
 
@@ -186,6 +191,34 @@ export const disconnectPrinter = async (): Promise<void> => {
   }
 };
 
+const writeData = async (port: MinimalSerialPort, data: Uint8Array): Promise<{ ok: boolean; error?: string }> => {
+  await wait(CONNECT_DELAY_MS);
+
+  const writer = port.writer || (port.writable && port.writable.getWriter());
+  if (!writer) {
+    return { ok: false, error: 'La impresora no esta disponible para escribir.' };
+  }
+
+  try {
+    for (let offset = 0; offset < data.length; offset += CHUNK_SIZE) {
+      const chunk = data.subarray(offset, offset + CHUNK_SIZE);
+      await writer.write(chunk);
+      if (offset + CHUNK_SIZE < data.length) {
+        await wait(CHUNK_DELAY_MS);
+      }
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: `Error de impresion: ${(err as Error)?.message || String(err)}` };
+  } finally {
+    try {
+      writer.releaseLock();
+    } catch {
+      // best effort
+    }
+  }
+};
+
 export const printBytes = async (
   data: Uint8Array,
 ): Promise<{ ok: boolean; error?: string }> => {
@@ -207,27 +240,28 @@ export const printBytes = async (
     port = opened;
   }
 
-  const writer = port.writer || (port.writable && port.writable.getWriter());
-  if (!writer) {
-    return { ok: false, error: 'La impresora no esta disponible para escribir.' };
+  const firstAttempt = await writeData(port, data);
+  if (firstAttempt.ok) {
+    return firstAttempt;
   }
 
-  try {
-    for (let offset = 0; offset < data.length; offset += CHUNK_SIZE) {
-      const chunk = data.subarray(offset, offset + CHUNK_SIZE);
-      await writer.write(chunk);
-      if (offset + CHUNK_SIZE < data.length) {
-        await new Promise((resolve) => setTimeout(resolve, CHUNK_DELAY_MS));
-      }
-    }
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: `Error de impresion: ${(err as Error)?.message || String(err)}` };
-  } finally {
+  const lastError = firstAttempt.error || '';
+  for (let attempt = 1; attempt < MAX_WRITE_ATTEMPTS; attempt += 1) {
     try {
-      writer.releaseLock();
+      if (port.isOpen) await port.close();
     } catch {
       // best effort
     }
+    try {
+      const reopened = await openWithTolerance(port);
+      if (!reopened) break;
+      port = reopened;
+      const retry = await writeData(port, data);
+      if (retry.ok) return retry;
+    } catch (err) {
+      return { ok: false, error: `Error de impresion: ${(err as Error)?.message || String(err)}` };
+    }
   }
+
+  return { ok: false, error: lastError };
 };

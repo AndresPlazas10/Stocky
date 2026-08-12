@@ -1525,7 +1525,9 @@
     "salePrinted": "Comprobante enviado a la impresora",
     "kitchenPrinted": "Orden de cocina enviada a la impresora",
     "fallbackUsed": "Impresora no disponible. Se usó la impresión del navegador.",
-    "saved": "Configuración de impresora guardada"
+    "saved": "Configuración de impresora guardada",
+    "baudRate": "Velocidad (baud rate)",
+    "baudHint": "Si la prueba no imprime, prueba con otro baud rate (19200, 38400, 115200) según tu modelo. El indicador de la impresora se pone azul al imprimir; en reposo es normal que esté verde."
   },
   "businessDisabled": {
     "yourBusiness": "tu negocio",
