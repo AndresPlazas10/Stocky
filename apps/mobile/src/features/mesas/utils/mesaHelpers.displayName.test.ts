@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { resolveOrderItemDisplayNameFrom } from './mesaHelpers';
 
-function item(partial) {
+function item(partial: Record<string, unknown> = {}) {
   return {
     id: 'item-1',
     order_id: 'order-1',

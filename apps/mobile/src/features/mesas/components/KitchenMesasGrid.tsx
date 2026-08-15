@@ -73,16 +73,20 @@ export const KitchenMesasGrid = React.memo(function KitchenMesasGrid({
             isCalling && styles.cardCalling,
           ]}
         >
-          {isMostRecent ? (
-            <View style={styles.mostRecentBadge}>
-              <Ionicons name="flash" size={13} color="#FFFFFF" />
-              <Text style={styles.mostRecentBadgeText}>
-                {t('labels.mostRecentOrder', 'Pedido más reciente')}
-              </Text>
-            </View>
-          ) : null}
+          <View style={styles.topRow}>
+            {isMostRecent ? (
+              <View style={styles.mostRecentBadge}>
+                <Ionicons name="flash" size={13} color="#FFFFFF" />
+                <Text style={styles.mostRecentBadgeText}>
+                  {t('labels.mostRecentOrder', 'Pedido más reciente')}
+                </Text>
+              </View>
+            ) : (
+              <View />
+            )}
+            <Text style={styles.topRowMesaName}>{mesaDisplayName(mesa)}</Text>
+          </View>
           <View style={styles.cardHeader}>
-            <Text style={styles.mesaName}>{mesaDisplayName(mesa)}</Text>
             <View
               style={[
                 styles.statusPill,
@@ -216,10 +220,15 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: '#FFFFFF',
   },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
   mostRecentBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
     gap: 4,
     borderRadius: 999,
     paddingHorizontal: 10,
@@ -229,6 +238,11 @@ const styles = StyleSheet.create({
   mostRecentBadgeText: {
     color: '#FFFFFF',
     fontSize: 11,
+    fontWeight: '800',
+  },
+  topRowMesaName: {
+    color: '#111827',
+    fontSize: 18,
     fontWeight: '800',
   },
   cardOccupied: {
@@ -249,12 +263,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
-  },
-  mesaName: {
-    flex: 1,
-    color: '#111827',
-    fontSize: 18,
-    fontWeight: '800',
   },
   statusPill: {
     borderRadius: 999,
