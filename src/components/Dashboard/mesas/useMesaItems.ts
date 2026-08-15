@@ -178,6 +178,7 @@ export function useMesaItems({
       setPendingQuantityUpdatesSafe({});
     } catch (err) {
       logger.warn('mesas:persist_pending_quantities failed', err);
+      throw err;
     }
   }, [setPendingQuantityUpdatesSafe, businessId, pendingQuantityUpdatesRef, orderItemsRef, setOrderItems]);
 

@@ -17,6 +17,7 @@ import {
 } from './mesaHelpers';
 import { closeModalImmediate } from '../../../utils/closeModalImmediate';
 import { normalizeTableRecord } from '../../../utils/tableStatus';
+import { resolveErrorMessage } from '../../../utils/rpcErrorUtils';
 import { logger } from '@/utils/logger';
 
 type SetState<T> = React.Dispatch<React.SetStateAction<T>>;
@@ -247,25 +248,35 @@ export function useMesaClose({
       setOrderItems([]);
       setSearchProduct('');
 
-      showSuccess(t('mesas:success.tableUpdated'), `${t('mesas:labels.table')} #${mesaSnapshot.table_number}`);
+      if (!hasLocalEdits) {
+        orderItemsDirtyRef.current = false;
+        showSuccess(t('mesas:success.tableUpdated'), `${t('mesas:labels.table')} #${mesaSnapshot.table_number}`);
+        return;
+      }
 
       void (async () => {
         try {
           // Solo persistir si esta sesión editó la orden: evita que un estado
           // cacheado/incompleto borre items agregados por otro dispositivo.
-          if (hasLocalEdits) {
-            const hasTempItems = (Array.isArray(effectiveOrderItemsSnapshot) ? effectiveOrderItemsSnapshot : []).some(
-              (item) => String(item?.id || '').startsWith('tmp-')
-            );
-            await persistPendingQuantityUpdates(mesaSnapshot.current_order_id!, { refreshItems: false, items: effectiveOrderItemsSnapshot });
-            // Si hubo items tmp-, el snapshot RPC ya persiste orders.total
-            // (e invalida cache + outbox): no escribir el total dos veces.
-            if (!hasTempItems) {
-              await updateOrderTotal(mesaSnapshot.current_order_id, effectiveOrderItemsSnapshot, { skipMesaState: true });
-            }
+          const hasTempItems = (Array.isArray(effectiveOrderItemsSnapshot) ? effectiveOrderItemsSnapshot : []).some(
+            (item) => String(item?.id || '').startsWith('tmp-')
+          );
+          await persistPendingQuantityUpdates(mesaSnapshot.current_order_id!, { refreshItems: false, items: effectiveOrderItemsSnapshot });
+          // Si hubo items tmp-, el snapshot RPC ya persiste orders.total
+          // (e invalida cache + outbox): no escribir el total dos veces.
+          if (!hasTempItems) {
+            await updateOrderTotal(mesaSnapshot.current_order_id, effectiveOrderItemsSnapshot, { skipMesaState: true });
           }
-        } catch {
-          // no-op: optimistic state is already correct, polling will sync
+          showSuccess(t('mesas:success.tableUpdated'), `${t('mesas:labels.table')} #${mesaSnapshot.table_number}`);
+        } catch (err) {
+          // El persist falló: el estado optimista queda en UI, pero el usuario
+          // debe saber que la DB no guardó (el poll de 5s reconciliará).
+          const message = resolveErrorMessage(err, '');
+          showError(
+            t('mesas:errors.saveOrderFailed'),
+            message ? `${t('mesas:labels.table')} #${mesaSnapshot.table_number}: ${message}` : undefined
+          );
+          logger.warn('mesas:save_persist failed', err);
         } finally {
           orderItemsDirtyRef.current = false;
         }

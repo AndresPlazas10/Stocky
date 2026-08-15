@@ -128,7 +128,10 @@ export function MesasPanel({ session, businessContext }: Props) {
 
   const { itemsByOrderId, loadingItems, callingOrderIds, mostRecentOrderId, orderArrivalTsByOrderId, handleCallMesa } = useKitchenOrders({
     mesas,
-    enabled: isKitchen,
+    // Solo activar la cocina cuando las mesas ya cargaron: evita que el baseline
+    // se siembre con mesas=[] (race con el role fetch) y dispare una ráfaga de
+    // 'new' para todas las órdenes existentes al aparecer los datos.
+    enabled: isKitchen && !loading,
     businessId: context?.businessId,
     onCall: useCallback(
       (mesa: MesaRecord) => {

@@ -98,6 +98,7 @@ export function MesaOrderItemsGrid({
                           <Button
                             size="sm"
                             variant="outline"
+                            data-testid="qty-dec"
                             onClick={() => onUpdateQuantity(item.id, toFiniteNumber(item.quantity, 0) - 1)}                            className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             -
@@ -108,6 +109,7 @@ export function MesaOrderItemsGrid({
                           <Button
                             size="sm"
                             variant="outline"
+                            data-testid="qty-inc"
                             onClick={() => onUpdateQuantity(item.id, toFiniteNumber(item.quantity, 0) + 1)}                            className="h-8 w-8 p-0 border-green-300 text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             +

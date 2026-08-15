@@ -138,6 +138,7 @@ const MesasGrid = memo(function MesasGrid({
           return (
             <motion.div
               key={mesa.id}
+              data-testid="mesa-card"
               initial={lowMotionMode ? false : { opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={lowMotionMode ? { duration: 0 } : { duration: 0.2, delay: index * 0.02 }}
@@ -161,7 +162,10 @@ const MesasGrid = memo(function MesasGrid({
                 <CardContent className="pt-6 text-center">
                   {/* Badge del pedido más reciente en cocina */}
                   {isKitchen && mostRecentOrderId && mesa.orders?.id === mostRecentOrderId && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 whitespace-nowrap rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white shadow-lg">
+                    <div
+                      data-testid="mesa-most-recent-badge"
+                      className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 whitespace-nowrap rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white shadow-lg"
+                    >
                       <Layers className="w-3.5 h-3.5" />
                       {t('mesas:labels.mostRecentOrder')}
                     </div>

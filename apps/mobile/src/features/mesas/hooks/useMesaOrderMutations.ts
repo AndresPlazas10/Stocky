@@ -277,11 +277,15 @@ export function useMesaOrderMutations({
     }
     orderModalOpenIntentRef.current = false;
     resetOrderFlow(order);
+    // Evita que cantidades pendientes sin guardar queden stale en el ref y se
+    // flusheen sobre órdenes cerradas o ajenas en el siguiente Guardar.
+    pendingQuantityUpdatesRef.current.clear();
   }, [
     heldMesaLockRef,
     releaseHeldMesaLock,
     orderModalOpenIntentRef,
     order,
+    pendingQuantityUpdatesRef,
   ]);
 
   const releaseEmptyOrderAndClose = useCallback(async () => {

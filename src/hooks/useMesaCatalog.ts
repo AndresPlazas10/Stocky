@@ -49,7 +49,7 @@ export function useMesaCatalog({ businessId, setProducts, setCombos, showError }
       if (offline) {
         setProducts([]);
       } else {
-        showError('Error', t('mesas.errors.loadCatalogFailed'));
+        showError('Error', t('mesas:errors.loadCatalogFailed'));
       }
     }
   }, [businessId, setProducts, showError, t]);
@@ -87,7 +87,7 @@ export function useMesaCatalog({ businessId, setProducts, setCombos, showError }
       if (offline) {
         setCombos([]);
       } else {
-        showError('Error', t('mesas.errors.loadCombosFailed'));
+        showError('Error', t('mesas:errors.loadCombosFailed'));
       }
     }
   }, [businessId, setCombos, showError, t]);

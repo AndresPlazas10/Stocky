@@ -7,14 +7,14 @@ import { expect } from '@playwright/test';
  * @param {string} password
  */
 export async function signIn(page, email, password) {
-  await page.goto('/');
+  await page.goto('/login');
   await page.waitForLoadState('networkidle');
 
-  // Wait for the login form to be visible
-  const emailInput = page.locator('input[type="email"]');
-  await expect(emailInput).toBeVisible({ timeout: 10000 });
+  // El login usa username (id="username"); se acepta email como fallback.
+  const usernameInput = page.locator('#username, input[type="email"]').first();
+  await expect(usernameInput).toBeVisible({ timeout: 10000 });
 
-  await emailInput.fill(email);
+  await usernameInput.fill(email);
   await page.locator('input[type="password"]').fill(password);
 
   // Click the login button
@@ -22,7 +22,7 @@ export async function signIn(page, email, password) {
   await loginButton.click();
 
   // Wait for navigation after login
-  await page.waitForURL(/\/(dashboard|mesas|home)/, { timeout: 15000 });
+  await page.waitForURL(/\/(dashboard|mesas|home|employee-dashboard)/, { timeout: 15000 });
 }
 
 /**
