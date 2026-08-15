@@ -35,7 +35,8 @@ describe('buildSaleReceiptTemplate', () => {
 
     expect(receipt.type).toBe('sale');
     expect(receipt.header.businessName).toBe('Mi Tienda');
-    expect(receipt.metadata).toHaveLength(2); // Vendedor, Cliente
+    expect(receipt.metadata).toHaveLength(3); // Comprobante, Vendedor, Cliente
+    expect(receipt.metadata[0]).toEqual({ label: 'Comprobante', value: 'CPV-SALE-123' });
     expect(receipt.items).toHaveLength(1);
     expect(receipt.totals.total).toBe(15000);
   });

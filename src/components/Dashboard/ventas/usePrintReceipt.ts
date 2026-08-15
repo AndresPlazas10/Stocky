@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { printSaleReceipt } from '@/utils/saleReceiptPrint';
 import { getBusinessNameById } from '@/data/queries/salesQueries';
 import { getVendedorName } from './ventasHelpers';
+import { useBusinessConfig } from '@/hooks/useBusinessConfig';
 import { logger } from '@/utils/logger';
 
 export function usePrintReceipt(
@@ -9,6 +10,7 @@ export function usePrintReceipt(
   showError: (title: string, message?: string) => void,
   t: (key: string, options?: any) => string,
 ) {
+  const config = useBusinessConfig();
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printSaleData, setPrintSaleData] = useState<any>(null);
   const [printSaleDetails, setPrintSaleDetails] = useState<any[]>([]);
@@ -29,6 +31,7 @@ export function usePrintReceipt(
         sellerName: printSaleData.seller_name || getVendedorName(printSaleData, t),
         businessName: await getBusinessNameById(businessId),
         customerName: printCustomerName,
+        timezone: config.timezone,
       });
 
       if (!printResult.ok) {
@@ -43,7 +46,7 @@ export function usePrintReceipt(
       setPrintSaleData(null);
       setPrintSaleDetails([]);
     }
-  }, [printSaleData, printSaleDetails, printCustomerName, businessId, showError, t]);
+  }, [printSaleData, printSaleDetails, printCustomerName, businessId, showError, t, config]);
 
   const handlePrintCancel = useCallback(() => {
     setShowPrintModal(false);
@@ -74,12 +77,13 @@ export function usePrintReceipt(
       saleDetails,
       sellerName: getVendedorName(sale, t),
       businessName: await getBusinessNameById(businessId),
+      timezone: config.timezone,
     });
 
     if (!printResult.ok) {
       showError('Error', t('ventas:errors.printWindowFailed'));
     }
-  }, [businessId, showError, t]);
+  }, [businessId, showError, t, config]);
 
   return {
     showPrintModal,

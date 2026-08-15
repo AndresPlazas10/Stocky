@@ -1,65 +1,83 @@
-import { getThermalPaperWidthMm } from '../utils/printer.js';
-import { formatDateTimeTicket, formatPrice } from '../utils/formatters';
+import { getThermalPaperWidthMm } from './printer.js';
+import { formatTicketDateNumeric } from './receiptLayout';
+import {
+  buildTicketHtml,
+  fullSeparator,
+  getReceiptColumns,
+  TICKET_MAX_PAGE_HEIGHT_MM,
+  thinSeparator,
+  twoColumnLines,
+  type TicketLine,
+} from './receiptLayout.js';
 
-const buildKitchenOrderHtml = (itemsParaCocina, tableNumber, status, orderTotal) => {
-  const printerWidthMm = getThermalPaperWidthMm();
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Orden Mesa ${tableNumber}</title>
-  <style>
-    * { color:#000!important; -webkit-text-fill-color:#000!important; text-shadow:none!important; box-shadow:none!important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-    @media print {
-      @page { size:${printerWidthMm}mm auto; margin:1mm; }
-      html,body { width:${printerWidthMm}mm!important; height:auto!important; margin:0; padding:0; }
-      .receipt { break-inside:avoid; page-break-inside:avoid; }
-    }
-    body { font-family:'Courier New',monospace; font-size:18px; line-height:1.4; font-weight:700; color:#000!important; width:${printerWidthMm}mm; max-width:${printerWidthMm}mm; box-sizing:border-box; margin:0; padding:0; background:#fff; }
-    .receipt { display:block; width:100%; margin:0; padding:1mm; box-sizing:border-box; }
-    .header { text-align:center; border-bottom:2px dashed #000; padding-bottom:6px; margin-bottom:6px; color:#000; }
-    .header h1 { font-size:30px; margin:0 0 3px 0; font-weight:900; letter-spacing:0.5px; }
-    .header p { margin:1px 0; font-size:18px; font-weight:700; }
-    .info { margin:6px 0; font-size:20px; font-weight:700; }
-    .info strong { font-weight:900; }
-    .items { margin:10px 0; }
-    .item { display:flex; justify-content:space-between; margin:4px 0; padding:2px 0; border-bottom:1px dashed #ccc; }
-    .item-name { flex:1; font-weight:900; font-size:21px; line-height:1.35; color:#000; }
-    .item-qty { width:88px; text-align:right; font-size:21px; font-weight:900; font-variant-numeric:tabular-nums; color:#000; }
-    .total { display:none; }
-    .footer { text-align:center; margin-top:12px; padding-top:6px; border-top:2px dashed #000; font-size:15px; font-weight:800; }
-    .separator { border-top:2px dashed #000; margin:8px 0; }
-  </style>
-</head>
-<body>
-  <div class="receipt">
-  <div class="header">
-    <h1>ORDEN DE COCINA</h1>
-    <p>Mesa #${tableNumber}</p>
-    <p>${formatDateTimeTicket(new Date())}</p>
-  </div>
-  <div class="info">
-    <p><strong>Estado:</strong> ${status === 'occupied' ? 'Ocupada' : 'Disponible'}</p>
-    <p><strong>Productos:</strong> ${itemsParaCocina.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)} item${itemsParaCocina.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0) !== 1 ? 's' : ''}</p>
-  </div>
-  <div class="separator"></div>
-  <div class="items">
-    ${itemsParaCocina.map(item => `
-      <div class="item">
-        <div class="item-name">${String(item?.products?.name || item?.combos?.nombre || item?.name || 'Item')}</div>
-        <div class="item-qty">x${item.quantity}</div>
-      </div>
-    `).join('')}
-  </div>
-  <div class="total">TOTAL: ${formatPrice(orderTotal)}</div>
-  <div class="footer">
-    <p>*** ORDEN PARA COCINA ***</p>
-    <p>Sistema Stocky</p>
-  </div>
-  </div>
-</body>
-</html>`;
+interface KitchenItem {
+  quantity?: number;
+  products?: { name?: string } | null;
+  combos?: { nombre?: string } | null;
+  name?: string;
+}
+
+export const KITCHEN_LABELS = {
+  kitchenTitle: 'ORDEN DE COCINA',
+  kitchenTable: 'Mesa #',
+  itemsLabel: 'Productos',
+  productsHeader: 'Productos',
+  quantityHeader: 'Cantidad',
+  kitchenFooter: '*** ORDEN PARA COCINA ***',
+  kitchenSystem: 'Sistema Stocky',
 };
+
+export function buildKitchenOrderHtml(
+  itemsParaCocina: KitchenItem[],
+  tableNumber: number | string,
+  orderTotal: number,
+  printerWidthMm: number,
+  labels: Partial<typeof KITCHEN_LABELS> = {},
+  timezone: string = 'America/Bogota',
+  pageHeightMm?: number,
+): string {
+  const l = { ...KITCHEN_LABELS, ...labels };
+  const columns = getReceiptColumns(printerWidthMm);
+  const lines: TicketLine[] = [];
+  const spacer = (n: number = 1) => { for (let i = 0; i < n; i += 1) lines.push({ text: '' }); };
+
+  const items = Array.isArray(itemsParaCocina) ? itemsParaCocina : [];
+  const totalUnits = items.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0);
+
+  spacer(1);
+  lines.push({ text: l.kitchenTitle, align: 'center', bold: true, double: true });
+  spacer(1);
+  lines.push({ text: `${l.kitchenTable}${String(tableNumber)}`, align: 'center', bold: true });
+  spacer(1);
+  lines.push({ text: formatTicketDateNumeric(new Date(), timezone), align: 'center' });
+  spacer(1);
+  lines.push({ text: fullSeparator(columns) });
+  spacer(1);
+
+  lines.push({ text: `${l.itemsLabel}: ${totalUnits}` });
+  spacer(1);
+  lines.push({ text: thinSeparator(columns) });
+  spacer(1);
+
+  twoColumnLines(l.productsHeader, l.quantityHeader, columns).forEach((line) => lines.push({ text: line, bold: true }));
+  spacer(1);
+
+  items.forEach((item) => {
+    const name = item?.products?.name || item?.combos?.nombre || item?.name || 'Item';
+    twoColumnLines(name, `x${Number(item?.quantity || 0)}`, columns).forEach((line) => lines.push({ text: line, bold: true }));
+    spacer(1);
+  });
+
+  spacer(1);
+  lines.push({ text: fullSeparator(columns) });
+  spacer(2);
+
+  lines.push({ text: l.kitchenFooter, align: 'center', bold: true });
+  spacer(4);
+
+  const effectivePageHeightMm = pageHeightMm ?? TICKET_MAX_PAGE_HEIGHT_MM;
+  return buildTicketHtml(lines, printerWidthMm, effectivePageHeightMm);
+}
 
 export async function printKitchenOrder({
   itemsParaCocina,
@@ -67,16 +85,19 @@ export async function printKitchenOrder({
   status,
   orderTotal,
   onError,
+  timezone = 'America/Bogota',
+  labels = {} as Partial<typeof KITCHEN_LABELS>,
 }: {
-  itemsParaCocina: any[];
-  tableNumber: number;
+  itemsParaCocina: KitchenItem[];
+  tableNumber: number | string;
   status: 'occupied' | 'available';
   orderTotal: number;
   onError?: (msg: string | null) => void;
+  timezone?: string;
+  labels?: Partial<typeof KITCHEN_LABELS>;
 }) {
   const printerWidthMm = getThermalPaperWidthMm();
-
-  const printContent = buildKitchenOrderHtml(itemsParaCocina, tableNumber, status, orderTotal);
+  const printContent = buildKitchenOrderHtml(itemsParaCocina, tableNumber, orderTotal, printerWidthMm, labels, timezone);
 
   const printWindow = window.open('', '_blank', 'width=300,height=600');
   if (printWindow) {

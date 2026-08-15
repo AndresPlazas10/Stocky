@@ -39,6 +39,8 @@ import {
   isAutoPrintReceiptEnabled,
   setAutoPrintReceiptEnabled,
 } from '@/utils/printer';
+import { printDiagnostic } from '@/utils/printDiagnostics';
+import { buildSaleReceiptHtml } from '@/utils/saleReceiptPrint';
 
 interface Business {
   id: string;
@@ -74,6 +76,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
   const [paperWidth, setPaperWidthState] = useState(getThermalPaperWidthMm());
   const [autoPrint, setAutoPrintState] = useState(isAutoPrintReceiptEnabled());
   const [testingPrint, setTestingPrint] = useState(false);
+  const [testingDiagnostic, setTestingDiagnostic] = useState(false);
 
   useEffect(() => {
     if (business) {
@@ -180,6 +183,9 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
     metadata: [
       { label: 'Estado', value: 'Conexion exitosa' },
     ],
+    productHeader: 'Producto',
+    quantityAbbreviation: 'Cant.',
+    total: 'Total',
     items: [
       {
         name: 'Impresion de prueba',
@@ -205,62 +211,11 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
       message: 'Conexion exitosa',
       alignment: 'center',
     },
-    itemsHeader: 'Producto       Cant.      Total',
     tipLabel: 'Propina',
     totalLabel: 'TOTAL',
     methodLabel: 'Metodo',
     notSpecified: 'No especificado',
   }), [business]);
-
-  const buildTestReceiptHtml = useCallback((receipt, printerWidthMm) => `<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>Prueba de impresion</title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; color:#000 !important; border-color:#000 !important; }
-  @media print {
-    @page { size:${printerWidthMm}mm auto; margin:1mm; }
-    html,body { width:${printerWidthMm}mm !important; margin:0; padding:0; background:#fff !important; }
-  }
-  body { width:${printerWidthMm}mm; max-width:${printerWidthMm}mm; margin:0 auto; padding:1mm;
-    font-family:'Courier New',monospace; font-size:18px; line-height:1.4; font-weight:700; background:#fff; color:#000;
-    -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  .hdr { text-align:center; border-bottom:2px dashed #000; padding-bottom:6px; margin-bottom:6px; }
-  .hdr h1 { font-size:28px; font-weight:900; margin-bottom:4px; }
-  .hdr p { font-size:18px; font-weight:700; margin:2px 0; }
-  .row { display:flex; justify-content:space-between; margin:2px 0; font-size:17px; font-weight:700; }
-  .sep { border-top:2px dashed #000; margin:8px 0; }
-  .item { display:flex; justify-content:space-between; margin:4px 0; padding:2px 0; border-bottom:1px dashed #ccc; }
-  .item-name { flex:1; padding-right:4px; font-weight:800; }
-  .item-qty { width:50px; text-align:center; font-weight:800; }
-  .item-price { width:100px; text-align:right; font-weight:800; }
-  .total { margin-top:8px; border-top:2px solid #000; padding-top:8px; font-size:24px; font-weight:900; display:flex; justify-content:space-between; }
-  .ftr { text-align:center; margin-top:12px; padding-top:8px; border-top:2px dashed #000; font-size:15px; font-weight:800; }
-</style></head>
-<body>
-  <div class="hdr">
-    <h1>${receipt.header.title}</h1>
-    <p>${receipt.header.businessName}</p>
-    <p style="font-size:16px;">${receipt.header.dateText}</p>
-  </div>
-  ${receipt.metadata.map((row) => `
-    <div class="row"><span><strong>${row.label}:</strong></span><span>${row.value}</span></div>
-  `).join('')}
-  <div class="sep"></div>
-  ${receipt.items.map((item) => `
-    <div class="item">
-      <div class="item-name">${item.name}</div>
-      <div class="item-qty">x${item.quantity}</div>
-      <div class="item-price">${item.subtotalText}</div>
-    </div>
-  `).join('')}
-  <div class="total"><span>TOTAL:</span><span>${receipt.totals.totalText}</span></div>
-  <div class="sep"></div>
-  <div class="ftr">
-    <p><strong>Metodo:</strong> ${receipt.payment.methodText}</p>
-    <p style="margin-top:3px;">${receipt.footer.message}</p>
-  </div>
-</body>
-</html>`, []);
 
   const handlePaperWidthChange = useCallback((value: number) => {
     setThermalPaperWidthMm(value);
@@ -278,7 +233,7 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
     if (testingPrint) return;
     setTestingPrint(true);
     try {
-      const html = buildTestReceiptHtml(buildTestReceipt(), paperWidth);
+      const html = buildSaleReceiptHtml(buildTestReceipt(), paperWidth);
       const win = window.open('', '_blank');
       if (!win) {
         showWarning(t('common:impresion.printError'), t('common:impresion.popupBlocked'));
@@ -294,6 +249,21 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
       setTestingPrint(false);
     }
   }, [testingPrint, buildTestReceipt, paperWidth, showSuccess, showWarning, showError, t]);
+
+  const handleTestDiagnostic = useCallback(async () => {
+    if (testingDiagnostic) return;
+    setTestingDiagnostic(true);
+    try {
+      const opened = printDiagnostic(paperWidth);
+      if (!opened) {
+        showWarning(t('common:impresion.printError'), t('common:impresion.popupBlocked'));
+      }
+    } catch {
+      showError(t('common:impresion.printError'), '');
+    } finally {
+      setTestingDiagnostic(false);
+    }
+  }, [testingDiagnostic, paperWidth, showSuccess, showWarning, showError, t]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-light-bg-primary/20 via-white to-[#C4DFE6]/10 p-4 md:p-6">
@@ -601,6 +571,9 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                 <li>{t('common:impresion.driverStep3')}</li>
                 <li>{t('common:impresion.driverStep4')}</li>
                 <li>{t('common:impresion.driverStep5')}</li>
+                <li>{t('common:impresion.driverStep6')}</li>
+                <li>{t('common:impresion.driverStep7')}</li>
+                <li>{t('common:impresion.driverStep8')}</li>
               </ol>
               <p className="text-xs text-gray-500 mt-3">{t('common:impresion.driverNote')}</p>
             </div>
@@ -663,6 +636,22 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                 >
                   <Printer className="w-4 h-4" />
                   {testingPrint ? t('buttons.loading') : t('common:impresion.printTest')}
+                </button>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-4 border-t border-violet-100">
+                <div>
+                  <p className="font-semibold text-gray-800">{t('common:impresion.diagnosticTitle')}</p>
+                  <p className="text-sm text-gray-600 mt-1">{t('common:impresion.diagnosticNote')}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleTestDiagnostic}
+                  disabled={testingDiagnostic}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-white border border-violet-300 text-violet-700 hover:bg-violet-50 rounded-lg font-medium transition-all text-sm disabled:opacity-50"
+                >
+                  <Printer className="w-4 h-4" />
+                  {testingDiagnostic ? t('buttons.loading') : t('common:impresion.diagnosticTitle')}
                 </button>
               </div>
             </div>
