@@ -10,6 +10,7 @@ import {
 } from '../../../services/mesasService';
 import { loadOpenOrderSnapshot, type MesaOrderItem } from '../../../services/mesaOrderService';
 import { compareMesaTableIdentifiers } from '../utils/mesaHelpers';
+import { suppressDismissedCalls } from '@stocky/shared';
 import type { StoredCatalogSnapshot } from '../utils/catalogCache';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -74,6 +75,7 @@ type UseMesaDataLoaderParams = {
     hasLoadedOnceRef: React.MutableRefObject<boolean>;
     isPendingEmptyRelease?: (mesaId: string) => boolean;
   };
+  dismissedCallsRef?: React.MutableRefObject<Map<string, number>> | null;
 };
 
 export function useMesaDataLoader({
@@ -83,6 +85,7 @@ export function useMesaDataLoader({
   catalogOps,
   broadcast,
   sharedRefs,
+  dismissedCallsRef = null,
 }: UseMesaDataLoaderParams) {
   const { session, businessContext, sessionDisplayName } = auth;
   const { setContext, setMesas, setLoading, setError, setActorDisplayName, setCatalogItems } = setters;
@@ -159,7 +162,10 @@ export function useMesaDataLoader({
         businessId: nextContext.businessId,
         rows: Array.isArray(nextMesas) ? nextMesas.length : 0,
       });
-      const sortedMesas = nextMesas.sort(compareMesaTableIdentifiers);
+      const sortedMesas = suppressDismissedCalls(
+        nextMesas.sort(compareMesaTableIdentifiers),
+        dismissedCallsRef?.current,
+      );
       setMesas(sortedMesas);
       void refreshMesaLocks(nextContext.businessId);
 

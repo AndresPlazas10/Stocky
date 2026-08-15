@@ -1,3 +1,5 @@
+import { CALL_WINDOW_MS } from './mesaConstants.js';
+
 export function isMesaOccupied(status: string | null | undefined): boolean {
   return (
     String(status || '')
@@ -76,6 +78,33 @@ export function isCallRequestedAtSuppressed(
     return false;
   }
   return true;
+}
+
+/**
+ * Aplica la supresión por dismiss a una lista de mesas: cualquier call
+ * descartado (dismissedCallsRef) dentro de la ventana CALL_WINDOW_MS se
+ * convierte en `call_requested_at: undefined`. Úsese en TODO camino de ingreso
+ * de estado (fetch/poll/realtime) para que un call ya descartado no re-aparezca
+ * en la UI (parpadeo de la campana tras el dismiss).
+ */
+export function suppressDismissedCalls<T extends MesaCallRow>(
+  mesas: T[] | null | undefined,
+  dismissedCalls: Map<string, number> | null | undefined,
+): T[] {
+  if (!Array.isArray(mesas) || mesas.length === 0) return mesas as T[];
+  if (!dismissedCalls || dismissedCalls.size === 0) return mesas as T[];
+  let changed = false;
+  const next = mesas.map((mesa) => {
+    const mesaId = String(mesa?.id || '').trim();
+    const raw = String(mesa?.call_requested_at || '').trim();
+    if (!mesaId || !raw) return mesa;
+    if (isCallRequestedAtSuppressed(dismissedCalls, mesaId, raw, CALL_WINDOW_MS)) {
+      changed = true;
+      return { ...mesa, call_requested_at: undefined };
+    }
+    return mesa;
+  });
+  return changed ? next : (mesas as T[]);
 }
 
 /**

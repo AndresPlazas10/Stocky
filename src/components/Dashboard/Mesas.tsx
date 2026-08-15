@@ -251,6 +251,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     emptyReleaseInProgressRef: refs.emptyReleaseInProgressRef,
     showError,
     showSuccess,
+    dismissedCallsRef,
   });
 
   useMesaRealtime({

@@ -50,6 +50,7 @@ interface UseMesaOrderOperationsParams {
   emptyReleaseInProgressRef: React.MutableRefObject<string | null>;
   showError: (title: string, message?: string) => void;
   showSuccess: (title: string, message?: string) => void;
+  dismissedCallsRef?: React.MutableRefObject<Map<string, number>> | null;
 }
 
 export function useMesaOrderOperations({
@@ -96,6 +97,7 @@ export function useMesaOrderOperations({
   emptyReleaseInProgressRef,
   showError,
   showSuccess,
+  dismissedCallsRef = null,
 }: UseMesaOrderOperationsParams) {
   const { t } = useTranslation(['mesas']);
 
@@ -103,6 +105,7 @@ export function useMesaOrderOperations({
     businessId, setMesas, setLoading, showError, showSuccess, t,
     canManageTables, isEmployee, isCreatingTable, setIsCreatingTable,
     newTableNumber, setNewTableNumber, setShowAddForm,
+    dismissedCallsRef,
   });
 
   const {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveCallEvents } from '@stocky/shared';
+import { resolveCallEvents, suppressDismissedCalls } from '@stocky/shared';
 
 function mesa(id, raw) {
   return { id, call_requested_at: raw };
@@ -73,5 +73,44 @@ describe('resolveCallEvents — baseline de llamadas de cocina', () => {
   it('inputs vacíos no rompen', () => {
     expect(resolveCallEvents(null, new Map(), true).newEvents).toEqual([]);
     expect(resolveCallEvents(undefined, new Map(), false).baselineSeeded).toBe(false);
+  });
+});
+
+describe('suppressDismissedCalls — anti-parpadeo de la campana tras dismiss', () => {
+  const NOW = Date.now();
+  const RAW = new Date(NOW - 60_000).toISOString(); // call hace 1 min
+
+  it('mesa descartada: call se convierte en undefined', () => {
+    const dismissed = new Map([['t1', NOW - 30_000]]);
+    const mesas = [mesa('t1', RAW), mesa('t2', RAW)];
+    const result = suppressDismissedCalls(mesas, dismissed);
+    expect(result[0].call_requested_at).toBeUndefined();
+    expect(result[1].call_requested_at).toBe(RAW);
+  });
+
+  it('sin dismiss: lista intacta (misma referencia)', () => {
+    const mesas = [mesa('t1', RAW)];
+    expect(suppressDismissedCalls(mesas, null)).toBe(mesas);
+    expect(suppressDismissedCalls(mesas, new Map())).toBe(mesas);
+  });
+
+  it('un call MÁS NUEVO que el dismiss NO se suprime (cocina volvió a llamar)', () => {
+    const dismissed = new Map([['t1', NOW - 30_000]]);
+    const newer = new Date(NOW).toISOString();
+    const result = suppressDismissedCalls([mesa('t1', newer)], dismissed);
+    expect(result[0].call_requested_at).toBe(newer);
+  });
+
+  it('ventana expirada (más de CALL_WINDOW_MS): no suprime y limpia la entrada', () => {
+    const dismissed = new Map([['t1', NOW - 11 * 60 * 1000]]);
+    const result = suppressDismissedCalls([mesa('t1', RAW)], dismissed);
+    expect(result[0].call_requested_at).toBe(RAW);
+    expect(dismissed.has('t1')).toBe(false);
+  });
+
+  it('inputs vacíos no rompen', () => {
+    expect(suppressDismissedCalls([], new Map([['t1', NOW]])).length).toBe(0);
+    expect(suppressDismissedCalls(null, new Map([['t1', NOW]]))).toBeNull();
+    expect(suppressDismissedCalls(undefined, null)).toBeUndefined();
   });
 });

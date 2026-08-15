@@ -101,6 +101,17 @@ test.describe('Alerta "orden lista" (call) contra meseros', () => {
       await waiter.waitForTimeout(3000);
       expect(await waiter.locator('text=Orden lista').count()).toBe(1);
 
+      // Anti-parpadeo: el toast expira, el auto-dismiss limpia la DB y el bell
+      // NO debe reaparecer (un fetch/poll stale podría re-agregar el call).
+      const bell = waiter.locator('[aria-label="Cocina te está llamando"]');
+      await expect(bell).toBeVisible({ timeout: 5000 });
+      await expect(waiter.locator('text=Orden lista').first()).toBeHidden({ timeout: 15000 });
+      await expect(bell).toBeHidden({ timeout: 5000 });
+      for (let i = 0; i < 8; i++) {
+        expect(await bell.count()).toBe(0);
+        await waiter.waitForTimeout(1000);
+      }
+
       // Cleanup: dismiss del bell si quedó (el auto-dismiss del toast debería limpiar la DB)
       await dismissWaiterBell(waiter);
     } finally {

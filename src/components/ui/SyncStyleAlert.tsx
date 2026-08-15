@@ -130,22 +130,29 @@ export function SyncStyleAlert({
   className = ''
 }: SyncStyleAlertProps) {
   const [isMounted, setIsMounted] = React.useState(false);
+  const onCloseRef = React.useRef(onClose);
 
   React.useEffect(() => {
     setIsMounted(true);
   }, []);
 
   React.useEffect(() => {
-    if (!autoClose || !isVisible || typeof onClose !== 'function') return undefined;
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
+  React.useEffect(() => {
+    if (!autoClose || !isVisible || typeof onCloseRef.current !== 'function') return undefined;
+
+    // El timer depende solo de isVisible/duration: un cambio de identidad de
+    // onClose (re-render del padre) NO debe reiniciar la cuenta regresiva.
     const timer = window.setTimeout(() => {
-      onClose();
+      onCloseRef.current?.();
     }, duration);
 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [autoClose, isVisible, onClose, duration]);
+  }, [autoClose, isVisible, duration]);
 
   if (!isMounted) return null;
 

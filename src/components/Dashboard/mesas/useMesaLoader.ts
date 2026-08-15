@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { suppressDismissedCalls } from '@stocky/shared';
 import { getTablesWithCurrentOrderByBusiness } from '@/data/queries/ordersQueries';
 import { createTable } from '@/data/commands/ordersCommands';
 import {
@@ -28,6 +29,7 @@ interface UseMesaLoaderParams {
   newTableNumber: string;
   setNewTableNumber: React.Dispatch<React.SetStateAction<string>>;
   setShowAddForm: React.Dispatch<React.SetStateAction<boolean>>;
+  dismissedCallsRef?: React.MutableRefObject<Map<string, number>> | null;
 }
 
 export function useMesaLoader({
@@ -44,14 +46,18 @@ export function useMesaLoader({
   newTableNumber,
   setNewTableNumber,
   setShowAddForm,
+  dismissedCallsRef = null,
 }: UseMesaLoaderParams) {
   const normalizeMesaList = useCallback((mesas: any[]) => {
-    return (Array.isArray(mesas) ? mesas : [])
-      .map(normalizeTableRecord)
-      .sort(compareTableIdentifiers)
-      .map(sanitizeMesaOrderAssociation)
-      .sort(compareTableIdentifiers);
-  }, []);
+    return suppressDismissedCalls(
+      (Array.isArray(mesas) ? mesas : [])
+        .map(normalizeTableRecord)
+        .sort(compareTableIdentifiers)
+        .map(sanitizeMesaOrderAssociation)
+        .sort(compareTableIdentifiers),
+      dismissedCallsRef?.current,
+    );
+  }, [dismissedCallsRef]);
 
   const loadMesas = useCallback(async () => {
     const offline = isOfflineMode();

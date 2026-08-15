@@ -583,6 +583,7 @@ export function MesasPanel({ session, businessContext }: Props) {
     catalogOps: { ensureCatalogLoaded, readCatalogFromStorage, catalogBusinessIdRef, catalogUpdatedAtRef, catalogItemsRef },
     broadcast: { publishMesaStateBroadcast, traceAsyncDuration },
     sharedRefs: { orderItemsCacheRef, mesasLengthRef, hasLoadedOnceRef, isPendingEmptyRelease },
+    dismissedCallsRef,
   });
 
   useEffect(() => {

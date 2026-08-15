@@ -24,6 +24,14 @@ export declare function mesaDisplayName(mesa: {
  */
 export declare function isCallRequestedAtSuppressed(dismissedCalls: Map<string, number> | null | undefined, mesaId: string, incomingRaw: string | null | undefined, callWindowMs: number): boolean;
 /**
+ * Aplica la supresión por dismiss a una lista de mesas: cualquier call
+ * descartado (dismissedCallsRef) dentro de la ventana CALL_WINDOW_MS se
+ * convierte en `call_requested_at: undefined`. Úsese en TODO camino de ingreso
+ * de estado (fetch/poll/realtime) para que un call ya descartado no re-aparezca
+ * en la UI (parpadeo de la campana tras el dismiss).
+ */
+export declare function suppressDismissedCalls<T extends MesaCallRow>(mesas: T[] | null | undefined, dismissedCalls: Map<string, number> | null | undefined): T[];
+/**
  * Clave de recencia de una orden para ordenar la cocina de "más reciente a
  * menos reciente": prioriza el timestamp de llegada en sesión (si existe),
  * luego orders.updated_at (persistido, se actualiza al Guardar) y finalmente
