@@ -36,4 +36,36 @@ export declare function resolveOrderRecencyMs(mesa: {
         opened_at?: string | null;
     } | null;
 }, arrivalMap?: Map<string, number> | null): number;
+export interface MesaCallRow {
+    id?: string | null;
+    call_requested_at?: string | null;
+}
+export interface CallEvent {
+    mesaId: string;
+    raw: string;
+}
+export interface ResolveCallEventsResult {
+    newEvents: CallEvent[];
+    baselineSeeded: boolean;
+    /** Entradas a marcar como vistas cuando se siembra el baseline (sin toast). */
+    seenEntries: CallEvent[];
+}
+/**
+ * Decide qué llamadas de cocina ("orden lista") deben disparar notificación.
+ *
+ * - Antes del baseline y sin mesas cargadas (array vacío): no marca baseline
+ *   (race: mesas aún cargando); se reintenta en el siguiente ciclo.
+ * - Antes del baseline y con mesas cargadas (haya o no calls): siembra en
+ *   silencio (baselineSeeded=true, cero eventos). Así, un mesero que inicia
+ *   sesión con llamadas pendientes no recibe la ráfaga de toasts/beeps (la
+ *   campana de la tarjeta sigue visible), y un mesero que inicia sin llamadas
+ *   pendientes no se traga la primera llamada real.
+ * - Después del baseline: solo son nuevos los calls cuyo raw difiera del visto.
+ *
+ * El caller NUNCA debe reconstruir `seenByMesa` desde el estado actual de las
+ * mesas: un fetch stale (iniciado antes del call) podría "olvidar" el call y
+ * provocar un segundo toast cuando el estado vuelva a traerlo. El seen-map es
+ * monotónico: solo se agregan raws (o se marcan en el baseline).
+ */
+export declare function resolveCallEvents(mesas: MesaCallRow[] | null | undefined, seenByMesa: Map<string, string>, baselineDone: boolean): ResolveCallEventsResult;
 //# sourceMappingURL=mesaUtils.d.ts.map

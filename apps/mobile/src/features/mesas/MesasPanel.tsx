@@ -28,6 +28,7 @@ import {
 } from '../../services/mesasService';
 import { getSupabaseClient } from '../../lib/supabase';
 import { TOAST_DURATION_MS } from '../../ui/StockyToast';
+import { resolveCallEvents } from '@stocky/shared';
 
 import { useMesaOrderState } from './hooks/useMesaOrderState';
 import { useMesaEditLock } from './hooks/useMesaEditLock';
@@ -191,25 +192,36 @@ export function MesasPanel({ session, businessContext }: Props) {
     [context?.businessId, setMesas],
   );
 
-  const callToastsSeenRef = useRef<Set<string>>(new Set());
+  const callToastsSeenRef = useRef<Map<string, string>>(new Map());
+  const callBaselineSeededRef = useRef(false);
   const latestMesasRef = useRef<MesaRecord[]>([]);
   const callAutoDismissTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
     latestMesasRef.current = mesas;
-    (Array.isArray(mesas) ? mesas : []).forEach((mesa) => {
-      const raw = String(mesa?.call_requested_at || '').trim();
+    if (isKitchen) return;
 
-      if (isKitchen || !raw) return;
+    const { newEvents, baselineSeeded, seenEntries } = resolveCallEvents(
+      mesas,
+      callToastsSeenRef.current,
+      callBaselineSeededRef.current,
+    );
+    if (baselineSeeded) {
+      callBaselineSeededRef.current = true;
+      // Siembra silenciosa: marca como vistos los calls previos al login.
+      seenEntries.forEach(({ mesaId, raw }) => {
+        callToastsSeenRef.current.set(mesaId, raw);
+      });
+    }
 
-      const toastKey = `${mesa.id}:${raw}`;
-      if (callToastsSeenRef.current.has(toastKey)) return;
-      callToastsSeenRef.current.add(toastKey);
-      if (callToastsSeenRef.current.size > 100) {
-        callToastsSeenRef.current = new Set(
-          Array.from(callToastsSeenRef.current).slice(-50),
-        );
-      }
+    // Calls que llegaron DURANTE la sesión: toast + sonido + auto-dismiss.
+    // Los calls previos al login se siembran en el baseline y solo dejan el bell.
+    newEvents.forEach(({ mesaId, raw }) => {
+      callToastsSeenRef.current.set(mesaId, raw);
+      const mesa = (Array.isArray(mesas) ? mesas : []).find(
+        (m) => String(m?.id || '').trim() === mesaId,
+      );
+      if (!mesa) return;
 
       const mesaLabel = mesaDisplayName(mesa, t('labels.table', 'Mesa'));
       void playKitchenAlert();
@@ -228,7 +240,7 @@ export function MesasPanel({ session, businessContext }: Props) {
       const timer = setTimeout(() => {
         callAutoDismissTimersRef.current.delete(mesa.id);
         const currentMesa = latestMesasRef.current.find(
-          (m) => String(m?.id || '').trim() === String(mesa.id || '').trim(),
+          (m) => String(m?.id || '').trim() === String(mesa?.id || '').trim(),
         );
         if (
           currentMesa &&

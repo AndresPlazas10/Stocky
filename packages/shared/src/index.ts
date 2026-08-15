@@ -59,7 +59,8 @@ export {
   resolveMesaSyncVersion,
   mesaDisplayName,
   isCallRequestedAtSuppressed,
-  resolveOrderRecencyMs
+  resolveOrderRecencyMs,
+  resolveCallEvents
 } from './mesaUtils.js';
 
 // Mesa Constants

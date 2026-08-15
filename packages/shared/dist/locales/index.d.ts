@@ -2369,6 +2369,8 @@ export declare const resources: {
                 sessionFailed: string;
                 syncingChanges: string;
                 updateQuantityFailed: string;
+                loadCatalogFailed: string;
+                loadCombosFailed: string;
             };
             toast: {
                 noKitchenItems: {
@@ -2401,6 +2403,11 @@ export declare const resources: {
                     messageGeneric: string;
                 };
             };
+            loadFailed: string;
+            notFound: string;
+            noSession: string;
+            orderNotFound: string;
+            updateFailed: string;
         };
         reports: {
             title: string;
@@ -4873,6 +4880,8 @@ export declare const resources: {
                 sessionFailed: string;
                 syncingChanges: string;
                 updateQuantityFailed: string;
+                loadCatalogFailed: string;
+                loadCombosFailed: string;
             };
             toast: {
                 noKitchenItems: {
@@ -4905,6 +4914,11 @@ export declare const resources: {
                     messageGeneric: string;
                 };
             };
+            loadFailed: string;
+            notFound: string;
+            noSession: string;
+            orderNotFound: string;
+            updateFailed: string;
         };
         reports: {
             title: string;

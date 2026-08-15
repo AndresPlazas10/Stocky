@@ -81,4 +81,45 @@ export function resolveOrderRecencyMs(mesa, arrivalMap) {
     const openedMs = Date.parse(String(mesa?.orders?.opened_at || ''));
     return Number.isFinite(openedMs) ? openedMs : 0;
 }
+/**
+ * Decide qué llamadas de cocina ("orden lista") deben disparar notificación.
+ *
+ * - Antes del baseline y sin mesas cargadas (array vacío): no marca baseline
+ *   (race: mesas aún cargando); se reintenta en el siguiente ciclo.
+ * - Antes del baseline y con mesas cargadas (haya o no calls): siembra en
+ *   silencio (baselineSeeded=true, cero eventos). Así, un mesero que inicia
+ *   sesión con llamadas pendientes no recibe la ráfaga de toasts/beeps (la
+ *   campana de la tarjeta sigue visible), y un mesero que inicia sin llamadas
+ *   pendientes no se traga la primera llamada real.
+ * - Después del baseline: solo son nuevos los calls cuyo raw difiera del visto.
+ *
+ * El caller NUNCA debe reconstruir `seenByMesa` desde el estado actual de las
+ * mesas: un fetch stale (iniciado antes del call) podría "olvidar" el call y
+ * provocar un segundo toast cuando el estado vuelva a traerlo. El seen-map es
+ * monotónico: solo se agregan raws (o se marcan en el baseline).
+ */
+export function resolveCallEvents(mesas, seenByMesa, baselineDone) {
+    const rows = Array.isArray(mesas) ? mesas : [];
+    const entries = [];
+    for (const mesa of rows) {
+        const mesaId = String(mesa?.id || '').trim();
+        const raw = String(mesa?.call_requested_at || '').trim();
+        if (!mesaId || !raw)
+            continue;
+        entries.push({ mesaId, raw });
+    }
+    if (!baselineDone) {
+        if (rows.length === 0) {
+            return { newEvents: [], baselineSeeded: false, seenEntries: [] };
+        }
+        return { newEvents: [], baselineSeeded: true, seenEntries: entries };
+    }
+    const newEvents = [];
+    for (const entry of entries) {
+        if (seenByMesa.get(entry.mesaId) !== entry.raw) {
+            newEvents.push(entry);
+        }
+    }
+    return { newEvents, baselineSeeded: false, seenEntries: [] };
+}
 //# sourceMappingURL=mesaUtils.js.map

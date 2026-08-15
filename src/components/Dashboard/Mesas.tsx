@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Layers, Plus, ChefHat } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { resolveCallEvents } from '@stocky/shared';
 import { deleteTableCascadeOrders, updateOrderNotesById, clearTableCallRequested } from '../../data/commands/ordersCommands';
 import type { SplitBillOrderItem, OrderItem, MesaRecord } from '../../types/components';
 import { calcularCambio } from '../../utils/cambio';
@@ -89,6 +90,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
   const latestMesasRef = useRef(state.mesas);
   latestMesasRef.current = state.mesas;
   const prevAutoDismissCallsRef = useRef(new Map<string, string>());
+  const callBaselineSeededRef = useRef(false);
   const callAutoDismissTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [mostRecentOrderId, setMostRecentOrderId] = useState<string | null>(null);
   const arrivalTimestampsRef = useRef<Map<string, number>>(new Map());
@@ -112,16 +114,27 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
 
   useEffect(() => {
     if (isKitchenRole) return;
-    const next = new Map<string, string>();
-    (Array.isArray(state.mesas) ? state.mesas : []).forEach((mesa) => {
-      const mesaId = String(mesa?.id || '').trim();
-      const raw = String(mesa?.call_requested_at || '').trim();
-      next.set(mesaId, raw);
-      if (!raw) return;
-      const prev = prevAutoDismissCallsRef.current.get(mesaId);
-      if (prev === raw) return;
-      prevAutoDismissCallsRef.current.set(mesaId, raw);
 
+    const { newEvents, baselineSeeded, seenEntries } = resolveCallEvents(
+      state.mesas,
+      prevAutoDismissCallsRef.current,
+      callBaselineSeededRef.current,
+    );
+    if (baselineSeeded) {
+      callBaselineSeededRef.current = true;
+      // Siembra silenciosa: marca como vistos los calls previos al login.
+      seenEntries.forEach(({ mesaId, raw }) => {
+        prevAutoDismissCallsRef.current.set(mesaId, raw);
+      });
+    }
+
+    // Calls que llegaron DURANTE la sesión: toast + beep + auto-dismiss.
+    // Los calls previos al login se siembran en el baseline y solo dejan el bell.
+    newEvents.forEach(({ mesaId, raw }) => {
+      prevAutoDismissCallsRef.current.set(mesaId, raw);
+      const mesa = (Array.isArray(state.mesas) ? state.mesas : []).find(
+        (m) => String(m?.id || '').trim() === mesaId,
+      );
       const mesaLabel = String(mesa?.table_number ?? '');
       playNewOrderBeep();
       showInfo(
@@ -145,7 +158,6 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
       }, TOAST_DEFAULT_DURATION);
       callAutoDismissTimersRef.current.set(mesaId, timer);
     });
-    prevAutoDismissCallsRef.current = next;
   }, [state.mesas, handleDismissCall, isKitchenRole, showInfo, t]);
 
   useEffect(() => {
