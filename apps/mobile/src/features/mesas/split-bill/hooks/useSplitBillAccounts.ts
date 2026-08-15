@@ -136,12 +136,10 @@ export function useSplitBillAccounts({ visible, orderItems }: UseSplitBillAccoun
     accounts,
     itemAssignments,
     subAccounts,
-    validationErrors,
     canConfirm,
     addAccount,
     removeAccount,
     updateAccountPaymentMethod,
     adjustItemQuantityForAccount,
-    getItemExpectedQuantity,
   };
 }

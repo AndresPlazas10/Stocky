@@ -26,7 +26,7 @@ export async function logSecurityEvent(params: {
       metadata: params.metadata || {},
     });
 
-    if (error && error.status !== 403 && error.code !== '42501') {
+    if (error && (error as { status?: number }).status !== 403 && error.code !== '42501') {
       console.error('security_audit:log_event_failed', error);
     }
   } catch {

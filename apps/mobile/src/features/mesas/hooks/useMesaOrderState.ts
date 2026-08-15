@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useDeferredValue, useMemo, useReducer, useRef } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
 import {
   buildCatalogLookup,
@@ -15,7 +14,7 @@ import { onCatalogInvalidated } from '../../../utils/catalogEvents';
 import {
   CATALOG_STORAGE_PREFIX,
   CATALOG_LOCAL_TTL_MS,
-  type StoredCatalogSnapshot,
+  writeCatalogToStorage,
 } from '../utils/catalogCache';
 
 // ---------------------------------------------------------------------------
@@ -31,8 +30,6 @@ type OrderState = {
   loadingOrder: boolean;
   orderModalError: string | null;
   searchCatalog: string;
-  isSearchFocused: boolean;
-  mutatingOrderItemId: string | null;
   releasingEmptyOrder: boolean;
   isSavingOrder: boolean;
   showCloseOrderChoiceModal: boolean;
@@ -47,10 +44,7 @@ type OrderState = {
 
 type OrderAction =
   | { type: 'SET_FIELD'; key: keyof OrderState; value: OrderState[keyof OrderState] }
-  | { type: 'SET_MULTIPLE'; patch: Partial<OrderState> }
-  | { type: 'CLOSE_ALL_MODALS' }
-  | { type: 'CLOSE_AUX_MODALS' }
-  | { type: 'RESET_ORDER' };
+  | { type: 'SET_MULTIPLE'; patch: Partial<OrderState> };
 
 const initialState: OrderState = {
   showOrderModal: false,
@@ -61,8 +55,6 @@ const initialState: OrderState = {
   loadingOrder: false,
   orderModalError: null,
   searchCatalog: '',
-  isSearchFocused: false,
-  mutatingOrderItemId: null,
   releasingEmptyOrder: false,
   isSavingOrder: false,
   showCloseOrderChoiceModal: false,
@@ -81,47 +73,6 @@ function orderReducer(state: OrderState, action: OrderAction): OrderState {
       return { ...state, [action.key]: action.value };
     case 'SET_MULTIPLE':
       return { ...state, ...action.patch };
-    case 'CLOSE_ALL_MODALS':
-      return {
-        ...state,
-        showOrderModal: false,
-        showCloseOrderChoiceModal: false,
-        showPaymentModal: false,
-        showSplitBillModal: false,
-        showPaymentMethodMenu: false,
-        selectedMesa: null,
-        orderItems: [],
-        orderModalError: null,
-        searchCatalog: '',
-        isSearchFocused: false,
-        mutatingOrderItemId: null,
-        paymentMethod: 'cash',
-        amountReceived: '',
-      };
-    case 'CLOSE_AUX_MODALS':
-      return {
-        ...state,
-        showCloseOrderChoiceModal: false,
-        showPaymentModal: false,
-        showSplitBillModal: false,
-        paymentMethod: 'cash',
-        amountReceived: '',
-      };
-    case 'RESET_ORDER':
-      return {
-        ...state,
-        orderItems: [],
-        orderModalError: null,
-        searchCatalog: '',
-        isSearchFocused: false,
-        mutatingOrderItemId: null,
-        releasingEmptyOrder: false,
-        isSavingOrder: false,
-        isClosingOrder: false,
-        paymentMethod: 'cash',
-        amountReceived: '',
-        hasPendingChanges: false,
-      };
   }
 }
 
@@ -149,23 +100,6 @@ type UseMesaOrderStateParams = {
 };
 
 // ---------------------------------------------------------------------------
-// Catalog storage helper
-// ---------------------------------------------------------------------------
-
-async function writeCatalogToStorage(businessId: string, items: MesaOrderCatalogItem[]) {
-  const storageKey = `${CATALOG_STORAGE_PREFIX}${businessId}`;
-  const payload: StoredCatalogSnapshot = {
-    cachedAt: Date.now(),
-    items,
-  };
-  try {
-    await AsyncStorage.setItem(storageKey, JSON.stringify(payload));
-  } catch {
-    // no-op
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
@@ -191,8 +125,6 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
   const setLoadingOrder = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'loadingOrder', value: v }), []);
   const setOrderModalError = useCallback((v: string | null) => dispatch({ type: 'SET_FIELD', key: 'orderModalError', value: v }), []);
   const setSearchCatalog = useCallback((v: string) => dispatch({ type: 'SET_FIELD', key: 'searchCatalog', value: v }), []);
-  const setIsSearchFocused = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'isSearchFocused', value: v }), []);
-  const setMutatingOrderItemId = useCallback((v: string | null) => dispatch({ type: 'SET_FIELD', key: 'mutatingOrderItemId', value: v }), []);
   const setReleasingEmptyOrder = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'releasingEmptyOrder', value: v }), []);
   const setIsSavingOrder = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'isSavingOrder', value: v }), []);
   const setShowCloseOrderChoiceModal = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'showCloseOrderChoiceModal', value: v }), []);
@@ -208,7 +140,7 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
   const setHasPendingChanges = useCallback((v: boolean) => dispatch({ type: 'SET_FIELD', key: 'hasPendingChanges', value: v }), []);
 
   // Refs (unchanged)
-  const addCatalogQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const quantityFlushQueueRef = useRef<Promise<void>>(Promise.resolve());
   const latestOrderItemsRef = useRef<MesaOrderItem[]>([]);
   const orderItemsCacheRef = useRef(new Map<string, MesaOrderItem[]>());
   const catalogBusinessIdRef = useRef<string | null>(null);
@@ -217,7 +149,6 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
   const catalogLoadPromiseRef = useRef<Promise<MesaOrderCatalogItem[]> | null>(null);
   const orderModalOpenIntentRef = useRef(false);
   const pendingQuantityUpdatesRef = useRef(new Map<string, PendingQuantityUpdate>());
-  const quantitySyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Effects
   useEffect(() => {
@@ -402,10 +333,6 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
     setOrderModalError,
     searchCatalog: state.searchCatalog,
     setSearchCatalog,
-    isSearchFocused: state.isSearchFocused,
-    setIsSearchFocused,
-    mutatingOrderItemId: state.mutatingOrderItemId,
-    setMutatingOrderItemId,
     releasingEmptyOrder: state.releasingEmptyOrder,
     setReleasingEmptyOrder,
     isSavingOrder: state.isSavingOrder,
@@ -427,7 +354,7 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
     hasPendingChanges: state.hasPendingChanges,
     setHasPendingChanges,
 
-    addCatalogQueueRef,
+    quantityFlushQueueRef,
     latestOrderItemsRef,
     orderItemsCacheRef,
     catalogBusinessIdRef,
@@ -436,7 +363,6 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
     catalogLoadPromiseRef,
     orderModalOpenIntentRef,
     pendingQuantityUpdatesRef,
-    quantitySyncTimerRef,
 
     filteredCatalog,
     insufficientItems,
@@ -448,7 +374,6 @@ export function useMesaOrderState({ listCatalogItems }: UseMesaOrderStateParams)
     cashChangeData,
 
     ensureCatalogLoaded,
-    dispatch,
   };
 }
 

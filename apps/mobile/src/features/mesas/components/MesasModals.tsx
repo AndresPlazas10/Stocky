@@ -1,8 +1,7 @@
 import React from 'react';
-import type { Session } from '@supabase/supabase-js';
 
 import type { MesaOrderCatalogItem, MesaOrderItem } from '../../../services/mesaOrderService';
-import type { BusinessContext, MesaRecord } from '../../../services/mesasService';
+import type { MesaRecord } from '../../../services/mesasService';
 import type { PaymentMethod, SplitSubAccount } from '../../../services/mesaCheckoutService';
 import { OrderModal } from './OrderModal';
 import { CreateMesaModal } from './CreateMesaModal';
@@ -25,7 +24,6 @@ type OrderState = {
   isClosingOrder: boolean;
   releasingEmptyOrder: boolean;
   isPrintInProgress: boolean;
-  mutatingOrderItemId: string | null;
   insufficientItems: StockShortage[];
   insufficientComboComponents: ComboComponentShortage[];
 };
@@ -49,8 +47,6 @@ type CashChangeData = {
 };
 
 export interface MesasModalsProps {
-  session: Session;
-  context: BusinessContext | null;
   isKeyboardVisible: boolean;
 
   showCreateMesaModal: boolean;
@@ -123,8 +119,6 @@ export const MesasModals = React.memo(function MesasModals(props: MesasModalsPro
 
       <OrderModal
         visible={props.showOrderModal}
-        session={props.session}
-        context={props.context}
         orderState={props.orderState}
         actions={props.actions}
       />

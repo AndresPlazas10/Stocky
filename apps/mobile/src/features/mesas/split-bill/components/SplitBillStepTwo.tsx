@@ -28,7 +28,6 @@ interface SplitBillStepTwoProps {
   onTogglePaymentMenu: () => void;
   onSelectPaymentMethod: (method: AccountState['paymentMethod']) => void;
   onAdjustQuantity: (itemId: string, accountId: number, delta: number) => void;
-  getItemExpectedQuantity: (_itemId: string) => number;
 }
 
 export const SplitBillStepTwo = React.memo(function SplitBillStepTwo({
@@ -42,7 +41,6 @@ export const SplitBillStepTwo = React.memo(function SplitBillStepTwo({
   onTogglePaymentMenu,
   onSelectPaymentMethod,
   onAdjustQuantity,
-  getItemExpectedQuantity: _getItemExpectedQuantity,
 }: SplitBillStepTwoProps) {
   const { t } = useTranslation('mesas');
   const config = useBusinessConfig();
@@ -51,7 +49,7 @@ export const SplitBillStepTwo = React.memo(function SplitBillStepTwo({
     const availableMethods = config.country.paymentMethods;
     return availableMethods.map((method) => ({
       value: method as PaymentMethod,
-      label: t(`paymentMethods.${method}`, { defaultValue: method }),
+      label: t(`paymentMethods.${method}`, { ns: 'common', defaultValue: method }),
     }));
   }, [config.country.paymentMethods, t]);
 

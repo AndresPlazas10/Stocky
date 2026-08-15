@@ -12,6 +12,9 @@ import {
   mergeMesaLocks,
   createMesaLocksRefresher,
   MESA_IN_USE_MESSAGE,
+  MESA_LOCK_TTL_MS,
+  MESA_LOCK_TTL_SECONDS,
+  MESA_LOCK_HEARTBEAT_MS,
 } from '../utils/mesaHelpers';
 
 type HeldMesaLock = {
@@ -28,7 +31,6 @@ export function useMesaEditLock({
   isOrderFlowActive = false,
   onLockLost,
   onCloseAuxiliaryOrderModals,
-  onHandleDismissOrderModal,
   sendBroadcast,
   sendBroadcastRef,
 }: {
@@ -39,7 +41,6 @@ export function useMesaEditLock({
   isOrderFlowActive?: boolean;
   onLockLost?: () => void;
   onCloseAuxiliaryOrderModals?: () => void;
-  onHandleDismissOrderModal?: () => void;
   sendBroadcast?: (event: string, payload: Record<string, unknown>) => void;
   sendBroadcastRef?: React.MutableRefObject<((event: string, payload: Record<string, unknown>) => void) | null>;
 }) {
@@ -77,14 +78,13 @@ export function useMesaEditLock({
       if (!businessId || !tableId) return;
 
       const locked = Boolean(input.locked);
-      const lockTtlMs = 45_000;
+      const lockTtlMs = MESA_LOCK_TTL_MS;
       const lockExpiresAt = locked
         ? String(input.lockExpiresAt || '').trim() || new Date(Date.now() + lockTtlMs).toISOString()
         : null;
 
       const broadcaster = sendBroadcast || sendBroadcastRef?.current;
       if (broadcaster) {
-        console.log('[Broadcast] Sending mesa_lock_changed', { mesaId: tableId, locked, mode: input.mode });
         broadcaster('mesa_lock_changed', {
           sender_user_id: session.user.id,
           sender_client_id: clientInstanceIdRef.current,
@@ -98,8 +98,6 @@ export function useMesaEditLock({
           lock_ttl_ms: locked ? lockTtlMs : null,
           emitted_at: Date.now(),
         });
-      } else {
-        console.warn('[Broadcast] No broadcaster available for mesa_lock_changed');
       }
     },
     [sendBroadcast, sendBroadcastRef, session.user.id],
@@ -189,7 +187,7 @@ export function useMesaEditLock({
           tableId,
           userId: session.user.id,
           userName: actorDisplayName,
-          ttlSeconds: 45,
+          ttlSeconds: MESA_LOCK_TTL_SECONDS,
         });
 
         if (result.unsupported) {
@@ -275,12 +273,8 @@ export function useMesaEditLock({
   }, [closeAuxiliaryOrderModals, onLockLost, releaseHeldMesaLock]);
 
   const handleDismissOrderModal = useCallback(() => {
-    if (onHandleDismissOrderModal) {
-      onHandleDismissOrderModal();
-    } else {
-      closeOrderModal();
-    }
-  }, [closeOrderModal, onHandleDismissOrderModal]);
+    closeOrderModal();
+  }, [closeOrderModal]);
 
   useEffect(() => {
     const held = heldMesaLockRef.current;
@@ -315,7 +309,7 @@ export function useMesaEditLock({
         userId: session.user.id,
         userName: actorDisplayName,
         lockToken: current.lockToken,
-        ttlSeconds: 45,
+        ttlSeconds: MESA_LOCK_TTL_SECONDS,
       })
         .then((result) => {
           if (cancelled) return;
@@ -344,7 +338,7 @@ export function useMesaEditLock({
         .catch((err: unknown) => {
           if (__DEV__) console.warn('[mesas] edit_lock_heartbeat_failed', (err as Error)?.message || err);
         });
-    }, 9000);
+    }, MESA_LOCK_HEARTBEAT_MS);
 
     return () => {
       cancelled = true;
@@ -365,9 +359,6 @@ export function useMesaEditLock({
     setMesaLocksByTableId,
     heldMesaLock,
     heldMesaLockRef,
-    closeOrderModal,
-    handleDismissOrderModal,
-    closeAuxiliaryOrderModals,
     publishMesaLockBroadcast,
     acquireMesaLockForEdition,
     releaseHeldMesaLock,

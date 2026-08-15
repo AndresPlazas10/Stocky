@@ -10,6 +10,20 @@ import {
 import type { MesaOrderItem } from '../../../services/mesaOrderService';
 import { compareMesaTableIdentifiers } from '../utils/mesaHelpers';
 
+function resolveErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error) {
+    return String(err.message || '').trim() || fallback;
+  }
+  if (err && typeof err === 'object') {
+    const message = (err as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim()) return message.trim();
+    const details = (err as { details?: unknown }).details;
+    if (typeof details === 'string' && details.trim()) return details.trim();
+  }
+  if (typeof err === 'string' && err.trim()) return err.trim();
+  return fallback;
+}
+
 type UseMesaOpenCloseParams = {
   session: Session;
   context: BusinessContext | null | undefined;
@@ -64,7 +78,7 @@ export function useMesaOpenClose({
   const handleOpenClose = useCallback(
     async (mesa: MesaRecord, action: 'open' | 'close') => {
       if (!session.access_token) {
-        setError(t('mesas.noSession'));
+        setError(t('mesas:noSession'));
         return;
       }
 
@@ -186,7 +200,7 @@ export function useMesaOpenClose({
             }
           } else {
             closeOrderModal();
-            setError(t('mesas.orderNotFound'));
+            setError(t('mesas:orderNotFound'));
           }
         } else {
           const updatedMesa = await openCloseMesa({
@@ -236,7 +250,7 @@ export function useMesaOpenClose({
           previousOrderId,
           mode: 'rollback',
         });
-        setError(err instanceof Error ? err.message : t('mesas.updateFailed'));
+        setError(resolveErrorMessage(err, t('mesas:updateFailed')));
       } finally {
         setActingMesaId((current) => (current === mesa.id ? null : current));
       }

@@ -1,9 +1,8 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import type { Session } from '@supabase/supabase-js';
 
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { StockyModal } from '../../../ui/StockyModal';
@@ -13,15 +12,13 @@ import type {
   MesaOrderItem,
   StockShortage,
 } from '../../../services/mesaOrderService';
-import type { BusinessContext, MesaRecord } from '../../../services/mesasService';
+import type { MesaRecord } from '../../../services/mesasService';
 import { CatalogResultsList } from './CatalogResultsList';
 import { OrderItemRow } from './OrderItemRow';
 import { StockShortageBanner } from './StockShortageBanner';
 
 export type OrderModalProps = {
   visible: boolean;
-  session: Session;
-  context: BusinessContext | null | undefined;
 
   orderState: {
     selectedMesa: MesaRecord | null;
@@ -36,10 +33,12 @@ export type OrderModalProps = {
     isClosingOrder: boolean;
     releasingEmptyOrder: boolean;
     isPrintInProgress: boolean;
-    mutatingOrderItemId: string | null;
+    orderModalError?: string | null;
     insufficientItems: StockShortage[];
     insufficientComboComponents: ComboComponentShortage[];
     hasPendingChanges?: boolean;
+    orderNotes?: string;
+    isSavingNotes?: boolean;
   };
 
   actions: {
@@ -51,6 +50,7 @@ export type OrderModalProps = {
     onUpdateOrderItemQuantity: (item: MesaOrderItem, delta: number) => void;
     onSearchChange: (query: string) => void;
     resolveOrderItemDisplayName: (item: MesaOrderItem) => string;
+    onSaveNotes?: (notes: string) => void;
   };
 };
 
@@ -76,10 +76,12 @@ export const OrderModal = React.memo(function OrderModal({
     isClosingOrder,
     releasingEmptyOrder,
     isPrintInProgress,
-    mutatingOrderItemId,
+    orderModalError = null,
     insufficientItems,
     insufficientComboComponents,
     hasPendingChanges,
+    orderNotes = '',
+    isSavingNotes = false,
   } = orderState;
 
   const {
@@ -91,7 +93,23 @@ export const OrderModal = React.memo(function OrderModal({
     onUpdateOrderItemQuantity,
     onSearchChange,
     resolveOrderItemDisplayName,
+    onSaveNotes,
   } = actions;
+
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesDraft, setNotesDraft] = useState('');
+
+  useEffect(() => {
+    setNotesDraft(orderNotes || '');
+    setNotesOpen(false);
+  }, [orderNotes, visible]);
+
+  const handleSaveOrderWithNotes = () => {
+    if (notesOpen && onSaveNotes && notesDraft !== orderNotes) {
+      onSaveNotes(notesDraft);
+    }
+    void onSaveOrder();
+  };
 
   const scrollViewRef = useRef<ScrollView | null>(null);
 
@@ -105,19 +123,16 @@ export const OrderModal = React.memo(function OrderModal({
 
   const renderOrderItem = useCallback(
     ({ item }: { item: MesaOrderItem }) => {
-      const busy = mutatingOrderItemId === item.id;
       return (
         <OrderItemRow
           item={item}
           itemName={resolveOrderItemDisplayName(item)}
-          busy={busy}
           disabled={isClosingOrder || releasingEmptyOrder}
           onChangeQuantity={onUpdateOrderItemQuantity}
         />
       );
     },
     [
-      mutatingOrderItemId,
       resolveOrderItemDisplayName,
       isClosingOrder,
       releasingEmptyOrder,
@@ -174,7 +189,7 @@ export const OrderModal = React.memo(function OrderModal({
               (releasingEmptyOrder || isSavingOrder) && styles.actionButtonDisabled,
             ]}
             onPress={() => {
-              void onSaveOrder();
+              handleSaveOrderWithNotes();
             }}
             disabled={releasingEmptyOrder || isSavingOrder}
           >
@@ -252,6 +267,13 @@ export const OrderModal = React.memo(function OrderModal({
         disabled={loadingOrder || isClosingOrder || releasingEmptyOrder}
       />
 
+      {orderModalError ? (
+        <View style={styles.orderModalErrorBanner}>
+          <Ionicons name="alert-circle-outline" size={18} color="#991B1B" />
+          <Text style={styles.orderModalErrorText}>{orderModalError}</Text>
+        </View>
+      ) : null}
+
       <Text style={styles.orderItemsTitle}>{t('labels.orderItems')}</Text>
       {orderItems.length === 0 ? (
         <View style={styles.orderItemsEmpty}>
@@ -278,6 +300,40 @@ export const OrderModal = React.memo(function OrderModal({
         insufficientItems={insufficientItems}
         insufficientComboComponents={insufficientComboComponents}
       />
+
+      <View style={styles.orderNotesSection}>
+        {orderNotes && !notesOpen ? (
+          <View style={styles.orderNotesPreview}>
+            <Ionicons name="chatbubble-ellipses-outline" size={16} color="#92400E" />
+            <Text style={styles.orderNotesPreviewText}>{orderNotes}</Text>
+          </View>
+        ) : null}
+
+        <Pressable
+          onPress={() => setNotesOpen((prev) => !prev)}
+          disabled={isSavingNotes}
+          style={({ pressed }) => [styles.orderNotesToggle, pressed && styles.orderNotesTogglePressed]}
+        >
+          <Ionicons name="chatbubble-ellipses-outline" size={16} color="#4F46E5" />
+          <Text style={styles.orderNotesToggleText}>
+            {orderNotes ? t('buttons.editNote', 'Editar comentario') : t('buttons.addNote', 'Agregar comentario')}
+          </Text>
+        </Pressable>
+
+        {notesOpen ? (
+          <View style={styles.orderNotesEditor}>
+            <TextInput
+              value={notesDraft}
+              onChangeText={setNotesDraft}
+              placeholder={t('buttons.orderNotesPlaceholder', 'Escribe un comentario para la cocina...')}
+              placeholderTextColor="#9CA3AF"
+              multiline
+              maxLength={500}
+              style={styles.orderNotesInput}
+            />
+          </View>
+        ) : null}
+      </View>
     </StockyModal>
   );
 });
@@ -399,6 +455,25 @@ const styles = StyleSheet.create({
   actionButtonDisabled: {
     opacity: 0.7,
   },
+  orderModalErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 10,
+  },
+  orderModalErrorText: {
+    flex: 1,
+    color: '#991B1B',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
   orderItemsTitle: {
     color: '#111827',
     fontSize: 20,
@@ -430,5 +505,63 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: '#6366F1',
+  },
+  orderNotesSection: {
+    marginTop: 4,
+    gap: 8,
+  },
+  orderNotesPreview: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFBEB',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  orderNotesPreviewText: {
+    flex: 1,
+    color: '#92400E',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 19,
+  },
+  orderNotesToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 12,
+  },
+  orderNotesTogglePressed: {
+    opacity: 0.8,
+  },
+  orderNotesToggleText: {
+    color: '#4F46E5',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  orderNotesEditor: {
+    gap: 8,
+  },
+  orderNotesInput: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#111827',
+    fontSize: 14,
+    fontWeight: '500',
+    minHeight: 88,
+    textAlignVertical: 'top',
   },
 });

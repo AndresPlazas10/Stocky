@@ -3,6 +3,7 @@ import { EXPO_CONFIG } from '../config/env';
 import { getSupabaseClient } from '../lib/supabase';
 import { normalizeReference } from '../utils/normalization';
 import { dedupedRequest } from '../utils/requestDedup';
+import { isMissingColumnError } from '../utils/supabaseErrors';
 
 import type { SupabaseErrorLike } from '../types/errors';
 
@@ -29,7 +30,7 @@ export async function checkRateLimit(
     });
 
     if (error) {
-      console.warn('[rate-limit] check failed, allowing request:', error.message);
+      if (__DEV__) console.warn('[rate-limit] check failed, allowing request:', error.message);
       return true;
     }
 
@@ -55,10 +56,14 @@ export type MesaRecord = {
   current_order_id?: string | null;
   order_units?: number;
   sync_version?: number;
+  call_requested_at?: string | null;
   orders?: {
     id?: string;
     status?: string;
     total?: number;
+    notes?: string;
+    opened_at?: string;
+    updated_at?: string;
   } | null;
 };
 
@@ -66,6 +71,7 @@ export type BusinessContext = {
   businessId: string;
   businessName: string | null;
   source: 'owner' | 'employee';
+  role?: string | null;
   isActive: boolean;
   country_code: string | null;
   timezone: string | null;
@@ -102,6 +108,7 @@ type BusinessCandidate = {
   businessId: string;
   businessName: string | null;
   source: 'owner' | 'employee';
+  role?: string | null;
   createdAt: string | null;
   isActive: boolean;
   country_code?: string | null;
@@ -188,11 +195,29 @@ function normalizeMesaRow(row: Record<string, unknown>): MesaRecord {
     sync_version: Number.isFinite(rawSyncVersion)
       ? Math.max(0, Math.floor(rawSyncVersion))
       : undefined,
+    call_requested_at:
+      row.call_requested_at && typeof row.call_requested_at === 'string'
+        ? row.call_requested_at
+        : row.call_requested_at
+          ? new Date(String(row.call_requested_at)).toISOString()
+          : undefined,
     orders: ordersRecord
       ? {
           id: ordersRecord.id as string | undefined,
           status: (ordersRecord.status as string | undefined) ?? undefined,
           total: Number(ordersRecord.total || 0),
+          notes:
+            typeof ordersRecord.notes === 'string' && ordersRecord.notes.trim() !== ''
+              ? ordersRecord.notes
+              : undefined,
+          opened_at:
+            typeof ordersRecord.opened_at === 'string' && ordersRecord.opened_at.trim() !== ''
+              ? ordersRecord.opened_at
+              : undefined,
+          updated_at:
+            typeof ordersRecord.updated_at === 'string' && ordersRecord.updated_at.trim() !== ''
+              ? ordersRecord.updated_at
+              : undefined,
         }
       : null,
   };
@@ -206,6 +231,11 @@ function normalizeBusinessContextCandidate(
     businessId: candidate.businessId,
     businessName: candidate.businessName,
     source: candidate.source,
+    role: candidate.role
+      ? String(candidate.role).trim().toLowerCase()
+      : candidate.source === 'owner'
+        ? 'owner'
+        : 'employee',
     isActive: candidate.isActive !== false,
     country_code: candidate.country_code || null,
     timezone: candidate.timezone || null,
@@ -233,6 +263,7 @@ async function resolveRememberedBusinessCandidate(
       businessId: String(ownerResult.data.id),
       businessName: ownerResult.data.name || null,
       source: 'owner',
+      role: 'owner',
       createdAt: ownerResult.data.created_at || null,
       isActive: ownerResult.data.is_active !== false,
       country_code: ownerResult.data.country_code || null,
@@ -243,7 +274,7 @@ async function resolveRememberedBusinessCandidate(
 
   const employeeResult = await client
     .from('employees')
-    .select('business_id,created_at')
+    .select('business_id,created_at,role')
     .eq('user_id', userId)
     .eq('is_active', true)
     .eq('business_id', rememberedBusinessId)
@@ -265,6 +296,7 @@ async function resolveRememberedBusinessCandidate(
       businessId: String(employeeResult.data.business_id),
       businessName: businessResult.data?.name || null,
       source: 'employee',
+      role: employeeResult.data.role || null,
       createdAt: employeeResult.data.created_at || businessResult.data?.created_at || null,
       isActive: businessResult.data?.is_active !== false,
       country_code: businessResult.data?.country_code || null,
@@ -441,10 +473,14 @@ async function fetchMesasWithSelect(businessId: string, _includeNameColumn: bool
       status,
       current_order_id,
       sync_version,
+      call_requested_at,
       orders:orders!current_order_id (
         id,
         status,
-        total
+        total,
+        notes,
+        opened_at,
+        updated_at
       )
     `;
 
@@ -667,16 +703,6 @@ async function runLegacyOpenCloseWithSupabaseClient({
   };
 }
 
-export async function setPreferredBusinessId(businessId: string) {
-  const normalized = String(businessId || '').trim();
-  if (!normalized) return;
-  await AsyncStorage.setItem(LAST_BUSINESS_ID_STORAGE_KEY, normalized);
-}
-
-export async function clearPreferredBusinessId() {
-  await AsyncStorage.removeItem(LAST_BUSINESS_ID_STORAGE_KEY);
-}
-
 export function clearResolvedBusinessContextCache(userId?: string) {
   const normalizedUserId = String(userId || '').trim();
   if (normalizedUserId) {
@@ -732,6 +758,7 @@ export async function resolveBusinessContext(
                     .toLowerCase() === 'employee'
                     ? 'employee'
                     : 'owner',
+                role: rpcRow.role ?? null,
                 createdAt: rpcRow.created_at ?? null,
                 isActive: rpcRow.is_active !== false,
                 country_code: rpcRow.country_code ?? null,
@@ -801,7 +828,7 @@ export async function resolveBusinessContext(
 
     const latestEmployeeRowResult = await client
       .from('employees')
-      .select('business_id,created_at')
+      .select('business_id,created_at,role')
       .eq('user_id', normalizedUserId)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
@@ -828,6 +855,7 @@ export async function resolveBusinessContext(
           businessId: latestEmployeeBusinessId,
           businessName: latestEmployeeBusinessResult.data?.name || null,
           source: 'employee',
+          role: latestEmployeeRow.role || null,
           createdAt:
             latestEmployeeRow.created_at || latestEmployeeBusinessResult.data?.created_at || null,
           isActive: latestEmployeeBusinessResult.data?.is_active !== false,
@@ -1777,6 +1805,45 @@ export async function deleteMesaCascade({
 
   if (deleteTable.error) throw deleteTable.error;
 }
+
+export async function setTableCallRequested(
+  tableId: string,
+  businessId: string,
+): Promise<void> {
+  const client = getSupabaseClient();
+  const { error } = await client
+    .from('tables')
+    .update({ call_requested_at: new Date().toISOString() })
+    .eq('id', tableId)
+    .eq('business_id', businessId);
+
+  if (
+    error &&
+    !isMissingColumnError(error, { tableName: 'tables', columnName: 'call_requested_at' })
+  ) {
+    throw error;
+  }
+}
+
+export async function clearTableCallRequested(
+  tableId: string,
+  businessId: string,
+): Promise<void> {
+  const client = getSupabaseClient();
+  const { error } = await client
+    .from('tables')
+    .update({ call_requested_at: null })
+    .eq('id', tableId)
+    .eq('business_id', businessId);
+
+  if (
+    error &&
+    !isMissingColumnError(error, { tableName: 'tables', columnName: 'call_requested_at' })
+  ) {
+    throw error;
+  }
+}
+
 
 export async function openCloseMesa({
   accessToken,

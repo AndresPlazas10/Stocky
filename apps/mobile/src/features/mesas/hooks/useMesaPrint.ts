@@ -1,16 +1,12 @@
 import { useCallback, useRef, useState } from 'react';
 
-export type UseMesaPrintProps = {
-  setOrderModalError: (msg: string | null) => void;
-};
-
 export type UseMesaPrintReturn = {
   isPrintInProgress: boolean;
   beginPrintFlow: () => boolean;
   endPrintFlow: () => void;
 };
 
-export function useMesaPrint(_props: UseMesaPrintProps): UseMesaPrintReturn {
+export function useMesaPrint(): UseMesaPrintReturn {
   const [isPrintInProgress, setIsPrintInProgress] = useState(false);
   const printInFlightRef = useRef(false);
 

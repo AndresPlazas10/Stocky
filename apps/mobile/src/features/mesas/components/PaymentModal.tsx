@@ -233,7 +233,7 @@ export const PaymentModal = React.memo(function PaymentModal({
 
       <View style={styles.breakdownCard}>
         <Text style={styles.breakdownTitle}>
-          {t('labels.noChange', { defaultValue: 'DESGLOSE DEL CAMBIO' }).toUpperCase()}
+          {t('labels.changeBreakdown', { defaultValue: 'DESGLOSE DEL CAMBIO' }).toUpperCase()}
         </Text>
         {paymentMethod !== 'cash' ? (
           <Text style={styles.breakdownText}>

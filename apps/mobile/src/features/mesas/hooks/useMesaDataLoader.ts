@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { useTranslation } from 'react-i18next';
 import {
@@ -14,11 +14,19 @@ import type { StoredCatalogSnapshot } from '../utils/catalogCache';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-type HeldMesaLock = {
-  businessId: string;
-  tableId: string;
-  lockToken: string | null;
-};
+function resolveErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error) {
+    return String(err.message || '').trim() || fallback;
+  }
+  if (err && typeof err === 'object') {
+    const message = (err as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim()) return message.trim();
+    const details = (err as { details?: unknown }).details;
+    if (typeof details === 'string' && details.trim()) return details.trim();
+  }
+  if (typeof err === 'string' && err.trim()) return err.trim();
+  return fallback;
+}
 
 type MesaEditLock = {
   table_id: string;
@@ -48,8 +56,6 @@ type UseMesaDataLoaderParams = {
   lockOps: {
     setMesaLocksByTableId: React.Dispatch<React.SetStateAction<Record<string, MesaEditLock>>>;
     refreshMesaLocks: (businessId: string) => Promise<void>;
-    heldMesaLockRef: React.MutableRefObject<HeldMesaLock | null>;
-    releaseHeldMesaLock: (held?: HeldMesaLock | null) => void;
   };
   catalogOps: {
     ensureCatalogLoaded: (businessId: string) => Promise<any[]>;
@@ -61,7 +67,6 @@ type UseMesaDataLoaderParams = {
   broadcast: {
     publishMesaStateBroadcast: (mesa: MesaRecord, options?: Record<string, unknown>) => void;
     traceAsyncDuration: (label: string, start: number, data?: Record<string, unknown>) => void;
-    realtimeClientInstanceIdRef: React.MutableRefObject<string>;
   };
   sharedRefs: {
     orderItemsCacheRef: React.MutableRefObject<Map<string, MesaOrderItem[]>>;
@@ -79,16 +84,14 @@ export function useMesaDataLoader({
   broadcast,
   sharedRefs,
 }: UseMesaDataLoaderParams) {
-  const { session, businessContext, sessionDisplayName, actorDisplayName } = auth;
+  const { session, businessContext, sessionDisplayName } = auth;
   const { setContext, setMesas, setLoading, setError, setActorDisplayName, setCatalogItems } = setters;
-  const { setMesaLocksByTableId, refreshMesaLocks, heldMesaLockRef, releaseHeldMesaLock } = lockOps;
+  const { setMesaLocksByTableId, refreshMesaLocks } = lockOps;
   const { ensureCatalogLoaded, readCatalogFromStorage, catalogBusinessIdRef, catalogUpdatedAtRef, catalogItemsRef } = catalogOps;
   const { publishMesaStateBroadcast, traceAsyncDuration } = broadcast;
   const { orderItemsCacheRef, mesasLengthRef, hasLoadedOnceRef, isPendingEmptyRelease } = sharedRefs;
 
   const { t } = useTranslation('mesas');
-  const actorDisplayNameRef = useRef(actorDisplayName);
-  actorDisplayNameRef.current = actorDisplayName;
 
   const loadData = useCallback(async () => {
     const shouldShowLoading = mesasLengthRef.current === 0 && !hasLoadedOnceRef.current;
@@ -106,7 +109,7 @@ export function useMesaDataLoader({
         setMesas([]);
         setMesaLocksByTableId({});
         orderItemsCacheRef.current.clear();
-        setError(t('mesas.notFound'));
+        setError(t('mesas:notFound'));
         return;
       }
 
@@ -168,7 +171,7 @@ export function useMesaDataLoader({
         void loadOpenOrderSnapshot(mesa.current_order_id!, { forceRefresh: false });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('mesas.loadFailed'));
+      setError(resolveErrorMessage(err, t('mesas:loadFailed')));
     } finally {
       hasLoadedOnceRef.current = true;
       if (shouldShowLoading) {
@@ -233,6 +236,28 @@ export function useMesaDataLoader({
       );
     },
     [isPendingEmptyRelease, setMesas],
+  );
+
+  const patchMesaOrderNotes = useCallback(
+    (mesaId: string, orderId: string, notes: string) => {
+      const cleanNotes = String(notes || '').trim().slice(0, 500);
+      setMesas((prev: MesaRecord[]) =>
+        prev.map((mesa: MesaRecord) => {
+          if (mesa.id !== mesaId) return mesa;
+          return {
+            ...mesa,
+            status: 'occupied',
+            current_order_id: orderId,
+            orders: {
+              ...(mesa.orders || {}),
+              id: orderId,
+              notes: cleanNotes !== '' ? cleanNotes : undefined,
+            },
+          };
+        }),
+      );
+    },
+    [setMesas],
   );
 
   const publishRealtimeOrderSummary = useCallback(
@@ -325,6 +350,7 @@ export function useMesaDataLoader({
   return {
     loadData,
     patchMesaOrderTotal,
+    patchMesaOrderNotes,
     publishRealtimeOrderSummary,
     markMesaAsAvailableAfterSale,
   };

@@ -3,8 +3,8 @@ import { normalizeText, normalizeNumber } from '../../utils/normalization';
 import { isFunctionUnavailableError, isMissingColumnError } from '../../utils/supabaseErrors';
 import { normalizeOrderId } from './internal';
 import { calculateOrderTotal } from './utils';
+import { calculateOrderUnits } from '@stocky/shared/order-normalization';
 import type {
-  MesaOrderProduct,
   MesaOrderItem,
   MesaOrderCatalogItem,
   MesaOpenOrderSnapshot,
@@ -84,13 +84,6 @@ function normalizeOrderItem(row: Record<string, unknown>): MesaOrderItem {
   };
 }
 
-function calculateOrderUnits(items: MesaOrderItem[]): number {
-  return (Array.isArray(items) ? items : []).reduce(
-    (sum, item) => sum + Math.max(0, Math.floor(normalizeNumber(item?.quantity, 0))),
-    0,
-  );
-}
-
 async function persistOrderTotal(orderId: string, total: number): Promise<void> {
   const client = getSupabaseClient();
   const withTotal = await client.from('orders').update({ total }).eq('id', orderId);
@@ -100,6 +93,19 @@ async function persistOrderTotal(orderId: string, total: number): Promise<void> 
     !isMissingColumnError(withTotal.error, { tableName: 'orders', columnName: 'total' })
   ) {
     throw withTotal.error;
+  }
+}
+
+export async function persistOrderNotes(orderId: string, notes: string): Promise<void> {
+  const client = getSupabaseClient();
+  const cleanNotes = String(notes || '').trim().slice(0, 500);
+  const result = await client.from('orders').update({ notes: cleanNotes }).eq('id', orderId);
+
+  if (
+    result.error &&
+    !isMissingColumnError(result.error, { tableName: 'orders', columnName: 'notes' })
+  ) {
+    throw result.error;
   }
 }
 
@@ -177,14 +183,6 @@ export function invalidateOrderItemsCache(orderId?: string) {
 
   orderItemsCacheByOrderId.clear();
   orderItemsInFlightByOrderId.clear();
-}
-
-export function getOrderItemsCacheSnapshot(
-  orderId: string,
-): { items: MesaOrderItem[]; cachedAt: number } | null {
-  const normalizedOrderId = normalizeOrderId(orderId);
-  if (!normalizedOrderId) return null;
-  return orderItemsCacheByOrderId.get(normalizedOrderId) || null;
 }
 
 export function setOrderItemsCacheSnapshot(orderId: string, items: MesaOrderItem[]): void {
@@ -341,188 +339,6 @@ export async function loadOpenOrderSnapshot(
     total: calculateOrderTotal(items),
     units: calculateOrderUnits(items),
   };
-}
-
-export async function listOrderItemUnitsByOrderIds(
-  orderIds: string[],
-): Promise<Record<string, number>> {
-  const normalizedIds = Array.from(
-    new Set(
-      (Array.isArray(orderIds) ? orderIds : [])
-        .map((id) => String(id || '').trim())
-        .filter(Boolean),
-    ),
-  );
-
-  if (normalizedIds.length === 0) return {};
-
-  const client = getSupabaseClient();
-  const { data, error } = await client
-    .from('order_items')
-    .select('order_id, quantity')
-    .in('order_id', normalizedIds);
-
-  if (error) throw error;
-
-  const totals: Record<string, number> = {};
-  (Array.isArray(data) ? data : []).forEach((row) => {
-    const orderId = normalizeText(row?.order_id);
-    if (!orderId) return;
-    const quantity = Math.max(0, Math.floor(normalizeNumber(row?.quantity, 0)));
-    totals[orderId] = (totals[orderId] || 0) + quantity;
-  });
-
-  return totals;
-}
-
-export async function syncOrderTotal(orderId: string): Promise<number> {
-  const client = getSupabaseClient();
-  const items = await listOrderItems(orderId);
-  const total = calculateOrderTotal(items);
-
-  const withTotal = await client.from('orders').update({ total }).eq('id', orderId);
-
-  if (
-    withTotal.error &&
-    !isMissingColumnError(withTotal.error, { tableName: 'orders', columnName: 'total' })
-  ) {
-    throw withTotal.error;
-  }
-
-  return total;
-}
-
-export async function addCatalogItemToOrder({
-  orderId,
-  catalogItem,
-  quantity = 1,
-}: {
-  orderId: string;
-  catalogItem: MesaOrderCatalogItem;
-  quantity?: number;
-}): Promise<{ item: MesaOrderItem }> {
-  const client = getSupabaseClient();
-  const safeQty = Math.max(1, Math.floor(normalizeNumber(quantity, 1)));
-
-  let existingQuery = client
-    .from('order_items')
-    .select('id, quantity, price')
-    .eq('order_id', orderId)
-    .limit(1);
-
-  if (catalogItem.item_type === 'combo') {
-    existingQuery = existingQuery.eq('combo_id', catalogItem.combo_id).is('product_id', null);
-  } else {
-    existingQuery = existingQuery.eq('product_id', catalogItem.product_id).is('combo_id', null);
-  }
-
-  const { data: existingItem, error: existingError } = await existingQuery.maybeSingle();
-  if (existingError) throw existingError;
-
-  if (existingItem?.id) {
-    const nextQuantity = normalizeNumber(existingItem.quantity, 0) + safeQty;
-    const itemPrice = normalizeNumber(existingItem.price, catalogItem.sale_price);
-    await updateOrderItemSubtotal({
-      itemId: String(existingItem.id),
-      quantity: nextQuantity,
-      price: itemPrice,
-    });
-    invalidateOrderItemsCache(orderId);
-    return {
-      item: {
-        id: String(existingItem.id),
-        order_id: orderId,
-        product_id: catalogItem.item_type === 'product' ? catalogItem.product_id : null,
-        combo_id: catalogItem.item_type === 'combo' ? catalogItem.combo_id : null,
-        quantity: nextQuantity,
-        price: itemPrice,
-        subtotal: nextQuantity * itemPrice,
-        products: null,
-        combos: null,
-      },
-    };
-  } else {
-    const row = {
-      order_id: orderId,
-      product_id: catalogItem.item_type === 'product' ? catalogItem.product_id : null,
-      combo_id: catalogItem.item_type === 'combo' ? catalogItem.combo_id : null,
-      quantity: safeQty,
-      price: catalogItem.sale_price,
-    };
-
-    const insert = await client.from('order_items').insert([row]).select('id').single();
-
-    if (insert.error) throw insert.error;
-    invalidateOrderItemsCache(orderId);
-    return {
-      item: {
-        id: normalizeText(insert.data?.id),
-        order_id: orderId,
-        product_id: catalogItem.item_type === 'product' ? catalogItem.product_id : null,
-        combo_id: catalogItem.item_type === 'combo' ? catalogItem.combo_id : null,
-        quantity: safeQty,
-        price: normalizeNumber(catalogItem.sale_price, 0),
-        subtotal: safeQty * normalizeNumber(catalogItem.sale_price, 0),
-        products: null,
-        combos: null,
-      },
-    };
-  }
-}
-
-export async function addProductToOrder({
-  orderId,
-  product,
-  quantity = 1,
-}: {
-  orderId: string;
-  product: MesaOrderProduct;
-  quantity?: number;
-}): Promise<{ item: MesaOrderItem }> {
-  return addCatalogItemToOrder({
-    orderId,
-    catalogItem: product,
-    quantity,
-  });
-}
-
-export async function updateOrderItemQuantityInOrder({
-  orderId,
-  itemId,
-  quantity,
-}: {
-  orderId: string;
-  itemId: string;
-  quantity: number;
-}): Promise<{ items: MesaOrderItem[]; total: number }> {
-  const client = getSupabaseClient();
-  const safeQty = Math.floor(normalizeNumber(quantity, 0));
-
-  if (safeQty <= 0) {
-    return removeOrderItemFromOrder({ orderId, itemId });
-  }
-
-  const { data: currentItem, error: currentError } = await client
-    .from('order_items')
-    .select('id, price')
-    .eq('id', itemId)
-    .maybeSingle();
-
-  if (currentError) throw currentError;
-  const currentPrice = normalizeNumber(currentItem?.price, 0);
-
-  await updateOrderItemSubtotal({
-    itemId,
-    quantity: safeQty,
-    price: currentPrice,
-  });
-
-  invalidateOrderItemsCache(orderId);
-  const items = await listOrderItems(orderId);
-  const total = calculateOrderTotal(items);
-  await persistOrderTotal(orderId, total);
-
-  return { items, total };
 }
 
 export async function syncOrderItemQuantity({
@@ -788,24 +604,4 @@ export async function persistOrderSnapshot({
   const total = calculateOrderTotal(persistedItems);
   await persistOrderTotal(orderId, total);
   return { items: persistedItems, total };
-}
-
-export async function removeOrderItemFromOrder({
-  orderId,
-  itemId,
-}: {
-  orderId: string;
-  itemId: string;
-}): Promise<{ items: MesaOrderItem[]; total: number }> {
-  const client = getSupabaseClient();
-  const { error } = await client.from('order_items').delete().eq('id', itemId);
-
-  if (error) throw error;
-
-  invalidateOrderItemsCache(orderId);
-  const items = await listOrderItems(orderId);
-  const total = calculateOrderTotal(items);
-  await persistOrderTotal(orderId, total);
-
-  return { items, total };
 }

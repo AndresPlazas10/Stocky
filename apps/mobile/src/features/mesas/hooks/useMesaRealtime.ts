@@ -12,7 +12,13 @@ import {
   loadOpenOrderSnapshot,
   normalizeOrderReference,
 } from '../../../services/mesaOrderService';
-import { mergeMesaLocks, createMesaLocksRefresher } from '../utils/mesaHelpers';
+import {
+  mergeMesaLocks,
+  createMesaLocksRefresher,
+  CALL_WINDOW_MS,
+  MESAS_REMOTE_FALLBACK_POLL_MS,
+} from '../utils/mesaHelpers';
+import { isCallRequestedAtSuppressed as sharedIsCallRequestedAtSuppressed } from '@stocky/shared/mesa-utils';
 
 const MESA_SYNC_TRACE_ENABLED = __DEV__;
 
@@ -47,6 +53,7 @@ export interface UseMesaRealtimeParams {
   }) => void;
   selectedMesaIdRef: React.MutableRefObject<string>;
   heldMesaLockRef: React.MutableRefObject<HeldMesaLock | null>;
+  dismissedCallsRef?: React.MutableRefObject<Map<string, number>>;
   shouldIgnoreStaleOccupiedDuringEmptyRelease?: (
     mesaId: string,
     incomingStatus?: string | null,
@@ -56,10 +63,6 @@ export interface UseMesaRealtimeParams {
 }
 
 export interface UseMesaRealtimeReturn {
-  scheduleMesasRealtimeRefresh: () => void;
-  scheduleMesaLocksRefresh: (businessId: string) => void;
-  scheduleOrderRealtimeSummaryHydration: (orderId: string) => void;
-  refreshMesasRealtime: () => Promise<void>;
   setActiveOrderId: (orderId: string | null) => void;
   mesasSyncBroadcastReadyRef: React.MutableRefObject<boolean>;
   mesasSyncBroadcastChannelRef: React.MutableRefObject<any>;
@@ -108,6 +111,7 @@ export function useMesaRealtime({
   setSelectedMesa,
   selectedMesaIdRef,
   heldMesaLockRef,
+  dismissedCallsRef,
   shouldIgnoreStaleOccupiedDuringEmptyRelease,
   isPendingEmptyRelease,
 }: UseMesaRealtimeParams): UseMesaRealtimeReturn {
@@ -116,10 +120,9 @@ export function useMesaRealtime({
   const orderRealtimeSummaryTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const mesasSyncBroadcastChannelRef = useRef<any>(null);
   const mesasSyncBroadcastReadyRef = useRef(false);
-  const [realtimeClientInstanceId] = useState(
-    () => `mesa-client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  const realtimeClientInstanceIdRef = useRef(
+    `mesa-client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   );
-  const realtimeClientInstanceIdRef = useRef(realtimeClientInstanceId);
   const pendingUiTraceRef = useRef<RealtimeUiTrace | null>(null);
   const mesaLockPlaceholderTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const activeOrderIdRef = useRef<string | null>(null);
@@ -432,6 +435,33 @@ export function useMesaRealtime({
   );
 
   // -------------------------------------------------------------------
+  // call_requested_at suppression (dismiss race)
+  // -------------------------------------------------------------------
+
+  const isCallRequestedAtSuppressed = useCallback(
+    (mesaId: string, incomingRaw: string | null | undefined): boolean =>
+      sharedIsCallRequestedAtSuppressed(
+        dismissedCallsRef?.current,
+        mesaId,
+        incomingRaw,
+        CALL_WINDOW_MS,
+      ),
+    [dismissedCallsRef],
+  );
+
+  const resolveSuppressedIncomingMesa = useCallback(
+    (incomingMesa: MesaRecord): MesaRecord => {
+      const raw = String(incomingMesa?.call_requested_at || '').trim();
+      if (!raw) return incomingMesa;
+      if (!isCallRequestedAtSuppressed(String(incomingMesa?.id || '').trim(), raw)) {
+        return incomingMesa;
+      }
+      return { ...incomingMesa, call_requested_at: undefined };
+    },
+    [isCallRequestedAtSuppressed],
+  );
+
+  // -------------------------------------------------------------------
   // refreshMesasRealtime
   // -------------------------------------------------------------------
 
@@ -493,7 +523,7 @@ export function useMesaRealtime({
               traceMesaSync('refresh_drop_occupied_during_empty_release_selected', { mesaId });
               return previousById.get(selectedMesaId) || mesa;
             }
-            return incomingMesa;
+            return resolveSuppressedIncomingMesa(incomingMesa);
           }
 
           if (!incomingMesa) {
@@ -522,13 +552,13 @@ export function useMesaRealtime({
             return mesa;
           }
 
-          return incomingMesa;
+          return resolveSuppressedIncomingMesa(incomingMesa);
         });
 
         for (const incomingMesa of incoming) {
           const incomingId = String(incomingMesa.id || '').trim();
           if (incomingId && !previousById.has(incomingId)) {
-            merged.push(incomingMesa);
+            merged.push(resolveSuppressedIncomingMesa(incomingMesa));
           }
         }
 
@@ -540,6 +570,8 @@ export function useMesaRealtime({
   }, [
     businessId,
     isOrderFlowActive,
+    isCallRequestedAtSuppressed,
+    resolveSuppressedIncomingMesa,
     selectedMesaIdRef,
     setMesas,
     shouldIgnoreStaleOccupiedDuringEmptyRelease,
@@ -694,6 +726,20 @@ export function useMesaRealtime({
       const nextSyncVersion = hasNextSyncVersion
         ? resolveMesaSyncVersion({ sync_version: nextRow?.sync_version } as Partial<MesaRecord>)
         : undefined;
+      const hasNextCallRequestedAt = Boolean(
+        nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'call_requested_at'),
+      );
+      const incomingCallRequestedAt = hasNextCallRequestedAt
+        ? nextRow?.call_requested_at
+          ? new Date(String(nextRow.call_requested_at)).toISOString()
+          : undefined
+        : undefined;
+      const callRequestedAtSuppressed =
+        hasNextCallRequestedAt &&
+        isCallRequestedAtSuppressed(mesaId, nextRow?.call_requested_at);
+      const nextCallRequestedAt = callRequestedAtSuppressed
+        ? undefined
+        : incomingCallRequestedAt;
 
       setMesas((prev) => {
         const index = prev.findIndex((mesa) => String(mesa?.id || '').trim() === mesaId);
@@ -719,6 +765,7 @@ export function useMesaRealtime({
             status: String(nextStatus || 'available'),
             current_order_id: hasNextCurrentOrderId ? nextCurrentOrderId : null,
             sync_version: hasNextSyncVersion ? nextSyncVersion : undefined,
+            call_requested_at: hasNextCallRequestedAt ? nextCallRequestedAt : undefined,
             orders: null,
           };
           return [...prev, insertedMesa].sort(compareMesaTableIdentifiers);
@@ -766,6 +813,7 @@ export function useMesaRealtime({
           table_number: hasNextTableNumber ? (nextRow?.table_number ?? null) : current.table_number,
           table_name: hasNextTableName ? (nextRow?.table_name ?? null) : current.table_name,
           sync_version: hasNextSyncVersion ? nextSyncVersion : current.sync_version,
+          call_requested_at: hasNextCallRequestedAt ? nextCallRequestedAt : current.call_requested_at,
           orders: (() => {
             if (!resolvedCurrentOrderId || resolvedStatus === 'available') return null;
             if (
@@ -816,6 +864,9 @@ export function useMesaRealtime({
           table_number: hasNextTableNumber ? (nextRow?.table_number ?? null) : prev.table_number,
           table_name: hasNextTableName ? (nextRow?.table_name ?? null) : prev.table_name,
           sync_version: hasNextSyncVersion ? nextSyncVersion : prev.sync_version,
+          call_requested_at: hasNextCallRequestedAt
+            ? nextCallRequestedAt
+            : prev.call_requested_at,
           orders: !resolvedCurrentOrderId || resolvedStatus === 'available' ? null : prev.orders,
         };
       });
@@ -867,6 +918,7 @@ export function useMesaRealtime({
       businessId,
       clearMesaLockPlaceholderTimer,
       heldMesaLockRef,
+      isCallRequestedAtSuppressed,
       scheduleMesaLocksRefresh,
       selectedMesaIdRef,
       setMesas,
@@ -895,6 +947,10 @@ export function useMesaRealtime({
         nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'total'),
       );
       const nextTotal = hasNextTotal ? Number(nextRow?.total || 0) : null;
+      const hasNextNotes = Boolean(
+        nextRow && Object.prototype.hasOwnProperty.call(nextRow, 'notes'),
+      );
+      const nextNotes = hasNextNotes ? String(nextRow?.notes || '') : null;
       const tableId = String(nextRow?.table_id || prevRow?.table_id || '').trim();
       const tableBusinessId = String(
         nextRow?.business_id || prevRow?.business_id || businessId || '',
@@ -937,6 +993,12 @@ export function useMesaRealtime({
               id: orderId,
               status: nextStatus || String(mesa?.orders?.status || 'open'),
               total: nextTotal === null ? Number(mesa?.orders?.total || 0) : Number(nextTotal || 0),
+              notes:
+                nextNotes === null
+                  ? mesa?.orders?.notes
+                  : String(nextNotes).trim() !== ''
+                    ? String(nextNotes).trim()
+                    : undefined,
             },
           };
         }),
@@ -1021,7 +1083,6 @@ export function useMesaRealtime({
     let fallbackTimer: ReturnType<typeof setInterval> | null = null;
     let realtimeConnected = false;
     let backoffMs = 0;
-    const BACKOFF_BASE_MS = 5000;
     const BACKOFF_MAX_MS = 30000;
 
     let client;
@@ -1043,12 +1104,12 @@ export function useMesaRealtime({
 
     function startFallbackPolling() {
       if (fallbackTimer || cancelled || !isFocused) return;
-      const intervalMs = Math.max(BACKOFF_BASE_MS, backoffMs);
+      const intervalMs = Math.max(MESAS_REMOTE_FALLBACK_POLL_MS, backoffMs);
       fallbackTimer = setInterval(() => {
         if (cancelled) return;
         scheduleRefresh();
         scheduleLocks();
-        backoffMs = Math.min(backoffMs * 2 || BACKOFF_BASE_MS, BACKOFF_MAX_MS);
+        backoffMs = Math.min(backoffMs * 2 || MESAS_REMOTE_FALLBACK_POLL_MS, BACKOFF_MAX_MS);
       }, intervalMs);
     }
 
@@ -1183,6 +1244,10 @@ export function useMesaRealtime({
         clearTimeout(timer);
       });
       orderRealtimeSummaryTimersRef.current = {};
+      Object.values(mesaLockPlaceholderTimersRef.current).forEach((timer) => {
+        clearTimeout(timer);
+      });
+      mesaLockPlaceholderTimersRef.current = {};
     };
   }, [
     applyRealtimeMesaLockBroadcast,
@@ -1263,10 +1328,6 @@ export function useMesaRealtime({
   // -------------------------------------------------------------------
 
   return {
-    scheduleMesasRealtimeRefresh,
-    scheduleMesaLocksRefresh,
-    scheduleOrderRealtimeSummaryHydration,
-    refreshMesasRealtime,
     setActiveOrderId,
     mesasSyncBroadcastReadyRef,
     mesasSyncBroadcastChannelRef,

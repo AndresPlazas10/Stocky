@@ -1,5 +1,4 @@
 import type { Session } from '@supabase/supabase-js';
-import type { MesaOrderCatalogItem, MesaOrderItem } from '../../../services/mesaOrderService';
 import type { MesaRecord, MesaEditLock } from '../../../services/mesasService';
 import type { PaymentMethod } from '../../../services/mesaCheckoutService';
 import {
@@ -16,8 +15,23 @@ import {
   sumOrderItemsQuantity as sumOrderItemsQuantityShared,
 } from '@stocky/shared/order-normalization';
 import { reconcileOrderItemsFromServer as reconcileOrderItemsFromServerShared } from '@stocky/shared/order-reconciliation';
+import {
+  CALL_WINDOW_MS,
+  MESA_LOCK_TTL_MS,
+  MESA_LOCK_TTL_SECONDS,
+  MESA_LOCK_HEARTBEAT_MS,
+  MESAS_REMOTE_FALLBACK_POLL_MS,
+} from '@stocky/shared/mesa-constants';
 
 export const MESA_IN_USE_MESSAGE = 'Alguien esta usando esta mesa.';
+
+export {
+  CALL_WINDOW_MS,
+  MESA_LOCK_TTL_MS,
+  MESA_LOCK_TTL_SECONDS,
+  MESA_LOCK_HEARTBEAT_MS,
+  MESAS_REMOTE_FALLBACK_POLL_MS,
+};
 
 /**
  * Merges server-returned locks with existing lock state, preserving
@@ -100,8 +114,7 @@ type ModalResetSetters = {
   setOrderItems: (v: never[]) => void;
   setOrderModalError: (v: null) => void;
   setSearchCatalog: (v: string) => void;
-  setIsSearchFocused: (v: boolean) => void;
-  setMutatingOrderItemId: (v: null) => void;
+  setHasPendingChanges: (v: boolean) => void;
   setPaymentMethod: (v: PaymentMethod) => void;
   setAmountReceived: (v: string) => void;
 };
@@ -129,8 +142,7 @@ export function resetOrderFlow(s: ModalResetSetters) {
   s.setOrderItems([]);
   s.setOrderModalError(null);
   s.setSearchCatalog('');
-  s.setIsSearchFocused(false);
-  s.setMutatingOrderItemId(null);
+  s.setHasPendingChanges(false);
 }
 
 const DENOMINATIONS_BY_COUNTRY: Record<string, number[]> = {
@@ -193,75 +205,4 @@ export function buildCashBreakdown(change: number, denominations?: number[]) {
   }
 
   return breakdown;
-}
-
-export function formatCatalogItemMeta(item: MesaOrderCatalogItem) {
-  const code = item.code ? `${item.code} · ` : '';
-  if (item.item_type === 'combo') {
-    const parts = Array.isArray(item.combo_items) ? item.combo_items.length : 0;
-    return `${code}Combo (${parts} items)`;
-  }
-
-  return `${code}${item.manage_stock ? `Stock ${item.stock}` : 'Sin control de stock'}`;
-}
-
-export function isSameOrderItemIdentity(left: MesaOrderItem, right: MesaOrderItem) {
-  const leftProduct = String(left.product_id || '');
-  const rightProduct = String(right.product_id || '');
-  const leftCombo = String(left.combo_id || '');
-  const rightCombo = String(right.combo_id || '');
-
-  if (leftProduct && rightProduct) return leftProduct === rightProduct;
-  if (leftCombo && rightCombo) return leftCombo === rightCombo;
-  return false;
-}
-
-function normalizeOrderReferenceLocal(value: string | null | undefined): string | null {
-  const raw = String(value ?? '').trim().toLowerCase();
-  if (!raw || raw === 'null' || raw === 'undefined') return null;
-  return String(value).trim();
-}
-
-/** Aligns mobile mesa state with web normalizeTableRecord rules for empty/closed orders. */
-export function normalizeMesaRecord(mesa: MesaRecord): MesaRecord {
-  if (!mesa || typeof mesa !== 'object') return mesa;
-
-  const normalizedCurrentOrderId = normalizeOrderReferenceLocal(mesa.current_order_id);
-  const normalizedOrderStatus = String(mesa?.orders?.status || '')
-    .trim()
-    .toLowerCase();
-  const rawStatus = String(mesa.status || '')
-    .trim()
-    .toLowerCase();
-  const normalizedRawStatus =
-    rawStatus === 'open' ? 'occupied' : rawStatus === 'closed' ? 'available' : rawStatus || 'available';
-  const isClosedOrder =
-    normalizedOrderStatus === 'closed' || normalizedOrderStatus === 'cancelled';
-  const hasCurrentOrder = Boolean(normalizedCurrentOrderId);
-  const shouldForceClearByStatus = normalizedRawStatus === 'available' && !hasCurrentOrder;
-  const shouldClearOrder = shouldForceClearByStatus || !hasCurrentOrder || isClosedOrder;
-
-  return {
-    ...mesa,
-    status: shouldClearOrder ? 'available' : 'occupied',
-    current_order_id: shouldClearOrder ? null : normalizedCurrentOrderId,
-    orders: shouldClearOrder ? null : mesa.orders || null,
-  };
-}
-
-export function buildAvailableMesaRecord(
-  mesa: Partial<MesaRecord> & { id: string },
-  syncVersion?: number,
-): MesaRecord {
-  return normalizeMesaRecord({
-    id: mesa.id,
-    business_id: String(mesa.business_id || ''),
-    table_number: mesa.table_number ?? null,
-    table_name: mesa.table_name ?? null,
-    status: 'available',
-    current_order_id: null,
-    orders: null,
-    sync_version:
-      syncVersion !== undefined ? syncVersion : resolveMesaSyncVersion(mesa as MesaRecord),
-  });
 }

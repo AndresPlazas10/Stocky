@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { StatusPill } from './StatusPill';
@@ -13,9 +13,13 @@ interface MesaCardProps {
   lockedByOther: boolean;
   isBusy?: boolean;
   total?: number;
+  callActive?: boolean;
   onPress: (mesa: MesaRecord) => void;
   onDeletePress?: (mesa: MesaRecord) => void;
+  onDismissCall?: (mesa: MesaRecord) => void;
 }
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export const MesaCard = React.memo(function MesaCard({
   mesa,
@@ -23,14 +27,54 @@ export const MesaCard = React.memo(function MesaCard({
   lockedByOther,
   isBusy = false,
   total = 0,
+  callActive = false,
   onPress,
   onDeletePress,
+  onDismissCall,
 }: MesaCardProps) {
   const { t } = useTranslation('mesas');
+  const bellRotation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!callActive) {
+      bellRotation.setValue(0);
+      return;
+    }
+
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bellRotation, {
+          toValue: 1,
+          duration: 450,
+          useNativeDriver: true,
+        }),
+        Animated.timing(bellRotation, {
+          toValue: 0,
+          duration: 450,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => {
+      animation.stop();
+      bellRotation.setValue(0);
+    };
+  }, [callActive, bellRotation]);
+
+  const rotate = bellRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['-25deg', '25deg'],
+  });
 
   return (
     <Pressable
-      style={[styles.card, occupied && styles.cardOccupied, lockedByOther && styles.cardLocked]}
+      style={[
+        styles.card,
+        occupied && styles.cardOccupied,
+        lockedByOther && styles.cardLocked,
+        callActive && styles.cardCalling,
+      ]}
       disabled={isBusy}
       onPress={() => onPress(mesa)}
     >
@@ -48,11 +92,30 @@ export const MesaCard = React.memo(function MesaCard({
         </Pressable>
       ) : null}
 
+      {callActive ? (
+        <Pressable
+          style={styles.callBell}
+          hitSlop={10}
+          onPress={(event) => {
+            event.stopPropagation?.();
+            onDismissCall?.(mesa);
+          }}
+        >
+          <Animated.View style={{ transform: [{ rotate }] }}>
+            <Ionicons name="notifications" size={26} color="#FFFFFF" />
+          </Animated.View>
+        </Pressable>
+      ) : null}
+
       <View style={[styles.iconShell, occupied && styles.iconShellOccupied]}>
         <Ionicons name="layers-outline" size={54} color={occupied ? '#CA8A04' : '#00A63E'} />
       </View>
 
       <Text style={styles.title}>{mesaDisplayName(mesa, t('labels.table'))}</Text>
+
+      {callActive ? (
+        <Text style={styles.callText}>{t('labels.tableCall', 'Cocina te está llamando')}</Text>
+      ) : null}
 
       {!lockedByOther ? <StatusPill occupied={occupied} lockedByOther={lockedByOther} /> : null}
 
@@ -98,6 +161,11 @@ const styles = StyleSheet.create({
     borderColor: '#F59E0B',
     backgroundColor: 'rgba(255, 248, 235, 0.66)',
   },
+  cardCalling: {
+    borderColor: '#F59E0B',
+    borderWidth: 2,
+    backgroundColor: '#FEF3C7',
+  },
   deleteButton: {
     position: 'absolute',
     top: 10,
@@ -108,6 +176,29 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  callBell: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    zIndex: 3,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F59E0B',
+    shadowColor: '#B45309',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  callText: {
+    color: '#B45309',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   iconShell: {
     width: 98,

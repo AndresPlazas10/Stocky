@@ -42,7 +42,6 @@ export const SplitBillModalRN = React.memo(function SplitBillModalRN({
     removeAccount,
     updateAccountPaymentMethod,
     adjustItemQuantityForAccount,
-    getItemExpectedQuantity,
   } = useSplitBillAccounts({ visible, orderItems });
 
   const {
@@ -151,7 +150,6 @@ export const SplitBillModalRN = React.memo(function SplitBillModalRN({
             currentAccount && updateAccountPaymentMethod(currentAccount.id, method)
           }
           onAdjustQuantity={adjustItemQuantityForAccount}
-          getItemExpectedQuantity={getItemExpectedQuantity}
         />
       ) : null}
     </StockyModal>

@@ -43,7 +43,7 @@ export const CreateMesaModal = React.memo(function CreateMesaModal({
         <View style={styles.footerRow}>
           <Pressable style={styles.cancelButton} onPress={onCancel} disabled={isCreatingMesa}>
             <Text style={styles.cancelText}>
-              {t('buttons.closeOrder')}
+              {t('buttons.cancel', { ns: 'common' })}
             </Text>
           </Pressable>
 
@@ -67,7 +67,7 @@ export const CreateMesaModal = React.memo(function CreateMesaModal({
               <Ionicons name="add" size={16} color={STOCKY_COLORS.white} />
               <Text style={styles.primaryText}>
                 {isCreatingMesa
-                  ? t('print.printing')
+                  ? t('buttons.creatingTable')
                   : t('buttons.createTable')}
               </Text>
             </LinearGradient>

@@ -6,32 +6,28 @@ import { formatCop } from '../../utils/money';
 import { readCatalogFromStorage } from './utils/catalogCache';
 
 import { useToastContext } from '../../hooks/useToastContext';
+import { useToastSound } from '../../hooks/useToastSound';
 import { useToastMessages } from '../../hooks/useToastMessages';
 import {
-  addCatalogItemToOrder,
   getOrderItemName,
   listCatalogItems,
   loadOpenOrderSnapshot,
+  persistOrderNotes,
   persistOrderSnapshot,
   preloadRpcCompatibility,
-  removeOrderItemFromOrder,
   syncOrderItemQuantity,
   type MesaOrderCatalogItem,
   type MesaOrderItem,
 } from '../../services/mesaOrderService';
 import { closeOrderAsSplit, closeOrderSingle } from '../../services/mesaCheckoutService';
 import {
-  deleteMesaCascade,
-  fetchMesasByBusinessId,
-  openCloseMesa,
-  refreshMesaEditLockHeartbeat,
-  resolveBusinessContext,
-  resolveMesaEditorDisplayName,
+  clearTableCallRequested,
   type BusinessContext,
   type MesaEditLock,
   type MesaRecord,
 } from '../../services/mesasService';
-import { SplitBillModalRN } from './split-bill/SplitBillModal';
+import { getSupabaseClient } from '../../lib/supabase';
+import { TOAST_DURATION_MS } from '../../ui/StockyToast';
 
 import { useMesaOrderState } from './hooks/useMesaOrderState';
 import { useMesaEditLock } from './hooks/useMesaEditLock';
@@ -42,20 +38,17 @@ import { useMesaCreate } from './hooks/useMesaCreate';
 import { useMesaKeyboard } from './hooks/useMesaKeyboard';
 import { useMesaDeleteModal } from './hooks/useMesaDeleteModal';
 import { usePaymentFlow } from './hooks/usePaymentFlow';
-import { useMesaAutoSave } from './hooks/useMesaAutoSave';
 import { useMesaDataLoader } from './hooks/useMesaDataLoader';
 import { useMesaOpenClose } from './hooks/useMesaOpenClose';
 import { useMesaActionBroadcast } from './hooks/useMesaActionBroadcast';
+import { useKitchenOrders } from './hooks/useKitchenOrders';
 import { MesasGrid } from './components/MesasGrid';
+import { KitchenMesasGrid } from './components/KitchenMesasGrid';
 import { MesasPanelHeader } from './components/MesasPanelHeader';
 import { MesasModals } from './components/MesasModals';
-import { OrderModal } from './components/OrderModal';
-import { CreateMesaModal } from './components/CreateMesaModal';
-import { DeleteMesaModal } from './components/DeleteMesaModal';
-import { CloseOrderChoiceModal } from './components/CloseOrderChoiceModal';
-import { PaymentModal } from './components/PaymentModal';
 import {
   MESA_IN_USE_MESSAGE,
+  MESA_LOCK_TTL_MS,
   mesaDisplayName,
   resolveSessionDisplayName,
   sumOrderItemsQuantity,
@@ -78,12 +71,13 @@ export function MesasPanel({ session, businessContext }: Props) {
   const mesasLengthRef = useRef(0);
   const hasLoadedOnceRef = useRef(false);
   const [loading, setLoading] = useState(true);
-  const [_error, setError] = useState<string | null>(null);
   const [actingMesaId, setActingMesaId] = useState<string | null>(null);
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
 
   const { isKeyboardVisible } = useMesaKeyboard();
 
   const selectedMesaIdRef = useRef<string>('');
+  const dismissedCallsRef = useRef<Map<string, number>>(new Map());
 
   const [actorDisplayName, setActorDisplayName] = useState(() =>
     resolveSessionDisplayName(session),
@@ -92,7 +86,164 @@ export function MesasPanel({ session, businessContext }: Props) {
   const canDeleteMesas = context?.source !== 'employee';
 
   const toast = useToastContext();
+  const { playKitchenAlert } = useToastSound();
   const toastMessages = useToastMessages();
+  const [isKitchen, setIsKitchen] = useState(false);
+
+  const showError = useCallback(
+    (msg: string | null) => {
+      if (!msg) return;
+      toast.showError({ title: t('mesas:defaults.unknownError', 'Error'), message: msg });
+    },
+    [toast, t],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    if (context?.source !== 'employee' || !context.businessId) {
+      setIsKitchen(false);
+      return;
+    }
+    const run = async () => {
+      try {
+        const { data } = await getSupabaseClient()
+          .from('employees')
+          .select('role')
+          .eq('business_id', context.businessId)
+          .eq('user_id', session.user.id)
+          .eq('is_active', true)
+          .maybeSingle();
+        if (cancelled) return;
+        const role = String(data?.role || '').trim().toLowerCase();
+        setIsKitchen(role === 'kitchen' || role === 'cocina');
+      } catch {
+        if (!cancelled) setIsKitchen(false);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [context?.source, context?.businessId, session.user.id]);
+
+  const { itemsByOrderId, loadingItems, callingOrderIds, mostRecentOrderId, orderArrivalTsByOrderId, handleCallMesa } = useKitchenOrders({
+    mesas,
+    enabled: isKitchen,
+    businessId: context?.businessId,
+    onCall: useCallback(
+      (mesa: MesaRecord) => {
+        toast.showSuccess({
+          title: t('mesas:toast.callSent.title', '🔔 Llamado enviado'),
+          message: t('mesas:toast.callSent.message', 'Se ha notificado al mesero'),
+        });
+      },
+      [toast, t],
+    ),
+    onOrderChanged: useCallback(
+      (kind: 'new' | 'update', _orderId: string, mesa: MesaRecord) => {
+        if (!isKitchen) return;
+        const mesaLabel = mesaDisplayName(mesa, t('labels.table', 'Mesa'));
+        void playKitchenAlert();
+        if (kind === 'new') {
+          toast.showInfo({
+            title: t('mesas:toast.newOrder.title', '🔔 Nuevo pedido'),
+            message: t(
+              'mesas:toast.newOrder.message',
+              'Nuevo pedido en {{mesa}}, por favor revise la cocina',
+              { mesa: mesaLabel },
+            ),
+            sound: false,
+          });
+          return;
+        }
+        toast.showInfo({
+          title: t('mesas:toast.updatedOrder.title', '🔔 Pedido actualizado'),
+          message: t(
+            'mesas:toast.updatedOrder.message',
+            'Pedido actualizado en {{mesa}}, por favor revise la cocina',
+            { mesa: mesaLabel },
+          ),
+          sound: false,
+        });
+      },
+      [isKitchen, t, toast, playKitchenAlert],
+    ),
+  });
+
+  const handleDismissCall = useCallback(
+    async (mesa: MesaRecord) => {
+      if (!context?.businessId || !mesa.id) return;
+      dismissedCallsRef.current.set(mesa.id, Date.now());
+      setMesas((prev) =>
+        prev.map((m) =>
+          m.id === mesa.id ? { ...m, call_requested_at: undefined } : m,
+        ),
+      );
+      try {
+        await clearTableCallRequested(mesa.id, context.businessId);
+      } catch {
+        // El optimista local se mantiene; la próxima carga reconciliará.
+      }
+    },
+    [context?.businessId, setMesas],
+  );
+
+  const callToastsSeenRef = useRef<Set<string>>(new Set());
+  const latestMesasRef = useRef<MesaRecord[]>([]);
+  const callAutoDismissTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    latestMesasRef.current = mesas;
+    (Array.isArray(mesas) ? mesas : []).forEach((mesa) => {
+      const raw = String(mesa?.call_requested_at || '').trim();
+
+      if (isKitchen || !raw) return;
+
+      const toastKey = `${mesa.id}:${raw}`;
+      if (callToastsSeenRef.current.has(toastKey)) return;
+      callToastsSeenRef.current.add(toastKey);
+      if (callToastsSeenRef.current.size > 100) {
+        callToastsSeenRef.current = new Set(
+          Array.from(callToastsSeenRef.current).slice(-50),
+        );
+      }
+
+      const mesaLabel = mesaDisplayName(mesa, t('labels.table', 'Mesa'));
+      void playKitchenAlert();
+      toast.showSuccess({
+        title: t('mesas:toast.orderReady.title', '🔔 Orden lista'),
+        message: t(
+          'mesas:toast.orderReady.message',
+          'La orden de la {{mesa}} ya está lista, por favor pase por cocina',
+          { mesa: mesaLabel },
+        ),
+        sound: false,
+      });
+
+      const existingTimer = callAutoDismissTimersRef.current.get(mesa.id);
+      if (existingTimer) clearTimeout(existingTimer);
+      const timer = setTimeout(() => {
+        callAutoDismissTimersRef.current.delete(mesa.id);
+        const currentMesa = latestMesasRef.current.find(
+          (m) => String(m?.id || '').trim() === String(mesa.id || '').trim(),
+        );
+        if (
+          currentMesa &&
+          String(currentMesa?.call_requested_at || '').trim() === raw
+        ) {
+          void handleDismissCall(currentMesa);
+        }
+      }, TOAST_DURATION_MS);
+      callAutoDismissTimersRef.current.set(mesa.id, timer);
+    });
+  }, [mesas, isKitchen, t, toast, playKitchenAlert, handleDismissCall]);
+
+  useEffect(() => {
+    return () => {
+      callAutoDismissTimersRef.current.forEach((timer) => clearTimeout(timer));
+      callAutoDismissTimersRef.current.clear();
+    };
+  }, []);
   const orderState = useMesaOrderState({ listCatalogItems });
   const {
     showOrderModal,
@@ -106,13 +257,10 @@ export function MesasPanel({ session, businessContext }: Props) {
     setOrderItems,
     loadingOrder,
     setLoadingOrder,
-    orderModalError: _orderModalError,
+    orderModalError,
     setOrderModalError,
     searchCatalog,
     setSearchCatalog,
-    setIsSearchFocused,
-    mutatingOrderItemId,
-    setMutatingOrderItemId,
     releasingEmptyOrder,
     isSavingOrder,
     isClosingOrder,
@@ -128,14 +276,12 @@ export function MesasPanel({ session, businessContext }: Props) {
     setPaymentMethod,
     amountReceived,
     setAmountReceived,
-    latestOrderItemsRef,
     orderItemsCacheRef,
     catalogBusinessIdRef,
     catalogUpdatedAtRef,
     catalogItemsRef,
     orderModalOpenIntentRef,
     pendingQuantityUpdatesRef,
-    quantitySyncTimerRef,
     filteredCatalog,
     insufficientItems,
     insufficientComboComponents,
@@ -145,7 +291,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     cashChangeData,
     ensureCatalogLoaded,
     hasPendingChanges,
-    setHasPendingChanges,
   } = orderState;
 
   const sendBroadcastRef = useRef<((event: string, payload: Record<string, unknown>) => void) | null>(null);
@@ -154,7 +299,7 @@ export function MesasPanel({ session, businessContext }: Props) {
     session,
     context,
     actorDisplayName,
-    onError: (msg) => setError(msg),
+    onError: (msg) => toast.showError({ title: t('mesas:defaults.unknownError', 'Error'), message: msg }),
     isOrderFlowActive,
     onLockLost: () => resetOrderFlow(orderState),
     onCloseAuxiliaryOrderModals: () => resetAuxiliaryModals(orderState),
@@ -166,14 +311,13 @@ export function MesasPanel({ session, businessContext }: Props) {
     setMesaLocksByTableId,
     heldMesaLock,
     heldMesaLockRef,
-    closeAuxiliaryOrderModals: _closeAuxiliaryOrderModals,
     publishMesaLockBroadcast,
     acquireMesaLockForEdition,
     releaseHeldMesaLock,
     refreshMesaLocks,
   } = editLock;
 
-  const { isPrintInProgress, beginPrintFlow, endPrintFlow } = useMesaPrint({ setOrderModalError });
+  const { isPrintInProgress, beginPrintFlow, endPrintFlow } = useMesaPrint();
 
   const mesaCreate = useMesaCreate({
     context,
@@ -183,7 +327,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         toastMessages.mesas.created(mesaDisplayName(createdMesa, t('labels.table'))),
       );
     },
-    onError: (msg) => setError(msg),
+    onError: (msg) => toast.showError({ title: t('mesas:errors.createFailed', 'No se pudo crear la mesa'), message: msg }),
   });
   const {
     showCreateMesaModal,
@@ -217,6 +361,7 @@ export function MesasPanel({ session, businessContext }: Props) {
     publishMesaLockBroadcast,
     selectedMesaIdRef,
     heldMesaLockRef,
+    dismissedCallsRef,
     isPendingEmptyRelease: (mesaId) => emptyReleaseGuardsRef.current.isPendingEmptyRelease(mesaId),
     shouldIgnoreStaleOccupiedDuringEmptyRelease: (mesaId, incomingStatus, incomingSyncVersion) =>
       emptyReleaseGuardsRef.current.shouldIgnoreStaleOccupiedDuringEmptyRelease(
@@ -308,7 +453,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         held.tableId === String(mesa.id || '').trim(),
       );
       const lockTokenHint = hasHeldLockForMesa ? held?.lockToken || null : null;
-      const lockTtlMs = 45_000;
+      const lockTtlMs = MESA_LOCK_TTL_MS;
       const lockExpiresAt = isMesaOccupiedNow
         ? new Date(Date.now() + lockTtlMs).toISOString()
         : null;
@@ -361,74 +506,11 @@ export function MesasPanel({ session, businessContext }: Props) {
 
   useEffect(
     () => () => {
-      if (quantitySyncTimerRef.current) {
-        clearTimeout(quantitySyncTimerRef.current);
-        quantitySyncTimerRef.current = null;
-      }
       pendingQuantityUpdatesRef.current.clear();
       void releaseHeldMesaLock();
     },
-    [pendingQuantityUpdatesRef, quantitySyncTimerRef, releaseHeldMesaLock],
+    [pendingQuantityUpdatesRef, releaseHeldMesaLock],
   );
-
-  useEffect(() => {
-    if (!isOrderFlowActive) return undefined;
-    const held = heldMesaLockRef.current;
-    if (!held) return undefined;
-
-    let cancelled = false;
-    const timer = setInterval(() => {
-      const current = heldMesaLockRef.current;
-      if (!current || current.tableId !== held.tableId || current.businessId !== held.businessId)
-        return;
-
-      void refreshMesaEditLockHeartbeat({
-        businessId: current.businessId,
-        tableId: current.tableId,
-        userId: session.user.id,
-        userName: actorDisplayName,
-        lockToken: current.lockToken,
-        ttlSeconds: 45,
-      })
-        .then((result) => {
-          if (cancelled) return;
-          if (result.unsupported) return;
-          if (result.ok) {
-            if (result.lock) {
-              setMesaLocksByTableId((prev) => ({
-                ...prev,
-                [current.tableId]: result.lock as MesaEditLock,
-              }));
-            }
-            return;
-          }
-
-          if (result.lost) {
-            setError(MESA_IN_USE_MESSAGE);
-            void releaseHeldMesaLock(current);
-            resetOrderFlow(orderState);
-            void refreshMesaLocks(current.businessId);
-          }
-        })
-        .catch((err: unknown) => {
-          if (__DEV__) console.warn('[mesas] panel_heartbeat_failed', (err as Error)?.message || err);
-        });
-    }, 9000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [
-    actorDisplayName,
-    heldMesaLockRef,
-    isOrderFlowActive,
-    orderState,
-    refreshMesaLocks,
-    releaseHeldMesaLock,
-    session.user.id,
-    setMesaLocksByTableId,
-  ]);
 
   const catalogNameByIdentity = useMemo(() => {
     if (orderItems.length === 0) return new Map<string, string>();
@@ -476,14 +558,15 @@ export function MesasPanel({ session, businessContext }: Props) {
   const {
     loadData,
     patchMesaOrderTotal,
+    patchMesaOrderNotes,
     publishRealtimeOrderSummary,
     markMesaAsAvailableAfterSale,
   } = useMesaDataLoader({
     auth: { session, businessContext, sessionDisplayName, actorDisplayName },
-    setters: { setContext, setMesas, setLoading, setError, setActorDisplayName, setCatalogItems },
-    lockOps: { setMesaLocksByTableId, refreshMesaLocks, heldMesaLockRef, releaseHeldMesaLock },
+    setters: { setContext, setMesas, setLoading, setError: showError, setActorDisplayName, setCatalogItems },
+    lockOps: { setMesaLocksByTableId, refreshMesaLocks },
     catalogOps: { ensureCatalogLoaded, readCatalogFromStorage, catalogBusinessIdRef, catalogUpdatedAtRef, catalogItemsRef },
-    broadcast: { publishMesaStateBroadcast, traceAsyncDuration, realtimeClientInstanceIdRef },
+    broadcast: { publishMesaStateBroadcast, traceAsyncDuration },
     sharedRefs: { orderItemsCacheRef, mesasLengthRef, hasLoadedOnceRef, isPendingEmptyRelease },
   });
 
@@ -496,11 +579,11 @@ export function MesasPanel({ session, businessContext }: Props) {
   const mutations = useMesaOrderMutations({
     order: orderState,
     auth: { businessId: context?.businessId, source: context?.source, session },
-    lockOps: { heldMesaLockRef, publishMesaLockBroadcast, acquireMesaLockForEdition, releaseHeldMesaLock },
+    lockOps: { heldMesaLockRef, acquireMesaLockForEdition, releaseHeldMesaLock },
     broadcastOps: { publishMesaStateBroadcast, bumpMesaActionVersion, isMesaActionVersionCurrent, beginPendingEmptyRelease, endPendingEmptyRelease, isPendingEmptyRelease },
-    orderServices: { loadOpenOrderSnapshot, addCatalogItemToOrder, syncOrderItemQuantity, removeOrderItemFromOrder, persistOrderSnapshot, closeOrderSingle, closeOrderAsSplit },
+    orderServices: { loadOpenOrderSnapshot, syncOrderItemQuantity, persistOrderSnapshot, closeOrderSingle, closeOrderAsSplit },
     dataLoader: { patchMesaOrderTotal, publishRealtimeOrderSummary, loadData },
-    globalSetters: { setError, setMesas, markMesaAsAvailableAfterSale },
+    globalSetters: { setError: showError, setMesas, markMesaAsAvailableAfterSale },
     printOps: { beginPrintFlow, endPrintFlow, buildCashBreakdown: buildCashBreakdownForCountry },
     callbacks: {
       onOrderSaved: () => {
@@ -553,12 +636,6 @@ export function MesasPanel({ session, businessContext }: Props) {
     handlePrintKitchen,
   } = mutations;
 
-  useMesaAutoSave({
-    hasPendingChanges,
-    onSave: handleSaveOrder,
-    enabled: showOrderModal && !isSavingOrder && !isClosingOrder,
-  });
-
   const closeOrderModal = useCallback(() => {
     setActiveOrderId(null);
     closeOrderModalBase();
@@ -576,7 +653,7 @@ export function MesasPanel({ session, businessContext }: Props) {
     selectedMesa,
     setMesas,
     closeOrderModal,
-    setError,
+    setError: showError,
     showDeletedToast: (label: string) => toast.showSuccess(toastMessages.mesas.deleted(label)),
   });
 
@@ -645,7 +722,7 @@ export function MesasPanel({ session, businessContext }: Props) {
     setLoadingOrder,
     setOrderModalError,
     setShowOrderModal,
-    setError,
+    setError: showError,
     setActingMesaId,
     setActiveOrderId,
     closeOrderModal,
@@ -666,7 +743,7 @@ export function MesasPanel({ session, businessContext }: Props) {
       { occupied, lockedByOther }: { occupied: boolean; lockedByOther: boolean },
     ) => {
       if (lockedByOther) {
-        setError(MESA_IN_USE_MESSAGE);
+        toast.showError({ title: t('mesas:defaults.someoneUsingTable', 'Mesa en uso'), message: MESA_IN_USE_MESSAGE });
         return;
       }
       if (occupied) {
@@ -696,6 +773,32 @@ export function MesasPanel({ session, businessContext }: Props) {
     setNewTableNumber('');
   }, [setShowCreateMesaModal, setNewTableNumber]);
 
+  const handleSaveNotes = useCallback(
+    async (notes: string) => {
+      if (!selectedMesa?.current_order_id || isSavingNotes) return;
+      setIsSavingNotes(true);
+      try {
+        await persistOrderNotes(selectedMesa.current_order_id, notes);
+        patchMesaOrderNotes(selectedMesa.id, selectedMesa.current_order_id, notes);
+        toast.showSuccess({
+          title: t('mesas:success.notesSaved', 'Comentario guardado'),
+        });
+      } catch {
+        toast.showError({
+          title: t('mesas:errors.notesSaveFailed', 'No se pudo guardar el comentario'),
+        });
+      } finally {
+        setIsSavingNotes(false);
+      }
+    },
+    [selectedMesa, isSavingNotes, patchMesaOrderNotes, toast, t],
+  );
+
+  const selectedOrderNotes = useMemo(
+    () => String(selectedMesa?.orders?.notes || ''),
+    [selectedMesa?.orders?.notes],
+  );
+
   const handleCancelCreateMesa = useCallback(() => {
     setShowCreateMesaModal(false);
     setNewTableNumber('');
@@ -715,10 +818,12 @@ export function MesasPanel({ session, businessContext }: Props) {
       isClosingOrder,
       releasingEmptyOrder,
       isPrintInProgress,
-      mutatingOrderItemId,
+      orderModalError,
       insufficientItems,
       insufficientComboComponents,
       hasPendingChanges,
+      orderNotes: selectedOrderNotes,
+      isSavingNotes,
     }),
     [
       selectedMesa,
@@ -733,10 +838,12 @@ export function MesasPanel({ session, businessContext }: Props) {
       isClosingOrder,
       releasingEmptyOrder,
       isPrintInProgress,
-      mutatingOrderItemId,
+      orderModalError,
       insufficientItems,
       insufficientComboComponents,
       hasPendingChanges,
+      selectedOrderNotes,
+      isSavingNotes,
     ],
   );
 
@@ -750,6 +857,7 @@ export function MesasPanel({ session, businessContext }: Props) {
       onUpdateOrderItemQuantity: handleUpdateOrderItemQuantity,
       onSearchChange: setSearchCatalog,
       resolveOrderItemDisplayName,
+      onSaveNotes: handleSaveNotes,
     }),
     [
       handleDismissOrderModal,
@@ -760,11 +868,28 @@ export function MesasPanel({ session, businessContext }: Props) {
       handleUpdateOrderItemQuantity,
       setSearchCatalog,
       resolveOrderItemDisplayName,
+      handleSaveNotes,
     ],
   );
 
   return (
     <>
+      {isKitchen ? (
+        <View style={styles.kitchenContainer}>
+          <KitchenMesasGrid
+            mesas={mesas}
+            loading={loading}
+            loadingItems={loadingItems}
+            itemsByOrderId={itemsByOrderId}
+            callingOrderIds={callingOrderIds}
+            mostRecentOrderId={mostRecentOrderId}
+            orderArrivalTsByOrderId={orderArrivalTsByOrderId}
+            resolveItemName={resolveOrderItemDisplayName}
+            onCallMesa={handleCallMesa}
+          />
+        </View>
+      ) : (
+        <>
       <View style={styles.mesasContainer}>
         <MesasPanelHeader isCreatingMesa={isCreatingMesa} onOpenAddMesa={handleOpenAddMesa} canCreateMesa={canDeleteMesas} />
 
@@ -781,12 +906,11 @@ export function MesasPanel({ session, businessContext }: Props) {
           sessionUserId={session.user.id}
           onMesaPress={handleMesaPress}
           onDeleteMesa={canDeleteMesas ? askDeleteMesa : undefined}
+          onDismissCall={handleDismissCall}
         />
       </View>
 
       <MesasModals
-        session={session}
-        context={context}
         isKeyboardVisible={isKeyboardVisible}
         showCreateMesaModal={showCreateMesaModal}
         isCreatingMesa={isCreatingMesa}
@@ -828,11 +952,16 @@ export function MesasPanel({ session, businessContext }: Props) {
         onCloseSplitBill={handleCloseSplitBill}
         onConfirmSplitBill={processSplitPaymentAndClose}
       />
+        </>
+      )}
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  kitchenContainer: {
+    marginTop: 24,
+  },
   mesasContainer: {
     marginTop: 24,
     borderRadius: 26,

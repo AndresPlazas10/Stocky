@@ -16,6 +16,8 @@ import { useToastSound } from '../hooks/useToastSound';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
+export const TOAST_DURATION_MS = 5000;
+
 export type ToastOptions = {
   type: ToastType;
   title: string;
@@ -48,7 +50,7 @@ export function StockyToast({
   title,
   message,
   ctaText,
-  durationMs = 2500,
+  durationMs = TOAST_DURATION_MS,
   sound = true,
   onClose,
 }: Props) {

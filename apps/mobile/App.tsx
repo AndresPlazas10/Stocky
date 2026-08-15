@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { ErrorUtils } from 'react-native';
 import './src/i18n';
 import { EXPO_CONFIG } from './src/config/env';
 import { useAuthSession } from './src/auth/useAuthSession';
@@ -33,17 +32,19 @@ export default function App() {
       sinceBootMs: perfDurationMs(APP_BOOT_STARTED_AT),
     });
 
-    const prevHandler = ErrorUtils.getGlobalHandler();
-    ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
-      if (__DEV__) {
-        console.error('[App:global] Unhandled error:', error.message, { isFatal });
-      }
-      perfMark('app_unhandled_error', {
-        message: error.message,
-        isFatal: Boolean(isFatal),
+    if (ErrorUtils) {
+      const prevHandler = ErrorUtils.getGlobalHandler();
+      ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
+        if (__DEV__) {
+          console.error('[App:global] Unhandled error:', error.message, { isFatal });
+        }
+        perfMark('app_unhandled_error', {
+          message: error.message,
+          isFatal: Boolean(isFatal),
+        });
+        prevHandler(error, isFatal);
       });
-      prevHandler(error, isFatal);
-    });
+    }
   }, []);
 
   useEffect(() => {

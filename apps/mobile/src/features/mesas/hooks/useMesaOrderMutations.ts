@@ -22,7 +22,7 @@ import {
   resolveMesaSyncVersion,
   type MesaRecord,
 } from '../../../services/mesasService';
-import { resetAuxiliaryModals, resetOrderFlow } from '../utils/mesaHelpers';
+import { resetOrderFlow } from '../utils/mesaHelpers';
 
 type UseMesaOrderStateSnapshot = {
   showOrderModal: boolean;
@@ -37,10 +37,6 @@ type UseMesaOrderStateSnapshot = {
   setOrderModalError: (v: string | null) => void;
   searchCatalog: string;
   setSearchCatalog: (v: string) => void;
-  isSearchFocused: boolean;
-  setIsSearchFocused: (v: boolean) => void;
-  mutatingOrderItemId: string | null;
-  setMutatingOrderItemId: (v: string | null) => void;
   releasingEmptyOrder: boolean;
   setReleasingEmptyOrder: (v: boolean) => void;
   isSavingOrder: boolean;
@@ -62,7 +58,7 @@ type UseMesaOrderStateSnapshot = {
   hasPendingChanges: boolean;
   setHasPendingChanges: (v: boolean) => void;
 
-  addCatalogQueueRef: React.MutableRefObject<Promise<void>>;
+  quantityFlushQueueRef: React.MutableRefObject<Promise<void>>;
   latestOrderItemsRef: React.MutableRefObject<MesaOrderItem[]>;
   orderItemsCacheRef: React.MutableRefObject<Map<string, MesaOrderItem[]>>;
   catalogItemsRef: React.MutableRefObject<MesaOrderCatalogItem[]>;
@@ -78,7 +74,6 @@ type UseMesaOrderStateSnapshot = {
       }
     >
   >;
-  quantitySyncTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
   orderModalOpenIntentRef: React.MutableRefObject<boolean>;
 
   orderTotal: number;
@@ -110,14 +105,6 @@ type UseMesaOrderMutationsParams = {
       tableId: string;
       lockToken: string | null;
     } | null>;
-    publishMesaLockBroadcast: (input: {
-      businessId: string;
-      tableId: string;
-      locked: boolean;
-      mode?: 'optimistic' | 'confirmed' | 'rollback';
-      lockToken?: string | null;
-      lockExpiresAt?: string | null;
-    }) => void;
     acquireMesaLockForEdition: (mesa: MesaRecord) => Promise<boolean>;
     releaseHeldMesaLock: (
       lockSnapshot?: {
@@ -149,11 +136,6 @@ type UseMesaOrderMutationsParams = {
       orderId: string,
       options?: { forceRefresh?: boolean },
     ) => Promise<{ items: MesaOrderItem[]; total: number }>;
-    addCatalogItemToOrder: (params: {
-      orderId: string;
-      catalogItem: MesaOrderCatalogItem;
-      quantity: number;
-    }) => Promise<{ item: MesaOrderItem }>;
     syncOrderItemQuantity: (params: {
       orderId: string;
       itemId: string;
@@ -161,10 +143,6 @@ type UseMesaOrderMutationsParams = {
       price: number;
       total: number;
     }) => Promise<void>;
-    removeOrderItemFromOrder: (params: {
-      orderId: string;
-      itemId: string;
-    }) => Promise<{ items: MesaOrderItem[]; total: number }>;
     persistOrderSnapshot: (params: {
       orderId: string;
       items: MesaOrderItem[];
@@ -236,9 +214,9 @@ export function useMesaOrderMutations({
   callbacks,
 }: UseMesaOrderMutationsParams) {
   const { businessId, source, session } = auth;
-  const { heldMesaLockRef, publishMesaLockBroadcast: _publishMesaLockBroadcast, acquireMesaLockForEdition, releaseHeldMesaLock } = lockOps;
+  const { heldMesaLockRef, acquireMesaLockForEdition, releaseHeldMesaLock } = lockOps;
   const { publishMesaStateBroadcast, bumpMesaActionVersion, isMesaActionVersionCurrent, beginPendingEmptyRelease, endPendingEmptyRelease, isPendingEmptyRelease } = broadcastOps;
-  const { loadOpenOrderSnapshot, addCatalogItemToOrder, syncOrderItemQuantity, removeOrderItemFromOrder, persistOrderSnapshot, closeOrderSingle, closeOrderAsSplit } = orderServices;
+  const { loadOpenOrderSnapshot, syncOrderItemQuantity, persistOrderSnapshot, closeOrderSingle, closeOrderAsSplit } = orderServices;
   const { patchMesaOrderTotal, publishRealtimeOrderSummary, loadData } = dataLoader;
   const { setError, setMesas, markMesaAsAvailableAfterSale } = globalSetters;
   const { beginPrintFlow, endPrintFlow, buildCashBreakdown } = printOps;
@@ -258,10 +236,6 @@ export function useMesaOrderMutations({
     setOrderModalError,
     searchCatalog: _searchCatalog,
     setSearchCatalog,
-    isSearchFocused: _isSearchFocused,
-    setIsSearchFocused,
-    mutatingOrderItemId: _mutatingOrderItemId,
-    setMutatingOrderItemId,
     releasingEmptyOrder,
     setReleasingEmptyOrder,
     isSavingOrder,
@@ -283,12 +257,11 @@ export function useMesaOrderMutations({
     hasPendingChanges: _hasPendingChanges,
     setHasPendingChanges,
 
-    addCatalogQueueRef,
+    quantityFlushQueueRef,
     latestOrderItemsRef,
     orderItemsCacheRef,
     catalogItemsRef,
     pendingQuantityUpdatesRef,
-    quantitySyncTimerRef,
     orderModalOpenIntentRef,
 
     orderTotal,
@@ -296,10 +269,6 @@ export function useMesaOrderMutations({
     getStockValidationMessage,
     ensureCatalogLoaded,
   } = order;
-
-  const closeAuxiliaryOrderModals = useCallback(() => {
-    resetAuxiliaryModals(order);
-  }, [order]);
 
   const closeOrderModal = useCallback(() => {
     const held = heldMesaLockRef.current;
@@ -447,16 +416,15 @@ export function useMesaOrderMutations({
   ]);
 
   const flushPendingQuantityUpdates = useCallback((): Promise<void> => {
-    if (quantitySyncTimerRef.current) {
-      clearTimeout(quantitySyncTimerRef.current);
-      quantitySyncTimerRef.current = null;
-    }
-
-    const pendingUpdates = Array.from(pendingQuantityUpdatesRef.current.values());
+    // Los items temporales (tmp-) aún no existen en la DB: se crean con la
+    // cantidad final en persistOrderSnapshot al guardar.
+    const pendingUpdates = Array.from(pendingQuantityUpdatesRef.current.values()).filter(
+      (update) => !String(update?.itemId || '').startsWith('tmp-'),
+    );
     if (pendingUpdates.length === 0) return Promise.resolve();
     pendingQuantityUpdatesRef.current.clear();
 
-    const flushPromise = addCatalogQueueRef.current
+    const flushPromise = quantityFlushQueueRef.current
       .then(async () => {
         for (const update of pendingUpdates) {
           await syncOrderItemQuantity(update);
@@ -481,18 +449,17 @@ export function useMesaOrderMutations({
         }
       });
 
-    addCatalogQueueRef.current = flushPromise;
+    quantityFlushQueueRef.current = flushPromise;
     return flushPromise;
   }, [
-    addCatalogQueueRef,
+    quantityFlushQueueRef,
     pendingQuantityUpdatesRef,
-    quantitySyncTimerRef,
     setOrderItems,
     setOrderModalError,
     syncOrderItemQuantity,
   ]);
 
-  const scheduleQuantitySync = useCallback(
+  const accumulateQuantityUpdate = useCallback(
     (payload: {
       orderId: string;
       itemId: string;
@@ -500,18 +467,11 @@ export function useMesaOrderMutations({
       price: number;
       total: number;
     }) => {
+      // Solo se acumula en local: las cantidades se persisten al presionar
+      // "Guardar" (flushPendingQuantityUpdates en handleSaveOrder).
       pendingQuantityUpdatesRef.current.set(payload.itemId, payload);
-
-      if (quantitySyncTimerRef.current) {
-        clearTimeout(quantitySyncTimerRef.current);
-      }
-
-      quantitySyncTimerRef.current = setTimeout(() => {
-        quantitySyncTimerRef.current = null;
-        flushPendingQuantityUpdates();
-      }, 50);
     },
-    [flushPendingQuantityUpdates, pendingQuantityUpdatesRef, quantitySyncTimerRef],
+    [pendingQuantityUpdatesRef],
   );
 
   const handleAddCatalogItem = useCallback(
@@ -525,9 +485,7 @@ export function useMesaOrderMutations({
       setSearchCatalog('');
       const orderId = selectedMesa.current_order_id;
       let optimisticItems: MesaOrderItem[] = [];
-      let previousItemsSnapshot: MesaOrderItem[] = [];
       setOrderItems((prev: MesaOrderItem[]) => {
-        previousItemsSnapshot = prev;
         const existing = prev.find((item) => {
           if (catalogItem.item_type === 'combo') {
             return String(item.combo_id || '') === String(catalogItem.combo_id || '');
@@ -592,73 +550,22 @@ export function useMesaOrderMutations({
       );
       setOrderModalError(null);
       setHasPendingChanges(true);
-      addCatalogQueueRef.current = addCatalogQueueRef.current
-        .then(async () => {
-          const result = await addCatalogItemToOrder({
-            orderId,
-            catalogItem,
-            quantity: 1,
-          });
-          const confirmedItem: MesaOrderItem = {
-            ...result.item,
-            products:
-              catalogItem.item_type === 'product'
-                ? {
-                    id: catalogItem.product_id,
-                    name: catalogItem.name,
-                    code: catalogItem.code || undefined,
-                  }
-                : null,
-            combos:
-              catalogItem.item_type === 'combo'
-                ? {
-                    id: catalogItem.combo_id,
-                    nombre: catalogItem.name,
-                  }
-                : null,
-          };
 
-          setOrderItems((prev: MesaOrderItem[]) => {
-            const next = reconcileOrderItemsFromServer(prev, [confirmedItem]);
-            const confirmedUnits = sumOrderItemsQuantity(next);
-            const confirmedTotal = calculateOrderTotal(next);
-            patchMesaOrderTotal(selectedMesa.id, orderId, confirmedTotal);
-            publishRealtimeOrderSummary(
-              selectedMesa,
-              orderId,
-              confirmedTotal,
-              confirmedUnits,
-              'confirmed',
-            );
-            return next;
-          });
-
-          if (catalogItem.item_type === 'product' && catalogItem.manage_stock) {
-            if (Number(catalogItem.stock) < Number(confirmedItem.quantity || 0)) {
-              setOrderModalError(
-                `Stock insuficiente para ${catalogItem.name}. Disponible: ${catalogItem.stock}.`,
-              );
-            }
-          }
-        })
-        .catch((err) => {
-          setOrderItems(previousItemsSnapshot);
-          const rollbackUnits = sumOrderItemsQuantity(previousItemsSnapshot);
-          const rollbackTotal = calculateOrderTotal(previousItemsSnapshot);
-          patchMesaOrderTotal(selectedMesa.id, orderId, rollbackTotal);
-          publishRealtimeOrderSummary(
-            selectedMesa,
-            orderId,
-            rollbackTotal,
-            rollbackUnits,
-            'rollback',
+      const addedQuantity = optimisticItems.reduce((sum, item) => {
+        if (catalogItem.item_type === 'combo') {
+          return sum + (String(item.combo_id || '') === String(catalogItem.combo_id || '') ? Number(item.quantity || 0) : 0);
+        }
+        return sum + (String(item.product_id || '') === String(catalogItem.product_id || '') ? Number(item.quantity || 0) : 0);
+      }, 0);
+      if (catalogItem.item_type === 'product' && catalogItem.manage_stock) {
+        if (Number(catalogItem.stock) < addedQuantity) {
+          setOrderModalError(
+            `Stock insuficiente para ${catalogItem.name}. Disponible: ${catalogItem.stock}.`,
           );
-          setOrderModalError(err instanceof Error ? err.message : 'No se pudo agregar el item.');
-        });
+        }
+      }
     },
     [
-      addCatalogItemToOrder,
-      addCatalogQueueRef,
       isClosingOrder,
       loadingOrder,
       patchMesaOrderTotal,
@@ -676,10 +583,6 @@ export function useMesaOrderMutations({
     (item: MesaOrderItem, delta: number) => {
       if (!selectedMesa?.current_order_id) {
         setOrderModalError('No hay una orden activa para actualizar.');
-        return;
-      }
-      if (String(item.id || '').startsWith('tmp-')) {
-        setOrderModalError('Espera un momento mientras se confirma el producto.');
         return;
       }
 
@@ -728,7 +631,7 @@ export function useMesaOrderMutations({
       setOrderModalError(null);
       setHasPendingChanges(true);
 
-      scheduleQuantitySync({
+      accumulateQuantityUpdate({
         orderId,
         itemId: item.id,
         quantity: resolvedQuantity,
@@ -739,7 +642,7 @@ export function useMesaOrderMutations({
     [
       patchMesaOrderTotal,
       publishRealtimeOrderSummary,
-      scheduleQuantitySync,
+      accumulateQuantityUpdate,
       selectedMesa,
       setOrderItems,
       setOrderModalError,
@@ -747,73 +650,24 @@ export function useMesaOrderMutations({
     ],
   );
 
-  const handleRemoveOrderItem = useCallback(
-    async (item: MesaOrderItem) => {
-      if (!selectedMesa?.current_order_id) {
-        setOrderModalError('No hay una orden activa para eliminar items.');
-        return;
-      }
-
-      setMutatingOrderItemId(item.id);
-      setOrderModalError(null);
-
-      try {
-        const result = await removeOrderItemFromOrder({
-          orderId: selectedMesa.current_order_id,
-          itemId: item.id,
-        });
-
-        setOrderItems(result.items);
-        const nextUnits = sumOrderItemsQuantity(result.items);
-        patchMesaOrderTotal(selectedMesa.id, selectedMesa.current_order_id, result.total);
-        publishRealtimeOrderSummary(
-          selectedMesa,
-          selectedMesa.current_order_id,
-          result.total,
-          nextUnits,
-          'confirmed',
-        );
-      } catch (err) {
-        setOrderModalError(err instanceof Error ? err.message : 'No se pudo eliminar el item.');
-      } finally {
-        setMutatingOrderItemId(null);
-      }
-    },
-    [
-      patchMesaOrderTotal,
-      publishRealtimeOrderSummary,
-      removeOrderItemFromOrder,
-      selectedMesa,
-      setMutatingOrderItemId,
-      setOrderItems,
-      setOrderModalError,
-    ],
-  );
-
-  const handleSaveOrder = useCallback(async (options?: { isAutoSave?: boolean }) => {
-    const isAutoSave = options?.isAutoSave ?? false;
-    
+  const handleSaveOrder = useCallback(async () => {
     if (releasingEmptyOrder || isClosingOrder || isSavingOrder || loadingOrder) return;
 
     const snapshotBeforeSave = latestOrderItemsRef.current;
     if (snapshotBeforeSave.length === 0) {
-      if (!isAutoSave) void releaseEmptyOrderAndClose();
+      void releaseEmptyOrderAndClose();
       return;
     }
 
     if (!selectedMesa?.id || !selectedMesa.current_order_id) {
-      if (!isAutoSave) setOrderModalError('No hay una orden activa para guardar.');
+      setOrderModalError('No hay una orden activa para guardar.');
       return;
     }
 
     setIsSavingOrder(true);
-    if (!isAutoSave) setOrderModalError(null);
+    setOrderModalError(null);
 
     try {
-      if (quantitySyncTimerRef.current) {
-        clearTimeout(quantitySyncTimerRef.current);
-        quantitySyncTimerRef.current = null;
-      }
       // Flush pending quantity updates to server before saving
       await flushPendingQuantityUpdates();
       pendingQuantityUpdatesRef.current.clear();
@@ -822,13 +676,13 @@ export function useMesaOrderMutations({
       // guardar, pero con un timeout de seguridad para no bloquear la UI si
       // alguna operación previa se quedó colgada.
       await Promise.race([
-        addCatalogQueueRef.current,
+        quantityFlushQueueRef.current,
         new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
       ]);
 
       const snapshotToPersist = latestOrderItemsRef.current;
       if (snapshotToPersist.length === 0) {
-        if (!isAutoSave) void releaseEmptyOrderAndClose();
+        void releaseEmptyOrderAndClose();
         return;
       }
 
@@ -850,30 +704,25 @@ export function useMesaOrderMutations({
         persistedUnits,
         'confirmed',
       );
-      // Only close modal on manual save, not auto-save
-      if (!isAutoSave) {
-        closeOrderModal();
-        onOrderSaved?.();
-      }
+      closeOrderModal();
+      onOrderSaved?.();
       setHasPendingChanges(false);
     } catch (err) {
-      if (!isAutoSave) {
-        const fallbackMessage = 'No se pudo guardar la orden.';
-        const message =
-          err instanceof Error
-            ? err.message
-            : String(
-                (err as { message?: string; details?: string } | null)?.message ||
-                  (err as { details?: string } | null)?.details ||
-                  fallbackMessage,
-              );
-        setOrderModalError(message || fallbackMessage);
-      }
+      const fallbackMessage = 'No se pudo guardar la orden.';
+      const message =
+        err instanceof Error
+          ? err.message
+          : String(
+              (err as { message?: string; details?: string } | null)?.message ||
+                (err as { details?: string } | null)?.details ||
+                fallbackMessage,
+            );
+      setOrderModalError(message || fallbackMessage);
     } finally {
       setIsSavingOrder(false);
     }
   }, [
-    addCatalogQueueRef,
+    quantityFlushQueueRef,
     closeOrderModal,
     isClosingOrder,
     isSavingOrder,
@@ -886,7 +735,6 @@ export function useMesaOrderMutations({
     pendingQuantityUpdatesRef,
     persistOrderSnapshot,
     publishRealtimeOrderSummary,
-    quantitySyncTimerRef,
     releaseEmptyOrderAndClose,
     releasingEmptyOrder,
     selectedMesa,
@@ -919,12 +767,7 @@ export function useMesaOrderMutations({
       const orderId = String(mesa.current_order_id || '').trim();
       const providedItems = Array.isArray(options?.initialItems) ? options.initialItems : null;
       const inMemoryCache = orderId ? orderItemsCacheRef.current.get(orderId) : null;
-      const serviceCache = orderId
-        ? {
-            items: orderItemsCacheRef.current.get(orderId) || null,
-          }
-        : null;
-      const cachedItems = providedItems || inMemoryCache || serviceCache?.items || null;
+      const cachedItems = providedItems || inMemoryCache || null;
       const hasCachedItems = Array.isArray(cachedItems) && cachedItems.length > 0;
       const skipOrderItemsFetch = options?.skipOrderItemsFetch === true;
 
@@ -932,6 +775,7 @@ export function useMesaOrderMutations({
       setShowOrderModal(true);
       setLoadingOrder(true);
       setOrderModalError(null);
+      setHasPendingChanges(false);
 
       if (hasCachedItems) {
         setOrderItems(cachedItems);
@@ -988,8 +832,6 @@ export function useMesaOrderMutations({
               setSelectedMesa(null);
               setOrderItems([]);
               setSearchCatalog('');
-              setIsSearchFocused(false);
-              setMutatingOrderItemId(null);
               setError('Alguien esta usando esta mesa.');
               return;
             }
@@ -1065,9 +907,7 @@ export function useMesaOrderMutations({
       orderModalOpenIntentRef,
       patchMesaOrderTotal,
       setError,
-      setIsSearchFocused,
       setLoadingOrder,
-      setMutatingOrderItemId,
       setOrderItems,
       setOrderModalError,
       setSearchCatalog,
@@ -1380,12 +1220,10 @@ export function useMesaOrderMutations({
   ]);
 
   return {
-    closeAuxiliaryOrderModals,
     closeOrderModal,
     releaseEmptyOrderAndClose,
     handleAddCatalogItem,
     handleUpdateOrderItemQuantity,
-    handleRemoveOrderItem,
     handleSaveOrder,
     openOrderModal,
     handleCloseOrder,

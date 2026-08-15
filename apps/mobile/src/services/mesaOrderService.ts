@@ -15,8 +15,6 @@ export {
   calculateOrderTotal,
   sumOrderItemsQuantity,
   normalizeOrderReference,
-  normalizeOrderItemQuantity,
-  normalizeOrderItemSubtotal,
   reconcileOrderItemsFromServer,
   calculateCashChange,
 } from './mesaOrder/utils';
@@ -30,19 +28,12 @@ export {
 
 export {
   preloadRpcCompatibility,
-  invalidateOrderItemsCache,
-  getOrderItemsCacheSnapshot,
   setOrderItemsCacheSnapshot,
   listOrderItems,
   loadOpenOrderSnapshot,
-  listOrderItemUnitsByOrderIds,
-  syncOrderTotal,
-  addCatalogItemToOrder,
-  addProductToOrder,
-  updateOrderItemQuantityInOrder,
   syncOrderItemQuantity,
   persistOrderSnapshot,
-  removeOrderItemFromOrder,
+  persistOrderNotes,
 } from './mesaOrder/itemService';
 
 export {

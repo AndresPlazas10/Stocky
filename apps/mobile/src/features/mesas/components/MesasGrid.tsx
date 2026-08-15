@@ -2,7 +2,7 @@ import React, { useCallback, useMemo } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { STOCKY_COLORS } from '../../../theme/tokens';
 import { MesaCard } from './MesaCard';
-import { isMesaOccupied } from '../utils/mesaHelpers';
+import { isMesaOccupied, CALL_WINDOW_MS } from '../utils/mesaHelpers';
 import type { MesaEditLock, MesaRecord } from '../../../services/mesasService';
 
 type HeldMesaLock = {
@@ -20,7 +20,6 @@ type MesaMeta = {
 
 interface MesasGridProps {
   mesas: MesaRecord[];
-  selectedMesaId?: string | number | null;
   loading?: boolean;
   actingMesaId?: string | null;
   canDeleteMesas?: boolean;
@@ -30,6 +29,7 @@ interface MesasGridProps {
   sessionUserId?: string;
   onMesaPress: (mesa: MesaRecord, meta: { occupied: boolean; lockedByOther: boolean }) => void;
   onDeleteMesa?: (mesa: MesaRecord) => void;
+  onDismissCall?: (mesa: MesaRecord) => void;
 }
 
 const ItemSeparator = () => <View style={styles.separator} />;
@@ -47,6 +47,7 @@ export const MesasGrid = React.memo(function MesasGrid({
   sessionUserId,
   onMesaPress,
   onDeleteMesa,
+  onDismissCall,
 }: MesasGridProps) {
   const mesaMetaMap = useMemo(() => {
     const map = new Map<string, MesaMeta>();
@@ -76,6 +77,14 @@ export const MesasGrid = React.memo(function MesasGrid({
     return map;
   }, [mesas, actingMesaId, mesaLocksByTableId, heldMesaLock, contextBusinessId, sessionUserId]);
 
+  const isCallActive = useCallback((mesa: MesaRecord): boolean => {
+    const raw = String(mesa?.call_requested_at || '').trim();
+    if (!raw) return false;
+    const calledAtMs = Date.parse(raw);
+    if (!Number.isFinite(calledAtMs)) return false;
+    return Date.now() - calledAtMs < CALL_WINDOW_MS;
+  }, []);
+
   const renderItem = useCallback(
     ({ item: mesa }: { item: MesaRecord }) => {
       const meta = mesaMetaMap.get(mesa.id);
@@ -83,6 +92,7 @@ export const MesasGrid = React.memo(function MesasGrid({
       const lockedByOther = meta?.lockedByOther ?? false;
       const total = meta?.total ?? 0;
       const isBusy = meta?.isBusy ?? false;
+      const callActive = isCallActive(mesa);
 
       return (
         <MesaCard
@@ -91,12 +101,14 @@ export const MesasGrid = React.memo(function MesasGrid({
           lockedByOther={lockedByOther}
           isBusy={isBusy}
           total={total}
+          callActive={callActive}
           onPress={(pressedMesa) => onMesaPress(pressedMesa, { occupied, lockedByOther })}
           onDeletePress={canDeleteMesas ? onDeleteMesa : undefined}
+          onDismissCall={onDismissCall}
         />
       );
     },
-    [mesaMetaMap, canDeleteMesas, onDeleteMesa, onMesaPress],
+    [mesaMetaMap, canDeleteMesas, onDeleteMesa, onMesaPress, onDismissCall, isCallActive],
   );
 
   return (

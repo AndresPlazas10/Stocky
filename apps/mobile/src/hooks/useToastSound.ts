@@ -9,8 +9,11 @@ const SOUND_FILES: Record<ToastType, number> = {
   info: require('../../assets/sounds/info.wav'),
 };
 
+const KITCHEN_ALERT_FILE = require('../../assets/sounds/kitchen.wav');
+
 export function useToastSound() {
   const soundsRef = useRef<Map<ToastType, Audio.Sound>>(new Map());
+  const kitchenAlertRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
     return () => {
@@ -18,6 +21,8 @@ export function useToastSound() {
         sound.unloadAsync().catch(() => {});
       });
       soundsRef.current.clear();
+      kitchenAlertRef.current?.unloadAsync().catch(() => {});
+      kitchenAlertRef.current = null;
     };
   }, []);
 
@@ -40,5 +45,21 @@ export function useToastSound() {
     }
   }, []);
 
-  return { playSound };
+  const playKitchenAlert = useCallback(async () => {
+    try {
+      if (!kitchenAlertRef.current) {
+        const { sound } = await Audio.Sound.createAsync(KITCHEN_ALERT_FILE, {
+          volume: 1.0,
+        });
+        kitchenAlertRef.current = sound;
+      }
+
+      await kitchenAlertRef.current.setPositionAsync(0);
+      await kitchenAlertRef.current.playAsync();
+    } catch {
+      // Silently ignore — sound is non-critical
+    }
+  }, []);
+
+  return { playSound, playKitchenAlert };
 }

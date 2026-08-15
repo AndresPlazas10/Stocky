@@ -7,7 +7,6 @@ import type { MesaOrderItem } from '../../../services/mesaOrderService';
 interface OrderItemRowProps {
   item: MesaOrderItem;
   itemName: string;
-  busy: boolean;
   disabled: boolean;
   onChangeQuantity: (item: MesaOrderItem, delta: number) => void;
 }
@@ -15,7 +14,6 @@ interface OrderItemRowProps {
 export const OrderItemRow = memo(function OrderItemRow({
   item,
   itemName,
-  busy,
   disabled,
   onChangeQuantity,
 }: OrderItemRowProps) {
@@ -47,9 +45,9 @@ export const OrderItemRow = memo(function OrderItemRow({
       <View style={styles.orderItemControlsRow}>
         <View style={styles.orderItemStepper}>
           <Pressable
-            style={[styles.orderItemStepperButton, busy && styles.actionButtonDisabled]}
+            style={styles.orderItemStepperButton}
             onPressIn={() => onChangeQuantity(item, -1)}
-            disabled={busy || disabled}
+            disabled={disabled}
             hitSlop={10}
             pressRetentionOffset={10}
           >
@@ -59,9 +57,9 @@ export const OrderItemRow = memo(function OrderItemRow({
           <Text style={styles.orderItemQtyText}>{item.quantity}</Text>
 
           <Pressable
-            style={[styles.orderItemStepperButton, busy && styles.actionButtonDisabled]}
+            style={styles.orderItemStepperButton}
             onPressIn={() => onChangeQuantity(item, 1)}
-            disabled={busy || disabled}
+            disabled={disabled}
             hitSlop={10}
             pressRetentionOffset={10}
           >
@@ -186,8 +184,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 18,
     fontWeight: '600',
-  },
-  actionButtonDisabled: {
-    opacity: 0.7,
   },
 });
