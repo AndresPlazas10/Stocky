@@ -36,6 +36,8 @@ vi.mock('lucide-react', () => {
     ...new Proxy({}, { get: (_, name) => createIcon(name) }),
     // Explicitly used in components we test
     AlertCircle: createIcon('AlertCircle'),
+    AlertTriangle: createIcon('AlertTriangle'),
+    Info: createIcon('Info'),
     Printer: createIcon('Printer'),
     X: createIcon('X'),
     Save: createIcon('Save'),

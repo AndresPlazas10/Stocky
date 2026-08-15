@@ -474,16 +474,6 @@ export function AuthScreen() {
             keyboardDismissMode="on-drag"
             automaticallyAdjustKeyboardInsets
           >
-            <StockyToast
-              visible={toast.toast.visible}
-              type={toast.toast.type}
-              title={toast.toast.title}
-              message={toast.toast.message}
-              ctaText={toast.toast.ctaText}
-              durationMs={toast.toast.durationMs}
-              onClose={toast.hideToast}
-            />
-
             <View style={cardStyle}>
               <View style={styles.languageSwitchContainer}>
                 <LanguageSwitch />
@@ -678,6 +668,17 @@ export function AuthScreen() {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+        <View style={styles.toastOverlay} pointerEvents="box-none">
+          <StockyToast
+            visible={toast.toast.visible}
+            type={toast.toast.type}
+            title={toast.toast.title}
+            message={toast.toast.message}
+            ctaText={toast.toast.ctaText}
+            durationMs={toast.toast.durationMs}
+            onClose={toast.hideToast}
+          />
+        </View>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -689,6 +690,14 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+  },
+  toastOverlay: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    right: 16,
+    zIndex: 9999,
+    elevation: 9999,
   },
   keyboardAvoiding: {
     flex: 1,

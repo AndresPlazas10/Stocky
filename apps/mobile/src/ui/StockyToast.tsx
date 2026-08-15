@@ -11,7 +11,6 @@ import Animated, {
   cancelAnimation,
 } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToastSound } from '../hooks/useToastSound';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -54,9 +53,8 @@ export function StockyToast({
   sound = true,
   onClose,
 }: Props) {
-  const insets = useSafeAreaInsets();
   const progress = useSharedValue(0);
-  const translateY = useSharedValue(-100);
+  const translateY = useSharedValue(-24);
   const opacity = useSharedValue(0);
   const onCloseRef = useRef(onClose);
   const { playSound } = useToastSound();
@@ -69,7 +67,7 @@ export function StockyToast({
     if (!visible) {
       cancelAnimation(progress);
       progress.value = 0;
-      translateY.value = withTiming(-100, { duration: 200 });
+      translateY.value = withTiming(-24, { duration: 200 });
       opacity.value = withTiming(0, { duration: 200 });
       return;
     }
@@ -105,42 +103,29 @@ export function StockyToast({
   }));
 
   const config = TYPE_CONFIG[type];
-  const topOffset = insets.top + 16;
 
   return (
-    <Animated.View
-      style={[styles.container, { top: topOffset }, containerStyle]}
-      pointerEvents={visible ? 'auto' : 'none'}
-    >
-      <View style={styles.card}>
-        <View style={styles.row}>
-          <View style={[styles.iconCircle, { backgroundColor: config.iconBg }]}>
-            <Ionicons name={config.iconName} size={18} color="#FFFFFF" />
-          </View>
-          <View style={styles.textCol}>
-            <Text style={styles.title}>{title}</Text>
-            {message ? <Text style={styles.message}>{message}</Text> : null}
-            {ctaText ? <Text style={styles.cta}>{ctaText}</Text> : null}
-          </View>
+    <Animated.View style={[styles.card, containerStyle]} pointerEvents="auto">
+      <View style={styles.row}>
+        <View style={[styles.iconCircle, { backgroundColor: config.iconBg }]}>
+          <Ionicons name={config.iconName} size={18} color="#FFFFFF" />
         </View>
-        <View style={styles.progressTrack}>
-          <Animated.View
-            style={[styles.progressFill, { backgroundColor: config.progressColor }, progressStyle]}
-          />
+        <View style={styles.textCol}>
+          <Text style={styles.title}>{title}</Text>
+          {message ? <Text style={styles.message}>{message}</Text> : null}
+          {ctaText ? <Text style={styles.cta}>{ctaText}</Text> : null}
         </View>
+      </View>
+      <View style={styles.progressTrack}>
+        <Animated.View
+          style={[styles.progressFill, { backgroundColor: config.progressColor }, progressStyle]}
+        />
       </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 9999,
-    elevation: 9999,
-  },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,

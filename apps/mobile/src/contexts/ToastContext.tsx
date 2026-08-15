@@ -1,15 +1,18 @@
-import { createContext, useCallback, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useRef, useState, type ReactNode } from 'react';
 import type { ToastOptions, ToastType } from '../ui/StockyToast';
 
-type ToastState = ToastOptions & { visible: boolean };
+export const MAX_VISIBLE_TOASTS = 5;
+
+type ToastState = ToastOptions & { id: number; visible: boolean };
 
 type ShowArgs =
   ToastOptions | { title: string; message?: string; ctaText?: string; sound?: boolean };
 
 export type ToastContextValue = {
   toast: ToastState;
+  toasts: ToastState[];
   showToast: (options: ToastOptions) => void;
-  hideToast: () => void;
+  hideToast: (id?: number) => void;
   showSuccess: (args: ShowArgs) => void;
   showError: (args: ShowArgs) => void;
   showWarning: (args: ShowArgs) => void;
@@ -17,6 +20,7 @@ export type ToastContextValue = {
 };
 
 const INITIAL_STATE: ToastState = {
+  id: -1,
   visible: false,
   type: 'success',
   title: '',
@@ -36,14 +40,32 @@ function resolveArgs(type: ToastType, args: ShowArgs): ToastOptions {
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toast, setToast] = useState<ToastState>(INITIAL_STATE);
+  const [toasts, setToasts] = useState<ToastState[]>([]);
+  const nextToastIdRef = useRef(1);
+  const toastsRef = useRef<ToastState[]>([]);
+  toastsRef.current = toasts;
 
   const showToast = useCallback((options: ToastOptions) => {
-    setToast({ ...options, visible: true });
+    const id = nextToastIdRef.current++;
+    setToasts((prev) => {
+      const next = [...prev, { ...options, id, visible: true }];
+      if (next.length > MAX_VISIBLE_TOASTS) {
+        return next.slice(next.length - MAX_VISIBLE_TOASTS);
+      }
+      return next;
+    });
   }, []);
 
-  const hideToast = useCallback(() => {
-    setToast((prev) => ({ ...prev, visible: false }));
+  const hideToast = useCallback((id?: number) => {
+    const targetId =
+      id !== undefined ? id : toastsRef.current[toastsRef.current.length - 1]?.id;
+    if (targetId === undefined) return;
+    setToasts((prev) =>
+      prev.map((toast) => (toast.id === targetId ? { ...toast, visible: false } : toast)),
+    );
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== targetId));
+    }, 220);
   }, []);
 
   const showSuccess = useCallback(
@@ -66,9 +88,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [showToast],
   );
 
+  const toast = toasts.length > 0 ? toasts[toasts.length - 1] : INITIAL_STATE;
+
   return (
     <ToastContext.Provider
-      value={{ toast, showToast, hideToast, showSuccess, showError, showWarning, showInfo }}
+      value={{ toast, toasts, showToast, hideToast, showSuccess, showError, showWarning, showInfo }}
     >
       {children}
     </ToastContext.Provider>
