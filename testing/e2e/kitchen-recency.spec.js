@@ -55,9 +55,12 @@ test.describe('Cocina ordenada por recencia', () => {
         await targetCard.click();
 
         // Espera a que el modal de la orden abra y cargue los items
-        await expect(waiter.locator('button:has-text("Guardar")').first()).toBeVisible({
-          timeout: 10000,
-        });
+        const saveBtn = waiter.locator('button:has-text("Guardar")').first();
+        if (!(await saveBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
+          // El grid pudo re-renderizarse con un evento realtime en vivo: re-click
+          await targetCard.click({ force: true });
+        }
+        await expect(saveBtn).toBeVisible({ timeout: 10000 });
         const qtyUp = waiter.locator('[data-testid="qty-inc"]').first();
         if (!(await qtyUp.isVisible({ timeout: 10000 }).catch(() => false))) {
           test.skip(true, 'la orden no tiene items editables');
