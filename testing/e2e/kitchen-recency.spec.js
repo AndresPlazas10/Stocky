@@ -75,6 +75,13 @@ test.describe('Cocina ordenada por recencia', () => {
           { timeout: 25000 },
         );
 
+        // El temporizador de la orden editada se reinició (≈ 00:0X desde el cambio)
+        const firstCard = kitchen.locator('[data-testid="mesa-card"]').first();
+        const timer = firstCard.locator('[data-testid="kitchen-order-timer"]');
+        await expect(timer).toBeVisible({ timeout: 5000 });
+        const timerText = (await timer.innerText()).trim();
+        expect(timerText).toMatch(/^0\d:\d{2}$/);
+
         // Badge "Pedido más reciente" sobre la mesa editada (si realtime lo entregó)
         const badge = kitchen.locator('[data-testid="mesa-most-recent-badge"]');
         if (await badge.count()) {

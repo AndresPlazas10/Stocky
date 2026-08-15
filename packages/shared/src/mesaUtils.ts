@@ -138,6 +138,22 @@ export function resolveOrderRecencyMs(
   return Number.isFinite(openedMs) ? openedMs : 0;
 }
 
+/**
+ * Formatea un tiempo transcurrido en ms como mm:ss (o hh:mm:ss si ≥ 1 hora).
+ * Úsese para el temporizador de la cocina ("hace cuánto llegó el pedido").
+ */
+export function formatElapsedTime(elapsedMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(Number(elapsedMs) / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (hours > 0) {
+    return `${hours}:${pad(minutes)}:${pad(seconds)}`;
+  }
+  return `${pad(minutes)}:${pad(seconds)}`;
+}
+
 export interface MesaCallRow {
   id?: string | null;
   call_requested_at?: string | null;

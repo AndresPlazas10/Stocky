@@ -27,6 +27,8 @@ export function useKitchenOrders({
   const [loadingItems, setLoadingItems] = useState(false);
   const [callingOrderIds, setCallingOrderIds] = useState<Set<string>>(new Set());
   const [mostRecentOrderId, setMostRecentOrderId] = useState<string | null>(null);
+  const [arrivalVersion, setArrivalVersion] = useState(0);
+  const bumpArrivalVersion = useCallback(() => setArrivalVersion((v) => v + 1), []);
   const loadedSignatureRef = useRef('');
   const lastForceLoadRef = useRef(0);
   const baselineDoneRef = useRef(false);
@@ -91,6 +93,7 @@ export function useKitchenOrders({
               arrivalTimestampsRef.current.set(orderId, persistedTs);
             }
           });
+          bumpArrivalVersion();
           return;
         }
 
@@ -109,12 +112,14 @@ export function useKitchenOrders({
           if (prevSignature === undefined || prevSignature === '') {
             if (nextSignature === '') return;
             arrivalTimestampsRef.current.set(orderId, Date.now());
+            bumpArrivalVersion();
             if (mesa) onOrderChangedRef.current?.('new', orderId, mesa);
             return;
           }
 
           if (prevSignature !== nextSignature && mesa) {
             arrivalTimestampsRef.current.set(orderId, Date.now());
+            bumpArrivalVersion();
             onOrderChangedRef.current?.('update', orderId, mesa);
           }
         });
@@ -124,9 +129,14 @@ export function useKitchenOrders({
         knownSignaturesRef.current.forEach((_, orderId) => {
           if (!activeOrderIds.has(orderId)) knownSignaturesRef.current.delete(orderId);
         });
+        let removedArrival = false;
         arrivalTimestampsRef.current.forEach((_, orderId) => {
-          if (!activeOrderIds.has(orderId)) arrivalTimestampsRef.current.delete(orderId);
+          if (!activeOrderIds.has(orderId)) {
+            arrivalTimestampsRef.current.delete(orderId);
+            removedArrival = true;
+          }
         });
+        if (removedArrival) bumpArrivalVersion();
 
         // El pedido con la llegada más reciente = "Pedido más reciente" en cocina.
         let latestOrderId: string | null = null;
@@ -142,7 +152,7 @@ export function useKitchenOrders({
         setLoadingItems(false);
       }
     },
-    [enabled, mesas],
+    [enabled, mesas, bumpArrivalVersion],
   );
 
   useEffect(() => {
@@ -203,6 +213,7 @@ export function useKitchenOrders({
     callingOrderIds,
     mostRecentOrderId,
     orderArrivalTsByOrderId: arrivalTimestampsRef,
+    arrivalVersion,
     handleCallMesa,
   };
 }

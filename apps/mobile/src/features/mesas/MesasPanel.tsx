@@ -128,7 +128,7 @@ export function MesasPanel({ session, businessContext }: Props) {
     };
   }, [context?.source, context?.businessId, session.user.id]);
 
-  const { itemsByOrderId, loadingItems, callingOrderIds, mostRecentOrderId, orderArrivalTsByOrderId, handleCallMesa } = useKitchenOrders({
+  const { itemsByOrderId, loadingItems, callingOrderIds, mostRecentOrderId, orderArrivalTsByOrderId, arrivalVersion, handleCallMesa } = useKitchenOrders({
     mesas,
     // Solo activar la cocina cuando las mesas ya cargaron: evita que el baseline
     // se siembre con mesas=[] (race con el role fetch) y dispare una ráfaga de
@@ -886,6 +886,7 @@ export function MesasPanel({ session, businessContext }: Props) {
             callingOrderIds={callingOrderIds}
             mostRecentOrderId={mostRecentOrderId}
             orderArrivalTsByOrderId={orderArrivalTsByOrderId}
+            arrivalVersion={arrivalVersion}
             resolveItemName={resolveOrderItemDisplayName}
             onCallMesa={handleCallMesa}
           />

@@ -61,7 +61,8 @@ export {
   isCallRequestedAtSuppressed,
   resolveOrderRecencyMs,
   resolveCallEvents,
-  suppressDismissedCalls
+  suppressDismissedCalls,
+  formatElapsedTime
 } from './mesaUtils.js';
 
 // Mesa Constants

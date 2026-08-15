@@ -7,6 +7,7 @@ import type { MesaOrderItem } from '../../../services/mesaOrderService';
 import type { MesaRecord } from '../../../services/mesasService';
 import { isMesaOccupied, mesaDisplayName, CALL_WINDOW_MS } from '../utils/mesaHelpers';
 import { resolveOrderRecencyMs } from '@stocky/shared/mesa-utils';
+import { ElapsedTimer } from './ElapsedTimer';
 
 interface KitchenMesasGridProps {
   mesas: MesaRecord[];
@@ -16,6 +17,7 @@ interface KitchenMesasGridProps {
   callingOrderIds: Set<string>;
   mostRecentOrderId?: string | null;
   orderArrivalTsByOrderId?: React.MutableRefObject<Map<string, number>> | null;
+  arrivalVersion?: number;
   resolveItemName: (item: MesaOrderItem) => string;
   onCallMesa: (mesa: MesaRecord) => void;
 }
@@ -32,6 +34,7 @@ export const KitchenMesasGrid = React.memo(function KitchenMesasGrid({
   callingOrderIds,
   mostRecentOrderId = null,
   orderArrivalTsByOrderId = null,
+  arrivalVersion = 0,
   resolveItemName,
   onCallMesa,
 }: KitchenMesasGridProps) {
@@ -97,6 +100,9 @@ export const KitchenMesasGrid = React.memo(function KitchenMesasGrid({
                 {occupied ? t('labels.occupied', 'Ocupada') : t('labels.available', 'Disponible')}
               </Text>
             </View>
+            {occupied && orderId ? (
+              <ElapsedTimer startedAt={orderArrivalTsByOrderId?.current?.get(orderId) ?? 0} />
+            ) : null}
           </View>
 
           {occupied ? (
@@ -159,7 +165,7 @@ export const KitchenMesasGrid = React.memo(function KitchenMesasGrid({
         </View>
       );
     },
-    [itemsByOrderId, callingOrderIds, resolveItemName, onCallMesa, loadingItems, t, hasActiveCall, mostRecentOrderId],
+    [itemsByOrderId, callingOrderIds, resolveItemName, onCallMesa, loadingItems, t, hasActiveCall, mostRecentOrderId, orderArrivalTsByOrderId, arrivalVersion],
   );
 
   return (

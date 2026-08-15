@@ -12,6 +12,7 @@ import { logger } from '@/utils/logger';
 import type { MesaRecord } from '@/types/components';
 import { getMesaProductUnits, getMesaInUseMessage, calculateOrderItemsTotal, CALL_WINDOW_MS } from './mesaHelpers';
 import { resolveOrderRecencyMs } from '@stocky/shared';
+import { ElapsedTimer } from './ElapsedTimer';
 
 interface MesaLockState {
   lockedByOther?: boolean;
@@ -34,6 +35,7 @@ interface MesasGridProps {
   getMesaLockState?: ((mesaId: string) => MesaLockState | null) | null;
   mostRecentOrderId?: string | null;
   orderArrivalTsByOrderId?: React.MutableRefObject<Map<string, number>> | null;
+  arrivalVersion?: number;
   onDismissCall?: (mesaId: string) => void;
   showInfo: (title: string, message?: string) => void;
   showError: (title: string, message?: string) => void;
@@ -56,6 +58,7 @@ const MesasGrid = memo(function MesasGrid({
   getMesaLockState = null,
   mostRecentOrderId = null,
   orderArrivalTsByOrderId = null,
+  arrivalVersion = 0,
   onDismissCall,
   showInfo,
   showError,
@@ -222,13 +225,20 @@ const MesasGrid = memo(function MesasGrid({
                     {t('mesas:labels.tableNumber', { number: mesa.table_number })}
                   </h3>
 
-                  {/* Estado */}
-                  <Badge
-                    variant={lockedByOther ? 'destructive' : (isOccupied ? 'warning' : 'success')}
-                    className="mb-3 text-sm font-semibold"
-                  >
-                    {lockedByOther ? '🔒 ' + t('mesas:labels.inUse') : (isOccupied ? '🔴 ' + t('mesas:labels.occupied') : '🟢 ' + t('mesas:labels.available'))}
-                  </Badge>
+                  {/* Estado + temporizador de cocina */}
+                  <div className="mb-3 flex items-center justify-center gap-2">
+                    <Badge
+                      variant={lockedByOther ? 'destructive' : (isOccupied ? 'warning' : 'success')}
+                      className="text-sm font-semibold"
+                    >
+                      {lockedByOther ? '🔒 ' + t('mesas:labels.inUse') : (isOccupied ? '🔴 ' + t('mesas:labels.occupied') : '🟢 ' + t('mesas:labels.available'))}
+                    </Badge>
+                    {isKitchen && isOccupied && mesa.orders?.id ? (
+                      <ElapsedTimer
+                        startedAt={orderArrivalTsByOrderId?.current?.get(String(mesa.orders.id)) ?? 0}
+                      />
+                    ) : null}
+                  </div>
 
                   {/* Información de la orden si está ocupada */}
                   {isOccupied && mesa.orders && !lockedByOther && (

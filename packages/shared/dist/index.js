@@ -10,7 +10,7 @@ export { isConnectivityError } from './connectivity.js';
 // Normalization
 export { normalizeText, normalizeOptionalText, normalizeNumber, normalizeOptionalAmount, normalizeReference } from './normalization.js';
 // Mesa Utilities
-export { isMesaOccupied, normalizeTableIdentifier, compareMesaTableIdentifiers, resolveMesaSyncVersion, mesaDisplayName, isCallRequestedAtSuppressed, resolveOrderRecencyMs, resolveCallEvents, suppressDismissedCalls } from './mesaUtils.js';
+export { isMesaOccupied, normalizeTableIdentifier, compareMesaTableIdentifiers, resolveMesaSyncVersion, mesaDisplayName, isCallRequestedAtSuppressed, resolveOrderRecencyMs, resolveCallEvents, suppressDismissedCalls, formatElapsedTime } from './mesaUtils.js';
 // Mesa Constants
 export { CALL_WINDOW_MS, MESA_LOCK_TTL_SECONDS, MESA_LOCK_TTL_MS, MESA_LOCK_HEARTBEAT_MS, MESAS_REMOTE_FALLBACK_POLL_MS } from './mesaConstants.js';
 // Order Normalization

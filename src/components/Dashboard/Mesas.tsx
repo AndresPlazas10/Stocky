@@ -93,6 +93,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
   const callBaselineSeededRef = useRef(false);
   const callAutoDismissTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [mostRecentOrderId, setMostRecentOrderId] = useState<string | null>(null);
+  const [arrivalVersion, setArrivalVersion] = useState(0);
   const arrivalTimestampsRef = useRef<Map<string, number>>(new Map());
 
   const handleDismissCall = useCallback(
@@ -170,6 +171,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
   const recordOrderArrival = useCallback((orderId: string) => {
     if (!orderId) return;
     arrivalTimestampsRef.current.set(orderId, Date.now());
+    setArrivalVersion((v) => v + 1);
     let latestId: string | null = null;
     let latestTs = -Infinity;
     arrivalTimestampsRef.current.forEach((ts, id) => {
@@ -183,18 +185,30 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
 
   // Siembra los timestamps de recencia desde datos persistidos (updated_at/opened_at)
   // para órdenes ya existentes: el orden "más reciente primero" sobrevive recargas.
+  // Si el updated_at persistido es MÁS NUEVO que el arrival actual (cambio
+  // detectado por poll sin realtime), se reinicia el temporizador de cocina.
   useEffect(() => {
+    let changed = false;
     (Array.isArray(state.mesas) ? state.mesas : []).forEach((mesa) => {
       if (String(mesa?.status || '').trim().toLowerCase() !== 'occupied') return;
       const orderId = String(mesa?.orders?.id || mesa?.current_order_id || '').trim();
-      if (!orderId || arrivalTimestampsRef.current.has(orderId)) return;
+      if (!orderId) return;
       const persistedTs = Date.parse(
         String(mesa?.orders?.updated_at || mesa?.orders?.opened_at || ''),
       );
-      if (Number.isFinite(persistedTs)) {
+      if (!Number.isFinite(persistedTs)) return;
+      const current = arrivalTimestampsRef.current.get(orderId);
+      if (current === undefined) {
         arrivalTimestampsRef.current.set(orderId, persistedTs);
+        changed = true;
+        return;
+      }
+      if (persistedTs > current) {
+        arrivalTimestampsRef.current.set(orderId, persistedTs);
+        changed = true;
       }
     });
+    if (changed) setArrivalVersion((v) => v + 1);
   }, [state.mesas]);
 
   const {
@@ -570,6 +584,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
             getMesaLockState={getMesaLockState}
             mostRecentOrderId={mostRecentOrderId}
             orderArrivalTsByOrderId={arrivalTimestampsRef}
+            arrivalVersion={arrivalVersion}
             onDismissCall={handleDismissCall}
             showInfo={showInfo}
             showError={showError}

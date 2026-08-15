@@ -44,6 +44,11 @@ export declare function resolveOrderRecencyMs(mesa: {
         opened_at?: string | null;
     } | null;
 }, arrivalMap?: Map<string, number> | null): number;
+/**
+ * Formatea un tiempo transcurrido en ms como mm:ss (o hh:mm:ss si ≥ 1 hora).
+ * Úsese para el temporizador de la cocina ("hace cuánto llegó el pedido").
+ */
+export declare function formatElapsedTime(elapsedMs: number): string;
 export interface MesaCallRow {
     id?: string | null;
     call_requested_at?: string | null;
