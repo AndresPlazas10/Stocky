@@ -144,8 +144,30 @@ export function EmployeeFormModal({
           <Text style={s.helperText}>{t('empleados.fields.passwordHelper')}</Text>
         </View>
 
-        <View style={s.roleInfoCard}>
-          <Text style={s.roleInfoText}>{t('empleados.roleAssigned')}</Text>
+        <View style={s.fieldGroup}>
+          <Text style={s.inputLabel}>{t('empleados.fields.role')}</Text>
+          <View style={s.roleSelectorRow}>
+            <Pressable
+              style={[s.roleOption, form.role === 'employee' && s.roleOptionActive]}
+              onPress={() => onFormChange({ role: 'employee' })}
+            >
+              <Text
+                style={[s.roleOptionText, form.role === 'employee' && s.roleOptionTextActive]}
+              >
+                {t('empleados.roles.employee')}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[s.roleOption, form.role === 'kitchen' && s.roleOptionActive]}
+              onPress={() => onFormChange({ role: 'kitchen' })}
+            >
+              <Text
+                style={[s.roleOptionText, form.role === 'kitchen' && s.roleOptionTextActive]}
+              >
+                {t('empleados.roles.kitchen')}
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
         {error ? (

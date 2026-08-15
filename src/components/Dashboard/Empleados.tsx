@@ -38,6 +38,14 @@ function isOwnerRole(role: string) {
   return normalized === 'owner' || normalized === 'propietario';
 }
 
+function formatRoleLabel(role: string | null | undefined, t: (key: string) => string): string {
+  const normalized = String(role || '').trim().toLowerCase();
+  if (normalized === 'admin' || normalized === 'administrador') return t('roles.admin');
+  if (normalized === 'owner' || normalized === 'propietario') return t('roles.owner');
+  if (normalized === 'kitchen' || normalized === 'cocina') return t('roles.kitchen');
+  return t('roles.employee');
+}
+
 function Empleados({ businessId }: DashboardModuleProps) {
   const { t } = useTranslation('common');
   const { showError, showSuccess, ToastComponent } = useAppToast();
@@ -163,7 +171,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
 
       const cleanUsername = formData.username.toLowerCase().trim();
       const cleanPassword = formData.password.trim();
-      const fixedRole = 'employee';
+      const selectedRole = formData.role || 'employee';
 
       if (/^\d+$/.test(cleanUsername)) {
         throw new Error(t('empleados.validation.usernameNotOnlyNumbers'));
@@ -192,7 +200,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
         fullName: formData.full_name.trim(),
         username: cleanUsername,
         password: cleanPassword,
-        role: fixedRole
+        role: selectedRole
       });
 
       const optimisticEmployee = {
@@ -201,7 +209,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
         user_id: null,
         full_name: formData.full_name.trim(),
         username: cleanUsername,
-        role: fixedRole,
+        role: selectedRole,
         is_active: true,
         status: 'active',
         created_at: new Date().toISOString()
@@ -446,7 +454,7 @@ function Empleados({ businessId }: DashboardModuleProps) {
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-sm text-gray-600 capitalize">
-                            {employee.role === 'admin' ? t('roles.admin') : employee.role === 'owner' ? t('roles.owner') : t('roles.employee')}
+                            {formatRoleLabel(employee.role, t)}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
@@ -573,10 +581,19 @@ function Empleados({ businessId }: DashboardModuleProps) {
                   </p>
                 </div>
 
-                <div className="p-3 rounded-xl bg-accent-50 border border-accent-200">
-                  <p className="text-sm text-primary-700">
-                    {t('roles.employee')}: <span className="font-semibold">{t('roles.employee')}</span>
-                  </p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t('labels.role')}
+                  </label>
+                  <select
+                    name="role"
+                    value={formData.role}
+                    onChange={handleChange}
+                    className="w-full h-12 px-4 border-2 border-accent-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all bg-white"
+                  >
+                    <option value="employee">{t('roles.employee')}</option>
+                    <option value="kitchen">{t('roles.kitchen')}</option>
+                  </select>
                 </div>
 
                 <button

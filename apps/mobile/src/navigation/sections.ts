@@ -44,9 +44,28 @@ export const ADMIN_SECTION_IDS: SectionId[] = [...SECTION_IDS];
 // Paridad con web: dashboard de empleado solo expone estas 3 vistas.
 export const EMPLOYEE_SECTION_IDS: SectionId[] = ['home', 'ventas', 'inventario', 'impresion'];
 
+// Paridad con web: el rol cocina solo ve el módulo de mesas (home).
+export const KITCHEN_SECTION_IDS: SectionId[] = ['home'];
+
 export function getSectionsBySource(source: 'owner' | 'employee' | null | undefined): SectionId[] {
   if (source === 'employee') return EMPLOYEE_SECTION_IDS;
   return ADMIN_SECTION_IDS;
+}
+
+export function getSectionsByRoleAndSource(
+  source: 'owner' | 'employee' | null | undefined,
+  role?: string | null,
+): SectionId[] {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  if (source === 'employee' && (normalizedRole === 'kitchen' || normalizedRole === 'cocina')) {
+    return KITCHEN_SECTION_IDS;
+  }
+  return getSectionsBySource(source);
+}
+
+export function isKitchenRole(role?: string | null): boolean {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  return normalizedRole === 'kitchen' || normalizedRole === 'cocina';
 }
 
 export function useSectionMeta(): SectionMeta[] {

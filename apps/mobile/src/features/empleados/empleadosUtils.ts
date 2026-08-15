@@ -4,12 +4,14 @@ export type EmployeeFormState = {
   full_name: string;
   username: string;
   password: string;
+  role: string;
 };
 
 export const INITIAL_FORM: EmployeeFormState = {
   full_name: '',
   username: '',
   password: '',
+  role: 'employee',
 };
 
 export const EMPLOYEES_PAGE_SIZE = 40;
@@ -27,6 +29,9 @@ export function formatRoleLabel(role: string): string {
   }
   if (normalized === 'admin' || normalized === 'administrador') {
     return i18next.t('empleados.roles.admin', { defaultValue: 'Administrador' });
+  }
+  if (normalized === 'kitchen' || normalized === 'cocina') {
+    return i18next.t('empleados.roles.kitchen', { defaultValue: 'Cocina' });
   }
   return i18next.t('empleados.roles.employee', { defaultValue: 'Empleado' });
 }

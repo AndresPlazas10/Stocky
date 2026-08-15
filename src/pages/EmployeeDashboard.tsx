@@ -209,6 +209,8 @@ function EmployeeDashboard() {
     }
   };
 
+  const isKitchen = employee?.role === 'kitchen' || employee?.role === 'cocina';
+
   const menuItems = [
     { id: 'home', label: t('employeeDashboard.home'), icon: Home },
     { id: 'ventas', label: t('employeeDashboard.sales'), icon: ShoppingCart },
@@ -220,6 +222,7 @@ function EmployeeDashboard() {
       case 'home':
         return (
           <div className="space-y-6">
+            {!isKitchen && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -236,7 +239,7 @@ function EmployeeDashboard() {
                     <span className="text-sm text-gray-700 font-medium">{t('labels.role')}</span>
                   </div>
                   <p className="text-lg font-bold text-gray-800 pl-8">
-                    {employee?.role === 'admin' ? t('roles.admin') : t('roles.employee')}
+                    {employee?.role === 'admin' ? t('roles.admin') : employee?.role === 'kitchen' ? t('roles.kitchen') : t('roles.employee')}
                   </p>
                 </div>
 
@@ -249,6 +252,7 @@ function EmployeeDashboard() {
                 </div>
               </div>
             </motion.div>
+            )}
             
             <Mesas businessId={business?.id} userRole={employee?.role || 'employee'} />
           </div>
@@ -306,6 +310,7 @@ function EmployeeDashboard() {
     <>
       {activeSection === 'home' ? <WhatsNewModal /> : null}
       <div className="flex h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 overflow-hidden">
+      {!isKitchen && (
       <motion.aside
         initial={{ x: -300 }}
         animate={{ x: 0 }}
@@ -339,11 +344,12 @@ function EmployeeDashboard() {
           <div className="flex items-center gap-2 px-3 py-2 bg-white/10 rounded-lg backdrop-blur-sm">
             <Shield className="w-4 h-4" />
             <span className="text-sm font-medium">
-              {employee?.role === 'admin' ? t('roles.admin') : t('roles.employee')}
+              {employee?.role === 'admin' ? t('roles.admin') : employee?.role === 'kitchen' ? t('roles.kitchen') : t('roles.employee')}
             </span>
           </div>
         </div>
 
+        {!isKitchen && (
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {menuItems.map((item) => {
             const Icon = item.icon;
@@ -374,7 +380,9 @@ function EmployeeDashboard() {
             );
           })}
         </nav>
+        )}
 
+        {!isKitchen && (
         <div className="p-4 border-t border-white/10">
           <div className="mb-3 px-3 py-2 bg-white/10 rounded-lg">
             <div className="flex items-center gap-2 text-sm text-white/80">
@@ -391,7 +399,9 @@ function EmployeeDashboard() {
             {t('buttons.signOut')}
           </button>
         </div>
+        )}
       </motion.aside>
+      )}
 
       {sidebarOpen && (
         <div
@@ -403,23 +413,36 @@ function EmployeeDashboard() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-4">
+            {!isKitchen && (
             <button
               onClick={() => setSidebarOpen(true)}
               className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <Menu className="w-6 h-6 text-gray-600" />
             </button>
+            )}
             <div className="flex items-center gap-3">
               <h1 className="text-xl md:text-2xl font-bold text-gray-800">{t('navigation.employees')}</h1>
               <WarmupStatusBadge status={warmupStatus} />
             </div>
           </div>
           
-          <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
-            <User className="w-5 h-5 text-gray-600" />
-            <span className="hidden md:inline text-sm font-medium text-gray-700">
-              {employee?.fullName || employee?.email}
-            </span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
+              <User className="w-5 h-5 text-gray-600" />
+              <span className="hidden md:inline text-sm font-medium text-gray-700">
+                {employee?.fullName || employee?.email}
+              </span>
+            </div>
+            {isKitchen && (
+              <button
+                onClick={handleSignOut}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium transition-all shadow-lg"
+              >
+                <LogOut className="w-5 h-5" />
+                <span className="hidden md:inline">{t('buttons.signOut')}</span>
+              </button>
+            )}
           </div>
         </header>
 

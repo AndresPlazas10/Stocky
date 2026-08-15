@@ -82,7 +82,7 @@ export function useEmpleadoMutations(params: UseEmpleadoMutationsParams) {
         fullName: cleanFullName,
         username: cleanUsername,
         password: cleanPassword,
-        role: 'employee',
+        role: form.form.role || 'employee',
       });
 
       onEmployeeCreated?.(cleanFullName);

@@ -342,6 +342,31 @@ export const empleadosStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  roleSelectorRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  roleOption: {
+    flex: 1,
+    borderRadius: STOCKY_RADIUS.md,
+    borderWidth: 1,
+    borderColor: STOCKY_COLORS.borderSoft,
+    backgroundColor: STOCKY_COLORS.surface,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  roleOptionActive: {
+    borderColor: STOCKY_COLORS.primary700,
+    backgroundColor: 'rgba(7, 87, 91, 0.08)',
+  },
+  roleOptionText: {
+    color: STOCKY_COLORS.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  roleOptionTextActive: {
+    color: STOCKY_COLORS.primary700,
+  },
   modalFooterRow: {
     flexDirection: 'row',
     gap: 8,

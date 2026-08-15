@@ -16,7 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { useTranslation } from 'react-i18next';
 import {
-  getSectionsBySource,
+  getSectionsByRoleAndSource,
+  isKitchenRole,
   useSectionMeta,
   useSectionGroupLabels,
   type SectionGroup,
@@ -92,7 +93,12 @@ const DrawerContent = memo(function DrawerContent({
   const { t } = useTranslation();
   const groupLabels = useSectionGroupLabels();
   const activeRouteName = state.routeNames[state.index];
-  const roleLabel = source === 'employee' ? t('roles.employee') : t('roles.admin');
+  const isKitchen = isKitchenRole(businessContext?.role);
+  const roleLabel = isKitchen
+    ? t('roles.kitchen', 'Cocina')
+    : source === 'employee'
+      ? t('roles.employee')
+      : t('roles.admin');
 
   const userLabel = useMemo(() => resolveUserLabel(session), [session]);
 
@@ -198,10 +204,11 @@ export function AppNavigator() {
   const sectionMeta = useSectionMeta();
   const netInfo = useNetInfo();
   const source = businessContext?.source || 'owner';
+  const role = businessContext?.role || null;
   const allowedSectionIds = useMemo<SectionId[]>(() => {
     if (loadingBusiness) return ['home'];
-    return getSectionsBySource(source);
-  }, [loadingBusiness, source]);
+    return getSectionsByRoleAndSource(source, role);
+  }, [loadingBusiness, source, role]);
   const allowedSections = useMemo(
     () =>
       allowedSectionIds
