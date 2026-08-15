@@ -1,26 +1,25 @@
 {
     "title": "Table Management",
-    "subtitle": "Manage your tables and orders",
     "buttons": {
         "addTable": "Add Table",
         "createTable": "Create Table",
-        "openTable": "Open Table",
         "closeOrder": "Close Order",
         "saveOrder": "Save",
         "printKitchen": "Print for kitchen",
-        "payAllTogether": "Pay all together",
-        "splitBill": "Split bill",
         "loadMore": "Load more tables",
-        "deleteTable": "Delete Table",
         "back": "Back",
-        "backShort": "Back",
         "nextAccount": "Next account",
         "startSplit": "Start split",
         "finishSale": "Complete sale",
-        "processing": "Processing..."
+        "processing": "Processing...",
+        "call": "Call",
+        "callAgain": "Call again",
+        "addNote": "Add comment",
+        "editNote": "Edit comment",
+        "orderNotesPlaceholder": "Write a comment for the kitchen...",
+        "creatingTable": "Creating table..."
     },
     "labels": {
-        "tableGrid": "Table Grid",
         "orderDetails": "Order Details",
         "orderItems": "Items in order",
         "noItems": "No items in this order",
@@ -28,11 +27,9 @@
         "searchProduct": "Search by name...",
         "totalToPay": "Total to pay",
         "tableNumber": "Table #{{number}}",
-        "tableStatus": "Table status",
         "occupied": "Occupied",
         "available": "Available",
         "orderTotal": "Order total",
-        "itemsCount": "{{count}} items",
         "confirmPayment": "Confirm Payment",
         "paymentMethod": "Payment Method",
         "amountReceived": "Amount received",
@@ -51,54 +48,49 @@
         "customerOptional": "Customer (optional)",
         "perUnit": "per unit",
         "subtotal": "Subtotal",
-        "order": "Order"
+        "mostRecentOrder": "Most recent order",
+        "tableCall": "The kitchen is calling you",
+        "loadingCatalog": "Searching products...",
+        "changeBreakdown": "CHANGE BREAKDOWN"
     },
     "success": {
         "saleRegistered": "Sale Registered",
         "tableCreated": "Table Created",
         "tableUpdated": "Table Updated",
         "paymentProcessed": "Confirm Sale",
-        "orderSaved": "Order Saved",
-        "orderClosed": "Order Closed"
+        "notesSaved": "Comment saved"
     },
     "defaults": {
         "generalSale": "General sale",
         "someoneUsingTable": "Someone is using this table.",
         "user": "User",
         "item": "Product",
-        "unknownError": "Unknown error"
+        "unknownError": "Unknown error",
+        "employee": "Employee",
+        "offlineSale": "Offline sale",
+        "pendingSync": "Pending sync",
+        "pendingSyncShort": "Pending"
     },
     "empty": {
         "noTables": "No tables created yet",
         "noTablesDescription": "Create your first table to start registering orders.",
         "createFirstTable": "Create First Table",
         "noItems": "No items in this order",
-        "noItemsDescription": "Add products or combos to get started"
+        "noPendingOrders": "No orders waiting",
+        "noPendingOrdersDescription": "When a waiter adds products and presses Save, the order will appear here in real time."
     },
     "alerts": {
-        "tableCreated": "Table created successfully",
         "tableDeleted": "Table deleted successfully",
-        "orderSaved": "Order saved successfully",
-        "orderClosed": "Order closed successfully",
-        "paymentProcessed": "Payment processed successfully",
         "confirmDeleteTable": "Are you sure you want to delete this table?",
         "confirmDeleteTableWarning": "This action cannot be undone",
-        "tableInUse": "Cannot delete a table that is in use",
-        "someoneUsingTable": "Someone is using this table.",
-        "orderEmpty": "The order is empty. Add products before closing.",
-        "printFailed": "Failed to print. Please try again.",
-        "splitBillSuccess": "Bill split successfully",
-        "splitBillError": "Error splitting bill"
+        "confirmDeleteTableMessage": "This will delete the table and its orders. This cannot be undone."
     },
     "splitBill": {
         "title": "Split Bill",
         "subtitle": "Split the bill into multiple payments",
         "addAccount": "Add Account",
-        "removeAccount": "Remove Account",
         "accountName": "Account {{number}}",
         "assignItems": "Assign items",
-        "totalPerAccount": "Total per account",
-        "grandTotal": "Grand total",
         "confirm": "Confirm split",
         "maxAccounts": "Maximum {{count}} accounts",
         "quantityMismatch": "Fix the quantities: the sum per product must match the total.",
@@ -108,16 +100,12 @@
         "title": "How to close the order?",
         "subtitle": "Choose how you want to process the payment",
         "payAll": "Pay all together",
-        "payAllDescription": "Process the full payment of the order",
-        "split": "Split bill",
-        "splitDescription": "Split the bill into multiple payments"
+        "split": "Split bill"
     },
     "print": {
-        "kitchenOrder": "Kitchen order",
         "printing": "Printing...",
         "saving": "Saving...",
         "processing": "Processing...",
-        "printSuccess": "Order printed successfully",
         "printFailed": "Failed to print order"
     },
     "receipt": {
@@ -155,13 +143,39 @@
         "fixBeforeClose": "Fix before closing the order.",
         "insufficientComboStock": "Insufficient stock in combo components",
         "fixComboBeforeClose": "Cannot confirm the sale until these quantities are corrected.",
-        "notFound": "No business found associated with this account.",
-        "noSession": "No active session token to execute the action.",
-        "orderNotFound": "The table was opened, but no active order was found.",
-        "updateFailed": "Could not update the table.",
         "tableIdentifierRequired": "Enter a valid table identifier.",
         "tableAlreadyExists": "That table identifier already exists.",
-        "tableMustBeNumeric": "In this database the table identifier must be numeric."
+        "tableMustBeNumeric": "In this database the table identifier must be numeric.",
+        "addItemFailed": "Could not add the product",
+        "adminOnly": "Only the administrator can perform this action",
+        "applyingChanges": "Applying changes...",
+        "callClearFailed": "Could not clear the call",
+        "callSendFailed": "Could not send the call",
+        "createFailed": "Could not create the table",
+        "identifierExists": "That table identifier already exists",
+        "insufficientAmount": "Insufficient amount",
+        "insufficientStock": "Insufficient stock",
+        "insufficientStockShortage": "Insufficient stock to complete the order",
+        "invalidIdentifier": "Invalid table identifier",
+        "invalidItemPrice": "Invalid product price",
+        "itemNotIdentified": "Could not identify the product",
+        "loadTablesFailed": "Could not load the tables",
+        "noActiveOrder": "There is no active order for this table",
+        "noItemsToPrint": "The sale has no items to print.",
+        "noKitchenItems": "There are no kitchen products to print",
+        "notesSaveFailed": "Could not save the comment",
+        "openTableFailed": "Could not open the table",
+        "orderClosing": "Closing the order...",
+        "orderSyncDetected": "Unsynchronized changes detected in the order",
+        "printAllFailed": "Could not print the receipts",
+        "printFailed": "Could not print",
+        "quantityMustBePositive": "Quantity must be greater than zero",
+        "saveOrderFailed": "Could not save the order",
+        "sessionFailed": "Invalid or expired session",
+        "syncingChanges": "Syncing changes...",
+        "updateQuantityFailed": "Could not update the quantity",
+        "loadCatalogFailed": "Failed to load catalog.",
+        "loadCombosFailed": "Failed to load combos."
     },
     "toast": {
         "noKitchenItems": {
@@ -174,6 +188,29 @@
         },
         "printError": {
             "title": "Print error"
+        },
+        "callSent": {
+            "title": "🔔 Call sent",
+            "message": "The waiter has been notified"
+        },
+        "orderReady": {
+            "title": "🔔 Order ready",
+            "message": "The order for {{mesa}} is ready, please come to the kitchen"
+        },
+        "newOrder": {
+            "title": "🔔 New order",
+            "message": "New order at {{mesa}}, please check the kitchen",
+            "messageGeneric": "New order, please check the kitchen"
+        },
+        "updatedOrder": {
+            "title": "🔔 Order updated",
+            "message": "Order updated at {{mesa}}, please check the kitchen",
+            "messageGeneric": "Order updated, please check the kitchen"
         }
-    }
+    },
+    "loadFailed": "Could not load information.",
+    "notFound": "No business found associated with this account.",
+    "noSession": "No active session token to execute the action.",
+    "orderNotFound": "The table was opened, but no active order was found.",
+    "updateFailed": "Could not update the table."
 }

@@ -1,26 +1,25 @@
 {
   "title": "Gestión de Mesas",
-  "subtitle": "Administra las mesas y órdenes de tu negocio",
   "buttons": {
     "addTable": "Agregar Mesa",
     "createTable": "Crear Mesa",
-    "openTable": "Abrir Mesa",
     "closeOrder": "Cerrar Orden",
     "saveOrder": "Guardar",
     "printKitchen": "Imprimir para cocina",
-    "payAllTogether": "Pagar todo junto",
-    "splitBill": "Dividir cuenta",
     "loadMore": "Cargar más mesas",
-    "deleteTable": "Eliminar Mesa",
     "back": "Volver",
-    "backShort": "Atrás",
     "nextAccount": "Siguiente cuenta",
     "startSplit": "Iniciar división",
     "finishSale": "Terminar venta",
-    "processing": "Procesando..."
+    "processing": "Procesando...",
+    "call": "Llamar",
+    "callAgain": "Llamar nuevamente",
+    "addNote": "Agregar comentario",
+    "editNote": "Editar comentario",
+    "orderNotesPlaceholder": "Escribe un comentario para la cocina...",
+    "creatingTable": "Creando mesa..."
   },
   "labels": {
-    "tableGrid": "Grid de Mesas",
     "orderDetails": "Detalles de la Orden",
     "orderItems": "Items en la orden",
     "noItems": "No hay items en esta orden",
@@ -28,11 +27,9 @@
     "searchProduct": "Buscar por nombre...",
     "totalToPay": "Total a pagar",
     "tableNumber": "Mesa #{{number}}",
-    "tableStatus": "Estado de la mesa",
     "occupied": "Ocupada",
     "available": "Disponible",
     "orderTotal": "Total de la orden",
-    "itemsCount": "{{count}} items",
     "confirmPayment": "Confirmar Pago",
     "paymentMethod": "Método de Pago",
     "amountReceived": "Monto recibido",
@@ -51,54 +48,49 @@
     "customerOptional": "Cliente (opcional)",
     "perUnit": "por unidad",
     "subtotal": "Subtotal",
-    "order": "Orden"
+    "mostRecentOrder": "Pedido más reciente",
+    "tableCall": "Cocina te está llamando",
+    "loadingCatalog": "Buscando productos...",
+    "changeBreakdown": "DESGLOSE DEL CAMBIO"
   },
   "success": {
     "saleRegistered": "Venta Registrada",
     "tableCreated": "Mesa Creada",
     "tableUpdated": "Mesa Actualizada",
     "paymentProcessed": "Confirmar Venta",
-    "orderSaved": "Orden Guardada",
-    "orderClosed": "Orden Cerrada"
+    "notesSaved": "Comentario guardado"
   },
   "defaults": {
     "generalSale": "Venta general",
     "someoneUsingTable": "Alguien está usando esta mesa.",
     "user": "Usuario",
     "item": "Producto",
-    "unknownError": "Error desconocido"
+    "unknownError": "Error desconocido",
+    "employee": "Empleado",
+    "offlineSale": "Venta sin conexión",
+    "pendingSync": "Pendiente de sincronizar",
+    "pendingSyncShort": "Pendiente"
   },
   "empty": {
     "noTables": "Aún no hay mesas creadas",
     "noTablesDescription": "Crea tu primera mesa para empezar a registrar órdenes.",
     "createFirstTable": "Crear Primera Mesa",
     "noItems": "No hay items en esta orden",
-    "noItemsDescription": "Agrega productos o combos para comenzar"
+    "noPendingOrders": "Sin pedidos en espera",
+    "noPendingOrdersDescription": "Cuando un mesero agregue productos y presione Guardar, la orden aparecerá aquí en tiempo real."
   },
   "alerts": {
-    "tableCreated": "Mesa creada exitosamente",
     "tableDeleted": "Mesa eliminada exitosamente",
-    "orderSaved": "Orden guardada exitosamente",
-    "orderClosed": "Orden cerrada exitosamente",
-    "paymentProcessed": "Pago procesado exitosamente",
     "confirmDeleteTable": "¿Estás seguro de eliminar esta mesa?",
     "confirmDeleteTableWarning": "Esta acción no se puede deshacer",
-    "tableInUse": "No se puede eliminar una mesa que está en uso",
-    "someoneUsingTable": "Alguien está usando esta mesa.",
-    "orderEmpty": "La orden está vacía. Agrega productos antes de cerrar.",
-    "printFailed": "No se pudo imprimir. Intenta nuevamente.",
-    "splitBillSuccess": "Cuenta dividida exitosamente",
-    "splitBillError": "Error al dividir la cuenta"
+    "confirmDeleteTableMessage": "Esta acción eliminará la mesa y sus órdenes. No se puede deshacer."
   },
   "splitBill": {
     "title": "Dividir Cuenta",
     "subtitle": "Divide la cuenta en múltiples pagos",
     "addAccount": "Agregar Cuenta",
-    "removeAccount": "Quitar Cuenta",
     "accountName": "Cuenta {{number}}",
     "assignItems": "Asignar items",
-    "totalPerAccount": "Total por cuenta",
-    "grandTotal": "Total general",
     "confirm": "Confirmar división",
     "maxAccounts": "Máximo {{count}} cuentas",
     "quantityMismatch": "Corrige las cantidades: la suma por producto debe coincidir con el total.",
@@ -108,16 +100,12 @@
     "title": "¿Cómo cerrar la orden?",
     "subtitle": "Elige cómo deseas procesar el pago",
     "payAll": "Pagar todo junto",
-    "payAllDescription": "Procesa el pago completo de la orden",
-    "split": "Dividir cuenta",
-    "splitDescription": "Divide la cuenta en múltiples pagos"
+    "split": "Dividir cuenta"
   },
   "print": {
-    "kitchenOrder": "Orden para cocina",
     "printing": "Imprimiendo...",
     "saving": "Guardando...",
     "processing": "Procesando...",
-    "printSuccess": "Orden impresa correctamente",
     "printFailed": "No se pudo imprimir la orden"
   },
   "receipt": {
@@ -155,13 +143,39 @@
     "fixBeforeClose": "Corrige antes de cerrar la orden.",
     "insufficientComboStock": "Stock insuficiente en componentes de combos",
     "fixComboBeforeClose": "No se puede confirmar la venta hasta corregir estas cantidades.",
-    "notFound": "No se encontró un negocio asociado a esta cuenta.",
-    "noSession": "No hay token de sesión activo para ejecutar la acción.",
-    "orderNotFound": "La mesa se abrió, pero no se encontró una orden activa.",
-    "updateFailed": "No se pudo actualizar la mesa.",
     "tableIdentifierRequired": "Ingresa un identificador de mesa válido.",
     "tableAlreadyExists": "Ese identificador de mesa ya existe.",
-    "tableMustBeNumeric": "En esta base de datos el identificador de mesa debe ser numérico."
+    "tableMustBeNumeric": "En esta base de datos el identificador de mesa debe ser numérico.",
+    "addItemFailed": "No se pudo agregar el producto",
+    "adminOnly": "Solo el administrador puede realizar esta acción",
+    "applyingChanges": "Aplicando cambios...",
+    "callClearFailed": "No se pudo quitar el llamado",
+    "callSendFailed": "No se pudo enviar el llamado",
+    "createFailed": "No se pudo crear la mesa",
+    "identifierExists": "Ese identificador de mesa ya existe",
+    "insufficientAmount": "Monto insuficiente",
+    "insufficientStock": "Stock insuficiente",
+    "insufficientStockShortage": "Stock insuficiente para completar la orden",
+    "invalidIdentifier": "Identificador de mesa inválido",
+    "invalidItemPrice": "Precio de producto inválido",
+    "itemNotIdentified": "No se pudo identificar el producto",
+    "loadTablesFailed": "No se pudieron cargar las mesas",
+    "noActiveOrder": "No hay una orden activa para esta mesa",
+    "noItemsToPrint": "La venta no tiene items para imprimir.",
+    "noKitchenItems": "No hay productos de cocina para imprimir",
+    "notesSaveFailed": "No se pudo guardar el comentario",
+    "openTableFailed": "No se pudo abrir la mesa",
+    "orderClosing": "Cerrando la orden...",
+    "orderSyncDetected": "Se detectaron cambios no sincronizados en la orden",
+    "printAllFailed": "No se pudieron imprimir los comprobantes",
+    "printFailed": "No se pudo imprimir",
+    "quantityMustBePositive": "La cantidad debe ser mayor a cero",
+    "saveOrderFailed": "No se pudo guardar la orden",
+    "sessionFailed": "Sesión inválida o expirada",
+    "syncingChanges": "Sincronizando cambios...",
+    "updateQuantityFailed": "No se pudo actualizar la cantidad",
+    "loadCatalogFailed": "No se pudo cargar el catálogo.",
+    "loadCombosFailed": "No se pudieron cargar los combos."
   },
   "toast": {
     "noKitchenItems": {
@@ -174,6 +188,29 @@
     },
     "printError": {
       "title": "Error de impresión"
+    },
+    "callSent": {
+      "title": "🔔 Llamado enviado",
+      "message": "Se ha notificado al mesero"
+    },
+    "orderReady": {
+      "title": "🔔 Orden lista",
+      "message": "La orden de la {{mesa}} ya está lista, por favor pase por cocina"
+    },
+    "newOrder": {
+      "title": "🔔 Nuevo pedido",
+      "message": "Nuevo pedido en {{mesa}}, por favor revise la cocina",
+      "messageGeneric": "Nuevo pedido, por favor revise la cocina"
+    },
+    "updatedOrder": {
+      "title": "🔔 Pedido actualizado",
+      "message": "Pedido actualizado en {{mesa}}, por favor revise la cocina",
+      "messageGeneric": "Pedido actualizado, por favor revise la cocina"
     }
-  }
+  },
+  "loadFailed": "No se pudo cargar la información.",
+  "notFound": "No se encontró un negocio asociado a esta cuenta.",
+  "noSession": "No hay token de sesión activo para ejecutar la acción.",
+  "orderNotFound": "La mesa se abrió, pero no se encontró una orden activa.",
+  "updateFailed": "No se pudo actualizar la mesa."
 }

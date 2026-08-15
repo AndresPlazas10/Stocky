@@ -31,4 +31,54 @@ export function mesaDisplayName(mesa, tablePrefix) {
     }
     return `${prefix} ${mesa.id.slice(0, 6)}`;
 }
+/**
+ * Suprime un call_requested_at entrante si el mesero ya lo descartó dentro de
+ * la ventana CALL_WINDOW_MS y el timestamp entrante no es más nuevo que el
+ * descarte (evita que respuestas stale de refresh/realtime re-muestren la alerta).
+ */
+export function isCallRequestedAtSuppressed(dismissedCalls, mesaId, incomingRaw, callWindowMs) {
+    const map = dismissedCalls;
+    if (!map)
+        return false;
+    const key = String(mesaId || '').trim();
+    if (!key)
+        return false;
+    const dismissedAt = map.get(key);
+    if (!dismissedAt)
+        return false;
+    if (Date.now() - dismissedAt > callWindowMs) {
+        map.delete(key);
+        return false;
+    }
+    if (!incomingRaw)
+        return false;
+    const incomingMs = Date.parse(String(incomingRaw));
+    if (!Number.isFinite(incomingMs))
+        return false;
+    if (incomingMs > dismissedAt) {
+        map.delete(key);
+        return false;
+    }
+    return true;
+}
+/**
+ * Clave de recencia de una orden para ordenar la cocina de "más reciente a
+ * menos reciente": prioriza el timestamp de llegada en sesión (si existe),
+ * luego orders.updated_at (persistido, se actualiza al Guardar) y finalmente
+ * orders.opened_at. Devuelve 0 si no hay ninguna señal.
+ */
+export function resolveOrderRecencyMs(mesa, arrivalMap) {
+    const orderId = String(mesa?.current_order_id || '').trim();
+    if (!orderId)
+        return 0;
+    const arrival = arrivalMap?.get(orderId);
+    if (arrival !== undefined && Number.isFinite(arrival) && arrival > 0) {
+        return arrival;
+    }
+    const updatedMs = Date.parse(String(mesa?.orders?.updated_at || ''));
+    if (Number.isFinite(updatedMs))
+        return updatedMs;
+    const openedMs = Date.parse(String(mesa?.orders?.opened_at || ''));
+    return Number.isFinite(openedMs) ? openedMs : 0;
+}
 //# sourceMappingURL=mesaUtils.js.map

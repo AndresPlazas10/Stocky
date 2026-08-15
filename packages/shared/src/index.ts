@@ -57,8 +57,19 @@ export {
   normalizeTableIdentifier,
   compareMesaTableIdentifiers,
   resolveMesaSyncVersion,
-  mesaDisplayName
+  mesaDisplayName,
+  isCallRequestedAtSuppressed,
+  resolveOrderRecencyMs
 } from './mesaUtils.js';
+
+// Mesa Constants
+export {
+  CALL_WINDOW_MS,
+  MESA_LOCK_TTL_SECONDS,
+  MESA_LOCK_TTL_MS,
+  MESA_LOCK_HEARTBEAT_MS,
+  MESAS_REMOTE_FALLBACK_POLL_MS
+} from './mesaConstants.js';
 
 // Order Normalization
 export {

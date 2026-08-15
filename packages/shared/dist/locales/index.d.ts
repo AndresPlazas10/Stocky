@@ -420,6 +420,56 @@ export declare const resources: {
                 privacy: string;
                 deleteAccount: string;
                 allRightsReserved: string;
+                heroBadge: string;
+                trustTitle: string;
+                trustNegocios: string;
+                trustNegociosLabel: string;
+                trustUptime: string;
+                trustUptimeLabel: string;
+                trustVentas: string;
+                trustVentasLabel: string;
+                featuresTitle: string;
+                featuresSubtitle: string;
+                howItWorksTitle: string;
+                testimonialsTitle: string;
+                faqTitle: string;
+                ctaTitle: string;
+                ctaSubtitle: string;
+                ctaButton: string;
+                scrollDown: string;
+                bottomBarSignIn: string;
+                bottomBarSignUp: string;
+                testimonial1: {
+                    text: string;
+                    name: string;
+                    role: string;
+                };
+                testimonial2: {
+                    text: string;
+                    name: string;
+                    role: string;
+                };
+                testimonial3: {
+                    text: string;
+                    name: string;
+                    role: string;
+                };
+                faq1: {
+                    question: string;
+                    answer: string;
+                };
+                faq2: {
+                    question: string;
+                    answer: string;
+                };
+                faq3: {
+                    question: string;
+                    answer: string;
+                };
+                faq4: {
+                    question: string;
+                    answer: string;
+                };
             };
             login: {
                 enterUsernamePassword: string;
@@ -1469,6 +1519,17 @@ export declare const resources: {
                 pairedDevices: string;
                 discoveredDevices: string;
                 scanFailed: string;
+                saved: string;
+                driverGuideTitle: string;
+                driverGuideIntro: string;
+                driverStep1: string;
+                driverStep2: string;
+                driverStep3: string;
+                driverStep4: string;
+                driverStep5: string;
+                driverNote: string;
+                driverTestNote: string;
+                popupBlocked: string;
             };
             businessDisabled: {
                 yourBusiness: string;
@@ -2134,27 +2195,26 @@ export declare const resources: {
         };
         mesas: {
             title: string;
-            subtitle: string;
             buttons: {
                 addTable: string;
                 createTable: string;
-                openTable: string;
                 closeOrder: string;
                 saveOrder: string;
                 printKitchen: string;
-                payAllTogether: string;
-                splitBill: string;
                 loadMore: string;
-                deleteTable: string;
                 back: string;
-                backShort: string;
                 nextAccount: string;
                 startSplit: string;
                 finishSale: string;
                 processing: string;
+                call: string;
+                callAgain: string;
+                addNote: string;
+                editNote: string;
+                orderNotesPlaceholder: string;
+                creatingTable: string;
             };
             labels: {
-                tableGrid: string;
                 orderDetails: string;
                 orderItems: string;
                 noItems: string;
@@ -2162,11 +2222,9 @@ export declare const resources: {
                 searchProduct: string;
                 totalToPay: string;
                 tableNumber: string;
-                tableStatus: string;
                 occupied: string;
                 available: string;
                 orderTotal: string;
-                itemsCount: string;
                 confirmPayment: string;
                 paymentMethod: string;
                 amountReceived: string;
@@ -2185,15 +2243,17 @@ export declare const resources: {
                 customerOptional: string;
                 perUnit: string;
                 subtotal: string;
-                order: string;
+                mostRecentOrder: string;
+                tableCall: string;
+                loadingCatalog: string;
+                changeBreakdown: string;
             };
             success: {
                 saleRegistered: string;
                 tableCreated: string;
                 tableUpdated: string;
                 paymentProcessed: string;
-                orderSaved: string;
-                orderClosed: string;
+                notesSaved: string;
             };
             defaults: {
                 generalSale: string;
@@ -2201,38 +2261,31 @@ export declare const resources: {
                 user: string;
                 item: string;
                 unknownError: string;
+                employee: string;
+                offlineSale: string;
+                pendingSync: string;
+                pendingSyncShort: string;
             };
             empty: {
                 noTables: string;
                 noTablesDescription: string;
                 createFirstTable: string;
                 noItems: string;
-                noItemsDescription: string;
+                noPendingOrders: string;
+                noPendingOrdersDescription: string;
             };
             alerts: {
-                tableCreated: string;
                 tableDeleted: string;
-                orderSaved: string;
-                orderClosed: string;
-                paymentProcessed: string;
                 confirmDeleteTable: string;
                 confirmDeleteTableWarning: string;
-                tableInUse: string;
-                someoneUsingTable: string;
-                orderEmpty: string;
-                printFailed: string;
-                splitBillSuccess: string;
-                splitBillError: string;
+                confirmDeleteTableMessage: string;
             };
             splitBill: {
                 title: string;
                 subtitle: string;
                 addAccount: string;
-                removeAccount: string;
                 accountName: string;
                 assignItems: string;
-                totalPerAccount: string;
-                grandTotal: string;
                 confirm: string;
                 maxAccounts: string;
                 quantityMismatch: string;
@@ -2242,16 +2295,12 @@ export declare const resources: {
                 title: string;
                 subtitle: string;
                 payAll: string;
-                payAllDescription: string;
                 split: string;
-                splitDescription: string;
             };
             print: {
-                kitchenOrder: string;
                 printing: string;
                 saving: string;
                 processing: string;
-                printSuccess: string;
                 printFailed: string;
             };
             receipt: {
@@ -2289,13 +2338,37 @@ export declare const resources: {
                 fixBeforeClose: string;
                 insufficientComboStock: string;
                 fixComboBeforeClose: string;
-                notFound: string;
-                noSession: string;
-                orderNotFound: string;
-                updateFailed: string;
                 tableIdentifierRequired: string;
                 tableAlreadyExists: string;
                 tableMustBeNumeric: string;
+                addItemFailed: string;
+                adminOnly: string;
+                applyingChanges: string;
+                callClearFailed: string;
+                callSendFailed: string;
+                createFailed: string;
+                identifierExists: string;
+                insufficientAmount: string;
+                insufficientStock: string;
+                insufficientStockShortage: string;
+                invalidIdentifier: string;
+                invalidItemPrice: string;
+                itemNotIdentified: string;
+                loadTablesFailed: string;
+                noActiveOrder: string;
+                noItemsToPrint: string;
+                noKitchenItems: string;
+                notesSaveFailed: string;
+                openTableFailed: string;
+                orderClosing: string;
+                orderSyncDetected: string;
+                printAllFailed: string;
+                printFailed: string;
+                quantityMustBePositive: string;
+                saveOrderFailed: string;
+                sessionFailed: string;
+                syncingChanges: string;
+                updateQuantityFailed: string;
             };
             toast: {
                 noKitchenItems: {
@@ -2308,6 +2381,24 @@ export declare const resources: {
                 };
                 printError: {
                     title: string;
+                };
+                callSent: {
+                    title: string;
+                    message: string;
+                };
+                orderReady: {
+                    title: string;
+                    message: string;
+                };
+                newOrder: {
+                    title: string;
+                    message: string;
+                    messageGeneric: string;
+                };
+                updatedOrder: {
+                    title: string;
+                    message: string;
+                    messageGeneric: string;
                 };
             };
         };
@@ -2833,6 +2924,56 @@ export declare const resources: {
                 privacy: string;
                 deleteAccount: string;
                 allRightsReserved: string;
+                heroBadge: string;
+                trustTitle: string;
+                trustNegocios: string;
+                trustNegociosLabel: string;
+                trustUptime: string;
+                trustUptimeLabel: string;
+                trustVentas: string;
+                trustVentasLabel: string;
+                featuresTitle: string;
+                featuresSubtitle: string;
+                howItWorksTitle: string;
+                testimonialsTitle: string;
+                faqTitle: string;
+                ctaTitle: string;
+                ctaSubtitle: string;
+                ctaButton: string;
+                scrollDown: string;
+                bottomBarSignIn: string;
+                bottomBarSignUp: string;
+                testimonial1: {
+                    text: string;
+                    name: string;
+                    role: string;
+                };
+                testimonial2: {
+                    text: string;
+                    name: string;
+                    role: string;
+                };
+                testimonial3: {
+                    text: string;
+                    name: string;
+                    role: string;
+                };
+                faq1: {
+                    question: string;
+                    answer: string;
+                };
+                faq2: {
+                    question: string;
+                    answer: string;
+                };
+                faq3: {
+                    question: string;
+                    answer: string;
+                };
+                faq4: {
+                    question: string;
+                    answer: string;
+                };
             };
             login: {
                 enterUsernamePassword: string;
@@ -3882,6 +4023,17 @@ export declare const resources: {
                 pairedDevices: string;
                 discoveredDevices: string;
                 scanFailed: string;
+                saved: string;
+                driverGuideTitle: string;
+                driverGuideIntro: string;
+                driverStep1: string;
+                driverStep2: string;
+                driverStep3: string;
+                driverStep4: string;
+                driverStep5: string;
+                driverNote: string;
+                driverTestNote: string;
+                popupBlocked: string;
             };
             businessDisabled: {
                 yourBusiness: string;
@@ -4547,27 +4699,26 @@ export declare const resources: {
         };
         mesas: {
             title: string;
-            subtitle: string;
             buttons: {
                 addTable: string;
                 createTable: string;
-                openTable: string;
                 closeOrder: string;
                 saveOrder: string;
                 printKitchen: string;
-                payAllTogether: string;
-                splitBill: string;
                 loadMore: string;
-                deleteTable: string;
                 back: string;
-                backShort: string;
                 nextAccount: string;
                 startSplit: string;
                 finishSale: string;
                 processing: string;
+                call: string;
+                callAgain: string;
+                addNote: string;
+                editNote: string;
+                orderNotesPlaceholder: string;
+                creatingTable: string;
             };
             labels: {
-                tableGrid: string;
                 orderDetails: string;
                 orderItems: string;
                 noItems: string;
@@ -4575,11 +4726,9 @@ export declare const resources: {
                 searchProduct: string;
                 totalToPay: string;
                 tableNumber: string;
-                tableStatus: string;
                 occupied: string;
                 available: string;
                 orderTotal: string;
-                itemsCount: string;
                 confirmPayment: string;
                 paymentMethod: string;
                 amountReceived: string;
@@ -4598,15 +4747,17 @@ export declare const resources: {
                 customerOptional: string;
                 perUnit: string;
                 subtotal: string;
-                order: string;
+                mostRecentOrder: string;
+                tableCall: string;
+                loadingCatalog: string;
+                changeBreakdown: string;
             };
             success: {
                 saleRegistered: string;
                 tableCreated: string;
                 tableUpdated: string;
                 paymentProcessed: string;
-                orderSaved: string;
-                orderClosed: string;
+                notesSaved: string;
             };
             defaults: {
                 generalSale: string;
@@ -4614,38 +4765,31 @@ export declare const resources: {
                 user: string;
                 item: string;
                 unknownError: string;
+                employee: string;
+                offlineSale: string;
+                pendingSync: string;
+                pendingSyncShort: string;
             };
             empty: {
                 noTables: string;
                 noTablesDescription: string;
                 createFirstTable: string;
                 noItems: string;
-                noItemsDescription: string;
+                noPendingOrders: string;
+                noPendingOrdersDescription: string;
             };
             alerts: {
-                tableCreated: string;
                 tableDeleted: string;
-                orderSaved: string;
-                orderClosed: string;
-                paymentProcessed: string;
                 confirmDeleteTable: string;
                 confirmDeleteTableWarning: string;
-                tableInUse: string;
-                someoneUsingTable: string;
-                orderEmpty: string;
-                printFailed: string;
-                splitBillSuccess: string;
-                splitBillError: string;
+                confirmDeleteTableMessage: string;
             };
             splitBill: {
                 title: string;
                 subtitle: string;
                 addAccount: string;
-                removeAccount: string;
                 accountName: string;
                 assignItems: string;
-                totalPerAccount: string;
-                grandTotal: string;
                 confirm: string;
                 maxAccounts: string;
                 quantityMismatch: string;
@@ -4655,16 +4799,12 @@ export declare const resources: {
                 title: string;
                 subtitle: string;
                 payAll: string;
-                payAllDescription: string;
                 split: string;
-                splitDescription: string;
             };
             print: {
-                kitchenOrder: string;
                 printing: string;
                 saving: string;
                 processing: string;
-                printSuccess: string;
                 printFailed: string;
             };
             receipt: {
@@ -4702,13 +4842,37 @@ export declare const resources: {
                 fixBeforeClose: string;
                 insufficientComboStock: string;
                 fixComboBeforeClose: string;
-                notFound: string;
-                noSession: string;
-                orderNotFound: string;
-                updateFailed: string;
                 tableIdentifierRequired: string;
                 tableAlreadyExists: string;
                 tableMustBeNumeric: string;
+                addItemFailed: string;
+                adminOnly: string;
+                applyingChanges: string;
+                callClearFailed: string;
+                callSendFailed: string;
+                createFailed: string;
+                identifierExists: string;
+                insufficientAmount: string;
+                insufficientStock: string;
+                insufficientStockShortage: string;
+                invalidIdentifier: string;
+                invalidItemPrice: string;
+                itemNotIdentified: string;
+                loadTablesFailed: string;
+                noActiveOrder: string;
+                noItemsToPrint: string;
+                noKitchenItems: string;
+                notesSaveFailed: string;
+                openTableFailed: string;
+                orderClosing: string;
+                orderSyncDetected: string;
+                printAllFailed: string;
+                printFailed: string;
+                quantityMustBePositive: string;
+                saveOrderFailed: string;
+                sessionFailed: string;
+                syncingChanges: string;
+                updateQuantityFailed: string;
             };
             toast: {
                 noKitchenItems: {
@@ -4721,6 +4885,24 @@ export declare const resources: {
                 };
                 printError: {
                     title: string;
+                };
+                callSent: {
+                    title: string;
+                    message: string;
+                };
+                orderReady: {
+                    title: string;
+                    message: string;
+                };
+                newOrder: {
+                    title: string;
+                    message: string;
+                    messageGeneric: string;
+                };
+                updatedOrder: {
+                    title: string;
+                    message: string;
+                    messageGeneric: string;
                 };
             };
         };

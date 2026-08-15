@@ -417,7 +417,57 @@
         "terms": "Terms",
         "privacy": "Privacy",
         "deleteAccount": "Delete account",
-        "allRightsReserved": "All rights reserved."
+        "allRightsReserved": "All rights reserved.",
+        "heroBadge": "POS for restaurants and bars",
+        "trustTitle": "They trust us",
+        "trustNegocios": "+500",
+        "trustNegociosLabel": "Active businesses",
+        "trustUptime": "99.9%",
+        "trustUptimeLabel": "Availability",
+        "trustVentas": "+50K",
+        "trustVentasLabel": "Sales processed",
+        "featuresTitle": "Everything you need",
+        "featuresSubtitle": "Six tools in one platform",
+        "howItWorksTitle": "Start in 3 steps",
+        "testimonialsTitle": "What our clients say",
+        "faqTitle": "Frequently asked questions",
+        "ctaTitle": "Ready to start?",
+        "ctaSubtitle": "Create your free account in 2 minutes and start selling today.",
+        "ctaButton": "Start free now",
+        "scrollDown": "Scroll to learn more",
+        "bottomBarSignIn": "Sign In",
+        "bottomBarSignUp": "Sign Up",
+        "testimonial1": {
+            "text": "Since we started using Stocky, we close the day in minutes instead of hours. My waiters collect faster and we have fewer errors.",
+            "name": "María García",
+            "role": "Owner, La Esquina Restaurant"
+        },
+        "testimonial2": {
+            "text": "Real-time inventory control changed our lives. Now we know exactly what we have and when to order more.",
+            "name": "Carlos López",
+            "role": "Manager, Café Central"
+        },
+        "testimonial3": {
+            "text": "The best part is it works offline. At my bar the signal sometimes drops and Stocky keeps running without issues.",
+            "name": "Ana Martínez",
+            "role": "Manager, Bar El Rincón"
+        },
+        "faq1": {
+            "question": "How do I start using Stocky?",
+            "answer": "Create a free account in 2 minutes. Add your products, create users for your team and start selling. No complicated installations or long configurations."
+        },
+        "faq2": {
+            "question": "Does it work without internet?",
+            "answer": "Yes. Stocky was designed to work even when there is no connection. All your sales are saved locally and sync automatically when the signal returns."
+        },
+        "faq3": {
+            "question": "What payment methods does it accept?",
+            "answer": "Cash, cards, transfers and digital payments like Nequi. Stocky records the payment method for each sale so you can keep clear control of your cash register."
+        },
+        "faq4": {
+            "question": "Can I cancel anytime?",
+            "answer": "Of course. There are no forced contracts or minimum commitments. You can cancel your account at any time from the settings."
+        }
     },
     "login": {
         "enterUsernamePassword": "Please enter username and password",
@@ -1466,7 +1516,18 @@
         "bluetoothDisabled": "Bluetooth disabled",
         "pairedDevices": "{{count}} paired device(s)",
         "discoveredDevices": "{{count}} discovered device(s)",
-        "scanFailed": "Scan failed"
+        "scanFailed": "Scan failed",
+        "saved": "Printer settings saved",
+        "driverGuideTitle": "How to print (system printer)",
+        "driverGuideIntro": "Install your thermal printer driver on this device so it appears as a Windows printer.",
+        "driverStep1": "Install your thermal printer driver (included with the product or from the manufacturer website).",
+        "driverStep2": "Connect the printer via USB, Bluetooth or network and verify it appears in Windows Devices and Printers.",
+        "driverStep3": "(Optional) Set it as the default printer to avoid choosing it every time.",
+        "driverStep4": "Select the correct paper width (58mm or 80mm) for your printer.",
+        "driverStep5": "Press Test print and choose your printer in the browser dialog.",
+        "driverNote": "Works in every browser. When printing a receipt, the browser print dialog will open with your thermal printer.",
+        "driverTestNote": "Opens the print dialog so you can select your thermal printer the first time.",
+        "popupBlocked": "The browser blocked the print window. Allow pop-ups for this site."
     },
     "businessDisabled": {
         "yourBusiness": "your business",
@@ -1630,7 +1691,6 @@
         "allSuppliers": "All suppliers",
         "catalogLoadError": "Could not load the purchase catalog.",
         "stockManagementHint": "Only products with stock management enabled are shown.",
-        "selectSupplierError": "Select a supplier.",
         "selectSupplierError": "Select a supplier.",
         "addProductError": "Add at least one product to the purchase.",
         "noStockControlError": "There are products without stock control in the cart. Remove them to continue.",

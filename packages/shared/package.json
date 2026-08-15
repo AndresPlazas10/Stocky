@@ -46,6 +46,10 @@
       "import": "./dist/mesaUtils.js",
       "types": "./dist/mesaUtils.d.ts"
     },
+    "./mesa-constants": {
+      "import": "./dist/mesaConstants.js",
+      "types": "./dist/mesaConstants.d.ts"
+    },
     "./order-normalization": {
       "import": "./dist/orderNormalization.js",
       "types": "./dist/orderNormalization.d.ts"

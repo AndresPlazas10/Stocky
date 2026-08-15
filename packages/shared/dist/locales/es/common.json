@@ -417,7 +417,57 @@
         "terms": "Términos",
         "privacy": "Privacidad",
         "deleteAccount": "Eliminar cuenta",
-        "allRightsReserved": "Todos los derechos reservados."
+        "allRightsReserved": "Todos los derechos reservados.",
+        "heroBadge": "POS para restaurantes y bares",
+        "trustTitle": "Confían en nosotros",
+        "trustNegocios": "+500",
+        "trustNegociosLabel": "Negocios activos",
+        "trustUptime": "99.9%",
+        "trustUptimeLabel": "Disponibilidad",
+        "trustVentas": "+50K",
+        "trustVentasLabel": "Ventas procesadas",
+        "featuresTitle": "Todo lo que necesitas",
+        "featuresSubtitle": "Seis herramientas en una sola plataforma",
+        "howItWorksTitle": "Empieza en 3 pasos",
+        "testimonialsTitle": "Lo que dicen nuestros clientes",
+        "faqTitle": "Preguntas frecuentes",
+        "ctaTitle": "¿Listo para empezar?",
+        "ctaSubtitle": "Crea tu cuenta gratis en 2 minutos y empieza a vender hoy.",
+        "ctaButton": "Comenzar gratis ahora",
+        "scrollDown": "Desliza para conocer más",
+        "bottomBarSignIn": "Ingresar",
+        "bottomBarSignUp": "Registrarse",
+        "testimonial1": {
+            "text": "Desde que usamos Stocky, cerramos el día en minutos en vez de horas. Mis meseros cobran más rápido y tenemos menos errores.",
+            "name": "María García",
+            "role": "Dueña, Restaurante La Esquina"
+        },
+        "testimonial2": {
+            "text": "El control de inventario en tiempo real nos cambió la vida. Ahora sabemos exactamente qué tenemos y cuándo pedir más.",
+            "name": "Carlos López",
+            "role": "Gerente, Café Central"
+        },
+        "testimonial3": {
+            "text": "Lo mejor es que funciona sin internet. En mi bar a veces falla la señal y Stocky sigue funcionando sin problema.",
+            "name": "Ana Martínez",
+            "role": "Administradora, Bar El Rincón"
+        },
+        "faq1": {
+            "question": "¿Cómo empiezo a usar Stocky?",
+            "answer": "Crea una cuenta gratis en 2 minutos. Agrega tus productos, crea usuarios para tu equipo y empieza a vender. Sin instalaciones complicadas ni configuraciones largas."
+        },
+        "faq2": {
+            "question": "¿Funciona sin internet?",
+            "answer": "Sí. Stocky fue diseñado para funcionar incluso cuando no hay conexión. Todas tus ventas se guardan localmente y se sincronizan automáticamente cuando vuelve la señal."
+        },
+        "faq3": {
+            "question": "¿Qué métodos de pago acepta?",
+            "answer": "Efectivo, tarjetas, transferencias y pagos digitales como Nequi. Stocky registra el método de pago de cada venta para que lleves un control claro de tu caja."
+        },
+        "faq4": {
+            "question": "¿Puedo cancelar cuando quiera?",
+            "answer": "Por supuesto. No hay contratos forzosos ni permanencia mínima. Puedes cancelar tu cuenta en cualquier momento desde la configuración."
+        }
     },
     "login": {
         "enterUsernamePassword": "Por favor ingresa usuario y contraseña",
@@ -1466,7 +1516,18 @@
         "bluetoothDisabled": "Bluetooth desactivado",
         "pairedDevices": "{{count}} dispositivo(s) emparejado(s)",
         "discoveredDevices": "{{count}} dispositivo(s) encontrado(s)",
-        "scanFailed": "Fallo al escanear"
+        "scanFailed": "Fallo al escanear",
+        "saved": "Configuración de impresora guardada",
+        "driverGuideTitle": "Como imprimir (impresora del sistema)",
+        "driverGuideIntro": "Instala el driver de tu impresora termica en este equipo para que aparezca como impresora de Windows.",
+        "driverStep1": "Instala el driver de tu impresora termica (viene con el producto o de la pagina del fabricante).",
+        "driverStep2": "Conecta la impresora por USB, Bluetooth o red y verifica que aparezca en Dispositivos e impresoras de Windows.",
+        "driverStep3": "(Opcional) Marcala como impresora predeterminada para no elegirla en cada impresion.",
+        "driverStep4": "Selecciona el ancho de papel correcto (58mm o 80mm) segun tu impresora.",
+        "driverStep5": "Presiona Imprimir prueba y elige tu impresora en el dialogo del navegador.",
+        "driverNote": "Funciona en todos los navegadores. Al imprimir un comprobante se abrira el dialogo de impresion del navegador con tu impresora termica.",
+        "driverTestNote": "Abre el dialogo de impresion para que selecciones tu impresora termica la primera vez.",
+        "popupBlocked": "El navegador bloqueo la ventana de impresion. Permite ventanas emergentes para este sitio."
     },
     "businessDisabled": {
         "yourBusiness": "tu negocio",
@@ -1630,7 +1691,6 @@
         "allSuppliers": "Todos los proveedores",
         "catalogLoadError": "No se pudo cargar el catalogo de compras.",
         "stockManagementHint": "Solo se muestran productos con control de stock habilitado.",
-        "selectSupplierError": "Selecciona un proveedor.",
         "selectSupplierError": "Selecciona un proveedor.",
         "addProductError": "Agrega al menos un producto a la compra.",
         "noStockControlError": "Hay productos sin control de stock en el carrito. Retiralos para continuar.",
