@@ -80,6 +80,15 @@ export const ordersAdapter = {
       .eq('id', orderId);
   },
 
+  async updateOrderByIdWithSelect(orderId, payload, selectSql = 'id') {
+    return supabase
+      .from('orders')
+      .update(payload)
+      .eq('id', orderId)
+      .select(selectSql)
+      .maybeSingle();
+  },
+
   async updateOrderByBusinessAndId({ businessId, orderId, payload }) {
     return supabase
       .from('orders')
@@ -122,6 +131,13 @@ export const ordersAdapter = {
       .eq('id', orderId)
       .order('id', { foreignTable: 'order_items', ascending: true })
       .single();
+  },
+
+  async persistOrderSnapshot({ orderId, items }) {
+    return supabase.rpc('persist_order_snapshot', {
+      p_order_id: orderId,
+      p_items: items
+    });
   },
 
   async deleteOrderItemById(itemId) {

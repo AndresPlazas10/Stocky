@@ -229,10 +229,27 @@ export interface ProductFormModalProps {
 
 export interface MesaRecord {
   id: string;
-  table_number: string;
+  table_number: number | string;
+  table_name?: string | null;
   business_id: string;
   status?: string;
-  orders?: unknown[];
+  current_order_id?: string | null;
+  call_requested_at?: string | null;
+  orders?: {
+    id?: string;
+    total?: number | string;
+    notes?: string;
+    opened_at?: string;
+    updated_at?: string;
+    order_items?: Array<{
+      id?: string;
+      quantity?: number;
+      price?: number;
+      subtotal?: number;
+      products?: { name?: string } | null;
+      combos?: { nombre?: string } | null;
+    }>;
+  } | null;
 }
 
 export interface MesaHeaderProps {
@@ -299,24 +316,6 @@ export interface DeactivateConfirmModalProps {
   onCancel: () => void;
 }
 
-export interface MesasAlertsProps {
-  isGeneratingSplitSales: boolean;
-  isClosingOrder: boolean;
-  success: boolean;
-  alertType: string;
-  successTitle: string;
-  successDetails: AlertDetail[];
-  error: string | null;
-  showPrintModal: boolean;
-  isPrintingReceipt: boolean;
-  printCustomerName: string;
-  onPrintConfirm: (customerName: string) => void;
-  onPrintCancel: () => void;
-  onPrintCustomerNameChange: (name: string) => void;
-  onSuccessClose: () => void;
-  onErrorClose: () => void;
-}
-
 export interface CatalogItem {
   item_type: string;
   id: string;
@@ -353,8 +352,7 @@ export interface OrderDetailsModalProps {
   hasMoreOrderItems: boolean;
   totalOrderItems: number;
   orderItemsSentinelRef: React.RefObject<HTMLDivElement>;
-  isOrderItemsSyncing: boolean;
-  getOrderItemRenderKey: (item: OrderItem) => string;
+  getOrderItemRenderKey: (item: OrderItem, index: number) => string;
   getOrderItemName: (item: OrderItem) => string;
   onUpdateQuantity: (itemId: string, quantity: number) => void;
   onLoadMoreOrderItems: () => void;
@@ -363,6 +361,8 @@ export interface OrderDetailsModalProps {
   onPrintKitchen: () => void;
   onCloseOrder: () => void;
   onClose: () => void;
+  orderNotes?: string;
+  onSaveNotes?: (notes: string) => void;
 }
 
 export interface InsufficientItem {
@@ -401,7 +401,6 @@ export interface MesaPaymentModalProps {
   onPaymentMethodChange: (method: string) => void;
   selectedCustomer: string;
   onCustomerChange: (customerId: string) => void;
-  clientes: Array<{ id: string; full_name: string; email: string }>;
   amountReceived: string;
   onAmountReceivedChange: (value: string) => void;
   amountReceivedError: string;

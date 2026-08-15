@@ -1,10 +1,8 @@
 import { useCallback } from 'react';
 import { getOrderItemsByOrderId } from '@/data/queries/ordersQueries';
 import {
-  deleteOrderItemById,
-  insertOrderItem,
   persistOrderItemQuantities,
-  updateOrderItemQuantityById,
+  persistOrderSnapshotWeb,
   updateOrderTotalById,
 } from '@/data/commands/ordersCommands';
 import {
@@ -28,14 +26,9 @@ interface UseMesaItemsParams {
   pendingQuantityUpdatesRef: React.MutableRefObject<Record<string, number>>;
   orderItemsRef: React.MutableRefObject<any[]>;
   orderItemsDirtyRef: React.MutableRefObject<boolean>;
-  optimisticTempItemQuantitiesRef: React.MutableRefObject<Record<string, number>>;
-  pendingOrderItemOpsRef: React.MutableRefObject<number>;
   pendingRemoteOrderTotalsRef: React.MutableRefObject<Record<string, number>>;
   lastSyncedOrderTotalsRef: React.MutableRefObject<Record<string, number>>;
   orderTotalSyncQueueRef: React.MutableRefObject<Record<string, Promise<void>>>;
-  markOrderItemOpStarted: () => void;
-  markOrderItemOpFinished: () => void;
-  enqueueOrderItemWrite: (itemId: string, writeFn: () => Promise<unknown>) => Promise<void>;
   showError: (title: string, message?: string) => void;
   t: (key: string, options?: any) => string;
   isOfflineFirstRuntime: boolean;
@@ -54,14 +47,9 @@ export function useMesaItems({
   pendingQuantityUpdatesRef,
   orderItemsRef,
   orderItemsDirtyRef,
-  optimisticTempItemQuantitiesRef,
-  pendingOrderItemOpsRef,
   pendingRemoteOrderTotalsRef,
   lastSyncedOrderTotalsRef,
   orderTotalSyncQueueRef,
-  markOrderItemOpStarted,
-  markOrderItemOpFinished,
-  enqueueOrderItemWrite,
   showError,
   t,
   isOfflineFirstRuntime,
@@ -92,9 +80,7 @@ export function useMesaItems({
           return;
         }
 
-        await updateOrderTotalById(normalizedOrderId, total, units, {
-          businessId,
-        });
+        await updateOrderTotalById({ orderId: normalizedOrderId, total, businessId });
 
         lastSyncedOrderTotalsRef.current[normalizedOrderId] = Math.round(total * 100);
         delete pendingRemoteOrderTotalsRef.current[normalizedOrderId];
@@ -129,7 +115,7 @@ export function useMesaItems({
     for (const [orderId, roundTotal] of entries) {
       try {
         const total = (roundTotal || 0) / 100;
-        await updateOrderTotalById(orderId, total, 0, { businessId });
+        await updateOrderTotalById({ orderId, total, businessId });
         lastSyncedOrderTotalsRef.current[orderId] = roundTotal;
         delete pendingRemoteOrderTotalsRef.current[orderId];
       } catch (err) {
@@ -138,17 +124,37 @@ export function useMesaItems({
     }
   }, [businessId, pendingRemoteOrderTotalsRef, lastSyncedOrderTotalsRef]);
 
-  const persistPendingQuantityUpdates = useCallback(async (orderId: string, { refreshItems = true }: { refreshItems?: boolean } = {}) => {
+  const persistPendingQuantityUpdates = useCallback(async (orderId: string, { refreshItems = true, items }: { refreshItems?: boolean; items?: any[] } = {}) => {
+    // El snapshot de items se pasa explícitamente: al "Guardar" el modal ya se
+    // cerró y orderItemsRef fue reseteado a [].
+    const sourceItems = Array.isArray(items) && items.length > 0
+      ? items
+      : (Array.isArray(orderItemsRef.current) ? orderItemsRef.current : []);
     const pendingMap = pendingQuantityUpdatesRef.current || {};
-    const entries = Object.entries(pendingMap).filter(([key]) => !String(key || '').startsWith('tmp-'));
+    const tmpItems = sourceItems.filter(
+      (item) => String(item?.id || '').startsWith('tmp-')
+    );
+    const nonTmpEntries = Object.entries(pendingMap).filter(
+      ([key]) => !String(key || '').startsWith('tmp-')
+    );
 
-    if (entries.length === 0) {
+    if (tmpItems.length === 0 && nonTmpEntries.length === 0) {
       setPendingQuantityUpdatesSafe({});
       return;
     }
 
     try {
-      await persistOrderItemQuantities(entries, { businessId, orderId });
+      if (tmpItems.length > 0) {
+        // Items temporales (tmp-) aún no existen en la DB: el snapshot los crea
+        // (y reconcilia cantidades y borrados) atómicamente en un solo round-trip.
+        await persistOrderSnapshotWeb({
+          orderId,
+          businessId,
+          items: sourceItems,
+        });
+      } else {
+        await persistOrderItemQuantities(nonTmpEntries, { businessId, orderId });
+      }
 
       if (refreshItems) {
         try {
@@ -173,88 +179,31 @@ export function useMesaItems({
     } catch (err) {
       logger.warn('mesas:persist_pending_quantities failed', err);
     }
-  }, [setPendingQuantityUpdatesSafe, businessId, pendingQuantityUpdatesRef, setOrderItems]);
+  }, [setPendingQuantityUpdatesSafe, businessId, pendingQuantityUpdatesRef, orderItemsRef, setOrderItems]);
 
   const removeItem = useCallback(async (itemId: string) => {
-    if (pendingOrderItemOpsRef.current > 0) {
-      showError('Error', t('mesas:errors.syncingChanges'));
-      return;
-    }
-
-    const currentOrderId = String(selectedMesa?.current_order_id || '');
-    const isLocalOnlyOrder =
-      String(selectedMesa?.orders?.__localOnly || '').toLowerCase() === 'true' ||
-      currentOrderId.startsWith('offline-order-');
-    const shouldUseLocalRemove = isLocalOnlyOrder || isOfflineFirstRuntime || isOfflineMode();
-
-    if (shouldUseLocalRemove) {
-      const currentOrderItems = Array.isArray(orderItemsRef.current) ? orderItemsRef.current : [];
-      const nextOrderItems = currentOrderItems.filter((item) => item.id !== itemId);
-      orderItemsDirtyRef.current = true;
-      orderItemsRef.current = nextOrderItems;
-      setOrderItems(nextOrderItems);
-      setPendingQuantityUpdatesSafe((prev) => {
-        const next = { ...(prev || {}) };
-        delete next[itemId];
-        return next;
-      });
-      delete optimisticTempItemQuantitiesRef.current[itemId];
-      updateOrderTotal(selectedMesa?.current_order_id, nextOrderItems, { skipMesaState: true }).catch(
-        (err) => logger.warn('mesas:order_operations:update_total_local_remove failed', err)
-      );
-      return;
-    }
-
-    markOrderItemOpStarted();
-    try {
-      await deleteOrderItemById(itemId, { businessId, orderId: selectedMesa?.current_order_id || null });
-      const currentOrderItems = Array.isArray(orderItemsRef.current) ? orderItemsRef.current : [];
-      const nextOrderItems = currentOrderItems.filter((item) => item.id !== itemId);
-      orderItemsDirtyRef.current = true;
-      orderItemsRef.current = nextOrderItems;
-      setOrderItems(nextOrderItems);
-      setPendingQuantityUpdatesSafe((prev) => {
-        const next = { ...prev };
-        delete next[itemId];
-        return next;
-      });
-      delete optimisticTempItemQuantitiesRef.current[itemId];
-      updateOrderTotal(selectedMesa?.current_order_id, nextOrderItems, { skipMesaState: true }).catch(
-        (err) => logger.warn('mesas:order_operations:update_total_remote_remove failed', err)
-      );
-    } catch {
-      showError('Error', t('mesas:errors.deleteItemFailed'));
-      try {
-        const freshItems = await getOrderItemsByOrderId({
-          orderId: selectedMesa?.current_order_id,
-          selectSql: ORDER_ITEMS_SELECT,
-        });
-        if (freshItems?.length) {
-          setOrderItems((prevItems) =>
-            mergeOrderItemsPreservingPosition(prevItems, applyPendingQuantities(freshItems, pendingQuantityUpdatesRef.current))
-          );
-        }
-      } catch (err) {
-        logger.warn('mesas:order_operations:remove_item_recover_items failed', err);
-      }
-    } finally {
-      markOrderItemOpFinished();
-    }
+    // El borrado es local: el snapshot reconciliado al "Guardar" (persistOrderSnapshotWeb)
+    // elimina los items que ya no están en el estado de la orden.
+    const currentOrderItems = Array.isArray(orderItemsRef.current) ? orderItemsRef.current : [];
+    const nextOrderItems = currentOrderItems.filter((item) => item.id !== itemId);
+    orderItemsDirtyRef.current = true;
+    orderItemsRef.current = nextOrderItems;
+    setOrderItems(nextOrderItems);
+    setPendingQuantityUpdatesSafe((prev) => {
+      const next = { ...(prev || {}) };
+      delete next[itemId];
+      return next;
+    });
+    updateOrderTotal(selectedMesa?.current_order_id, nextOrderItems, { skipMesaState: true }).catch(
+      (err) => logger.warn('mesas:order_operations:update_total_local_remove failed', err)
+    );
   }, [
     selectedMesa,
-    isOfflineFirstRuntime,
     updateOrderTotal,
     setPendingQuantityUpdatesSafe,
-    businessId,
-    markOrderItemOpStarted,
-    markOrderItemOpFinished,
-    pendingOrderItemOpsRef,
-    optimisticTempItemQuantitiesRef,
-    showError,
     setOrderItems,
     orderItemsRef,
     orderItemsDirtyRef,
-    pendingQuantityUpdatesRef,
     t,
   ]);
 
@@ -267,10 +216,6 @@ export function useMesaItems({
         String(selectedMesa?.orders?.__localOnly || '').toLowerCase() === 'true' ||
         currentOrderId.startsWith('offline-order-');
       const shouldUseLocalItemFlow = isLocalOnlyOrder || isOfflineFirstRuntime || isOfflineMode();
-      const itemDebugTag = (stage: string, err: unknown = null) => {
-        const msg = String((err as Error)?.message || err || '').replace(/\s+/g, ' ').slice(0, 80);
-        return `MESA_ITEM_DBG|stage=${stage}|order=${currentOrderId || 'na'}|localFlow=${shouldUseLocalItemFlow ? '1' : '0'}|msg=${msg || 'na'}`;
-      };
 
       const itemType = catalogItem?.item_type || ORDER_ITEM_TYPE.PRODUCT;
       const isCombo = itemType === ORDER_ITEM_TYPE.COMBO;
@@ -307,7 +252,6 @@ export function useMesaItems({
       if (existingItem) {
         const newQuantity = toFiniteNumber(existingItem.quantity, 0) + qty;
         const nextQuantity = Number(newQuantity || 0);
-        const isOptimisticExistingItem = String(existingItem?.id || '').startsWith('tmp-');
         nextOrderItems = currentOrderItems.map((item) =>
           item.id === existingItem.id
             ? { ...item, quantity: nextQuantity, subtotal: nextQuantity * Number(item.price || 0) }
@@ -317,35 +261,12 @@ export function useMesaItems({
         orderItemsRef.current = nextOrderItems;
         setOrderItems(nextOrderItems);
         orderItemsChanged = true;
-        if (isOptimisticExistingItem || shouldUseLocalItemFlow) {
-          optimisticTempItemQuantitiesRef.current[existingItem.id] = nextQuantity;
-          setPendingQuantityUpdatesSafe((prev) => ({ ...(prev || {}), [existingItem.id]: nextQuantity }));
-          if (shouldUseLocalItemFlow) {
-            setPendingQuantityUpdatesSafe((prev) => {
-              const next = { ...(prev || {}) };
-              delete next[existingItem.id];
-              return next;
-            });
-          }
-        } else {
-          markOrderItemOpStarted();
-          enqueueOrderItemWrite(existingItem.id, () =>
-            updateOrderItemQuantityById({ itemId: existingItem.id, quantity: nextQuantity, businessId, orderId: selectedMesa.current_order_id })
-          )
-            .catch(async () => {
-              showError('Error', t('mesas:errors.addItemFailed'));
-              try {
-                const freshItems = await getOrderItemsByOrderId({ orderId: selectedMesa.current_order_id, selectSql: ORDER_ITEMS_SELECT });
-                if (Array.isArray(freshItems)) {
-                  setOrderItems((prevItems) => mergeOrderItemsPreservingPosition(prevItems, applyPendingQuantities(freshItems, pendingQuantityUpdatesRef.current)));
-                }
-              } catch (err) {
-                logger.warn('mesas:order_operations:quantity_sync_refresh_items failed', err);
-              }
-            })
-            .finally(() => markOrderItemOpFinished());
+        // La cantidad se acumula en local: se persiste recién al "Guardar"
+        // (snapshot o persistOrderItemQuantities), sin escribir a la DB por cambio.
+        setPendingQuantityUpdatesSafe((prev) => ({ ...(prev || {}), [existingItem.id]: nextQuantity }));
+        if (shouldUseLocalItemFlow) {
           setPendingQuantityUpdatesSafe((prev) => {
-            const next = { ...prev };
+            const next = { ...(prev || {}) };
             delete next[existingItem.id];
             return next;
           });
@@ -379,61 +300,14 @@ export function useMesaItems({
           });
           orderItemsChanged = true;
         } else {
-          optimisticTempItemQuantitiesRef.current[tempId] = optimisticQuantity;
+          // Alta diferida: el item queda temporal (tmp-) y se crea en la DB
+          // recién al "Guardar" (persistOrderSnapshotWeb). La cocina no recibe
+          // aviso por cada alta durante la edición.
           nextOrderItems = [optimisticItem, ...currentOrderItems];
           orderItemsDirtyRef.current = true;
           orderItemsRef.current = nextOrderItems;
           setOrderItems(nextOrderItems);
           orderItemsChanged = true;
-          markOrderItemOpStarted();
-          insertOrderItem({
-            row: { order_id: selectedMesa.current_order_id, product_id: isCombo ? null : itemId, combo_id: isCombo ? itemId : null, quantity: qty, price: parseFloat(String(precio)) },
-            selectSql: 'id',
-            businessId,
-          })
-            .then((newItem: any) => {
-              if (!newItem?.id) { delete optimisticTempItemQuantitiesRef.current[tempId]; return; }
-              const latestTempItem = (Array.isArray(orderItemsRef.current) ? orderItemsRef.current : []).find((item) => item.id === tempId);
-              const trackedTempQuantity = toFiniteNumber(optimisticTempItemQuantitiesRef.current?.[tempId], NaN);
-              const resolvedQuantity = Number.isFinite(trackedTempQuantity) && trackedTempQuantity > 0 ? trackedTempQuantity : toFiniteNumber(latestTempItem?.quantity, optimisticQuantity);
-              const resolvedPrice = toFiniteNumber(latestTempItem?.price, optimisticPrice);
-              const pendingTempQuantity = toFiniteNumber(pendingQuantityUpdatesRef.current?.[tempId], NaN);
-              const quantityToPersist = Number.isFinite(pendingTempQuantity) && pendingTempQuantity > 0 ? pendingTempQuantity : resolvedQuantity;
-              const shouldPersistResolvedQuantity = Math.abs(quantityToPersist - optimisticQuantity) > 0.0001;
-              setOrderItems((prevItems) => prevItems.map((item) => (item.id === tempId ? { ...item, id: newItem.id!, quantity: resolvedQuantity, subtotal: resolvedQuantity * resolvedPrice } : item)));
-              setPendingQuantityUpdatesSafe((prev) => {
-                const next = { ...(prev || {}) };
-                delete next[tempId];
-                if (shouldPersistResolvedQuantity) next[newItem.id!] = quantityToPersist;
-                else delete next[newItem.id!];
-                return next;
-              });
-              delete optimisticTempItemQuantitiesRef.current[tempId];
-              if (!shouldPersistResolvedQuantity) return;
-              markOrderItemOpStarted();
-              enqueueOrderItemWrite(newItem.id!, () => updateOrderItemQuantityById({ itemId: newItem.id!, quantity: quantityToPersist, businessId, orderId: selectedMesa.current_order_id }))
-                .then(() => setPendingQuantityUpdatesSafe((prev) => { const next = { ...(prev || {}) }; delete next[newItem.id!]; return next; }))
-                .catch(async () => {
-                  showError('Error', `${t('mesas:errors.addItemFailed')} [${itemDebugTag('quantity-sync-failed')}]`);
-                  try {
-                    const freshItems = await getOrderItemsByOrderId({ orderId: selectedMesa.current_order_id, selectSql: ORDER_ITEMS_SELECT });
-                    if (Array.isArray(freshItems)) setOrderItems((prevItems) => mergeOrderItemsPreservingPosition(prevItems, applyPendingQuantities(freshItems, pendingQuantityUpdatesRef.current)));
-                  } catch (err) { logger.warn('mesas:order_operations:remove_item_refresh failed', err); }
-                })
-                .finally(() => markOrderItemOpFinished());
-            })
-            .catch(async (err) => {
-              logger.warn('mesas:order_operations:insert_item_catch failed', err);
-              showError('Error', `${t('mesas:errors.addItemFailed')} [${itemDebugTag('insert-catch')}]`);
-              delete optimisticTempItemQuantitiesRef.current[tempId];
-              setOrderItems((prevItems) => prevItems.filter((item) => item.id !== tempId));
-              setPendingQuantityUpdatesSafe((prev) => { const next = { ...(prev || {}) }; delete next[tempId]; return next; });
-              try {
-                const freshItems = await getOrderItemsByOrderId({ orderId: selectedMesa.current_order_id, selectSql: ORDER_ITEMS_SELECT });
-                if (Array.isArray(freshItems)) setOrderItems((prevItems) => mergeOrderItemsPreservingPosition(prevItems, applyPendingQuantities(freshItems, pendingQuantityUpdatesRef.current)));
-              } catch (recoverErr) { logger.warn('mesas:order_operations:insert_item_recover_items failed', recoverErr); }
-            })
-            .finally(() => markOrderItemOpFinished());
         }
       }
 
@@ -452,21 +326,16 @@ export function useMesaItems({
       } catch (err) { logger.warn('mesas:order_operations:add_catalog_item_refresh_items failed', err); }
     }
   }, [
-    selectedMesa, quantityToAdd, updateOrderTotal, setPendingQuantityUpdatesSafe, businessId, isOfflineFirstRuntime,
-    markOrderItemOpStarted, markOrderItemOpFinished, enqueueOrderItemWrite, showError, setOrderItems,
-    setSearchProduct, setQuantityToAdd, pendingQuantityUpdatesRef, optimisticTempItemQuantitiesRef,
-    pendingOrderItemOpsRef, orderItemsRef, orderItemsDirtyRef, t,
+    selectedMesa, quantityToAdd, updateOrderTotal, setPendingQuantityUpdatesSafe, isOfflineFirstRuntime,
+    showError, setOrderItems,
+    setSearchProduct, setQuantityToAdd, pendingQuantityUpdatesRef,
+    orderItemsRef, orderItemsDirtyRef, t,
   ]);
 
   const updateItemQuantity = useCallback(async (itemId: string, newQuantity: number) => {
     try {
-      if (pendingOrderItemOpsRef.current > 0) {
-        showError('Error', t('mesas:errors.syncingChanges'));
-        return;
-      }
       const normalizedQuantity = toFiniteNumber(newQuantity, NaN);
       if (!Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0) {
-        if (String(itemId || '').startsWith('tmp-')) delete optimisticTempItemQuantitiesRef.current[itemId];
         await removeItem(itemId);
         return;
       }
@@ -482,7 +351,6 @@ export function useMesaItems({
       setOrderItems(nextOrderItems);
       orderItemsDirtyRef.current = true;
       setPendingQuantityUpdatesSafe((prev) => ({ ...prev, [itemId]: normalizedQuantity }));
-      if (String(itemId || '').startsWith('tmp-')) optimisticTempItemQuantitiesRef.current[itemId] = normalizedQuantity;
     } catch {
       showError('Error', t('mesas:errors.updateQuantityFailed'));
       try {
@@ -495,13 +363,12 @@ export function useMesaItems({
       } catch (err) { logger.warn('mesas:order_operations:update_item_quantity_recover_items failed', err); }
       setPendingQuantityUpdatesSafe({});
     }
-  }, [selectedMesa, isOfflineFirstRuntime, removeItem, setPendingQuantityUpdatesSafe, pendingOrderItemOpsRef, optimisticTempItemQuantitiesRef, showError, setOrderItems, pendingQuantityUpdatesRef, orderItemsRef, orderItemsDirtyRef, t]);
+  }, [selectedMesa, isOfflineFirstRuntime, removeItem, setPendingQuantityUpdatesSafe, showError, setOrderItems, pendingQuantityUpdatesRef, orderItemsRef, orderItemsDirtyRef, t]);
 
   return {
     updateOrderTotal,
     flushPendingRemoteOrderTotals,
     persistPendingQuantityUpdates,
-    removeItem,
     addCatalogItemToOrder,
     updateItemQuantity,
   };

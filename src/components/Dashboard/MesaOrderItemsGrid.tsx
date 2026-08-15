@@ -22,7 +22,6 @@ interface MesaOrderItemsGridProps {
   totalOrderItems: number;
   orderItemsSentinelRef: RefObject<HTMLDivElement | null>;
   lowMotionMode: boolean;
-  isOrderItemsSyncing: boolean;
   getOrderItemRenderKey: (item: OrderItem, index: number) => string;
   getOrderItemName: (item: OrderItem) => string;
   onUpdateQuantity: (itemId: string, quantity: number) => void;
@@ -36,7 +35,6 @@ export function MesaOrderItemsGrid({
   totalOrderItems,
   orderItemsSentinelRef,
   lowMotionMode,
-  isOrderItemsSyncing,
   getOrderItemRenderKey,
   getOrderItemName,
   onUpdateQuantity,
@@ -100,9 +98,7 @@ export function MesaOrderItemsGrid({
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => onUpdateQuantity(item.id, toFiniteNumber(item.quantity, 0) - 1)}
-                            disabled={isOrderItemsSyncing}
-                            className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={() => onUpdateQuantity(item.id, toFiniteNumber(item.quantity, 0) - 1)}                            className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             -
                           </Button>
@@ -112,9 +108,7 @@ export function MesaOrderItemsGrid({
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => onUpdateQuantity(item.id, toFiniteNumber(item.quantity, 0) + 1)}
-                            disabled={isOrderItemsSyncing}
-                            className="h-8 w-8 p-0 border-green-300 text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={() => onUpdateQuantity(item.id, toFiniteNumber(item.quantity, 0) + 1)}                            className="h-8 w-8 p-0 border-green-300 text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             +
                           </Button>

@@ -2,6 +2,7 @@ import { supabaseAdapter } from '../adapters/supabaseAdapter';
 import { enqueueOutboxMutation } from '../../sync/outboxShadow';
 import LOCAL_SYNC_CONFIG from '../../config/localSync';
 import { invalidateOrderCache } from '../adapters/cacheInvalidation';
+import { logger } from '@/utils/logger';
 import type { Order, OrderItem, Table } from '../../types';
 
 let openCloseRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
@@ -322,8 +323,11 @@ export async function updateOrderTotalById({
   total: number;
   businessId?: string | null;
 }): Promise<{ id: string; total: number; __localOnly: boolean }> {
-  const { error } = await supabaseAdapter.updateOrderById(orderId, { total });
+  const { data, error } = await supabaseAdapter.updateOrderByIdWithSelect(orderId, { total }, 'id');
   if (error) throw error;
+  if (!data) {
+    throw new Error(`orders_update_blocked_by_rls: order ${orderId} no fue actualizado (0 filas afectadas)`);
+  }
 
   await enqueueOutboxMutation({
     businessId,
@@ -341,6 +345,76 @@ export async function updateOrderTotalById({
     total: normalizeNumber(total, 0),
     __localOnly: false
   };
+}
+
+export async function updateOrderNotesById({
+  orderId,
+  notes,
+  businessId = null
+}: {
+  orderId: string;
+  notes: string;
+  businessId?: string | null;
+}): Promise<{ id: string; notes: string; __localOnly: boolean }> {
+  const cleanNotes = String(notes || '').trim().slice(0, 500);
+  const { data, error } = await supabaseAdapter.updateOrderByIdWithSelect(
+    orderId,
+    { notes: cleanNotes },
+    'id, notes'
+  );
+  if (error) throw error;
+  if (!data) {
+    throw new Error(`orders_update_blocked_by_rls: order ${orderId} no fue actualizado (0 filas afectadas)`);
+  }
+
+  await enqueueOutboxMutation({
+    businessId,
+    mutationType: 'order.notes.update',
+    payload: {
+      order_id: orderId,
+      notes: cleanNotes
+    },
+    mutationId: buildMutationId('order.notes.update', businessId)
+  });
+  await invalidateOrderCache({ businessId, orderId });
+
+  return {
+    id: orderId,
+    notes: cleanNotes,
+    __localOnly: false
+  };
+}
+
+export async function setTableCallRequested({
+  tableId,
+  businessId,
+  calledAt = new Date()
+}: {
+  tableId: string;
+  businessId: string;
+  calledAt?: Date;
+}): Promise<void> {
+  const { error } = await supabaseAdapter.updateTableByBusinessAndId({
+    businessId,
+    tableId,
+    payload: { call_requested_at: calledAt.toISOString() }
+  });
+  if (error) throw error;
+}
+
+export async function clearTableCallRequested({
+  tableId,
+  businessId
+}: {
+  tableId: string;
+  businessId: string;
+}): Promise<void> {
+  const { error } = await supabaseAdapter.updateTableByBusinessAndId({
+    businessId,
+    tableId,
+    payload: { call_requested_at: null }
+  });
+  if (error) throw error;
 }
 
 export async function persistOrderItemQuantities(
@@ -652,6 +726,189 @@ export async function deleteOrderAndReleaseTable({
     table_id: tableId,
     __localOnly: false
   };
+}
+
+export interface PersistOrderSnapshotInputItem {
+  id?: string;
+  order_id?: string;
+  product_id?: string | null;
+  combo_id?: string | null;
+  quantity?: number;
+  price?: number;
+}
+
+export async function persistOrderSnapshotWeb({
+  orderId,
+  businessId = null,
+  items = []
+}: {
+  orderId: string;
+  businessId?: string | null;
+  items?: PersistOrderSnapshotInputItem[];
+}): Promise<{ total: number; itemsCount: number; __localOnly: boolean }> {
+  const source = Array.isArray(items) ? items : [];
+  const aggregated = new Map<
+    string,
+    { order_id: string; product_id: string | null; combo_id: string | null; quantity: number; price: number }
+  >();
+
+  source.forEach((item) => {
+    const quantity = Math.max(0, Math.floor(normalizeNumber(item?.quantity, 0)));
+    if (quantity <= 0) return;
+
+    const price = Math.max(0, normalizeNumber(item?.price, 0));
+    const productId = item?.product_id ? String(item.product_id) : null;
+    const comboId = item?.combo_id ? String(item.combo_id) : null;
+    const hasSingleIdentity = (productId ? 1 : 0) + (comboId ? 1 : 0) === 1;
+    if (!hasSingleIdentity) return;
+
+    const key = productId ? `p:${productId}` : `c:${comboId}`;
+    const existing = aggregated.get(key);
+    if (!existing) {
+      aggregated.set(key, {
+        order_id: orderId,
+        product_id: productId,
+        combo_id: comboId,
+        quantity,
+        price
+      });
+      return;
+    }
+
+    existing.quantity += quantity;
+    existing.price = price;
+  });
+
+  const targetRows = Array.from(aggregated.values());
+  if (targetRows.length === 0) {
+    await supabaseAdapter.persistOrderSnapshot({ orderId, items: [] });
+    await invalidateOrderCache({ businessId, orderId });
+    return { total: 0, itemsCount: 0, __localOnly: false };
+  }
+
+  const rpcPayload = targetRows.map((row) => ({
+    product_id: row.product_id,
+    combo_id: row.combo_id,
+    quantity: row.quantity,
+    price: row.price
+  }));
+  const totalFromSnapshot = targetRows.reduce(
+    (sum, row) => sum + row.quantity * row.price,
+    0
+  );
+
+  try {
+    const rpcResult = await Promise.race([
+      supabaseAdapter.persistOrderSnapshot({ orderId, items: rpcPayload }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('persist_order_snapshot timeout')), 8_000)
+      )
+    ]);
+    if (rpcResult?.error) throw rpcResult.error;
+
+    await invalidateOrderCache({ businessId, orderId });
+    return {
+      total: totalFromSnapshot,
+      itemsCount: targetRows.reduce((sum, row) => sum + row.quantity, 0),
+      __localOnly: false
+    };
+  } catch (_rpcError) {
+    // Fallback manual: reconciliar por fila (upsert + borrado de stale + total)
+    const { data: currentRows, error: currentRowsError } = await supabaseAdapter.getOrderItemsByOrderId(
+      orderId,
+      'id, product_id, combo_id, quantity, price'
+    );
+    if (currentRowsError) throw currentRowsError;
+
+    const currentByKey = new Map<
+      string,
+      { id: string; product_id: string | null; combo_id: string | null }
+    >();
+    const duplicateIdsToDelete: string[] = [];
+
+    const currentRowList = (Array.isArray(currentRows) ? currentRows : []) as unknown as Array<Record<string, unknown>>;
+    currentRowList.forEach((row) => {
+      const rowId = String(row?.id || '').trim();
+      if (!rowId) return;
+      const productId = row?.product_id ? String(row.product_id) : null;
+      const comboId = row?.combo_id ? String(row.combo_id) : null;
+      const key = productId ? `p:${productId}` : comboId ? `c:${comboId}` : '';
+      if (!key) {
+        duplicateIdsToDelete.push(rowId);
+        return;
+      }
+      if (currentByKey.has(key)) {
+        duplicateIdsToDelete.push(rowId);
+        return;
+      }
+      currentByKey.set(key, { id: rowId, product_id: productId, combo_id: comboId });
+    });
+
+    const targetKeys = new Set(targetRows.map((row) => (row.product_id ? `p:${row.product_id}` : `c:${row.combo_id}`)));
+    const staleIdsToDelete: string[] = [];
+    currentByKey.forEach((row, key) => {
+      if (!targetKeys.has(key)) staleIdsToDelete.push(row.id);
+    });
+
+    const upsertResults = await Promise.allSettled(
+      targetRows.map((row) => {
+        const key = row.product_id ? `p:${row.product_id}` : `c:${row.combo_id}`;
+        const existing = currentByKey.get(key);
+
+        if (existing?.id) {
+          return updateOrderItemQuantityById({
+            itemId: existing.id,
+            quantity: row.quantity,
+            businessId,
+            orderId
+          });
+        }
+
+        return insertOrderItem({
+          row: {
+            order_id: orderId,
+            product_id: row.product_id,
+            combo_id: row.combo_id,
+            quantity: row.quantity,
+            price: row.price
+          },
+          selectSql: 'id',
+          businessId
+        });
+      })
+    );
+
+    const failedUpserts = upsertResults.filter((result) => result.status === 'rejected');
+    if (failedUpserts.length > 0 && LOCAL_SYNC_CONFIG?.devtoolsEnabled) {
+      logger.warn(
+        'orders:persist_order_snapshot_fallback_upserts_failed',
+        failedUpserts.map((result) => (result as PromiseRejectedResult).reason?.message || result)
+      );
+    }
+
+    const idsToDelete = [...duplicateIdsToDelete, ...staleIdsToDelete];
+    if (idsToDelete.length > 0) {
+      const deleteResults = await Promise.allSettled(
+        idsToDelete.map((itemId) => deleteOrderItemById(itemId, { businessId, orderId }))
+      );
+      const failedDeletes = deleteResults.filter((result) => result.status === 'rejected');
+      if (failedDeletes.length > 0 && LOCAL_SYNC_CONFIG?.devtoolsEnabled) {
+        logger.warn(
+          'orders:persist_order_snapshot_fallback_deletes_failed',
+          failedDeletes.map((result) => (result as PromiseRejectedResult).reason?.message || result)
+        );
+      }
+    }
+
+    await updateOrderTotalById({ orderId, total: totalFromSnapshot, businessId });
+    await invalidateOrderCache({ businessId, orderId });
+
+    return {
+      total: totalFromSnapshot,
+      itemsCount: targetRows.reduce((sum, row) => sum + row.quantity, 0),
+      __localOnly: false
+    };
+  }
 }
 
 export async function deleteTableCascadeOrders(

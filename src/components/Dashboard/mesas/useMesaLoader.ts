@@ -3,16 +3,11 @@ import { getTablesWithCurrentOrderByBusiness } from '@/data/queries/ordersQuerie
 import { createTable } from '@/data/commands/ordersCommands';
 import {
   normalizeEntityId,
-  toFiniteNumber,
-  getTotalProductUnits,
-  calculateOrderItemsTotal,
-  mergeOrderItemsPreservingPosition,
   normalizeTableIdentifier,
   compareTableIdentifiers,
   areMesaArraysEquivalent,
   sanitizeMesaOrderAssociation,
   reconcileTablesWithOpenOrders,
-  reconcileClosedOrdersFromOutbox,
 } from './mesaHelpers';
 import { normalizeTableRecord } from '@/utils/tableStatus';
 import { isOfflineMode, readOfflineSnapshot, saveOfflineSnapshot } from '@/utils/offlineSnapshot';
@@ -50,17 +45,22 @@ export function useMesaLoader({
   setNewTableNumber,
   setShowAddForm,
 }: UseMesaLoaderParams) {
+  const normalizeMesaList = useCallback((mesas: any[]) => {
+    return (Array.isArray(mesas) ? mesas : [])
+      .map(normalizeTableRecord)
+      .sort(compareTableIdentifiers)
+      .map(sanitizeMesaOrderAssociation)
+      .sort(compareTableIdentifiers);
+  }, []);
+
   const loadMesas = useCallback(async () => {
     const offline = isOfflineMode();
     const offlineSnapshotKey = `mesas.list:${businessId}`;
     const offlineSnapshot = readOfflineSnapshot(offlineSnapshotKey, []);
 
     if (offline && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
-      const normalizedOfflineSnapshot = offlineSnapshot.map(normalizeTableRecord).sort(compareTableIdentifiers);
-      const withOpenOrders = await reconcileTablesWithOpenOrders({ mesas: normalizedOfflineSnapshot, businessId });
-      const reconciledSnapshot = await reconcileClosedOrdersFromOutbox(withOpenOrders);
-      const finalSnapshot = reconciledSnapshot.map(normalizeTableRecord).sort(compareTableIdentifiers);
-      const sanitizedSnapshot = finalSnapshot.map(sanitizeMesaOrderAssociation).sort(compareTableIdentifiers);
+      const withOpenOrders = await reconcileTablesWithOpenOrders({ mesas: offlineSnapshot, businessId });
+      const sanitizedSnapshot = normalizeMesaList(withOpenOrders);
       setMesas(sanitizedSnapshot);
       saveOfflineSnapshot(offlineSnapshotKey, sanitizedSnapshot);
       return;
@@ -69,33 +69,25 @@ export function useMesaLoader({
     try {
       const data = await getTablesWithCurrentOrderByBusiness(businessId);
       const normalized = (Array.isArray(data) ? data : []).map(normalizeTableRecord).sort(compareTableIdentifiers);
-      const withOpenOrders = offline ? await reconcileTablesWithOpenOrders({ mesas: normalized, businessId }) : normalized;
-      const reconciledMesas = offline ? await reconcileClosedOrdersFromOutbox(withOpenOrders) : withOpenOrders;
-      const finalMesas = reconciledMesas.map(normalizeTableRecord).sort(compareTableIdentifiers);
-      const sanitizedMesas = finalMesas.map(sanitizeMesaOrderAssociation).sort(compareTableIdentifiers);
       const hasLocalData = normalized.length > 0;
 
       if (offline && !hasLocalData && Array.isArray(offlineSnapshot) && offlineSnapshot.length > 0) {
-        const normalizedOfflineSnapshot = offlineSnapshot.map(normalizeTableRecord).sort(compareTableIdentifiers);
-        const withOpenOrdersFromSnapshot = await reconcileTablesWithOpenOrders({ mesas: normalizedOfflineSnapshot, businessId });
-        const reconciledSnapshot = await reconcileClosedOrdersFromOutbox(withOpenOrdersFromSnapshot);
-        const finalSnapshot = reconciledSnapshot.map(normalizeTableRecord).sort(compareTableIdentifiers);
-        const sanitizedSnapshot = finalSnapshot.map(sanitizeMesaOrderAssociation).sort(compareTableIdentifiers);
+        const withOpenOrdersFromSnapshot = await reconcileTablesWithOpenOrders({ mesas: offlineSnapshot, businessId });
+        const sanitizedSnapshot = normalizeMesaList(withOpenOrdersFromSnapshot);
         setMesas((prev) => areMesaArraysEquivalent(prev, sanitizedSnapshot) ? prev : sanitizedSnapshot);
         saveOfflineSnapshot(offlineSnapshotKey, sanitizedSnapshot);
         return;
       }
 
+      const withOpenOrders = offline ? await reconcileTablesWithOpenOrders({ mesas: normalized, businessId }) : normalized;
+      const sanitizedMesas = normalizeMesaList(withOpenOrders);
       setMesas((prev) => areMesaArraysEquivalent(prev, sanitizedMesas) ? prev : sanitizedMesas);
       if (!offline || hasLocalData) saveOfflineSnapshot(offlineSnapshotKey, sanitizedMesas);
     } catch {
       const cached = readOfflineSnapshot(offlineSnapshotKey, []);
       if (Array.isArray(cached) && cached.length > 0) {
-        const normalizedCached = cached.map(normalizeTableRecord).sort(compareTableIdentifiers);
-        const withOpenOrdersCached = await reconcileTablesWithOpenOrders({ mesas: normalizedCached, businessId });
-        const reconciledCached = await reconcileClosedOrdersFromOutbox(withOpenOrdersCached);
-        const finalCached = reconciledCached.map(normalizeTableRecord).sort(compareTableIdentifiers);
-        const sanitizedCached = finalCached.map(sanitizeMesaOrderAssociation).sort(compareTableIdentifiers);
+        const withOpenOrdersCached = await reconcileTablesWithOpenOrders({ mesas: cached, businessId });
+        const sanitizedCached = normalizeMesaList(withOpenOrdersCached);
         setMesas((prev) => areMesaArraysEquivalent(prev, sanitizedCached) ? prev : sanitizedCached);
         saveOfflineSnapshot(offlineSnapshotKey, sanitizedCached);
         return;
@@ -105,7 +97,7 @@ export function useMesaLoader({
     } finally {
       setLoading(false);
     }
-  }, [businessId, setMesas, showError, setLoading, t]);
+  }, [businessId, setMesas, showError, setLoading, t, normalizeMesaList]);
 
   const clearClosedMesaCache = useCallback(async ({ tableId, orderId = null }: { tableId?: string | null; orderId?: string | null } = {}) => {
     const normalizedTableId = normalizeEntityId(tableId);
@@ -121,7 +113,7 @@ export function useMesaLoader({
       saveOfflineSnapshot(snapshotKey, sanitized);
     }
 
-    invalidateOrderCache({ businessId, orderId }).catch((err: unknown) => { logger.warn('mesas:order_operations:invalidate_cache failed', err); });
+    invalidateOrderCache({ businessId, tableId: normalizedTableId, orderId }).catch((err: unknown) => { logger.warn('mesas:order_operations:invalidate_cache failed', err); });
   }, [businessId]);
 
   const handleCreateTable = useCallback(async (e: React.FormEvent) => {
@@ -143,7 +135,7 @@ export function useMesaLoader({
       try {
         const createdTable = await createTable({ businessId, tableNumber: tableIdentifier });
         if (createdTable?.id) {
-          const normalizedTable = normalizeTableRecord(createdTable);
+          const normalizedTable = normalizeTableRecord(createdTable as unknown as Parameters<typeof normalizeTableRecord>[0]);
           setMesas((prev) => {
             const exists = prev.some((table) => table.id === normalizedTable.id);
             if (exists) return prev;

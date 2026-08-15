@@ -1,16 +1,25 @@
 import { normalizeTableRecord } from '../../../utils/tableStatus';
 import { getOpenOrdersByBusiness } from '../../../data/queries/ordersQueries';
-import { getPaymentMethodLabel } from '../../ui/PaymentMethodBankLogo';
+import {
+  CALL_WINDOW_MS,
+  MESA_LOCK_TTL_SECONDS,
+  MESA_LOCK_TTL_MS,
+  MESA_LOCK_HEARTBEAT_MS,
+  MESAS_REMOTE_FALLBACK_POLL_MS,
+  sumOrderItemsQuantity,
+} from '@stocky/shared';
 import type { Table } from '../../../types/order';
-
-export { getPaymentMethodLabel };
-import { isConnectivityError } from '../../../utils/connectivity';
 
 type TranslateFunction = (key: string) => string;
 
-export const MESAS_REMOTE_FALLBACK_POLL_MS = 5000;
-export const MESA_LOCK_TTL_SECONDS = 45;
-export const MESA_LOCK_HEARTBEAT_MS = 20000;
+// Re-export de las constantes compartidas (web + móvil)
+export {
+  CALL_WINDOW_MS,
+  MESA_LOCK_TTL_SECONDS,
+  MESA_LOCK_TTL_MS,
+  MESA_LOCK_HEARTBEAT_MS,
+  MESAS_REMOTE_FALLBACK_POLL_MS,
+};
 
 export const getMesaInUseMessage = (t: TranslateFunction): string =>
   t('mesas:defaults.someoneUsingTable');
@@ -115,7 +124,7 @@ export const normalizeOrderItemNumericFields = (item: OrderItem): OrderItem => {
 };
 
 export const getTotalProductUnits = (items: OrderItem[] = []): number =>
-  items.reduce((sum, item) => sum + toFiniteNumber(item?.quantity, 0), 0);
+  sumOrderItemsQuantity(items);
 
 export const calculateOrderItemsTotal = (items: OrderItem[] = []): number =>
   items.reduce((sum, item) => {
@@ -135,13 +144,6 @@ export const normalizeDisplayName = (value: unknown, t: TranslateFunction): stri
 export const isMesaLockExpired = (lock: Lock): boolean => {
   const expiresAtMs = Date.parse(String(lock?.lock_expires_at || '').trim());
   return Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now();
-};
-
-export const isDuplicateKeyError = (errorLike: ErrorLike): boolean => {
-  const code = String(errorLike?.code || '').trim();
-  if (code === '23505') return true;
-  const message = String(errorLike?.message || '').toLowerCase();
-  return message.includes('duplicate key');
 };
 
 export const isMissingTableEditLocksRelationError = (errorLike: ErrorLike): boolean => {
@@ -209,9 +211,26 @@ export const mergeOrderItemsPreservingPosition = (previousItems: OrderItem[] = [
   );
   const previousIds = new Set(previousItems.map((item) => item?.id).filter(Boolean));
 
+  const isTempItemReplaced = (item: OrderItem): boolean => {
+    const isTemp = String(item?.id || '').startsWith('tmp-');
+    if (!isTemp) return false;
+    const productId = normalizeEntityId(item?.product_id);
+    const comboId = normalizeEntityId(item?.combo_id);
+    if (!productId && !comboId) return false;
+    return normalizedIncoming.some((incoming) => {
+      const incomingProductId = normalizeEntityId(incoming?.product_id);
+      const incomingComboId = normalizeEntityId(incoming?.combo_id);
+      return Boolean(productId && incomingProductId === productId)
+        || Boolean(comboId && incomingComboId === comboId);
+    });
+  };
+
   const preserved = previousItems
-    .filter((item) => item?.id && incomingById.has(item.id))
-    .map((item) => incomingById.get(item.id)!);
+    .filter((item) => {
+      if (item?.id && incomingById.has(item.id)) return true;
+      return !isTempItemReplaced(item);
+    })
+    .map((item) => (item?.id && incomingById.has(item.id) ? incomingById.get(item.id) : item));
 
   const newItemsFirst = normalizedIncoming.filter((item) => !item?.id || !previousIds.has(item.id));
 
@@ -337,12 +356,7 @@ export function sanitizeMesaOrderAssociation(mesa: Mesa): Mesa {
   return normalizeTableRecord(mesa as Table);
 }
 
-export async function reconcileClosedOrdersFromOutbox(mesas: Mesa[] = []): Promise<Mesa[]> {
-  if (!Array.isArray(mesas) || mesas.length === 0) return mesas;
-  return mesas;
-}
-
-export function pickCanonicalOpenOrderForTable(openOrders: Mesa['orders'][] = []): Mesa['orders'] | null {
+function pickCanonicalOpenOrderForTable(openOrders: Mesa['orders'][] = []): Mesa['orders'] | null {
   if (!Array.isArray(openOrders) || openOrders.length === 0) return null;
   return openOrders
     .filter((order) => normalizeEntityId(order?.id))
@@ -356,7 +370,7 @@ export function pickCanonicalOpenOrderForTable(openOrders: Mesa['orders'][] = []
     })[0] || null;
 }
 
-export function orderHasProducts(order: Mesa['orders']): boolean {
+function orderHasProducts(order: Mesa['orders']): boolean {
   const items = Array.isArray(order?.order_items) ? order.order_items : [];
   if (items.length > 0) return true;
   const total = Number(order?.total);

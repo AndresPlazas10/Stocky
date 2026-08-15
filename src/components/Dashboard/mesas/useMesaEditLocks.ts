@@ -4,7 +4,6 @@ import {
   normalizeEntityId,
   normalizeDisplayName,
   isMesaLockExpired,
-  isDuplicateKeyError,
   isMissingTableEditLocksRelationError,
   isMissingTableEditLocksColumnError,
   MESA_LOCK_TTL_SECONDS,
@@ -18,7 +17,6 @@ export function useMesaEditLocks({
   isOfflineFirstRuntime,
   heldMesaLockRef,
   mesaSyncClientIdRef,
-  _activeMesaBroadcastRef,
   mesaLockHeartbeatTimerRef,
 }) {
   const { t } = useTranslation(['mesas', 'common']);
@@ -91,7 +89,7 @@ export function useMesaEditLocks({
       const fallbackSelect =
         'table_id,business_id,lock_owner_user_id,lock_owner_name,lock_expires_at,updated_at';
 
-      let result = await supabase
+      let result: { data: any[] | null; error: any } = await supabase
         .from('table_edit_locks')
         .select(baseSelect)
         .eq('business_id', normalizedBusinessId);
@@ -607,16 +605,12 @@ export function useMesaEditLocks({
   );
 
   return {
-    mesaLocksByTableId,
     getMesaLockState,
     acquireMesaEditLockWeb,
     refreshMesaEditLockHeartbeatWeb,
     releaseMesaEditLockWeb,
-    normalizeMesaLockRow,
-    applyMesaLocks,
     refreshMesaLocks,
     applyRealtimeMesaLockRow,
     applyRealtimeMesaLockBroadcast,
-    selectMesaEditLockByTableId,
   };
 }

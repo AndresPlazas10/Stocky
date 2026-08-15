@@ -7,7 +7,6 @@ import { useBusinessConfig } from '../../hooks/useBusinessConfig';
 interface MesaOrderFooterProps {
   orderTotal: number;
   orderItemsCount: number;
-  isOrderItemsSyncing: boolean;
   onSave: () => void;
   onPrintKitchen: () => void;
   onCloseOrder: () => void;
@@ -16,7 +15,6 @@ interface MesaOrderFooterProps {
 export function MesaOrderFooter({
   orderTotal,
   orderItemsCount,
-  isOrderItemsSyncing,
   onSave,
   onPrintKitchen,
   onCloseOrder,
@@ -40,11 +38,10 @@ export function MesaOrderFooter({
           <Button
             onClick={onSave}
             variant="outline"
-            disabled={isOrderItemsSyncing}
             className="border-2 border-accent-300 text-accent-700 hover:bg-accent-50 h-12 px-6 w-full sm:w-auto"
           >
             <Save className="w-5 h-5 mr-2" />
-            {isOrderItemsSyncing ? t('status.syncing', { ns: 'common' }) : t('mesas:buttons.saveOrder')}
+            {t('mesas:buttons.saveOrder')}
           </Button>
           <Button
             onClick={onPrintKitchen}

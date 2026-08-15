@@ -17,7 +17,6 @@ export function MesaPaymentModal({
   onPaymentMethodChange,
   selectedCustomer,
   onCustomerChange,
-  clientes,
   amountReceived,
   onAmountReceivedChange,
   amountReceivedError,
@@ -104,11 +103,6 @@ export function MesaPaymentModal({
                         className="w-full h-11 px-3 rounded-xl border-2 border-accent-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
                       >
                         <option value="">{t('form.generalSale', { ns: 'common' })}</option>
-                        {clientes.map(cliente => (
-                          <option key={cliente.id} value={cliente.id}>
-                            {cliente.full_name} - {cliente.email}
-                          </option>
-                        ))}
                       </select>
                     </div>
 

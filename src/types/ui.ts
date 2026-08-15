@@ -1,4 +1,4 @@
-export type UserRole = 'owner' | 'admin' | 'manager' | 'cashier' | 'waiter' | 'employee';
+export type UserRole = 'owner' | 'admin' | 'manager' | 'cashier' | 'waiter' | 'kitchen' | 'employee';
 
 export type DashboardModule =
   | 'home'

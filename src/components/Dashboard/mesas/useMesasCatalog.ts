@@ -154,8 +154,6 @@ export function useMesasCatalog({
   const hasInsufficientComboStock = insufficientComboComponents.length > 0;
 
   return {
-    comboById,
-    catalogItems,
     filteredCatalog,
     visibleFilteredCatalog,
     hasMoreFilteredCatalog,
@@ -170,7 +168,6 @@ export function useMesasCatalog({
     orderTotal,
     cambioPago,
     isCashPaymentInvalid,
-    productById,
     insufficientItems,
     insufficientComboComponents,
     hasInsufficientComboStock,

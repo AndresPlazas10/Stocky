@@ -2,7 +2,6 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   deleteOrderAndReleaseTable,
-  persistOrderItemQuantities,
 } from '../../../data/commands/ordersCommands';
 import {
   getOrderForRealtimeById,
@@ -57,13 +56,12 @@ interface UseMesaCloseParams {
   setOrderItems: SetState<DynamicRow[]>;
   setSearchProduct: SetState<string>;
   setPendingQuantityUpdatesSafe: SetState<Record<string, number>>;
-  waitForPendingOrderItemOps: () => Promise<boolean>;
   showError: (title: string, message?: string) => void;
   showSuccess: (title: string, message?: string) => void;
   updateOrderTotal: (orderId: string | null | undefined, itemsSnapshot?: DynamicRow[], options?: { skipMesaState?: boolean }) => Promise<void>;
   loadMesas: () => Promise<void>;
   clearClosedMesaCache: (params?: { tableId?: string | null; orderId?: string | null }) => Promise<void>;
-  persistPendingQuantityUpdates: (orderId: string, options?: { refreshItems?: boolean }) => Promise<void>;
+  persistPendingQuantityUpdates: (orderId: string, options?: { refreshItems?: boolean; items?: DynamicRow[] }) => Promise<void>;
 }
 
 export function useMesaClose({
@@ -83,7 +81,6 @@ export function useMesaClose({
   setOrderItems,
   setSearchProduct,
   setPendingQuantityUpdatesSafe,
-  waitForPendingOrderItemOps,
   showError,
   showSuccess,
   updateOrderTotal,
@@ -158,12 +155,6 @@ export function useMesaClose({
     if (!selectedMesa) return;
     
     try {
-      const hasSettledPendingOps = await waitForPendingOrderItemOps();
-      if (!hasSettledPendingOps) {
-        showError('Error',t('mesas:errors.applyingChanges'));
-        return;
-      }
-
       const mesaSnapshot = { ...selectedMesa };
       const orderItemsSnapshot = Array.isArray(orderItemsRef.current) ? [...orderItemsRef.current] : [];
       const mesaItemsSnapshot = Array.isArray(mesaSnapshot?.orders?.order_items)
@@ -173,7 +164,6 @@ export function useMesaClose({
       let effectiveOrderItemsSnapshot = hasLocalEdits
         ? orderItemsSnapshot
         : (orderItemsSnapshot.length > 0 ? orderItemsSnapshot : mesaItemsSnapshot);
-
       if (effectiveOrderItemsSnapshot.length === 0 && mesaSnapshot?.current_order_id) {
         try {
           let latestOrder = null;
@@ -247,22 +237,37 @@ export function useMesaClose({
         )
       );
       
-      orderItemsDirtyRef.current = false;
+      // El dirty se mantiene true hasta que termine el persist: así los eventos
+      // realtime de los items recién guardados no se aplican por encima del
+      // estado optimista mientras el snapshot aún no resolvió.
       setShowOrderDetails(false);
       setModalOpenIntent(false);
       setSelectedMesa(null);
       orderItemsRef.current = [];
       setOrderItems([]);
       setSearchProduct('');
-      
+
       showSuccess(t('mesas:success.tableUpdated'), `${t('mesas:labels.table')} #${mesaSnapshot.table_number}`);
 
-      (async () => {
+      void (async () => {
         try {
-          await persistPendingQuantityUpdates(mesaSnapshot.current_order_id!, { refreshItems: false });
-          await updateOrderTotal(mesaSnapshot.current_order_id, effectiveOrderItemsSnapshot, { skipMesaState: true });
+          // Solo persistir si esta sesión editó la orden: evita que un estado
+          // cacheado/incompleto borre items agregados por otro dispositivo.
+          if (hasLocalEdits) {
+            const hasTempItems = (Array.isArray(effectiveOrderItemsSnapshot) ? effectiveOrderItemsSnapshot : []).some(
+              (item) => String(item?.id || '').startsWith('tmp-')
+            );
+            await persistPendingQuantityUpdates(mesaSnapshot.current_order_id!, { refreshItems: false, items: effectiveOrderItemsSnapshot });
+            // Si hubo items tmp-, el snapshot RPC ya persiste orders.total
+            // (e invalida cache + outbox): no escribir el total dos veces.
+            if (!hasTempItems) {
+              await updateOrderTotal(mesaSnapshot.current_order_id, effectiveOrderItemsSnapshot, { skipMesaState: true });
+            }
+          }
         } catch {
           // no-op: optimistic state is already correct, polling will sync
+        } finally {
+          orderItemsDirtyRef.current = false;
         }
       })();
     } catch {
@@ -274,7 +279,6 @@ export function useMesaClose({
     persistPendingQuantityUpdates,
     loadMesas,
     releaseEmptyOrderAndCloseModal,
-    waitForPendingOrderItemOps,
     setMesas,
     setShowOrderDetails,
     setModalOpenIntent,
@@ -300,7 +304,6 @@ export function useMesaClose({
     const effectiveItemsSnapshot = hasLocalEdits
       ? itemsSnapshot
       : (itemsSnapshot.length > 0 ? itemsSnapshot : mesaItemsSnapshot);
-    const pendingEntriesSnapshot = Object.entries(pendingQuantityUpdatesRef.current || {});
     const normalizedSnapshotOrderId = normalizeEntityId(mesaSnapshot?.current_order_id);
     const snapshotOrderTotal = toFiniteNumber(mesaSnapshot?.orders?.total, 0);
     const pendingSnapshotTotal = normalizedSnapshotOrderId
@@ -310,7 +313,7 @@ export function useMesaClose({
 
     if (effectiveItemsSnapshot.length === 0) {
       if (hasOrderTotalSignal) {
-        showError('Error',t('mesas:errors.orderSyncDetected'));
+        showError('Error', t('mesas:errors.orderSyncDetected'));
         closeModalImmediate(() => {
           orderItemsDirtyRef.current = false;
           setShowOrderDetails(false);
@@ -326,50 +329,8 @@ export function useMesaClose({
       return;
     }
 
-    const backgroundWork = async () => {
-      if (!mesaSnapshot) return;
-      try {
-        if (!mesaSnapshot.current_order_id) return;
-
-        if (pendingEntriesSnapshot.length > 0) {
-          await persistOrderItemQuantities(pendingEntriesSnapshot, {
-            businessId,
-            orderId: mesaSnapshot.current_order_id
-          });
-        }
-
-        await updateOrderTotal(mesaSnapshot.current_order_id, effectiveItemsSnapshot, { skipMesaState: true });
-      } catch {
-        try { await loadMesas(); } catch (err: unknown) { logger.warn('mesas:order_operations:load_mesas_recovery failed', err); }
-      }
-    };
-
-    if (mesaSnapshot && effectiveItemsSnapshot.length > 0) {
-      const localOrderTotal = calculateOrderItemsTotal(effectiveItemsSnapshot);
-      const localUnits = getTotalProductUnits(effectiveItemsSnapshot);
-
-      setMesas(prevMesas =>
-        prevMesas.map(m =>
-          m.id === mesaSnapshot.id
-            ? {
-              ...m,
-              status: 'occupied',
-              current_order_id: mesaSnapshot.current_order_id,
-              orders: {
-                ...(m.orders || {}),
-                id: mesaSnapshot.current_order_id,
-                total: localOrderTotal,
-                local_units: localUnits,
-                order_items: effectiveItemsSnapshot
-              }
-            }
-            : m
-        )
-      );
-
-      showSuccess(t('mesas:success.tableUpdated'), `${t('mesas:labels.table')} #${mesaSnapshot.table_number}`);
-    }
-
+    // X = descartar cambios: no se persiste nada en la DB. La cocina solo se
+    // entera cuando el mesero presiona "Guardar" (handleRefreshOrder).
     closeModalImmediate(() => {
       orderItemsDirtyRef.current = false;
       setShowOrderDetails(false);
@@ -378,11 +339,9 @@ export function useMesaClose({
       orderItemsRef.current = [];
       setOrderItems([]);
       setPendingQuantityUpdatesSafe({});
-    }, backgroundWork);
+    });
   }, [
     selectedMesa,
-    loadMesas,
-    updateOrderTotal,
     releaseEmptyOrderAndCloseModal,
     setMesas,
     setShowOrderDetails,
@@ -391,13 +350,9 @@ export function useMesaClose({
     setOrderItems,
     setPendingQuantityUpdatesSafe,
     showError,
-    showSuccess,
     orderItemsRef,
     orderItemsDirtyRef,
-    pendingQuantityUpdatesRef,
     pendingRemoteOrderTotalsRef,
-    businessId,
-    persistPendingQuantityUpdates,
     t
   ]);
 

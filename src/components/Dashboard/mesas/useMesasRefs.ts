@@ -1,16 +1,12 @@
 import { useCallback, useRef } from 'react';
 import { logger } from '../../../utils/logger';
-import { normalizeEntityId } from './mesaHelpers';
+import { normalizeEntityId, MESA_LOCK_TTL_MS } from './mesaHelpers';
 import { isOfflineMode, isOfflinePersistenceEnabled } from '../../../utils/offlineSnapshot.js';
 
 export function useMesasRefs({
   businessId,
   currentUser,
-  setPendingQuantityUpdates,
-  setPendingOrderItemOps,
 }) {
-  const mesasLengthRef = useRef(0);
-  const hasLoadedOnceRef = useRef(false);
   const pendingQuantityUpdatesRef = useRef({});
   const orderItemsDirtyRef = useRef(false);
   const orderItemsRef = useRef([]);
@@ -21,9 +17,6 @@ export function useMesasRefs({
   const lastSyncedOrderTotalsRef = useRef({});
   const pendingRemoteOrderTotalsRef = useRef({});
   const orderTotalSyncQueueRef = useRef({});
-  const optimisticTempItemQuantitiesRef = useRef({});
-  const pendingOrderItemOpsRef = useRef(0);
-  const orderItemWriteQueueRef = useRef({});
   const mesasSnapshotTimerRef = useRef(null);
   const mesaOpenDebugRef = useRef({ stage: 'idle', ts: null });
 
@@ -47,7 +40,6 @@ export function useMesasRefs({
     const next = typeof updater === 'function' ? updater(prev) : updater;
     const normalizedNext = next && typeof next === 'object' ? next : {};
     pendingQuantityUpdatesRef.current = normalizedNext;
-    setPendingQuantityUpdates(normalizedNext);
   }, []);
 
   const setMesaOpenDebugStage = useCallback((stage) => {
@@ -58,7 +50,7 @@ export function useMesasRefs({
   }, []);
 
   const buildMesaOpenDebugTag = useCallback((errorLike, mesa) => {
-    const dbg = mesaOpenDebugRef.current || {};
+    const dbg = mesaOpenDebugRef.current;
     const mesaId = normalizeEntityId(mesa?.id) || 'na';
     const navOnline = typeof navigator !== 'undefined' && navigator.onLine === false ? '0' : '1';
     const runtimeOffline = isOfflineMode() ? '1' : '0';
@@ -110,7 +102,7 @@ export function useMesasRefs({
       if (!normalizedBusinessId || !normalizedTableId) return;
       const resolvedUserId = normalizeEntityId(currentUser?.id);
       if (!resolvedUserId) return;
-      const lockTtlMs = 45_000;
+      const lockTtlMs = MESA_LOCK_TTL_MS;
       const lockExpiresAt = locked ? new Date(Date.now() + lockTtlMs).toISOString() : null;
       sendMesaSyncBroadcast('mesa_lock_changed', {
         sender_user_id: resolvedUserId,
@@ -129,42 +121,7 @@ export function useMesasRefs({
     [businessId, currentUser?.id, sendMesaSyncBroadcast],
   );
 
-  const markOrderItemOpStarted = useCallback(() => {
-    pendingOrderItemOpsRef.current += 1;
-    setPendingOrderItemOps((prev) => prev + 1);
-  }, [setPendingOrderItemOps]);
-
-  const markOrderItemOpFinished = useCallback(() => {
-    pendingOrderItemOpsRef.current = Math.max(pendingOrderItemOpsRef.current - 1, 0);
-    setPendingOrderItemOps((prev) => Math.max(prev - 1, 0));
-  }, [setPendingOrderItemOps]);
-
-  const waitForPendingOrderItemOps = useCallback(async ({ timeoutMs = 2000, pollMs = 40 } = {}) => {
-    const startedAt = Date.now();
-    while (pendingOrderItemOpsRef.current > 0 && Date.now() - startedAt < timeoutMs) {
-      await new Promise((resolve) => setTimeout(resolve, pollMs));
-    }
-    return pendingOrderItemOpsRef.current <= 0;
-  }, []);
-
-  const enqueueOrderItemWrite = useCallback((itemId, task) => {
-    const normalizedItemId = String(itemId || '').trim();
-    if (!normalizedItemId || typeof task !== 'function') return Promise.resolve(null);
-    const queueByItem = orderItemWriteQueueRef.current || {};
-    const previous = queueByItem[normalizedItemId] || Promise.resolve();
-    const next = previous.catch((err) => { logger.warn('mesas:refs:enqueueOrderItemWrite:previous_task_failed', err); }).then(() => task());
-    queueByItem[normalizedItemId] = next;
-    orderItemWriteQueueRef.current = queueByItem;
-    return next.finally(() => {
-      if (orderItemWriteQueueRef.current?.[normalizedItemId] === next) {
-        delete orderItemWriteQueueRef.current[normalizedItemId];
-      }
-    });
-  }, []);
-
   return {
-    mesasLengthRef,
-    hasLoadedOnceRef,
     pendingQuantityUpdatesRef,
     orderItemsDirtyRef,
     orderItemsRef,
@@ -175,9 +132,6 @@ export function useMesasRefs({
     lastSyncedOrderTotalsRef,
     pendingRemoteOrderTotalsRef,
     orderTotalSyncQueueRef,
-    optimisticTempItemQuantitiesRef,
-    pendingOrderItemOpsRef,
-    orderItemWriteQueueRef,
     mesasSnapshotTimerRef,
     mesaOpenDebugRef,
     mesaSyncBroadcastChannelRef,
@@ -194,9 +148,5 @@ export function useMesasRefs({
     buildMesaOpenDebugTag,
     sendMesaSyncBroadcast,
     publishMesaLockBroadcast,
-    markOrderItemOpStarted,
-    markOrderItemOpFinished,
-    waitForPendingOrderItemOps,
-    enqueueOrderItemWrite,
   };
 }

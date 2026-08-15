@@ -1,13 +1,14 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Layers, Plus } from 'lucide-react';
+import { Layers, Plus, ChefHat } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { deleteTableCascadeOrders } from '../../data/commands/ordersCommands';
-import type { SplitBillOrderItem, OrderItem } from '../../types/components';
+import { deleteTableCascadeOrders, updateOrderNotesById, clearTableCallRequested } from '../../data/commands/ordersCommands';
+import type { SplitBillOrderItem, OrderItem, MesaRecord } from '../../types/components';
 import { calcularCambio } from '../../utils/cambio';
 import { Button } from '../ui/button';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
-import { useAppToast } from '../../hooks/useAppToast';
+import { useAppToast, TOAST_DEFAULT_DURATION } from '../../hooks/useAppToast';
+import { playNewOrderBeep } from '../../utils/notificationSound';
 import { getTotalProductUnits, getOrderItemRenderKey, getOrderItemName } from './mesas/mesaHelpers';
 import MesasGrid from './mesas/MesasGrid';
 import { useMesaEditLocks } from './mesas/useMesaEditLocks.js';
@@ -22,6 +23,7 @@ import { useMesaCatalog } from '../../hooks/useMesaCatalog.js';
 import { useRafBatchedQueue } from '../../hooks/useRafBatchedQueue.js';
 import { useCloseOrderLocks } from '../../hooks/useCloseOrderLocks.js';
 import { useBusinessConfig } from '../../hooks/useBusinessConfig';
+import { logger } from '@/utils/logger';
 import { MesasHeader } from './mesas/MesasHeader.jsx';
 import { AddMesaForm } from './mesas/AddMesaForm.jsx';
 import { OrderDetailsModal } from './mesas/OrderDetailsModal.jsx';
@@ -34,15 +36,14 @@ import { PrintReceiptConfirmModal } from '../ui/PrintReceiptConfirmModal';
 function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRole?: string }) {
   const { t } = useTranslation(['mesas', 'common']);
   const config = useBusinessConfig();
-  const { showError, showSuccess, ToastComponent } = useAppToast();
+  const { showError, showSuccess, showInfo, ToastComponent } = useAppToast();
   const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
+  const isKitchenRole = userRole === 'kitchen' || userRole === 'cocina';
   
   const state = useMesasState(businessId, userRole);
   const refs = useMesasRefs({
     businessId,
     currentUser: state.currentUser,
-    setPendingQuantityUpdates: state.setPendingQuantityUpdates,
-    setPendingOrderItemOps: state.setPendingOrderItemOps,
   });
 
   const { loadCombos, ensureCatalogWarmup } = useMesaCatalog({
@@ -60,17 +61,14 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     acquireMesaEditLockWeb,
     releaseMesaEditLockWeb,
     refreshMesaLocks,
-    applyRealtimeMesaLockRow,
     applyRealtimeMesaLockBroadcast,
     refreshMesaEditLockHeartbeatWeb,
-    selectMesaEditLockByTableId,
   } = useMesaEditLocks({
     businessId,
     currentUser: state.currentUser,
     isOfflineFirstRuntime: refs.isOfflineFirstRuntime,
     heldMesaLockRef: refs.heldMesaLockRef,
     mesaSyncClientIdRef: refs.mesaSyncClientIdRef,
-    _activeMesaBroadcastRef: refs.activeMesaBroadcastRef,
     mesaLockHeartbeatTimerRef: refs.mesaLockHeartbeatTimerRef,
   });
 
@@ -87,56 +85,134 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
   });
 
   const isOpeningTableRef = useRef(false);
+  const dismissedCallsRef = useRef(new Map<string, number>());
+  const latestMesasRef = useRef(state.mesas);
+  latestMesasRef.current = state.mesas;
+  const prevAutoDismissCallsRef = useRef(new Map<string, string>());
+  const callAutoDismissTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const [mostRecentOrderId, setMostRecentOrderId] = useState<string | null>(null);
+  const arrivalTimestampsRef = useRef<Map<string, number>>(new Map());
+
+  const handleDismissCall = useCallback(
+    (mesaId: string) => {
+      if (!mesaId || !businessId) return;
+      dismissedCallsRef.current.set(mesaId, Date.now());
+      state.setMesas((prev) =>
+        (Array.isArray(prev) ? prev : []).map((mesa) =>
+          String(mesa?.id || '') === String(mesaId) ? { ...mesa, call_requested_at: undefined } : mesa,
+        ),
+      );
+      clearTableCallRequested({ tableId: mesaId, businessId }).catch((err) => {
+        showError('Error', t('mesas:errors.callClearFailed'));
+        logger.warn('mesas:call_clear failed', err);
+      });
+    },
+    [businessId, state.setMesas, showError, t],
+  );
+
+  useEffect(() => {
+    if (isKitchenRole) return;
+    const next = new Map<string, string>();
+    (Array.isArray(state.mesas) ? state.mesas : []).forEach((mesa) => {
+      const mesaId = String(mesa?.id || '').trim();
+      const raw = String(mesa?.call_requested_at || '').trim();
+      next.set(mesaId, raw);
+      if (!raw) return;
+      const prev = prevAutoDismissCallsRef.current.get(mesaId);
+      if (prev === raw) return;
+      prevAutoDismissCallsRef.current.set(mesaId, raw);
+
+      const mesaLabel = String(mesa?.table_number ?? '');
+      playNewOrderBeep();
+      showInfo(
+        t('mesas:toast.orderReady.title'),
+        t('mesas:toast.orderReady.message', { mesa: mesaLabel })
+      );
+
+      const existingTimer = callAutoDismissTimersRef.current.get(mesaId);
+      if (existingTimer) clearTimeout(existingTimer);
+      const timer = setTimeout(() => {
+        callAutoDismissTimersRef.current.delete(mesaId);
+        const currentMesa = latestMesasRef.current.find(
+          (m) => String(m?.id || '').trim() === mesaId,
+        );
+        if (
+          currentMesa &&
+          String(currentMesa.call_requested_at || '').trim() === raw
+        ) {
+          handleDismissCall(mesaId);
+        }
+      }, TOAST_DEFAULT_DURATION);
+      callAutoDismissTimersRef.current.set(mesaId, timer);
+    });
+    prevAutoDismissCallsRef.current = next;
+  }, [state.mesas, handleDismissCall, isKitchenRole, showInfo, t]);
+
+  useEffect(() => {
+    return () => {
+      callAutoDismissTimersRef.current.forEach((timer) => clearTimeout(timer));
+      callAutoDismissTimersRef.current.clear();
+    };
+  }, []);
+
+  const recordOrderArrival = useCallback((orderId: string) => {
+    if (!orderId) return;
+    arrivalTimestampsRef.current.set(orderId, Date.now());
+    let latestId: string | null = null;
+    let latestTs = -Infinity;
+    arrivalTimestampsRef.current.forEach((ts, id) => {
+      if (ts > latestTs) {
+        latestTs = ts;
+        latestId = id;
+      }
+    });
+    setMostRecentOrderId((prev) => (prev === latestId ? prev : latestId));
+  }, []);
+
+  // Siembra los timestamps de recencia desde datos persistidos (updated_at/opened_at)
+  // para órdenes ya existentes: el orden "más reciente primero" sobrevive recargas.
+  useEffect(() => {
+    (Array.isArray(state.mesas) ? state.mesas : []).forEach((mesa) => {
+      if (String(mesa?.status || '').trim().toLowerCase() !== 'occupied') return;
+      const orderId = String(mesa?.orders?.id || mesa?.current_order_id || '').trim();
+      if (!orderId || arrivalTimestampsRef.current.has(orderId)) return;
+      const persistedTs = Date.parse(
+        String(mesa?.orders?.updated_at || mesa?.orders?.opened_at || ''),
+      );
+      if (Number.isFinite(persistedTs)) {
+        arrivalTimestampsRef.current.set(orderId, persistedTs);
+      }
+    });
+  }, [state.mesas]);
 
   const {
     handleCreateTable,
     loadMesas,
+    clearClosedMesaCache,
     handleOpenTable,
     addCatalogItemToOrder,
     updateItemQuantity,
     handleRefreshOrder,
     handleCloseModal,
-    updateOrderTotal,
     flushPendingRemoteOrderTotals,
-    releaseEmptyOrderAndCloseModal,
-    loadOrderDetails,
   } = useMesaOrderOperations({
     businessId,
-    _userRole: userRole,
-    _mesas: state.mesas,
     setMesas: state.setMesas,
     setLoading: state.setLoading,
     selectedMesa: state.selectedMesa,
     setSelectedMesa: state.setSelectedMesa,
-    _showOrderDetails: state.showOrderDetails,
     setShowOrderDetails: state.setShowOrderDetails,
     orderItems: state.orderItems,
     setOrderItems: state.setOrderItems,
     setPendingQuantityUpdatesSafe: refs.setPendingQuantityUpdatesSafe,
-    _products: state.products,
-    _combos: state.combos,
-    _catalogItems: catalog?.filteredCatalog,
-    _productCatalogByIdRef: refs.productCatalogByIdRef,
-    _comboCatalogByIdRef: refs.comboCatalogByIdRef,
     pendingQuantityUpdatesRef: refs.pendingQuantityUpdatesRef,
     orderItemsDirtyRef: refs.orderItemsDirtyRef,
     orderItemsRef: refs.orderItemsRef,
-    _selectedMesaRef: refs.selectedMesaRef,
     orderDetailsRequestRef: refs.orderDetailsRequestRef,
     pendingRemoteOrderTotalsRef: refs.pendingRemoteOrderTotalsRef,
     orderTotalSyncQueueRef: refs.orderTotalSyncQueueRef,
     lastSyncedOrderTotalsRef: refs.lastSyncedOrderTotalsRef,
-    optimisticTempItemQuantitiesRef: refs.optimisticTempItemQuantitiesRef,
-    pendingOrderItemOpsRef: refs.pendingOrderItemOpsRef,
-    _orderItemWriteQueueRef: refs.orderItemWriteQueueRef,
-    markOrderItemOpStarted: refs.markOrderItemOpStarted,
-    markOrderItemOpFinished: refs.markOrderItemOpFinished,
-    waitForPendingOrderItemOps: refs.waitForPendingOrderItemOps,
-    enqueueOrderItemWrite: refs.enqueueOrderItemWrite,
     acquireMesaEditLockWeb,
-    selectMesaEditLockByTableId,
-    _releaseMesaEditLockWeb: releaseMesaEditLockWeb,
-    _sendMesaSyncBroadcast: refs.sendMesaSyncBroadcast,
     publishMesaLockBroadcast: refs.publishMesaLockBroadcast,
     ensureCatalogWarmup,
     isOfflineFirstRuntime: refs.isOfflineFirstRuntime,
@@ -146,11 +222,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     setIsCreatingTable: state.setIsCreatingTable,
     newTableNumber: state.newTableNumber,
     setNewTableNumber: state.setNewTableNumber,
-    _modalOpenIntent: state.modalOpenIntent,
     setModalOpenIntent: state.setModalOpenIntent,
-    _canShowOrderModal: state.canShowOrderModal,
-    setCanShowOrderModal: state.setCanShowOrderModal,
-    _searchProduct: state.searchProduct,
     setSearchProduct: state.setSearchProduct,
     quantityToAdd: state.quantityToAdd,
     setQuantityToAdd: state.setQuantityToAdd,
@@ -162,7 +234,6 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     mesaSyncClientIdRef: refs.mesaSyncClientIdRef,
     heldMesaLockRef: refs.heldMesaLockRef,
     getMesaLockState,
-    showAddForm: state.showAddForm,
     setShowAddForm: state.setShowAddForm,
     isOpeningTableRef,
     emptyReleaseInProgressRef: refs.emptyReleaseInProgressRef,
@@ -174,12 +245,12 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     businessId,
     setMesas: state.setMesas,
     enqueueRealtimeUpdate,
+    dismissedCallsRef,
     setSelectedMesa: state.setSelectedMesa,
     selectedMesaRef: refs.selectedMesaRef,
     orderItemsRef: refs.orderItemsRef,
     setOrderItems: state.setOrderItems,
     pendingQuantityUpdatesRef: refs.pendingQuantityUpdatesRef,
-    pendingOrderItemOps: state.pendingOrderItemOps,
     productCatalogByIdRef: refs.productCatalogByIdRef,
     orderItemsDirtyRef: refs.orderItemsDirtyRef,
     lastSyncedOrderTotalsRef: refs.lastSyncedOrderTotalsRef,
@@ -191,6 +262,50 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     comboCatalogByIdRef: refs.comboCatalogByIdRef,
     isOpeningTableRef,
     emptyReleaseInProgressRef: refs.emptyReleaseInProgressRef,
+    onOrderChanged: (kind, payload) => {
+      if (!isKitchenRole) return;
+      const itemRow = payload as { order_id?: string; id?: string } | null;
+      const orderId = String(itemRow?.order_id || itemRow?.id || '').trim();
+      const matchingMesa = orderId
+        ? (Array.isArray(state.mesas) ? state.mesas : []).find(
+            (m) => String((m.orders as unknown as Record<string, unknown>)?.id || '') === orderId
+          )
+        : null;
+      // No avisar si la orden ya no está activa: cerrada, liberada o sin mesa.
+      // En 'new' se tolera que la mesa aún no aparezca en el estado del kitchen
+      // (el INSERT del item puede llegar antes del UPDATE de la tabla): se
+      // notifica igual y se resuelve la mesa cuando esté disponible.
+      if (!matchingMesa) {
+        if (kind !== 'new') return;
+      } else {
+        const mesaOrderStatus = String(
+          (matchingMesa?.orders as unknown as Record<string, unknown>)?.status || ''
+        ).trim().toLowerCase();
+        if (mesaOrderStatus === 'closed') return;
+        if (kind !== 'new' && matchingMesa.status !== 'occupied') return;
+      }
+      playNewOrderBeep();
+      recordOrderArrival(orderId);
+      const tableNumber = matchingMesa?.table_number;
+      const mesaLabel = tableNumber
+        ? t('mesas:labels.tableNumber', { number: tableNumber })
+        : null;
+      if (kind === 'new') {
+        showInfo(
+          t('mesas:toast.newOrder.title'),
+          mesaLabel
+            ? t('mesas:toast.newOrder.message', { mesa: mesaLabel })
+            : t('mesas:toast.newOrder.messageGeneric')
+        );
+        return;
+      }
+      showInfo(
+        t('mesas:toast.updatedOrder.title'),
+        mesaLabel
+          ? t('mesas:toast.updatedOrder.message', { mesa: mesaLabel })
+          : t('mesas:toast.updatedOrder.messageGeneric')
+      );
+    },
   });
 
   const {
@@ -204,9 +319,6 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     handlePrintCancel,
   } = useMesaPayment({
     businessId,
-    userRole,
-    currentUser: state.currentUser,
-    mesas: state.mesas,
     setMesas: state.setMesas,
     selectedMesa: state.selectedMesa,
     setSelectedMesa: state.setSelectedMesa,
@@ -216,50 +328,29 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     setPaymentMethod: state.setPaymentMethod,
     amountReceived: state.amountReceived,
     setAmountReceived: state.setAmountReceived,
-    amountReceivedError: state.amountReceivedError,
     setAmountReceivedError: state.setAmountReceivedError,
-    selectedCustomer: state.selectedCustomer,
     setSelectedCustomer: state.setSelectedCustomer,
-    customers: state.customers,
-    setCustomers: state.setCustomers,
     isClosingOrder: state.isClosingOrder,
     setIsClosingOrder: state.setIsClosingOrder,
     setIsGeneratingSplitSales: state.setIsGeneratingSplitSales,
-    showPaymentModal: state.showPaymentModal,
     setShowPaymentModal: state.setShowPaymentModal,
-    showSplitBillModal: state.showSplitBillModal,
     setShowSplitBillModal: state.setShowSplitBillModal,
-    showCloseOrderChoiceModal: state.showCloseOrderChoiceModal,
     setShowCloseOrderChoiceModal: state.setShowCloseOrderChoiceModal,
-    showPrintModal: state.showPrintModal,
     setShowPrintModal: state.setShowPrintModal,
     printSaleDataList: state.printSaleDataList,
     setPrintSaleDataList: state.setPrintSaleDataList,
-    isPrintingReceipt: state.isPrintingReceipt,
     setIsPrintingReceipt: state.setIsPrintingReceipt,
     printCustomerName: state.printCustomerName,
     setPrintCustomerName: state.setPrintCustomerName,
     setPrintSaleIds: state.setPrintSaleIds,
-    pendingOrderItemOps: state.pendingOrderItemOps,
     justCompletedSaleRef: refs.justCompletedSaleRef,
     acquireCloseOrderLock,
     releaseCloseOrderLock,
-    acquireMesaEditLockWeb,
-    releaseMesaEditLockWeb,
-    refreshMesaLocks,
-    applyRealtimeMesaLockRow,
-    sendMesaSyncBroadcast: refs.sendMesaSyncBroadcast,
     publishMesaLockBroadcast: refs.publishMesaLockBroadcast,
     loadMesas,
-    loadOrderDetails,
-    updateOrderTotal,
-    flushPendingRemoteOrderTotals,
-    waitForPendingOrderItemOps: refs.waitForPendingOrderItemOps,
-    persistPendingQuantityUpdates: handleRefreshOrder,
-    releaseEmptyOrderAndCloseModal,
+    clearClosedMesaCache,
     productCatalogByIdRef: refs.productCatalogByIdRef,
     comboCatalogByIdRef: refs.comboCatalogByIdRef,
-    pendingQuantityUpdatesRef: refs.pendingQuantityUpdatesRef,
     orderItemsDirtyRef: refs.orderItemsDirtyRef,
     orderItemsRef: refs.orderItemsRef,
     setModalOpenIntent: state.setModalOpenIntent,
@@ -285,10 +376,6 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
   }, [state.selectedMesa]);
 
   useEffect(() => {
-    refs.mesasLengthRef.current = Array.isArray(state.mesas) ? state.mesas.length : 0;
-  }, [state.mesas]);
-
-  useEffect(() => {
     const productMap = new Map();
     (Array.isArray(state.products) ? state.products : []).forEach((product) => {
       const productId = product?.id;
@@ -309,10 +396,8 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
   useMesasEffects({
     businessId,
     mesas: state.mesas,
-    _selectedMesa: state.selectedMesa,
     showOrderDetails: state.showOrderDetails,
     loadMesas,
-    loadClientes: state.loadCustomers,
     getCurrentUser: state.getCurrentUser,
     checkIfEmployee: state.checkIfEmployee,
     refreshMesaLocks,
@@ -320,9 +405,6 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     refreshMesaEditLockHeartbeatWeb,
     releaseMesaEditLockWeb,
     flushPendingRemoteOrderTotals,
-    _setMesas: state.setMesas,
-    _setShowOrderDetails: state.setShowOrderDetails,
-    _setCanShowOrderModal: state.setCanShowOrderModal,
     heldMesaLockRef: refs.heldMesaLockRef,
     activeMesaBroadcastRef: refs.activeMesaBroadcastRef,
     mesaSyncBroadcastChannelRef: refs.mesaSyncBroadcastChannelRef,
@@ -335,11 +417,59 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
 
   const handleRetry = async () => {
     try {
-      await Promise.all([loadMesas(), state.loadCustomers()]);
+      await loadMesas();
     } catch {
       showError('Error', t('mesas:errors.loadFailed'));
     }
   };
+
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
+
+  const selectedOrderNotes = useMemo(() => {
+    const orders = state.selectedMesa?.orders;
+    if (!orders || typeof orders !== 'object') return '';
+    return String((orders as unknown as Record<string, unknown>)?.notes || '');
+  }, [state.selectedMesa?.orders]);
+
+  const handleSaveNotes = useCallback(async (notes: string) => {
+    const orders = state.selectedMesa?.orders;
+    const orderId = orders && typeof orders === 'object'
+      ? (orders as unknown as Record<string, unknown>)?.id
+      : null;
+    if (!orderId || isSavingNotes) return;
+
+    setIsSavingNotes(true);
+    try {
+      const cleanNotes = String(notes || '').trim().slice(0, 500);
+      await updateOrderNotesById({
+        orderId: String(orderId),
+        notes: cleanNotes,
+        businessId
+      });
+
+      const selectedMesaId = state.selectedMesa?.id;
+      state.setSelectedMesa((prev) => {
+        if (!prev || prev.id !== selectedMesaId) return prev;
+        const currentOrders = prev.orders && typeof prev.orders === 'object'
+          ? { ...(prev.orders as unknown as Record<string, unknown>) }
+          : {};
+        return { ...prev, orders: { ...currentOrders, notes: cleanNotes } } as unknown as MesaRecord;
+      });
+      state.setMesas((prev) => prev.map((mesa) => {
+        if (mesa.id !== selectedMesaId) return mesa;
+        const currentOrders = mesa.orders && typeof mesa.orders === 'object'
+          ? { ...(mesa.orders as unknown as Record<string, unknown>) }
+          : {};
+        return { ...mesa, orders: { ...currentOrders, notes: cleanNotes } } as unknown as MesaRecord;
+      }));
+
+      showSuccess(t('mesas:success.notesSaved'));
+    } catch {
+      showError('Error', t('mesas:errors.notesSaveFailed'));
+    } finally {
+      setIsSavingNotes(false);
+    }
+  }, [state.selectedMesa, businessId, isSavingNotes, showSuccess, showError, t]);
 
   return (
     <>
@@ -370,10 +500,12 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
         transition={{ duration: 0.3, delay: 0.1 }}
         className="space-y-6"
       >
+        {!isKitchenRole && (
         <MesasHeader
           canManageTables={state.canManageTables}
           onToggleAddForm={() => state.setShowAddForm(!state.showAddForm)}
         />
+        )}
 
         <div className="pt-6">
           <PrintReceiptConfirmModal
@@ -420,8 +552,31 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
                   : null
             }
             lowMotionMode={state.lowMotionMode}
+            isKitchen={isKitchenRole}
+            businessId={businessId}
             getMesaLockState={getMesaLockState}
+            mostRecentOrderId={mostRecentOrderId}
+            orderArrivalTsByOrderId={arrivalTimestampsRef}
+            onDismissCall={handleDismissCall}
+            showInfo={showInfo}
+            showError={showError}
           />
+
+          {/* Cocina: hay mesas pero ninguna con pedidos en espera */}
+          {isKitchenRole && !state.loading && state.mesas.length > 0 && !state.mesas.some((m) => m.status === 'occupied') && (
+            <div className="text-center py-16">
+              <div className="relative w-20 h-20 mx-auto mb-4">
+                {!state.lowMotionMode && (
+                  <div className="absolute inset-0 rounded-full bg-amber-200/70 animate-ping" aria-hidden="true" />
+                )}
+                <div className="relative w-20 h-20 rounded-full bg-amber-100 flex items-center justify-center">
+                  <ChefHat className="w-10 h-10 text-amber-600" />
+                </div>
+              </div>
+              <h3 className="text-xl font-semibold text-primary-900 mb-2">{t('mesas:empty.noPendingOrders')}</h3>
+              <p className="text-primary-600">{t('mesas:empty.noPendingOrdersDescription')}</p>
+            </div>
+          )}
 
           {state.mesas.length === 0 && !state.loading && (
             <div className="text-center py-12">
@@ -458,8 +613,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
           hasMoreOrderItems={catalog.hasMoreOrderItems}
           totalOrderItems={catalog.totalOrderItems}
           orderItemsSentinelRef={catalog.orderItemsSentinelRef}
-          isOrderItemsSyncing={state.isOrderItemsSyncing}
-          getOrderItemRenderKey={getOrderItemRenderKey as unknown as (item: OrderItem) => string}
+          getOrderItemRenderKey={getOrderItemRenderKey as unknown as (item: OrderItem, index: number) => string}
           getOrderItemName={(item) => getOrderItemName(item as unknown as import('./mesas/mesaHelpers').OrderItem, t)}
           onUpdateQuantity={updateItemQuantity}
           onLoadMoreOrderItems={catalog.loadMoreOrderItems}
@@ -468,6 +622,8 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
           onPrintKitchen={handlePrintOrder}
           onCloseOrder={handleCloseOrder}
           onClose={handleCloseModal}
+          orderNotes={selectedOrderNotes}
+          onSaveNotes={handleSaveNotes}
         />
 
         <CloseOrderChoiceModal
@@ -499,7 +655,6 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
           onPaymentMethodChange={state.setPaymentMethod}
           selectedCustomer={state.selectedCustomer}
           onCustomerChange={state.setSelectedCustomer}
-          clientes={state.customers}
           amountReceived={state.amountReceived}
           onAmountReceivedChange={state.setAmountReceived}
           amountReceivedError={state.amountReceivedError}

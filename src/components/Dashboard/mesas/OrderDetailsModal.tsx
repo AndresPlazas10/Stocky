@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ShoppingCart, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
@@ -26,7 +27,6 @@ export function OrderDetailsModal({
   hasMoreOrderItems,
   totalOrderItems,
   orderItemsSentinelRef,
-  isOrderItemsSyncing,
   getOrderItemRenderKey,
   getOrderItemName,
   onUpdateQuantity,
@@ -36,8 +36,25 @@ export function OrderDetailsModal({
   onPrintKitchen,
   onCloseOrder,
   onClose,
+  orderNotes = '',
+  onSaveNotes,
 }: OrderDetailsModalProps) {
   const { t } = useTranslation(['mesas', 'common']);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesDraft, setNotesDraft] = useState('');
+
+  useEffect(() => {
+    setNotesDraft(orderNotes || '');
+    setNotesOpen(false);
+  }, [orderNotes, isOpen]);
+
+  const handleSaveOrderWithNotes = () => {
+    if (notesOpen && onSaveNotes && notesDraft !== orderNotes) {
+      onSaveNotes(notesDraft);
+    }
+    onSave();
+  };
+
   return (
     <AnimatePresence>
       {isOpen && selectedMesa && (
@@ -92,18 +109,45 @@ export function OrderDetailsModal({
                   totalOrderItems={totalOrderItems}
                   orderItemsSentinelRef={orderItemsSentinelRef}
                   lowMotionMode={lowMotionMode}
-                  isOrderItemsSyncing={isOrderItemsSyncing}
                   getOrderItemRenderKey={getOrderItemRenderKey}
                   getOrderItemName={getOrderItemName}
                   onUpdateQuantity={onUpdateQuantity}
                   onLoadMore={onLoadMoreOrderItems}
                 />
+
+                <div className="border-t border-accent-100 mt-4 pt-4">
+                  {orderNotes && !notesOpen && (
+                    <p className="text-sm italic text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">
+                      💬 {orderNotes}
+                    </p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setNotesOpen((prev) => !prev)}
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-primary-700 hover:text-primary-900 transition-colors"
+                  >
+                    💬 {orderNotes ? t('mesas:buttons.editNote') : t('mesas:buttons.addNote')}
+                  </button>
+
+                  {notesOpen && (
+                    <div className="mt-3 space-y-2">
+                      <textarea
+                        value={notesDraft}
+                        onChange={(e) => setNotesDraft(e.target.value)}
+                        placeholder={t('mesas:buttons.orderNotesPlaceholder')}
+                        rows={3}
+                        maxLength={500}
+                        className="w-full px-3 py-2 border-2 border-accent-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all text-sm resize-none"
+                      />
+                    </div>
+                  )}
+                </div>
               </CardContent>
               <MesaOrderFooter
                 orderTotal={orderTotal}
                 orderItemsCount={orderItems.length}
-                isOrderItemsSyncing={isOrderItemsSyncing}
-                onSave={onSave}
+                onSave={handleSaveOrderWithNotes}
                 onPrintKitchen={onPrintKitchen}
                 onCloseOrder={onCloseOrder}
               />

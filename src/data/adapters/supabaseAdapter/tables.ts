@@ -22,7 +22,9 @@ export const tablesAdapter = {
             id,
             status,
             total,
+            notes,
             opened_at,
+            updated_at,
             order_items (
               id,
               product_id,

@@ -29,7 +29,6 @@ export function useMesasState(businessId: string, userRole: string = 'admin') {
   const [isEmployee, setIsEmployee] = useState<boolean>(false);
 
   const [orderItems, setOrderItems] = useState<unknown[]>([]);
-  const [, setPendingQuantityUpdates] = useState<Record<string, unknown>>({});
   const [products, setProducts] = useState<ProductWithSupplier[]>([]);
   const [combos, setCombos] = useState<ComboItem[]>([]);
   const [searchProduct, setSearchProduct] = useState<string>('');
@@ -41,24 +40,21 @@ export function useMesasState(businessId: string, userRole: string = 'admin') {
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
   const [showCloseOrderChoiceModal, setShowCloseOrderChoiceModal] = useState<boolean>(false);
   const [showSplitBillModal, setShowSplitBillModal] = useState<boolean>(false);
-  const [isGeneratingSplitSales, setIsGeneratingSplitSales] = useState<boolean>(false);
+  const [, setIsGeneratingSplitSales] = useState<boolean>(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
   const [amountReceived, setAmountReceived] = useState<string>('');
   const [amountReceivedError, setAmountReceivedError] = useState<string>('');
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
-  const [customers, setCustomers] = useState<Array<{ id: string; full_name: string; email: string }>>([]);
   const [isClosingOrder, setIsClosingOrder] = useState<boolean>(false);
   const [isCreatingTable, setIsCreatingTable] = useState<boolean>(false);
-  const [pendingOrderItemOps, setPendingOrderItemOps] = useState<number>(0);
   const [newTableNumber, setNewTableNumber] = useState<string>('');
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const [mesaToDelete, setMesaToDelete] = useState<MesaRecord | null>(null);
 
   const [canShowOrderModal, setCanShowOrderModal] = useState<boolean>(true);
-  const isOrderItemsSyncing = pendingOrderItemOps > 0;
 
   const [showPrintModal, setShowPrintModal] = useState<boolean>(false);
-  const [_printSaleIds, setPrintSaleIds] = useState<string[]>([]);
+  const [, setPrintSaleIds] = useState<string[]>([]);
   const [printSaleDataList, setPrintSaleDataList] = useState<unknown[]>([]);
   const [isPrintingReceipt, setIsPrintingReceipt] = useState<boolean>(false);
   const [printCustomerName, setPrintCustomerName] = useState<string>('Venta general');
@@ -117,10 +113,6 @@ export function useMesasState(businessId: string, userRole: string = 'admin') {
     }
   }, [businessId]);
 
-  const loadCustomers = useCallback(async () => {
-    setCustomers([]);
-  }, []);
-
   useEffect(() => {
     if (!canManageTables && showAddForm) {
       setShowAddForm(false);
@@ -142,7 +134,6 @@ export function useMesasState(businessId: string, userRole: string = 'admin') {
     loading,
     setLoading,
     error,
-    setError,
     showAddForm,
     setShowAddForm,
     selectedMesa,
@@ -154,7 +145,6 @@ export function useMesasState(businessId: string, userRole: string = 'admin') {
     isEmployee,
     orderItems,
     setOrderItems,
-    setPendingQuantityUpdates,
     products,
     setProducts,
     combos,
@@ -163,7 +153,6 @@ export function useMesasState(businessId: string, userRole: string = 'admin') {
     setSearchProduct,
     debouncedSearch,
     currentUser,
-    setCurrentUser,
     quantityToAdd,
     setQuantityToAdd,
     showPaymentModal,
@@ -172,7 +161,6 @@ export function useMesasState(businessId: string, userRole: string = 'admin') {
     setShowCloseOrderChoiceModal,
     showSplitBillModal,
     setShowSplitBillModal,
-    isGeneratingSplitSales,
     setIsGeneratingSplitSales,
     paymentMethod,
     setPaymentMethod,
@@ -182,14 +170,10 @@ export function useMesasState(businessId: string, userRole: string = 'admin') {
     setAmountReceivedError,
     selectedCustomer,
     setSelectedCustomer,
-    customers,
-    setCustomers,
     isClosingOrder,
     setIsClosingOrder,
     isCreatingTable,
     setIsCreatingTable,
-    pendingOrderItemOps,
-    setPendingOrderItemOps,
     newTableNumber,
     setNewTableNumber,
     showDeleteModal,
@@ -198,10 +182,8 @@ export function useMesasState(businessId: string, userRole: string = 'admin') {
     setMesaToDelete,
     canShowOrderModal,
     setCanShowOrderModal,
-    isOrderItemsSyncing,
     showPrintModal,
     setShowPrintModal,
-    _printSaleIds,
     setPrintSaleIds,
     printSaleDataList,
     setPrintSaleDataList,
@@ -217,6 +199,5 @@ export function useMesasState(businessId: string, userRole: string = 'admin') {
     loadMoreMesas,
     getCurrentUser,
     checkIfEmployee,
-    loadCustomers,
   };
 }

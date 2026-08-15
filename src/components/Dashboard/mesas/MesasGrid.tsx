@@ -1,20 +1,17 @@
-import { memo, type RefObject } from 'react';
+import { memo, useEffect, useRef, useState, type RefObject } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
-import { Layers, Trash2 } from 'lucide-react';
+import { Layers, Trash2, Bell } from 'lucide-react';
 import { formatPrice } from '../../../utils/formatters';
 import { useBusinessConfig } from '../../../hooks/useBusinessConfig';
 import { useTranslation } from 'react-i18next';
-import { getMesaProductUnits, getMesaInUseMessage } from './mesaHelpers';
-
-interface MesaRecord {
-  id: string;
-  status: 'occupied' | 'available';
-  table_number: number;
-  orders?: { total?: string };
-}
+import { setTableCallRequested } from '../../../data/commands/ordersCommands';
+import { logger } from '@/utils/logger';
+import type { MesaRecord } from '@/types/components';
+import { getMesaProductUnits, getMesaInUseMessage, calculateOrderItemsTotal, CALL_WINDOW_MS } from './mesaHelpers';
+import { resolveOrderRecencyMs } from '@stocky/shared';
 
 interface MesaLockState {
   lockedByOther?: boolean;
@@ -32,7 +29,14 @@ interface MesasGridProps {
   selectedMesaId?: string | null;
   selectedMesaUnits?: number | null;
   lowMotionMode?: boolean;
+  isKitchen?: boolean;
+  businessId?: string;
   getMesaLockState?: ((mesaId: string) => MesaLockState | null) | null;
+  mostRecentOrderId?: string | null;
+  orderArrivalTsByOrderId?: React.MutableRefObject<Map<string, number>> | null;
+  onDismissCall?: (mesaId: string) => void;
+  showInfo: (title: string, message?: string) => void;
+  showError: (title: string, message?: string) => void;
 }
 
 const MesasGrid = memo(function MesasGrid({
@@ -47,24 +51,89 @@ const MesasGrid = memo(function MesasGrid({
   selectedMesaId = null,
   selectedMesaUnits = null,
   lowMotionMode = false,
-  getMesaLockState = null
+  isKitchen = false,
+  businessId,
+  getMesaLockState = null,
+  mostRecentOrderId = null,
+  orderArrivalTsByOrderId = null,
+  onDismissCall,
+  showInfo,
+  showError,
 }: MesasGridProps) {
   const { t } = useTranslation(['mesas', 'common']);
   const config = useBusinessConfig();
   const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
-  
+  const [callingMesaIds, setCallingMesaIds] = useState<Set<string>>(new Set());
+  const callTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    return () => {
+      callTimersRef.current.forEach((timer) => clearTimeout(timer));
+      callTimersRef.current.clear();
+    };
+  }, []);
+
+  const handleCallMesa = (mesaId: string) => {
+    showInfo(t('mesas:toast.callSent.title'), t('mesas:toast.callSent.message'));
+    setCallingMesaIds((prev) => new Set(prev).add(mesaId));
+    const timer = setTimeout(() => {
+      setCallingMesaIds((prev) => {
+        const next = new Set(prev);
+        next.delete(mesaId);
+        return next;
+      });
+      callTimersRef.current.delete(mesaId);
+    }, 4000);
+    callTimersRef.current.set(mesaId, timer);
+
+    if (businessId) {
+      setTableCallRequested({ tableId: mesaId, businessId }).catch((err) => {
+        showError('Error', t('mesas:errors.callSendFailed'));
+        logger.warn('mesas:call_request_persist failed', err);
+      });
+    }
+  };
+
+  const handleDismissCall = (mesaId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDismissCall?.(mesaId);
+  };
+
+  const isCallActive = (mesa: MesaRecord): boolean => {
+    const raw = String(mesa?.call_requested_at || '').trim();
+    if (!raw) return false;
+    const calledAtMs = Date.parse(raw);
+    if (!Number.isFinite(calledAtMs)) return false;
+    return Date.now() - calledAtMs < CALL_WINDOW_MS;
+  };
+
   const fmtPrice = (value, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig);
+
+  const mesasToRender = isKitchen
+    ? (() => {
+        const occupied = (Array.isArray(visibleMesas) ? visibleMesas : []).filter((mesa) => mesa.status === 'occupied');
+        return [...occupied].sort(
+          (a, b) =>
+            resolveOrderRecencyMs(b, orderArrivalTsByOrderId?.current) -
+            resolveOrderRecencyMs(a, orderArrivalTsByOrderId?.current)
+        );
+      })()
+    : visibleMesas;
   
   return (
     <>
       {/* Grid de mesas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {visibleMesas.map((mesa, index) => {
+        {mesasToRender.map((mesa, index) => {
           const shouldUseSelectedUnits = selectedMesaId && mesa.id === selectedMesaId && selectedMesaUnits !== null;
           const units = shouldUseSelectedUnits ? selectedMesaUnits : getMesaProductUnits(mesa);
           const lockState = typeof getMesaLockState === 'function' ? getMesaLockState(mesa.id) : null;
           const lockedByOther = Boolean(lockState?.lockedByOther);
           const isOccupied = mesa.status === 'occupied';
+          const mesaOrderItems = Array.isArray(mesa.orders?.order_items) ? mesa.orders.order_items : [];
+          const mesaOrderTotal = mesaOrderItems.length > 0
+            ? calculateOrderItemsTotal(mesaOrderItems)
+            : parseFloat(String(mesa.orders?.total || '0'));
 
           return (
             <motion.div
@@ -75,7 +144,9 @@ const MesasGrid = memo(function MesasGrid({
             >
               <Card
                 className={`relative transition-all duration-300 ${
-                  lockedByOther ? 'cursor-not-allowed' : 'cursor-pointer hover:shadow-xl hover:-translate-y-1'
+                  callingMesaIds.has(mesa.id) ? 'ring-4 ring-amber-400 animate-pulse' : ''
+                } ${
+                  lockedByOther || isKitchen ? 'cursor-default' : 'cursor-pointer hover:shadow-xl hover:-translate-y-1'
                 } ${
                   lockedByOther
                     ? 'border-red-400 bg-red-50/40'
@@ -85,9 +156,33 @@ const MesasGrid = memo(function MesasGrid({
                         : 'border-green-400 bg-green-50/30'
                     )
                 }`}
-                onClick={() => onOpenTable(mesa)}
+                onClick={isKitchen ? undefined : () => onOpenTable(mesa)}
               >
                 <CardContent className="pt-6 text-center">
+                  {/* Badge del pedido más reciente en cocina */}
+                  {isKitchen && mostRecentOrderId && mesa.orders?.id === mostRecentOrderId && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 whitespace-nowrap rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white shadow-lg">
+                      <Layers className="w-3.5 h-3.5" />
+                      {t('mesas:labels.mostRecentOrder')}
+                    </div>
+                  )}
+
+                  {/* Campana de alerta de cocina (meseros) */}
+                  {!isKitchen && isCallActive(mesa) && (
+                    <motion.button
+                      type="button"
+                      onClick={(e) => handleDismissCall(mesa.id, e)}
+                      title={t('mesas:labels.tableCall')}
+                      aria-label={t('mesas:labels.tableCall')}
+                      className="absolute top-2 left-2 z-10 h-10 w-10 rounded-full bg-amber-400 hover:bg-amber-500 text-white shadow-lg flex items-center justify-center"
+                      animate={{ rotate: [-22, 22, -22] }}
+                      transition={{ repeat: Infinity, duration: 0.9, ease: 'easeInOut' }}
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      <Bell className="w-5 h-5" />
+                    </motion.button>
+                  )}
+
                   {/* Botón eliminar (solo si está disponible y no es empleado) */}
                   {mesa.status === 'available' && !isEmployee && (
                     <Button
@@ -133,11 +228,50 @@ const MesasGrid = memo(function MesasGrid({
 
                   {/* Información de la orden si está ocupada */}
                   {isOccupied && mesa.orders && !lockedByOther && (
-                    <div className="mt-4 pt-4 border-t border-accent-200">
-                      <p className="text-lg font-bold text-primary-900">
-                        {fmtPrice(parseFloat(String(mesa.orders.total || '0')))}
-                      </p>
-                    </div>
+                    isKitchen ? (
+                      <div className="mt-4 pt-4 border-t border-accent-200 text-left">
+                        {mesaOrderItems.length > 0 ? (
+                          <ul className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                            {mesaOrderItems.map((item, idx) => (
+                              <li
+                                key={`${mesa.id}-item-${idx}`}
+                                className="flex items-center justify-between gap-2"
+                              >
+                                <span className="text-sm font-semibold text-gray-800 truncate">
+                                  {item.products?.name || item.combos?.nombre || t('mesas:defaults.item')}
+                                </span>
+                                <span className="shrink-0 inline-flex items-center justify-center min-w-7 h-7 px-1.5 rounded-lg bg-primary-100 text-primary-800 text-sm font-bold">
+                                  x{item.quantity ?? 1}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-gray-500">{t('mesas:labels.noItems')}</p>
+                        )}
+
+                        {mesa.orders?.notes ? (
+                          <p className="mt-3 text-sm italic text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-snug">
+                            💬 {mesa.orders.notes}
+                          </p>
+                        ) : null}
+
+                        <button
+                          type="button"
+                          onClick={() => handleCallMesa(mesa.id)}
+                          disabled={callingMesaIds.has(mesa.id)}
+                          className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-400 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition-all shadow-md"
+                        >
+                          🔔 {isCallActive(mesa) ? t('mesas:buttons.callAgain') : t('mesas:buttons.call')}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mt-4 pt-4 border-t border-accent-200">
+                        <p className="text-lg font-bold text-primary-900">
+                          {fmtPrice(mesaOrderTotal)}
+                        </p>
+                      </div>
+                    )
                   )}
 
                   {lockedByOther ? (
@@ -154,7 +288,7 @@ const MesasGrid = memo(function MesasGrid({
         })}
       </div>
 
-      {hasMoreMesas && (
+      {hasMoreMesas && !isKitchen && (
         <div className="flex flex-col items-center gap-3 py-2">
           <p className="text-xs text-gray-500">
             {t('mesas:labels.showing')} {visibleMesas.length} {t('mesas:labels.of')} {totalMesas} {t('mesas:labels.tables')}

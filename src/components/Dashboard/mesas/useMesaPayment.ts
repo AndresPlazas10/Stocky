@@ -7,20 +7,17 @@ import { printKitchenOrder } from '../../../utils/kitchenOrderPrint.js';
 import { printSaleReceipt } from '../../../utils/saleReceiptPrint.js';
 import { isAutoPrintReceiptEnabled } from '../../../utils/printer.js';
 import { calcularCambio, parseCopAmount } from '../../../utils/cambio.js';
-import { formatPrice } from '../../../utils/formatters';
 import {
   toFiniteNumber,
   normalizeEntityId,
   calculateOrderItemsTotal,
   buildDiagnosticAlertMessage,
-  getPaymentMethodLabel,
 } from './mesaHelpers';
 import {
   readOfflineSnapshot,
   saveOfflineSnapshot,
 } from '../../../utils/offlineSnapshot.js';
-import { invalidateOrderCache } from '../../../data/adapters/cacheInvalidation.js';
-import { normalizeTableRecord } from '../../../utils/tableStatus';
+import { useBusinessConfig } from '../../../hooks/useBusinessConfig';
 import { logger } from '@/utils/logger';
 
 type SetState<T> = React.Dispatch<React.SetStateAction<T>>;
@@ -37,32 +34,6 @@ type PrintBundle = Record<string, any>;
 type StockShortageItem = Record<string, unknown>;
 
 const MODAL_REOPEN_GUARD_MS = 600;
-
-function clearClosedMesaCache({ tableId, orderId = null, businessId }: { tableId: string; orderId?: string | null; businessId: string }) {
-  const normalizedTableId = normalizeEntityId(tableId);
-  if (!businessId || !normalizedTableId) return;
-
-  const snapshotKey = `mesas.list:${businessId}`;
-  const cachedMesas = readOfflineSnapshot(snapshotKey, []);
-  if (Array.isArray(cachedMesas) && cachedMesas.length > 0) {
-    const sanitized = cachedMesas.map((mesa: MesaRecord) => {
-      if (normalizeEntityId(mesa?.id) !== normalizedTableId) return mesa;
-      return normalizeTableRecord({
-        ...mesa,
-        status: 'available',
-        current_order_id: null,
-        orders: null
-      } as unknown as Parameters<typeof normalizeTableRecord>[0]);
-    });
-    saveOfflineSnapshot(snapshotKey, sanitized);
-  }
-
-  invalidateOrderCache({
-    businessId,
-    tableId: normalizedTableId,
-    orderId: normalizeEntityId(orderId)
-  }).catch((err: unknown) => { logger.warn('mesas:payment:invalidate_order_cache failed', err); });
-}
 
 function buildStockConsumptionFromItems(items: OrderItem[] = [], comboCatalogByIdRef: React.MutableRefObject<Map<string, Record<string, unknown>>>) {
   const consumptionByProduct = new Map<string, number>();
@@ -307,9 +278,6 @@ function buildLocalSplitPrintBundles({ saleIds = [], sales = [], subAccounts = [
 
 interface UseMesaPaymentParams {
   businessId: string;
-  userRole: string;
-  currentUser: { id: string } | null;
-  mesas: MesaRecord[];
   setMesas: SetState<MesaRecord[]>;
   selectedMesa: MesaRecord | null;
   setSelectedMesa: SetState<MesaRecord | null>;
@@ -319,51 +287,30 @@ interface UseMesaPaymentParams {
   setPaymentMethod: SetState<string>;
   amountReceived: string;
   setAmountReceived: SetState<string>;
-  amountReceivedError: string;
   setAmountReceivedError: SetState<string>;
-  selectedCustomer: string;
   setSelectedCustomer: SetState<string>;
-  customers: Record<string, unknown>[];
-  setCustomers: SetState<Record<string, unknown>[]>;
   isClosingOrder: boolean;
   setIsClosingOrder: SetState<boolean>;
   setIsGeneratingSplitSales: SetState<boolean>;
-  showPaymentModal: boolean;
   setShowPaymentModal: SetState<boolean>;
-  showSplitBillModal: boolean;
   setShowSplitBillModal: SetState<boolean>;
-  showCloseOrderChoiceModal: boolean;
   setShowCloseOrderChoiceModal: SetState<boolean>;
-  showPrintModal: boolean;
   setShowPrintModal: SetState<boolean>;
   printSaleDataList: PrintBundle[];
   setPrintSaleDataList: SetState<PrintBundle[]>;
-  isPrintingReceipt: boolean;
   setIsPrintingReceipt: SetState<boolean>;
   printCustomerName: string;
   setPrintCustomerName: SetState<string>;
   setPrintSaleIds: SetState<string[]>;
-  pendingOrderItemOps: number;
   justCompletedSaleRef: React.MutableRefObject<boolean>;
   acquireCloseOrderLock: (key: string) => boolean;
   releaseCloseOrderLock: (key: string) => void;
-  acquireMesaEditLockWeb: (params: { targetBusinessId: string; tableId: string; lockToken: string }) => Promise<{ unsupported?: boolean; ok?: boolean; lockToken?: string }>;
-  releaseMesaEditLockWeb: (params: { targetBusinessId: string; tableId: string; lockToken: string }) => Promise<void>;
-  refreshMesaLocks: () => Promise<void>;
-  applyRealtimeMesaLockRow: (row: Record<string, unknown>) => void;
   priceConfig: Record<string, unknown>;
-  sendMesaSyncBroadcast: (params: { tableId: string; action: string; data?: Record<string, unknown> }) => void;
   publishMesaLockBroadcast: (params: { tableId: string; locked: boolean; mode: string; lockToken: string | null }) => void;
   loadMesas: () => Promise<void>;
-  loadOrderDetails: (mesa: MesaRecord) => Promise<void>;
-  updateOrderTotal: (...args: unknown[]) => Promise<void>;
-  flushPendingRemoteOrderTotals: () => Promise<void>;
-  waitForPendingOrderItemOps: () => Promise<boolean>;
-  persistPendingQuantityUpdates: (...args: unknown[]) => Promise<void>;
-  releaseEmptyOrderAndCloseModal: (...args: unknown[]) => unknown;
+  clearClosedMesaCache: (params?: { tableId?: string | null; orderId?: string | null }) => Promise<void>;
   productCatalogByIdRef: React.MutableRefObject<Map<string, Record<string, unknown>>>;
   comboCatalogByIdRef: React.MutableRefObject<Map<string, Record<string, unknown>>>;
-  pendingQuantityUpdatesRef: React.MutableRefObject<Record<string, number>>;
   orderItemsDirtyRef: React.MutableRefObject<boolean>;
   orderItemsRef: React.MutableRefObject<OrderItem[]>;
   setModalOpenIntent: SetState<boolean>;
@@ -381,9 +328,6 @@ interface UseMesaPaymentParams {
 
 export function useMesaPayment({
   businessId,
-  userRole,
-  currentUser,
-  mesas,
   setMesas,
   selectedMesa,
   setSelectedMesa,
@@ -393,51 +337,30 @@ export function useMesaPayment({
   setPaymentMethod,
   amountReceived,
   setAmountReceived,
-  amountReceivedError,
   setAmountReceivedError,
-  selectedCustomer,
   setSelectedCustomer,
-  customers,
-  setCustomers,
   isClosingOrder,
   setIsClosingOrder,
   setIsGeneratingSplitSales,
-  showPaymentModal,
   setShowPaymentModal,
-  showSplitBillModal,
   setShowSplitBillModal,
-  showCloseOrderChoiceModal,
   setShowCloseOrderChoiceModal,
-  showPrintModal,
   setShowPrintModal,
   printSaleDataList,
   setPrintSaleDataList,
-  isPrintingReceipt,
   setIsPrintingReceipt,
   printCustomerName,
   setPrintCustomerName,
   setPrintSaleIds,
-  pendingOrderItemOps,
   justCompletedSaleRef,
   acquireCloseOrderLock,
   releaseCloseOrderLock,
-  acquireMesaEditLockWeb,
-  releaseMesaEditLockWeb,
-  refreshMesaLocks,
-  applyRealtimeMesaLockRow,
   priceConfig,
-  sendMesaSyncBroadcast,
   publishMesaLockBroadcast,
   loadMesas,
-  loadOrderDetails,
-  updateOrderTotal,
-  flushPendingRemoteOrderTotals,
-  waitForPendingOrderItemOps,
-  persistPendingQuantityUpdates,
-  releaseEmptyOrderAndCloseModal,
+  clearClosedMesaCache,
   productCatalogByIdRef,
   comboCatalogByIdRef,
-  pendingQuantityUpdatesRef,
   orderItemsDirtyRef,
   orderItemsRef,
   setModalOpenIntent,
@@ -453,7 +376,7 @@ export function useMesaPayment({
   showSuccess,
 }: UseMesaPaymentParams) {
   const { t } = useTranslation(['mesas', 'common']);
-  const fmtPrice = (value: number, includeCurrency = true) => formatPrice(value, includeCurrency, priceConfig || {});
+  const config = useBusinessConfig();
   
   const handleCloseOrder = () => {
     setShowCloseOrderChoiceModal(true);
@@ -505,27 +428,32 @@ export function useMesaPayment({
         appendedSaleIds.add(candidateSaleId);
       };
 
-      for (const saleId of normalizedSaleIds) {
-        let wasAdded = false;
-
-        try {
-          const { saleRow, saleDetails } = await getSalePrintBundle({
-            businessId,
-            saleId
-          });
-
-          if (saleRow && Array.isArray(saleDetails) && saleDetails.length > 0) {
-            appendCandidate({ saleId, saleRow, saleDetails });
-            wasAdded = appendedSaleIds.has(String(saleId || '').trim());
+      const fetchedBundles = await Promise.all(
+        normalizedSaleIds.map(async (saleId) => {
+          try {
+            const { saleRow, saleDetails } = await getSalePrintBundle({
+              businessId,
+              saleId
+            });
+            return { saleId, saleRow, saleDetails };
+          } catch (err) {
+            logger.warn('mesas:payment:get_sale_print_bundle failed', err);
+            return null;
           }
-        } catch (err) {
-          logger.warn('mesas:payment:get_sale_print_bundle failed', err);
-        }
+        })
+      );
 
-        if (!wasAdded) {
+      fetchedBundles.forEach((candidate) => {
+        if (!candidate) return;
+        if (candidate.saleRow && Array.isArray(candidate.saleDetails) && candidate.saleDetails.length > 0) {
+          appendCandidate({ saleId: candidate.saleId, saleRow: candidate.saleRow, saleDetails: candidate.saleDetails });
+        }
+      });
+      normalizedSaleIds.forEach((saleId) => {
+        if (!appendedSaleIds.has(String(saleId || '').trim())) {
           appendCandidate(localById.get(saleId));
         }
-      }
+      });
 
       if (saleDataList.length === 0) {
         normalizedLocalPrintDataList.forEach((entry: PrintBundle) => appendCandidate(entry));
@@ -546,14 +474,16 @@ export function useMesaPayment({
   const handlePrintConfirm = useCallback(async () => {
     setIsPrintingReceipt(true);
     try {
+      const businessName = await getBusinessNameById(businessId);
       for (const { saleRow, saleDetails } of printSaleDataList) {
         try {
           const printResult = await printSaleReceipt({
             sale: saleRow,
             saleDetails,
             sellerName: saleRow?.seller_name || t('mesas:defaults.employee'),
-            businessName: await getBusinessNameById(businessId),
+            businessName,
             customerName: printCustomerName,
+            timezone: config.timezone,
           });
 
           if (!printResult.ok) {
@@ -580,33 +510,6 @@ export function useMesaPayment({
     setPrintSaleDataList([]);
     setPrintCustomerName(t('mesas:defaults.generalSale'));
   }, []);
-
-  const _tryAutoPrintReceiptBySaleId = useCallback(async (saleId: string) => {
-    if (!isAutoPrintReceiptEnabled() || !saleId) return;
-
-    try {
-      const { saleRow, saleDetails } = await getSalePrintBundle({
-        businessId,
-        saleId
-      });
-
-      if (!saleRow || !Array.isArray(saleDetails) || saleDetails.length === 0) return;
-
-      const printResult = await printSaleReceipt({
-        sale: saleRow,
-        saleDetails,
-        sellerName: ((saleRow as unknown) as Record<string, unknown>).seller_name as string || t('mesas:defaults.employee'),
-        businessName: await getBusinessNameById(businessId),
-        customerName: t('mesas:defaults.generalSale'),
-      });
-
-      if (!printResult.ok) {
-        showError('Error',t('mesas:errors.printAutoFailed'));
-      }
-    } catch {
-      showError('Error',t('mesas:errors.printAutoFailed'));
-    }
-  }, [businessId]);
 
   const processSplitPaymentAndClose = async ({ subAccounts }: { subAccounts: SubAccount[] }) => {
     if (isClosingOrder) return;
@@ -674,7 +577,6 @@ export function useMesaPayment({
     clearClosedMesaCache({
       tableId: mesaSnapshot.id,
       orderId: mesaSnapshot.current_order_id,
-      businessId
     });
     justCompletedSaleRef.current = true;
     setCanShowOrderModal(false);
@@ -724,10 +626,6 @@ export function useMesaPayment({
       const shouldPrintReceipts = isAutoPrintReceiptEnabled()
         ? (await askReceiptPrintConfirmation(saleIds, localSplitPrintBundles))
         : false;
-
-      if (!shouldPrintReceipts) {
-        // Usuario canceló la impresión o auto-print deshabilitado
-      }
 
       loadMesas().catch((err: Error) => { logger.warn('mesas:payment:load_mesas_after_split failed', err); });
 
@@ -821,7 +719,6 @@ export function useMesaPayment({
       clearClosedMesaCache({
         tableId: mesaSnapshot.id,
         orderId: mesaSnapshot.current_order_id,
-        businessId
       });
     }
     setShowPaymentModal(false);
@@ -846,7 +743,7 @@ export function useMesaPayment({
       `${t('mesas:labels.table')} #${mesaSnapshot?.table_number || '-'}`
     );
 
-    (async () => {
+    void (async () => {
       try {
         const closeResult = await closeOrderSingle(businessId, {
           orderId: mesaSnapshot.current_order_id,
@@ -889,10 +786,6 @@ export function useMesaPayment({
             localSinglePrintBundle ? [localSinglePrintBundle] : []
           ))
           : false;
-
-        if (!shouldPrintReceipt) {
-          // Usuario canceló la impresión o auto-print deshabilitado
-        }
 
         loadMesas().catch((err: Error) => { logger.warn('mesas:payment:load_mesas_after_single failed', err); });
 
@@ -943,6 +836,7 @@ export function useMesaPayment({
       tableNumber: selectedMesa.table_number,
       status: selectedMesa.status,
       orderTotal,
+      timezone: config.timezone,
       onError: (msg: string) => {
         if (msg) showError('Error', msg);
       },
@@ -956,7 +850,6 @@ export function useMesaPayment({
     processPaymentAndClose,
     processSplitPaymentAndClose,
     handlePrintOrder,
-    askReceiptPrintConfirmation,
     handlePrintConfirm,
     handlePrintCancel,
   };

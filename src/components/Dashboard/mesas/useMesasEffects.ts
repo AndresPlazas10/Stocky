@@ -8,10 +8,8 @@ import { logger } from '@/utils/logger';
 export function useMesasEffects({
   businessId,
   mesas,
-  _selectedMesa,
   showOrderDetails,
   loadMesas,
-  loadClientes,
   getCurrentUser,
   checkIfEmployee,
   refreshMesaLocks,
@@ -19,9 +17,6 @@ export function useMesasEffects({
   refreshMesaEditLockHeartbeatWeb,
   releaseMesaEditLockWeb,
   flushPendingRemoteOrderTotals,
-  _setMesas,
-  _setShowOrderDetails,
-  _setCanShowOrderModal,
   heldMesaLockRef,
   activeMesaBroadcastRef,
   mesaSyncBroadcastChannelRef,
@@ -36,16 +31,14 @@ export function useMesasEffects({
     if (businessId) {
       const loadData = async () => {
         try {
-          await Promise.all([loadMesas(), loadClientes()]);
+          await Promise.all([loadMesas(), getCurrentUser(), checkIfEmployee()]);
         } catch (err) {
           logger.warn('mesas:effects:initial_data_load failed', err);
         }
       };
-      loadData();
-      getCurrentUser();
-      checkIfEmployee();
+      void loadData();
     }
-  }, [businessId, loadMesas, loadClientes, getCurrentUser, checkIfEmployee]);
+  }, [businessId, loadMesas, getCurrentUser, checkIfEmployee]);
 
   useEffect(() => {
     if (!businessId) return;

@@ -15,20 +15,22 @@ import {
   toFiniteNumber,
   getTotalProductUnits,
   calculateOrderItemsTotal,
-  compareTableIdentifiers
+  compareTableIdentifiers,
+  CALL_WINDOW_MS
 } from './mesaHelpers';
+import { isCallRequestedAtSuppressed } from '@stocky/shared';
 import { logger } from '@/utils/logger';
 
 export function useMesaRealtime({
   businessId,
   setMesas,
   enqueueRealtimeUpdate,
+  dismissedCallsRef,
   setSelectedMesa,
   selectedMesaRef,
   orderItemsRef,
   setOrderItems,
   pendingQuantityUpdatesRef,
-  pendingOrderItemOps,
   productCatalogByIdRef,
   orderItemsDirtyRef,
   lastSyncedOrderTotalsRef,
@@ -40,8 +42,16 @@ export function useMesaRealtime({
   comboCatalogByIdRef,
   isOpeningTableRef,
   emptyReleaseInProgressRef,
+  onOrderChanged,
 }) {
   const orderRealtimeRefreshTimersRef = useRef({});
+  const closedOrderIdsRef = useRef<Set<string>>(new Set());
+  const knownOrderNotesRef = useRef<Map<string, string>>(new Map());
+  const onOrderChangedRef = useRef(onOrderChanged);
+  onOrderChangedRef.current = onOrderChanged;
+
+  const isCallRequestedAtSuppressedFor = (mesaId, incomingRaw) =>
+    isCallRequestedAtSuppressed(dismissedCallsRef?.current, mesaId, incomingRaw, CALL_WINDOW_MS);
 
   const handleTableInsert = useCallback((newTable) => {
     const normalizedTable = normalizeTableRecord(newTable);
@@ -70,9 +80,16 @@ export function useMesaRealtime({
       const resolvedOrders = normalizedTable.current_order_id
         ? (normalizedTable.orders ?? mesa.orders)
         : null;
+      const suppressedCall = isCallRequestedAtSuppressedFor(
+        normalizedTable.id,
+        normalizedTable.call_requested_at,
+      );
       return normalizeTableRecord({
         ...mesa,
         ...normalizedTable,
+        call_requested_at: suppressedCall
+          ? undefined
+          : normalizedTable.call_requested_at,
         orders: resolvedOrders
       });
     }));
@@ -84,9 +101,16 @@ export function useMesaRealtime({
           setModalOpenIntent(false);
           return null;
         }
+        const suppressedSelectedCall = isCallRequestedAtSuppressedFor(
+          normalizedTable.id,
+          normalizedTable.call_requested_at,
+        );
         return normalizeTableRecord({
           ...prev,
           ...normalizedTable,
+          call_requested_at: suppressedSelectedCall
+            ? undefined
+            : normalizedTable.call_requested_at,
           orders: normalizedTable.current_order_id
             ? (normalizedTable.orders ?? prev.orders)
             : null
@@ -222,50 +246,28 @@ export function useMesaRealtime({
         if (!updatedOrder || justCompletedSaleRef.current) return;
 
         const normalizedOrderStatus = String(updatedOrder?.status || '').trim().toLowerCase();
-        const shouldRetryItemsFetch = (
-          normalizedOrderStatus === 'open'
-          && toFiniteNumber(updatedOrder?.total, 0) > 0
-        );
 
+        // El embed de order_items ya trae los items completos: se usa como fuente
+        // primaria. Solo se hace una lectura extra si vino vacío en una orden
+        // abierta (anomalía de cache/RLS), antes se hacían hasta 3 lecturas.
         const joinedOrderItems = applyPendingQuantities(
           Array.isArray(updatedOrder?.order_items) ? updatedOrder.order_items : [],
           pendingQuantityUpdatesRef.current
         );
         let incomingOrderItems = joinedOrderItems;
 
-        if (normalizedOrderStatus === 'open') {
+        if (normalizedOrderStatus === 'open' && incomingOrderItems.length === 0) {
           try {
             const directItems = await getOrderItemsByOrderId({
               orderId,
               selectSql: ORDER_ITEMS_SELECT
             });
-            const normalizedDirectItems = applyPendingQuantities(
+            incomingOrderItems = applyPendingQuantities(
               Array.isArray(directItems) ? directItems : [],
               pendingQuantityUpdatesRef.current
             );
-            if (normalizedDirectItems.length > 0 || joinedOrderItems.length === 0) {
-              incomingOrderItems = normalizedDirectItems;
-            }
           } catch (err) {
             logger.warn('mesas:realtime:fetch_order_items_direct failed', err);
-          }
-        }
-
-        if (incomingOrderItems.length === 0 && shouldRetryItemsFetch) {
-          try {
-            const retryItems = await getOrderItemsByOrderId({
-              orderId,
-              selectSql: ORDER_ITEMS_SELECT
-            });
-            const normalizedRetryItems = applyPendingQuantities(
-              Array.isArray(retryItems) ? retryItems : [],
-              pendingQuantityUpdatesRef.current
-            );
-            if (normalizedRetryItems.length > 0) {
-              incomingOrderItems = normalizedRetryItems;
-            }
-          } catch (err) {
-            logger.warn('mesas:realtime:fetch_order_items_retry failed', err);
           }
         }
 
@@ -473,7 +475,7 @@ export function useMesaRealtime({
   useRealtimeSubscription('orders', {
     filter: { business_id: businessId },
     enabled: !!businessId,
-    onUpdate: (updatedOrder) => {
+    onUpdate: (updatedOrder, _previousOrder) => {
       enqueueRealtimeUpdate(() => {
         if (justCompletedSaleRef.current) {
           return;
@@ -483,6 +485,26 @@ export function useMesaRealtime({
         if (!normalizedOrderId) return;
 
         const normalizedOrderStatus = String(updatedOrder?.status || '').trim().toLowerCase();
+
+        // Cierre de orden: la mesa pasa a disponible y no hay nada que preparar.
+        // Nunca avisar a cocina por una orden cerrada (ni por notas que cambiaron
+        // en el mismo update).
+        if (normalizedOrderStatus === 'closed') {
+          closedOrderIdsRef.current.add(normalizedOrderId);
+          knownOrderNotesRef.current.delete(normalizedOrderId);
+        } else {
+          // El comentario del pedido cambió → avisar a cocina. La comparación es
+          // contra el último comentario visto por esta sesión (orders no tiene
+          // REPLICA IDENTITY FULL, así que previousOrder puede llegar undefined).
+          const firstSighting = !knownOrderNotesRef.current.has(normalizedOrderId);
+          const prevNotes = String(knownOrderNotesRef.current.get(normalizedOrderId) ?? '').trim();
+          const nextNotes = String(updatedOrder?.notes || '').trim();
+          knownOrderNotesRef.current.set(normalizedOrderId, nextNotes);
+          if (!firstSighting && prevNotes !== nextNotes) {
+            onOrderChangedRef.current?.('notes', updatedOrder);
+          }
+        }
+
         const incomingOrderTotal = toFiniteNumber(updatedOrder?.total, NaN);
         const pendingRemoteTotal = toFiniteNumber(
           pendingRemoteOrderTotalsRef.current?.[normalizedOrderId],
@@ -585,12 +607,37 @@ export function useMesaRealtime({
   });
 
   // 🔥 TIEMPO REAL: Suscripción a cambios en items de orden (NIVEL NEGOCIO)
+  // order_items no tiene columna business_id: la suscripción sin filtro es
+  // filtrada por RLS de Realtime (igual que en la app mobile).
   useRealtimeSubscription('order_items', {
     enabled: !!businessId,
     filter: {},
-    onInsert: (newItem) => enqueueRealtimeUpdate(() => handleOrderItemChange(newItem, 'INSERT')),
-    onUpdate: (updatedItem) => enqueueRealtimeUpdate(() => handleOrderItemChange(updatedItem, 'UPDATE')),
-    onDelete: (deletedItem) => enqueueRealtimeUpdate(() => handleOrderItemChange(deletedItem, 'DELETE'))
+    requireBusinessId: false,
+    onInsert: (newItem) => enqueueRealtimeUpdate(() => {
+      handleOrderItemChange(newItem, 'INSERT');
+      if (justCompletedSaleRef.current) return;
+      const itemOrderId = normalizeEntityId(newItem?.order_id);
+      if (itemOrderId && closedOrderIdsRef.current.has(itemOrderId)) return;
+      onOrderChangedRef.current?.('new', newItem);
+    }),
+    onUpdate: (updatedItem, previousItem) => enqueueRealtimeUpdate(() => {
+      handleOrderItemChange(updatedItem, 'UPDATE');
+      if (justCompletedSaleRef.current) return;
+      const itemOrderId = normalizeEntityId(updatedItem?.order_id);
+      if (itemOrderId && closedOrderIdsRef.current.has(itemOrderId)) return;
+      const prevQuantity = toFiniteNumber(previousItem?.quantity, NaN);
+      const nextQuantity = toFiniteNumber(updatedItem?.quantity, NaN);
+      const quantityChanged =
+        Number.isFinite(prevQuantity) && Number.isFinite(nextQuantity) && prevQuantity !== nextQuantity;
+      if (quantityChanged) onOrderChangedRef.current?.('update', updatedItem);
+    }),
+    onDelete: (deletedItem) => enqueueRealtimeUpdate(() => {
+      handleOrderItemChange(deletedItem, 'DELETE');
+      if (justCompletedSaleRef.current) return;
+      const itemOrderId = normalizeEntityId(deletedItem?.order_id);
+      if (itemOrderId && closedOrderIdsRef.current.has(itemOrderId)) return;
+      onOrderChangedRef.current?.('update', deletedItem);
+    })
   });
 
   // 🔥 TIEMPO REAL: Suscripción a cambios en combos
@@ -606,6 +653,4 @@ export function useMesaRealtime({
     const timers = orderRealtimeRefreshTimersRef.current || {};
     Object.values(timers).forEach((timerId) => clearTimeout(timerId));
   }, []);
-
-  return { orderRealtimeRefreshTimersRef };
 }

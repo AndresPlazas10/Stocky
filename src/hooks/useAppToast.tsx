@@ -11,7 +11,8 @@ interface ToastState {
   duration: number;
 }
 
-const DEFAULT_DURATION = 5000;
+export const TOAST_DEFAULT_DURATION = 10000;
+const DEFAULT_DURATION = TOAST_DEFAULT_DURATION;
 const LOADING_DURATION = 600000;
 
 export function useAppToast() {

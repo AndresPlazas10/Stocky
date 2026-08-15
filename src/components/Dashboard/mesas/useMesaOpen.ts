@@ -18,7 +18,6 @@ import {
   applyPendingQuantities,
   mergeOrderItemsPreservingPosition,
   sanitizeMesaOrderAssociation,
-  isMesaLockExpired,
   buildDiagnosticAlertMessage,
 } from './mesaHelpers';
 import { isConnectivityError } from '../../../utils/connectivity';
@@ -51,7 +50,6 @@ interface UseMesaOpenParams {
   orderDetailsRequestRef: React.MutableRefObject<number>;
   pendingQuantityUpdatesRef: React.MutableRefObject<Record<string, number>>;
   getMesaLockState: (tableId: string) => MesaLockState | null;
-  selectMesaEditLockByTableId: (params: { businessId: string; tableId: string }) => Promise<Record<string, unknown> | null>;
   activeMesaBroadcastRef: React.MutableRefObject<MesaBroadcastState | null>;
   publishMesaLockBroadcast: (params: { tableId: string; locked: boolean; mode: string; lockToken: string | null }) => void;
   mesaSyncClientIdRef: React.MutableRefObject<string>;
@@ -81,7 +79,6 @@ export function useMesaOpen({
   orderDetailsRequestRef,
   pendingQuantityUpdatesRef,
   getMesaLockState,
-  selectMesaEditLockByTableId,
   activeMesaBroadcastRef,
   publishMesaLockBroadcast,
   mesaSyncClientIdRef,
@@ -215,7 +212,7 @@ export function useMesaOpen({
 
       try {
         const latestTables = await getTablesWithCurrentOrderByBusiness(businessId);
-        const latestMesa = (latestTables || []).find((item: MesaRecord) => item?.id === mesa?.id);
+        const latestMesa = (latestTables || []).find((item) => item?.id === mesa?.id);
         const normalizedLatestMesa = latestMesa ? normalizeTableRecord(latestMesa) : null;
         const recoveredOrderId = normalizedLatestMesa?.current_order_id || null;
 
@@ -445,28 +442,6 @@ export function useMesaOpen({
       return;
     }
 
-    // Direct DB check to catch locks immediately (bypasses broadcast/Postgres Changes delay)
-    if (!isOfflineFirstRuntime && normalizedMesa?.id && businessId) {
-      setMesaOpenDebugStage('open:db-lock-check');
-      try {
-        const dbLock = await selectMesaEditLockByTableId({
-          businessId: businessId,
-          tableId: normalizedMesa.id,
-        });
-        if (dbLock && !isMesaLockExpired(dbLock) && String(dbLock.lock_owner_user_id || '').trim() !== resolvedUserId) {
-          setMesaOpenDebugStage('open:db-lock-blocked');
-          logger.info('[MesaOpen] Lock detected via direct DB check', {
-            mesaId: normalizedMesa.id,
-            lockOwner: dbLock.lock_owner_user_id,
-          });
-          showError('Error',getMesaInUseMessage(t));
-          return;
-        }
-      } catch (err) {
-        logger.warn('[MesaOpen] Direct DB lock check failed, continuing with optimistic approach', err);
-      }
-    }
-
     if (!isOfflineFirstRuntime && normalizedMesa?.id && businessId) {
       setMesaOpenDebugStage('open:lock-acquire');
       const nextMesaId = normalizeEntityId(normalizedMesa.id);
@@ -487,7 +462,7 @@ export function useMesaOpen({
           mode: 'optimistic',
           lockToken
         });
-        activeMesaBroadcastRef.current = { tableId: nextMesaId, lockToken };
+        activeMesaBroadcastRef.current = { tableId: nextMesaId, lockToken, locked: true, mode: 'optimistic' };
         const result = await acquireMesaEditLockWeb({
           targetBusinessId: businessId,
           tableId: nextMesaId,
@@ -573,8 +548,6 @@ export function useMesaOpen({
   ]);
 
   return {
-    ensureCurrentUser,
-    createNewOrder,
     loadOrderDetails,
     handleOpenTable,
   };
