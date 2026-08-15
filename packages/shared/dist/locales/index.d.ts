@@ -301,6 +301,7 @@ export declare const resources: {
             roles: {
                 admin: string;
                 owner: string;
+                kitchen: string;
                 employee: string;
             };
             labels: {
@@ -2812,6 +2813,7 @@ export declare const resources: {
             roles: {
                 admin: string;
                 owner: string;
+                kitchen: string;
                 employee: string;
             };
             labels: {

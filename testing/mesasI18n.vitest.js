@@ -31,6 +31,7 @@ describe('i18n mesas (regresión de notación de namespace)', () => {
         'mesas:toast.updatedOrder.title',
         'mesas:labels.mostRecentOrder',
         'mesas:empty.noPendingOrders',
+        'common:roles.kitchen',
       ]) {
         const value = i18n.t(key);
         expect(value, `${lng} ${key}`).not.toBe(key);

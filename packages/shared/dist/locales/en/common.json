@@ -299,6 +299,7 @@
     "roles": {
         "admin": "Administrator",
         "owner": "Owner",
+        "kitchen": "Kitchen",
         "employee": "Employee"
     },
     "labels": {
