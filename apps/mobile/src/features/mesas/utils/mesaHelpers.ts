@@ -15,6 +15,8 @@ import {
   sumOrderItemsQuantity as sumOrderItemsQuantityShared,
 } from '@stocky/shared/order-normalization';
 import { reconcileOrderItemsFromServer as reconcileOrderItemsFromServerShared } from '@stocky/shared/order-reconciliation';
+import { getOrderItemName } from '../../../services/mesaOrder/utils';
+import type { MesaOrderItem } from '../../../services/mesaOrder/types';
 import {
   CALL_WINDOW_MS,
   MESA_LOCK_TTL_MS,
@@ -32,6 +34,35 @@ export {
   MESA_LOCK_HEARTBEAT_MS,
   MESAS_REMOTE_FALLBACK_POLL_MS,
 };
+
+/**
+ * Resuelve el nombre visible de un item de orden:
+ * 1. nombre embebido (products.name / combos.nombre) si existe y no es 'Item'
+ * 2. catálogo por identidad (p:{product_id} / c:{combo_id})
+ * 3. fallback 'Item'
+ *
+ * La cocina móvil depende del catálogo cuando el RPC snapshot aún no embebe
+ * nombres (caché vieja o RPC sin actualizar).
+ */
+export function resolveOrderItemDisplayNameFrom(
+  item: MesaOrderItem | null | undefined,
+  catalogNameByIdentity: Map<string, string>,
+): string {
+  if (!item) return 'Item';
+  const direct = getOrderItemName(item);
+  if (direct && direct !== 'Item') return direct;
+  const productId = String(item?.product_id || '').trim();
+  if (productId) {
+    const name = String(catalogNameByIdentity?.get(`p:${productId}`) || '').trim();
+    if (name) return name;
+  }
+  const comboId = String(item?.combo_id || '').trim();
+  if (comboId) {
+    const name = String(catalogNameByIdentity?.get(`c:${comboId}`) || '').trim();
+    if (name) return name;
+  }
+  return direct;
+}
 
 /**
  * Merges server-returned locks with existing lock state, preserving

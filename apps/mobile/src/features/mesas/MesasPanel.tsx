@@ -58,6 +58,7 @@ import {
   getDenominationsForCountry,
   resetAuxiliaryModals,
   resetOrderFlow,
+  resolveOrderItemDisplayNameFrom,
 } from './utils/mesaHelpers';
 
 type Props = {
@@ -528,7 +529,6 @@ export function MesasPanel({ session, businessContext }: Props) {
   );
 
   const catalogNameByIdentity = useMemo(() => {
-    if (orderItems.length === 0) return new Map<string, string>();
     const map = new Map<string, string>();
     (Array.isArray(catalogItems) ? catalogItems : []).forEach((item) => {
       if (item.item_type === 'product' && item.product_id) {
@@ -540,23 +540,9 @@ export function MesasPanel({ session, businessContext }: Props) {
       }
     });
     return map;
-  }, [catalogItems, orderItems.length]);
+  }, [catalogItems]);
   const resolveOrderItemDisplayName = useCallback(
-    (item: MesaOrderItem) => {
-      const direct = getOrderItemName(item);
-      if (direct && direct !== 'Item') return direct;
-      const productId = String(item?.product_id || '').trim();
-      if (productId) {
-        const name = String(catalogNameByIdentity.get(`p:${productId}`) || '').trim();
-        if (name) return name;
-      }
-      const comboId = String(item?.combo_id || '').trim();
-      if (comboId) {
-        const name = String(catalogNameByIdentity.get(`c:${comboId}`) || '').trim();
-        if (name) return name;
-      }
-      return direct;
-    },
+    (item: MesaOrderItem) => resolveOrderItemDisplayNameFrom(item, catalogNameByIdentity),
     [catalogNameByIdentity],
   );
 
