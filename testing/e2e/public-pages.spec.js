@@ -1,14 +1,6 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Páginas públicas', () => {
-  test('la página de descargas carga correctamente', async ({ page }) => {
-    await page.goto('/descargar');
-    await page.waitForLoadState('networkidle');
-
-    await expect(page.locator('h1')).toBeVisible();
-    await expect(page.getByText(/Descarga/i)).toBeVisible();
-  });
-
   test('la página de términos carga correctamente', async ({ page }) => {
     await page.goto('/terminos');
     await page.waitForLoadState('networkidle');

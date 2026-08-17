@@ -20,7 +20,6 @@ const Register = lazy(() => import('./pages/Register'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const EmployeeAccess = lazy(() => import('./pages/EmployeeAccess'));
 const EmployeeDashboard = lazy(() => import('./pages/EmployeeDashboard'));
-const DownloadPage = lazy(() => import('./pages/Download'));
 const Terms = lazy(() => import('./pages/Terms'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 
@@ -109,7 +108,6 @@ function App() {
           <Route path='/' element={<Home />} />
           <Route path='/login' element={<Login />} />
           <Route path='/register' element={<Register />} />
-          <Route path='/descargar' element={<DownloadPage />} />
           <Route path='/terms' element={<Terms />} />
           <Route path='/privacy' element={<Privacy />} />
           <Route path='/dashboard' element={<Dashboard />} />

@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { logger } from '@/utils/logger';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import BusinessDisabledModal from '../components/BusinessDisabledModal';
-import WhatsNewModal from '../components/Modals/WhatsNewModal';
 import { AsyncStateWrapper } from '../ui/system/async-state/index';
 import { useAppToast } from '../hooks/useAppToast';
 import { BusinessConfigProvider } from '../contexts/BusinessConfigContext';
@@ -354,8 +353,6 @@ function Dashboard() {
 
   return (
     <BusinessConfigProvider business={business}>
-      {activeSection === 'home' ? <WhatsNewModal /> : null}
-      
       <DashboardLayout
         userName={business?.owner_name || t('dashboard.user')}
         userEmail={(user as Record<string, unknown>)?.email as string || ''}

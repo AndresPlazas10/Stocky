@@ -1,14 +1,12 @@
-import { useEffect, useState, useMemo, lazy, Suspense } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useMemo, lazy, Suspense } from 'react';
+import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { logger } from '@/utils/logger';
 import { signOutSession } from '../data/commands/authCommands';
-import { isIOs, isStandalone, supportsPWA } from '../utils/deviceDetection';
 import GradientButton from '../components/ui/gradient-button';
 import { useViewport } from '../hooks/useViewport.js';
 import {
-  X,
   ArrowDown,
   ShoppingCart,
   Receipt,
@@ -17,7 +15,6 @@ import {
   Shield,
   Clock3,
   Check,
-  Smartphone,
   ChevronDown,
   Star,
   TrendingUp,
@@ -38,7 +35,6 @@ const TestimonialCarousel = lazy(() => import('../components/landing/Testimonial
 function Home() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [showIosBanner, setShowIosBanner] = useState(false);
   const { isMobile, isDesktop } = useViewport();
 
   const processSteps = useMemo(() => [t('home.addProducts'), t('home.sellAndControl'), t('home.reviewAndImprove')], [t]);
@@ -74,21 +70,7 @@ function Home() {
       }
     };
     signOut();
-
-    const isIosDevice = isIOs();
-    const isInstalled = isStandalone();
-    const supportsPwa = supportsPWA();
-    const dismissed = localStorage.getItem('ios-banner-dismissed');
-
-    if (isIosDevice && !isInstalled && supportsPwa && !dismissed) {
-      setShowIosBanner(true);
-    }
   }, []);
-
-  const dismissIosBanner = () => {
-    setShowIosBanner(false);
-    localStorage.setItem('ios-banner-dismissed', 'true');
-  };
 
   return (
     <div className="relative min-h-screen bg-white text-primary-900 antialiased overflow-x-hidden">
@@ -108,39 +90,6 @@ function Home() {
       `}</style>
 
       {}
-      <AnimatePresence>
-        {showIosBanner && (
-          <motion.div
-            initial={{ opacity: 0, y: -40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -40 }}
-            transition={{ duration: 0.25 }}
-            className="relative z-50 bg-primary-900 px-4 py-3"
-          >
-            <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-800">
-                  <Smartphone className="h-4 w-4 text-primary-200" />
-                </div>
-                <div className="text-sm">
-                  <p className="font-semibold text-white">{t('home.installOnIphone')}</p>
-                  <p className="text-xs text-primary-300">{t('home.safariShareInstruction')}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => navigate('/descargar')} className="cursor-pointer rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-primary-900 transition-colors duration-200 hover:bg-primary-50">
-                  {t('home.viewGuide')}
-                </button>
-                <button onClick={dismissIosBanner} className="cursor-pointer rounded-lg p-1.5 text-primary-400 transition-colors duration-200 hover:bg-primary-800 hover:text-white" aria-label={t('buttons.close')}>
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {}
       <header className="sticky top-0 z-40 border-b border-primary-100/60 bg-white/90 backdrop-blur-md">
         <div className="mx-auto flex h-14 sm:h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <button onClick={() => navigate('/')} className="cursor-pointer inline-flex items-center gap-2.5 rounded-lg -ml-2 px-2 py-1.5 transition-colors duration-200 hover:bg-primary-50">
@@ -155,7 +104,6 @@ function Home() {
             <a href="#process" className="cursor-pointer text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-primary-700">{t('home.process')}</a>
             <a href="#testimonials" className="cursor-pointer text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-primary-700">{t('home.testimonialsTitle')}</a>
             <a href="#faq" className="cursor-pointer text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-primary-700">{t('home.faqTitle')}</a>
-            <button onClick={() => navigate('/descargar')} className="cursor-pointer text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-primary-700">{t('home.downloads')}</button>
           </nav>
 
           <div className="hidden items-center gap-2 md:flex">

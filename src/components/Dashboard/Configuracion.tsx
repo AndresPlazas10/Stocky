@@ -26,10 +26,6 @@ import {
   Info,
   Database,
   Shield,
-  Smartphone,
-  Bell,
-  Download,
-  ExternalLink,
   Printer
 } from 'lucide-react';
 import type { RefObject } from 'react';
@@ -704,70 +700,6 @@ function Configuracion({ user, business, onBusinessUpdate }: ConfiguracionProps)
                   <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                   {t('status.connected')}
                 </p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Sección de Dispositivos y Notificaciones */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-          className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
-        >
-          <div className="gradient-primary text-white p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                <Smartphone className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold">{t('settings.devicesNotifications')}</h2>
-                <p className="text-white/80">{t('settings.manageApps')}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Tarjeta de Descargas */}
-              <div className="p-4 bg-gradient-to-br from-violet-50 to-white rounded-xl border border-violet-100">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 bg-violet-100 rounded-lg">
-                    <Download className="w-5 h-5 text-violet-600" />
-                  </div>
-                  <span className="text-sm text-gray-600 font-medium">{t('buttons.download')}</span>
-                </div>
-                <p className="text-sm text-gray-600 mb-3 pl-11">
-                  {t('settings.downloadDescription')}
-                </p>
-                <button
-                  onClick={() => window.open('/descargar', '_blank')}
-                  className="ml-11 flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium transition-all text-sm"
-                >
-                  {t('settings.viewDownloads')}
-                  <ExternalLink className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Tarjeta de Notificaciones */}
-              <div className="p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 bg-gray-100 rounded-lg">
-                    <Bell className="w-5 h-5 text-gray-600" />
-                  </div>
-                  <span className="text-sm text-gray-600 font-medium">{t('settings.pushNotifications')}</span>
-                </div>
-                <p className="text-sm text-gray-600 mb-3 pl-11">
-                  {t('settings.notificationsDescription')}
-                </p>
-                <button
-                  onClick={() => window.open('/descargar', '_blank')}
-                  className="ml-11 flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-all text-sm"
-                >
-                  {t('settings.configureNotifications')}
-                  <ExternalLink className="w-4 h-4" />
-                </button>
               </div>
             </div>
           </div>
