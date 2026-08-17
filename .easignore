@@ -20,6 +20,8 @@ apps/mobile/build-*.apk
 apps/mobile/build-*.aab
 apps/mobile/*.apk
 apps/mobile/*.aab
+*.apk
+*.aab
 
 # Build artifacts - print bridge
 apps/print-bridge-windows/release/
