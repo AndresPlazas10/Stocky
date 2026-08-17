@@ -3,7 +3,7 @@ import { EXPO_CONFIG } from '../config/env';
 import { getSupabaseClient } from '../lib/supabase';
 import { normalizeReference } from '../utils/normalization';
 import { dedupedRequest } from '../utils/requestDedup';
-import { isMissingColumnError } from '../utils/supabaseErrors';
+import { isFunctionUnavailableError, isMissingColumnError } from '../utils/supabaseErrors';
 
 import type { SupabaseErrorLike } from '../types/errors';
 
@@ -1811,18 +1811,32 @@ export async function setTableCallRequested(
   businessId: string,
 ): Promise<void> {
   const client = getSupabaseClient();
-  const { error } = await client
-    .from('tables')
-    .update({ call_requested_at: new Date().toISOString() })
-    .eq('id', tableId)
-    .eq('business_id', businessId);
 
-  if (
-    error &&
-    !isMissingColumnError(error, { tableName: 'tables', columnName: 'call_requested_at' })
-  ) {
-    throw error;
+  // RPC dedicado: permite al rol cocina (solo lectura por RLS) llamar al
+  // mesero sin violar can_operate_business. Si la RPC no existe (entorno
+  // sin migración), cae al UPDATE directo (comportamiento previo).
+  const rpcResult = await client.rpc('set_table_call_requested', {
+    p_table_id: tableId,
+    p_business_id: businessId,
+  });
+
+  if (rpcResult.error && isFunctionUnavailableError(rpcResult.error, 'set_table_call_requested')) {
+    const { error } = await client
+      .from('tables')
+      .update({ call_requested_at: new Date().toISOString() })
+      .eq('id', tableId)
+      .eq('business_id', businessId);
+
+    if (
+      error &&
+      !isMissingColumnError(error, { tableName: 'tables', columnName: 'call_requested_at' })
+    ) {
+      throw error;
+    }
+    return;
   }
+
+  if (rpcResult.error) throw rpcResult.error;
 }
 
 export async function clearTableCallRequested(
@@ -1830,18 +1844,29 @@ export async function clearTableCallRequested(
   businessId: string,
 ): Promise<void> {
   const client = getSupabaseClient();
-  const { error } = await client
-    .from('tables')
-    .update({ call_requested_at: null })
-    .eq('id', tableId)
-    .eq('business_id', businessId);
 
-  if (
-    error &&
-    !isMissingColumnError(error, { tableName: 'tables', columnName: 'call_requested_at' })
-  ) {
-    throw error;
+  const rpcResult = await client.rpc('clear_table_call_requested', {
+    p_table_id: tableId,
+    p_business_id: businessId,
+  });
+
+  if (rpcResult.error && isFunctionUnavailableError(rpcResult.error, 'clear_table_call_requested')) {
+    const { error } = await client
+      .from('tables')
+      .update({ call_requested_at: null })
+      .eq('id', tableId)
+      .eq('business_id', businessId);
+
+    if (
+      error &&
+      !isMissingColumnError(error, { tableName: 'tables', columnName: 'call_requested_at' })
+    ) {
+      throw error;
+    }
+    return;
   }
+
+  if (rpcResult.error) throw rpcResult.error;
 }
 
 

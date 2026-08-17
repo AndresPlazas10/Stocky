@@ -28,6 +28,18 @@ function isMissingTablesUpdatedAtColumnError(errorLike: unknown): boolean {
   );
 }
 
+function isRpcUnavailableError(errorLike: unknown): boolean {
+  const message = String((errorLike as ErrorLike)?.message || errorLike || '').toLowerCase();
+  const code = String((errorLike as ErrorLike)?.code || '').toLowerCase();
+  return (
+    code === '42883'
+    || code === 'pgrst202'
+    || message.includes('could not find the function')
+    || message.includes('schema cache')
+    || message.includes('does not exist')
+  );
+}
+
 function isMissingTablesOpenedAtColumnError(errorLike: unknown): boolean {
   const message = String((errorLike as ErrorLike)?.message || errorLike || '').toLowerCase();
   return (
@@ -394,12 +406,27 @@ export async function setTableCallRequested({
   businessId: string;
   calledAt?: Date;
 }): Promise<void> {
-  const { error } = await supabaseAdapter.updateTableByBusinessAndId({
-    businessId,
+  // RPC dedicado: permite al rol cocina (solo lectura por RLS) llamar al
+  // mesero sin violar can_operate_business. Si la RPC no existe (entorno
+  // sin migración), cae al UPDATE directo (comportamiento previo).
+  const rpcResult = await supabaseAdapter.setTableCallRequestedRpc({
     tableId,
-    payload: { call_requested_at: calledAt.toISOString() }
+    businessId,
+    calledAt
   });
-  if (error) throw error;
+  if (!rpcResult.error) return;
+
+  if (isRpcUnavailableError(rpcResult.error)) {
+    const { error } = await supabaseAdapter.updateTableByBusinessAndId({
+      businessId,
+      tableId,
+      payload: { call_requested_at: calledAt.toISOString() }
+    });
+    if (error) throw error;
+    return;
+  }
+
+  throw rpcResult.error;
 }
 
 export async function clearTableCallRequested({
@@ -409,12 +436,23 @@ export async function clearTableCallRequested({
   tableId: string;
   businessId: string;
 }): Promise<void> {
-  const { error } = await supabaseAdapter.updateTableByBusinessAndId({
-    businessId,
+  const rpcResult = await supabaseAdapter.clearTableCallRequestedRpc({
     tableId,
-    payload: { call_requested_at: null }
+    businessId
   });
-  if (error) throw error;
+  if (!rpcResult.error) return;
+
+  if (isRpcUnavailableError(rpcResult.error)) {
+    const { error } = await supabaseAdapter.updateTableByBusinessAndId({
+      businessId,
+      tableId,
+      payload: { call_requested_at: null }
+    });
+    if (error) throw error;
+    return;
+  }
+
+  throw rpcResult.error;
 }
 
 export async function persistOrderItemQuantities(

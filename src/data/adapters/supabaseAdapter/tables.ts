@@ -86,6 +86,23 @@ export const tablesAdapter = {
       .eq('business_id', businessId);
   },
 
+  // RPCs dedicados para call_requested_at: el rol cocina es solo lectura
+  // por RLS (can_operate_business=false), pero debe poder llamar al mesero.
+  async setTableCallRequestedRpc({ businessId, tableId, calledAt }) {
+    return supabase.rpc('set_table_call_requested', {
+      p_table_id: tableId,
+      p_business_id: businessId,
+      p_called_at: calledAt ? calledAt.toISOString() : new Date().toISOString()
+    });
+  },
+
+  async clearTableCallRequestedRpc({ businessId, tableId }) {
+    return supabase.rpc('clear_table_call_requested', {
+      p_table_id: tableId,
+      p_business_id: businessId
+    });
+  },
+
   async deleteTableById(tableId) {
     return supabase
       .from('tables')
