@@ -7,6 +7,12 @@ export async function getTablesWithCurrentOrderByBusiness(businessId: string): P
   return data || [];
 }
 
+export async function getTablesSyncFingerprint(businessId: string): Promise<string> {
+  const { data, error } = await readAdapter.getTablesSyncFingerprint(businessId);
+  if (error) throw error;
+  return String(data || '');
+}
+
 export async function getOpenOrdersByBusiness(
   businessId: string,
   selectSql: string = 'id, business_id, table_id, status, opened_at, updated_at'

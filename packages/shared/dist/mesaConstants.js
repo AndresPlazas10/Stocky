@@ -8,5 +8,5 @@ export const MESA_LOCK_TTL_MS = MESA_LOCK_TTL_SECONDS * 1000;
 /** Intervalo del heartbeat de renovación del lock de edición (ms). */
 export const MESA_LOCK_HEARTBEAT_MS = 20000;
 /** Intervalo del poll de fallback de mesas (ms). */
-export const MESAS_REMOTE_FALLBACK_POLL_MS = 5000;
+export const MESAS_REMOTE_FALLBACK_POLL_MS = 15000;
 //# sourceMappingURL=mesaConstants.js.map

@@ -22,6 +22,7 @@ import {
 import { closeOrderAsSplit, closeOrderSingle } from '../../services/mesaCheckoutService';
 import {
   clearTableCallRequested,
+  resolveMesaEditorDisplayName,
   type BusinessContext,
   type MesaEditLock,
   type MesaRecord,
@@ -48,7 +49,7 @@ import { KitchenMesasGrid } from './components/KitchenMesasGrid';
 import { MesasPanelHeader } from './components/MesasPanelHeader';
 import { MesasModals } from './components/MesasModals';
 import {
-  MESA_IN_USE_MESSAGE,
+  mesaInUseMessage,
   MESA_LOCK_TTL_MS,
   mesaDisplayName,
   resolveSessionDisplayName,
@@ -86,6 +87,26 @@ export function MesasPanel({ session, businessContext }: Props) {
   );
   const sessionDisplayName = useMemo(() => resolveSessionDisplayName(session), [session]);
   const canDeleteMesas = context?.source !== 'employee';
+
+  // Nombre real del usuario que toma los locks de mesa: se consulta el
+  // employees.full_name en la DB (con cache) una vez que el negocio está
+  // resuelto; la metadata de sesión queda como fallback inmediato.
+  const businessIdForName = String(context?.businessId || '').trim();
+  const resolvedUserIdForName = String(session.user.id || '').trim();
+  useEffect(() => {
+    let cancelled = false;
+    if (!businessIdForName || !resolvedUserIdForName) return;
+    void resolveMesaEditorDisplayName({
+      businessId: businessIdForName,
+      userId: resolvedUserIdForName,
+      fallbackName: sessionDisplayName,
+    }).then((resolved) => {
+      if (!cancelled) setActorDisplayName(resolved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [businessIdForName, resolvedUserIdForName, sessionDisplayName]);
 
   const toast = useToastContext();
   const { playKitchenAlert } = useToastSound();
@@ -370,6 +391,7 @@ export function MesasPanel({ session, businessContext }: Props) {
   const realtime = useMesaRealtime({
     businessId: String(context?.businessId || ''),
     userId: session.user.id,
+    actorDisplayName,
     isOrderFlowActive,
     setMesas,
     setMesaLocksByTableId,
@@ -745,7 +767,11 @@ export function MesasPanel({ session, businessContext }: Props) {
       { occupied, lockedByOther }: { occupied: boolean; lockedByOther: boolean },
     ) => {
       if (lockedByOther) {
-        toast.showError({ title: t('mesas:defaults.someoneUsingTable', 'Mesa en uso'), message: MESA_IN_USE_MESSAGE });
+        const ownerName = mesaLocksByTableId[mesa.id]?.lock_owner_name;
+        toast.showError({
+          title: mesaInUseMessage(ownerName),
+          message: '',
+        });
         return;
       }
       if (occupied) {
@@ -759,7 +785,7 @@ export function MesasPanel({ session, businessContext }: Props) {
         void handleOpenClose(mesa, 'open');
       }
     },
-    [handleOpenClose, openOrderModal, setActiveOrderId],
+    [handleOpenClose, mesaLocksByTableId, openOrderModal, setActiveOrderId],
   );
 
   const handleCatalogItemPress = useCallback(

@@ -31,6 +31,19 @@ interface SuppliersManagementResult {
   taxColumn: string;
 }
 
+// La columna de impuestos se resuelve UNA vez por negocio (la primera petición
+// descubre si la tabla usa `nit` o `tax_id`); las siguientes reutilizan el
+// resultado y evitan la query fallida de reintento.
+const resolvedTaxColumnByBusinessId = new Map<string, string>();
+
+function resolvePreferredTaxColumn(businessId: string, requested: string): string {
+  return resolvedTaxColumnByBusinessId.get(businessId) || requested;
+}
+
+function rememberTaxColumn(businessId: string, column: string): void {
+  resolvedTaxColumnByBusinessId.set(businessId, column);
+}
+
 export async function getSuppliersForManagement({
   businessId,
   preferredTaxColumn = 'nit'
@@ -38,6 +51,7 @@ export async function getSuppliersForManagement({
   businessId: string;
   preferredTaxColumn?: string;
 }): Promise<SuppliersManagementResult> {
+  preferredTaxColumn = resolvePreferredTaxColumn(businessId, preferredTaxColumn);
   const candidates = preferredTaxColumn === 'nit' ? ['nit', 'tax_id'] : ['tax_id', 'nit'];
   let data: SupplierWithNit[] | null = null;
   let lastError: unknown = null;
@@ -64,6 +78,7 @@ export async function getSuppliersForManagement({
         created_at: String(row.created_at || '')
       }));
       resolvedTaxColumn = column;
+      rememberTaxColumn(businessId, column);
       lastError = null;
       break;
     }
@@ -95,6 +110,7 @@ export async function getSuppliersForManagementPage({
   limit?: number;
   offset?: number;
 }): Promise<SuppliersManagementPageResult> {
+  preferredTaxColumn = resolvePreferredTaxColumn(businessId, preferredTaxColumn);
   const candidates = preferredTaxColumn === 'nit' ? ['nit', 'tax_id'] : ['tax_id', 'nit'];
   let data: SupplierWithNit[] | null = null;
   let lastError: unknown = null;
@@ -126,6 +142,7 @@ export async function getSuppliersForManagementPage({
         created_at: String(row.created_at || '')
       }));
       resolvedTaxColumn = column;
+      rememberTaxColumn(businessId, column);
       lastError = null;
       break;
     }

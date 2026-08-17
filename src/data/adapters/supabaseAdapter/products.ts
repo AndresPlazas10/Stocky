@@ -1,15 +1,18 @@
 import { supabase } from '../../../supabase/Client';
 import { INVENTORY_PRODUCT_COLUMNS, INVENTORY_PRODUCT_SUPPLIER_SELECT } from './shared.js';
+import { requestDeduplicator } from '../../../utils/queryCache.js';
 
 export const productsAdapter = {
   async getActiveProductsForSale(businessId) {
-    return supabase
-      .from('products')
-      .select('id, code, name, sale_price, stock, category, manage_stock')
-      .eq('business_id', businessId)
-      .eq('is_active', true)
-      .order('name')
-      .limit(200);
+    return requestDeduplicator.execute(`products:sale:${businessId}`, () =>
+      supabase
+        .from('products')
+        .select('id, code, name, sale_price, stock, category, manage_stock')
+        .eq('business_id', businessId)
+        .eq('is_active', true)
+        .order('name')
+        .limit(200)
+    );
   },
 
   async getLowStockProductsByBusiness({
@@ -45,15 +48,6 @@ export const productsAdapter = {
       .order('name');
   },
 
-  async getProductsForPurchase(businessId) {
-    return supabase
-      .from('products')
-      .select('id, name, purchase_price, supplier_id, stock, manage_stock, is_active')
-      .eq('business_id', businessId)
-      .eq('is_active', true)
-      .gt('stock', 0);
-  },
-
   async getProductPurchasePricesByBusiness(businessId) {
     return supabase
       .from('products')
@@ -83,21 +77,36 @@ export const productsAdapter = {
   },
 
   async getProductsForOrdersByBusiness(businessId) {
-    return supabase
-      .from('products')
-      .select('id, code, name, sale_price, stock, category, manage_stock')
-      .eq('business_id', businessId)
-      .eq('is_active', true)
-      .order('name')
-      .limit(200);
+    return requestDeduplicator.execute(`products:orders:${businessId}`, () =>
+      supabase
+        .from('products')
+        .select('id, code, name, sale_price, stock, category, manage_stock')
+        .eq('business_id', businessId)
+        .eq('is_active', true)
+        .order('name')
+        .limit(200)
+    );
   },
 
   async getProductsWithSupplierByBusiness(businessId) {
-    return supabase
-      .from('products')
-      .select(`${INVENTORY_PRODUCT_COLUMNS}, ${INVENTORY_PRODUCT_SUPPLIER_SELECT}`)
-      .eq('business_id', businessId)
-      .order('created_at', { ascending: false });
+    return requestDeduplicator.execute(`products:inventory:${businessId}`, () =>
+      supabase
+        .from('products')
+        .select(`${INVENTORY_PRODUCT_COLUMNS}, ${INVENTORY_PRODUCT_SUPPLIER_SELECT}`)
+        .eq('business_id', businessId)
+        .order('created_at', { ascending: false })
+    );
+  },
+
+  async getProductsForPurchase(businessId) {
+    return requestDeduplicator.execute(`products:purchase:${businessId}`, () =>
+      supabase
+        .from('products')
+        .select('id, name, purchase_price, supplier_id, stock, manage_stock, is_active')
+        .eq('business_id', businessId)
+        .eq('is_active', true)
+        .gt('stock', 0)
+    );
   },
 
   async getProductsWithSupplierByBusinessPaginated({

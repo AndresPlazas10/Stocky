@@ -507,6 +507,9 @@ export declare const resources: {
                 redirectingToDashboard: string;
                 businessName: string;
                 businessNameExample: string;
+                email: string;
+                emailPlaceholder: string;
+                emailRequired: string;
                 country: string;
                 selectCountry: string;
                 username: string;
@@ -542,6 +545,8 @@ export declare const resources: {
                 passwordPlaceholder: string;
                 businessName: string;
                 businessNamePlaceholder: string;
+                email: string;
+                emailPlaceholder: string;
                 nitOptional: string;
                 phone: string;
                 address: string;
@@ -2259,6 +2264,8 @@ export declare const resources: {
             defaults: {
                 generalSale: string;
                 someoneUsingTable: string;
+                mesaInUseByUser: string;
+                ownerName: string;
                 user: string;
                 item: string;
                 unknownError: string;
@@ -3019,6 +3026,9 @@ export declare const resources: {
                 redirectingToDashboard: string;
                 businessName: string;
                 businessNameExample: string;
+                email: string;
+                emailPlaceholder: string;
+                emailRequired: string;
                 country: string;
                 selectCountry: string;
                 username: string;
@@ -3054,6 +3064,8 @@ export declare const resources: {
                 passwordPlaceholder: string;
                 businessName: string;
                 businessNamePlaceholder: string;
+                email: string;
+                emailPlaceholder: string;
                 nitOptional: string;
                 phone: string;
                 address: string;
@@ -4771,6 +4783,8 @@ export declare const resources: {
             defaults: {
                 generalSale: string;
                 someoneUsingTable: string;
+                mesaInUseByUser: string;
+                ownerName: string;
                 user: string;
                 item: string;
                 unknownError: string;

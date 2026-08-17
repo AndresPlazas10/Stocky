@@ -10,7 +10,7 @@ import {
 } from '@stocky/shared';
 import type { Table } from '../../../types/order';
 
-type TranslateFunction = (key: string) => string;
+type TranslateFunction = (key: string, options?: Record<string, unknown>) => string;
 
 // Re-export de las constantes compartidas (web + móvil)
 export {
@@ -21,8 +21,16 @@ export {
   MESAS_REMOTE_FALLBACK_POLL_MS,
 };
 
-export const getMesaInUseMessage = (t: TranslateFunction): string =>
-  t('mesas:defaults.someoneUsingTable');
+export const getMesaInUseMessage = (t: TranslateFunction, ownerName?: string | null): string => {
+  const normalized = String(ownerName || '').trim();
+  if (
+    normalized &&
+    !['alguien', 'usuario', 'user'].includes(normalized.toLowerCase())
+  ) {
+    return t('mesas:defaults.mesaInUseByUser', { name: normalized });
+  }
+  return t('mesas:defaults.someoneUsingTable');
+};
 
 export const ORDER_ITEMS_SELECT = `
   id,
@@ -296,6 +304,41 @@ export const applyPendingQuantities = (items: OrderItem[] = [], pendingUpdates: 
 
 export const getOrderItemName = (item: OrderItem, t: TranslateFunction): string =>
   item?.products?.name || item?.combos?.nombre || t('mesas:defaults.item');
+
+/**
+ * Resuelve el nombre visible de un item de orden:
+ * 1. nombre embebido (products.name / combos.nombre) si existe
+ * 2. catálogo por identidad (p:{product_id} / c:{combo_id})
+ * 3. fallback (traducción de `mesas:defaults.item`)
+ *
+ * La cocina web depende del catálogo cuando el evento realtime de order_items
+ * llega sin la relación products/combos embebida (payload crudo).
+ */
+export function resolveOrderItemDisplayNameFrom(
+  item: {
+    product_id?: string | null;
+    combo_id?: string | null;
+    products?: { name?: string } | null;
+    combos?: { nombre?: string } | null;
+  } | null | undefined,
+  catalogNameByIdentity: Map<string, string>,
+  fallback: string,
+): string {
+  if (!item) return fallback;
+  const direct = String(item?.products?.name || item?.combos?.nombre || '').trim();
+  if (direct) return direct;
+  const productId = String(item?.product_id || '').trim();
+  if (productId) {
+    const name = String(catalogNameByIdentity?.get(`p:${productId}`) || '').trim();
+    if (name) return name;
+  }
+  const comboId = String(item?.combo_id || '').trim();
+  if (comboId) {
+    const name = String(catalogNameByIdentity?.get(`c:${comboId}`) || '').trim();
+    if (name) return name;
+  }
+  return fallback;
+}
 
 export const buildDiagnosticAlertMessage = (errorLike: ErrorLike | string, t: TranslateFunction): string => {
   const fallback = t('mesas:defaults.unknownError');

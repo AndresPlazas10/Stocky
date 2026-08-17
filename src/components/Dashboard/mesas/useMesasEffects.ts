@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { compareTableIdentifiers, MESAS_REMOTE_FALLBACK_POLL_MS, MESA_LOCK_HEARTBEAT_MS } from './mesaHelpers';
 import { normalizeTableRecord } from '../../../utils/tableStatus';
 import { saveOfflineSnapshot } from '../../../utils/offlineSnapshot.js';
 import { supabase } from '../../../supabase/Client';
+import { getTablesSyncFingerprint } from '../../../data/queries/ordersQueries';
 import { logger } from '@/utils/logger';
 
 export function useMesasEffects({
@@ -70,14 +71,31 @@ export function useMesasEffects({
     };
   }, [applyRealtimeMesaLockBroadcast, businessId]);
 
-  // Remote Sync Polling
+  // Remote Sync Polling — light-first: primero se consulta una huella barata
+  // del estado de mesas (ids + último updated_at); el reload completo solo se
+  // ejecuta si la huella cambió. El realtime sigue siendo la fuente primaria.
   useEffect(() => {
     if (!businessId) return undefined;
-    const syncFromRemote = () => {
+    const lastPollFingerprintRef = { current: null as string | null };
+    const syncFromRemote = async () => {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
       if (emptyReleaseInProgressRef?.current) return;
-      loadMesas().catch((err) => { logger.warn('mesas:effects:remote_sync_poll failed', err); });
+
+      let fingerprint: string | null = null;
+      try {
+        fingerprint = await getTablesSyncFingerprint(businessId);
+      } catch (err) {
+        logger.warn('mesas:effects:sync_fingerprint failed', err);
+      }
+      if (fingerprint !== null && fingerprint === lastPollFingerprintRef.current) return;
+
+      try {
+        await loadMesas();
+        lastPollFingerprintRef.current = fingerprint;
+      } catch (err) {
+        logger.warn('mesas:effects:remote_sync_poll failed', err);
+      }
     };
     const handleVisibility = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {

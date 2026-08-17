@@ -96,7 +96,7 @@ export function useMesasRefs({
   }, []);
 
   const publishMesaLockBroadcast = useCallback(
-    ({ tableId, locked, mode = 'optimistic', lockToken = null }) => {
+    ({ tableId, locked, mode = 'optimistic', lockToken = null, lockOwnerName = null }) => {
       const normalizedBusinessId = String(businessId || '').trim();
       const normalizedTableId = String(tableId || '').trim();
       if (!normalizedBusinessId || !normalizedTableId) return;
@@ -112,6 +112,7 @@ export function useMesasRefs({
         locked: Boolean(locked),
         mode,
         lock_owner_user_id: locked ? resolvedUserId : null,
+        lock_owner_name: locked ? String(lockOwnerName || '').trim() || null : null,
         lock_token: lockToken,
         lock_expires_at: lockExpiresAt,
         lock_ttl_ms: locked ? lockTtlMs : null,

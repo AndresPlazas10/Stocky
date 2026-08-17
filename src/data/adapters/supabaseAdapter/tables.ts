@@ -41,6 +41,28 @@ export const tablesAdapter = {
       .order('table_number', { ascending: true });
   },
 
+  // Huella barata del estado de mesas (ids + último updated_at): sirve para que
+  // el poll de fallback solo haga el reload completo cuando algo realmente
+  // cambió (los triggers bump_table_sync_version actualizan updated_at ante
+  // cambios en orders/order_items).
+  async getTablesSyncFingerprint(businessId) {
+    const { data, error } = await supabase
+      .from('tables')
+      .select('id, updated_at')
+      .eq('business_id', businessId);
+    if (error) throw error;
+    const rows = Array.isArray(data) ? data : [];
+    const ids = rows
+      .map((row) => String(row?.id || ''))
+      .sort()
+      .join(',');
+    const maxTs = rows.reduce((acc, row) => {
+      const ts = Date.parse(String(row?.updated_at || ''));
+      return Number.isFinite(ts) && ts > acc ? ts : acc;
+    }, 0);
+    return `${ids}|${maxTs}`;
+  },
+
   async insertTable(row) {
     return supabase
       .from('tables')

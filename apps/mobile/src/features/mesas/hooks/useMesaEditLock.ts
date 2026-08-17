@@ -11,7 +11,7 @@ import {
 import {
   mergeMesaLocks,
   createMesaLocksRefresher,
-  MESA_IN_USE_MESSAGE,
+  mesaInUseMessage,
   MESA_LOCK_TTL_MS,
   MESA_LOCK_TTL_SECONDS,
   MESA_LOCK_HEARTBEAT_MS,
@@ -71,6 +71,7 @@ export function useMesaEditLock({
       locked: boolean;
       mode?: 'optimistic' | 'confirmed' | 'rollback';
       lockToken?: string | null;
+      lockOwnerName?: string | null;
       lockExpiresAt?: string | null;
     }) => {
       const businessId = String(input.businessId || '').trim();
@@ -93,6 +94,7 @@ export function useMesaEditLock({
           locked,
           mode: input.mode || 'confirmed',
           lock_owner_user_id: locked ? session.user.id : null,
+          lock_owner_name: locked ? String(input.lockOwnerName || '').trim() || null : null,
           lock_token: locked ? String(input.lockToken || '').trim() || null : null,
           lock_expires_at: lockExpiresAt,
           lock_ttl_ms: locked ? lockTtlMs : null,
@@ -164,11 +166,13 @@ export function useMesaEditLock({
   );
 
   const acquireMesaLockForEdition = useCallback(
-    async (mesa: MesaRecord): Promise<boolean> => {
+    async (
+      mesa: MesaRecord,
+    ): Promise<{ granted: boolean; ownerName?: string | null }> => {
       try {
-        if (!context?.businessId) return true;
+        if (!context?.businessId) return { granted: true };
         const tableId = String(mesa?.id || '').trim();
-        if (!tableId) return false;
+        if (!tableId) return { granted: false };
 
         const held = heldMesaLockRef.current;
         if (held && (held.tableId !== tableId || held.businessId !== context.businessId)) {
@@ -180,6 +184,7 @@ export function useMesaEditLock({
           tableId,
           locked: true,
           mode: 'optimistic',
+          lockOwnerName: actorDisplayName,
         });
 
         const result = await acquireMesaEditLock({
@@ -197,7 +202,7 @@ export function useMesaEditLock({
             locked: false,
             mode: 'rollback',
           });
-          return true;
+          return { granted: true };
         }
 
         if (!result.ok) {
@@ -207,7 +212,8 @@ export function useMesaEditLock({
             locked: false,
             mode: 'rollback',
           });
-          onError(MESA_IN_USE_MESSAGE);
+          const ownerName = String(result.lock?.lock_owner_name || '').trim() || null;
+          onError(mesaInUseMessage(ownerName));
           if (result.lock) {
             setMesaLocksByTableId((prev) => ({
               ...prev,
@@ -215,7 +221,7 @@ export function useMesaEditLock({
             }));
           }
           void refreshMesaLocks(context.businessId);
-          return false;
+          return { granted: false, ownerName };
         }
 
         if (result.lock) {
@@ -237,11 +243,12 @@ export function useMesaEditLock({
           locked: true,
           mode: 'confirmed',
           lockToken: result.lockToken || null,
+          lockOwnerName: result.lock?.lock_owner_name || actorDisplayName,
           lockExpiresAt: result.lock?.lock_expires_at || null,
         });
-        return true;
+        return { granted: true };
       } catch {
-        return false;
+        return { granted: false };
       }
     },
     [
@@ -327,7 +334,7 @@ export function useMesaEditLock({
           }
 
           if (result.lost) {
-            onError(MESA_IN_USE_MESSAGE);
+            onError(mesaInUseMessage(result?.lock?.lock_owner_name));
             void releaseHeldMesaLock(current);
             if (onLockLost) {
               onLockLost();

@@ -623,6 +623,17 @@ export const readAdapter = {
     });
   },
 
+  async getTablesSyncFingerprint(businessId) {
+    // La huella SIEMPRE va a la red (sin cache): es la señal barata que decide
+    // si el poll de fallback necesita el reload completo.
+    try {
+      const data = await supabaseAdapter.getTablesSyncFingerprint(businessId);
+      return { data, error: null };
+    } catch (error) {
+      return { data: '', error };
+    }
+  },
+
   async getOpenOrdersByBusiness(businessId, selectSql = 'id, business_id, table_id, status, opened_at, updated_at') {
     const normalizedSelectSql = String(selectSql || '').trim();
     const canUseMaterializedSelect = normalizedSelectSql === 'id, business_id, table_id, status, opened_at, updated_at';
@@ -734,11 +745,11 @@ export const readAdapter = {
     });
   },
 
-  async getEmployeeByUserId(userId, selectSql = 'id, business_id') {
+  async getEmployeeByUserId(userId, selectSql = 'id, business_id', businessId?) {
     return readThroughCache({
-      cacheKey: buildCacheKey(['employees', 'by_user', userId, selectSql]),
+      cacheKey: buildCacheKey(['employees', 'by_user', userId, selectSql, businessId || '']),
       enabled: true,
-      fetcher: () => supabaseAdapter.getEmployeeByUserId(userId, selectSql)
+      fetcher: () => supabaseAdapter.getEmployeeByUserId(userId, selectSql, businessId)
     });
   },
 

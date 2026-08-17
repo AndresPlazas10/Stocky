@@ -39,6 +39,7 @@ export type HeldMesaLock = {
 export interface UseMesaRealtimeParams {
   businessId: string;
   userId: string;
+  actorDisplayName?: string | null;
   isOrderFlowActive: boolean;
   setMesas: React.Dispatch<React.SetStateAction<MesaRecord[]>>;
   setMesaLocksByTableId: React.Dispatch<React.SetStateAction<Record<string, MesaEditLock>>>;
@@ -105,6 +106,7 @@ function traceMesaSync(label: string, data: Record<string, unknown>) {
 export function useMesaRealtime({
   businessId: _businessId,
   userId,
+  actorDisplayName,
   isOrderFlowActive,
   setMesas,
   setMesaLocksByTableId,
@@ -199,11 +201,12 @@ export function useMesaRealtime({
   }, []);
 
   const applyMesaLockPlaceholder = useCallback(
-    (mesaId: string, lockBusinessId: string) => {
+    (mesaId: string, lockBusinessId: string, ownerName?: string | null) => {
       if (!mesaId || !lockBusinessId) return;
       const token = `pending-${mesaId}-${Date.now()}`;
       const expiresAt = new Date(Date.now() + 3500).toISOString();
       const updatedAt = new Date().toISOString();
+      const resolvedOwnerName = String(ownerName || '').trim() || 'Alguien';
 
       setMesaLocksByTableId((prev) => {
         if (prev[mesaId]) return prev;
@@ -213,7 +216,7 @@ export function useMesaRealtime({
             table_id: mesaId,
             business_id: lockBusinessId,
             lock_owner_user_id: '',
-            lock_owner_name: 'Alguien',
+            lock_owner_name: resolvedOwnerName,
             lock_token: token,
             lock_expires_at: expiresAt,
             updated_at: updatedAt,
@@ -417,6 +420,7 @@ export function useMesaRealtime({
         ? Math.min(parsedExpiresAt, nowMs + lockTtlMs)
         : nowMs + lockTtlMs;
       const lockExpiresAt = new Date(safeExpiresAtMs).toISOString();
+      const carriedOwnerName = String(payload?.lock_owner_name || '').trim();
 
       setMesaLocksByTableId((prev) => ({
         ...prev,
@@ -424,7 +428,10 @@ export function useMesaRealtime({
           table_id: mesaId,
           business_id: resolvedBusinessId || String(prev[mesaId]?.business_id || '').trim(),
           lock_owner_user_id: ownerUserId,
-          lock_owner_name: 'Alguien',
+          lock_owner_name:
+            carriedOwnerName ||
+            String(prev[mesaId]?.lock_owner_name || '').trim() ||
+            'Alguien',
           lock_token: lockToken,
           lock_expires_at: lockExpiresAt,
           updated_at: new Date().toISOString(),
@@ -680,7 +687,7 @@ export function useMesaRealtime({
       timers[normalizedOrderId] = setTimeout(() => {
         delete timers[normalizedOrderId];
         void hydrateOrderRealtimeSummary(normalizedOrderId);
-      }, 10);
+      }, 300);
     },
     [hydrateOrderRealtimeSummary],
   );
@@ -899,7 +906,7 @@ export function useMesaRealtime({
               held && held.tableId === mesaId && held.businessId === tableBusinessId,
             );
             if (!hasHeldLock && (!selectedMesaId || selectedMesaId !== mesaId)) {
-              applyMesaLockPlaceholder(mesaId, tableBusinessId);
+              applyMesaLockPlaceholder(mesaId, tableBusinessId, actorDisplayName);
             }
           }
         }
@@ -914,6 +921,7 @@ export function useMesaRealtime({
       }
     },
     [
+      actorDisplayName,
       applyMesaLockPlaceholder,
       businessId,
       clearMesaLockPlaceholderTimer,
@@ -967,7 +975,7 @@ export function useMesaRealtime({
             held && held.tableId === tableId && held.businessId === tableBusinessId,
           );
           if (!hasHeldLock && (!selectedMesaId || selectedMesaId !== tableId)) {
-            applyMesaLockPlaceholder(tableId, tableBusinessId);
+            applyMesaLockPlaceholder(tableId, tableBusinessId, actorDisplayName);
           }
         } else if (normalizedStatus) {
           clearMesaLockPlaceholderTimer(tableId);
@@ -1005,6 +1013,7 @@ export function useMesaRealtime({
       );
     },
     [
+      actorDisplayName,
       applyMesaLockPlaceholder,
       businessId,
       clearMesaLockPlaceholderTimer,

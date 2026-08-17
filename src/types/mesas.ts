@@ -69,6 +69,7 @@ export interface MesaLockState {
   lockedBy?: string;
   lockToken?: string;
   expiresAt?: string;
+  lockOwnerName?: string | null;
 }
 
 export interface MesaBroadcastState {
@@ -82,5 +83,6 @@ export interface MesaLockResult {
   unsupported?: boolean;
   ok?: boolean;
   lockToken?: string;
+  lockOwnerName?: string | null;
   error?: string;
 }

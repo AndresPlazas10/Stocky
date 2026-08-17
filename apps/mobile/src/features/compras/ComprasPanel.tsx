@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
@@ -420,10 +420,11 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
     }, 180);
   }, [refreshCatalogSilently]);
 
-  useSupabaseRealtime({
-    channelKey: 'compras',
-    businessId,
-    tables: [
+  // La lista de suscripciones debe ser estable: un literal inline cambiaría de
+  // identidad en cada render y re-crearía el canal realtime (y re-dispararía
+  // onSubscribed) en cada re-render del panel.
+  const realtimeTables = useMemo(
+    () => [
       {
         table: 'purchases',
         filter: businessId ? `business_id=eq.${businessId}` : undefined,
@@ -441,6 +442,14 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
         onEvent: scheduleCatalogRefresh,
       },
     ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [businessId],
+  );
+
+  useSupabaseRealtime({
+    channelKey: 'compras',
+    businessId,
+    tables: realtimeTables,
     onSubscribed: () => {
       schedulePurchasesRefresh();
       scheduleCatalogRefresh();
@@ -465,7 +474,7 @@ export function ComprasPanel({ businessId, businessName, userId, source }: Props
     useCallback(() => {
       setLoadingPurchases(true);
       setError(null);
-      listRecentCompras(businessId, 50, { forceRefresh: true })
+      listRecentCompras(businessId, 50)
         .then(setPurchases)
         .catch((err) => setError(err instanceof Error ? err.message : t('errors.refreshFailed')))
         .finally(() => setLoadingPurchases(false));

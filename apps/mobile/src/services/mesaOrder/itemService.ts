@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { getSupabaseClient } from '../../lib/supabase';
 import { normalizeText, normalizeNumber } from '../../utils/normalization';
 import { isFunctionUnavailableError, isMissingColumnError } from '../../utils/supabaseErrors';
@@ -31,6 +33,84 @@ function isMissingListOpenOrderSnapshotRpcError(errorLike: SupabaseErrorLike) {
 
 function isMissingListOpenOrderSnapshotFastRpcError(errorLike: SupabaseErrorLike) {
   return isFunctionUnavailableError(errorLike, 'list_open_order_snapshot_fast');
+}
+
+// El probe de compatibilidad del RPC se ejecuta una vez por sesión y su
+// resultado se persiste (claveado por versión de build) para no disparar una
+// query de probe en cada arranque de la app.
+const RPC_PROBE_STORAGE_PREFIX = 'stocky:rpc-probe:list-open-order-snapshot-fast:';
+const RPC_PROBE_TTL_MS = 24 * 60 * 60 * 1000;
+
+function getRpcProbeStorageKey(): string {
+  const appVersion = String(
+    (Constants as { expoConfig?: { version?: string } })?.expoConfig?.version || 'unknown',
+  );
+  return `${RPC_PROBE_STORAGE_PREFIX}${appVersion}`;
+}
+
+async function readRpcProbeFromStorage(): Promise<'supported' | 'unsupported' | null> {
+  try {
+    const raw = await AsyncStorage.getItem(getRpcProbeStorageKey());
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { value?: string; cachedAt?: number };
+    const cachedAt = Number(parsed?.cachedAt || 0);
+    const value = String(parsed?.value || '');
+    if (!Number.isFinite(cachedAt) || cachedAt <= 0) return null;
+    if (Date.now() - cachedAt > RPC_PROBE_TTL_MS) return null;
+    if (value !== 'supported' && value !== 'unsupported') return null;
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+async function persistRpcProbeToStorage(value: 'supported' | 'unsupported'): Promise<void> {
+  try {
+    await AsyncStorage.setItem(
+      getRpcProbeStorageKey(),
+      JSON.stringify({ value, cachedAt: Date.now() }),
+    );
+  } catch {
+    // Persistir es best-effort: si falla, el próximo arranque vuelve a probear.
+  }
+}
+
+export function preloadRpcCompatibility(): Promise<void> {
+  if (rpcPreloadPromise) return rpcPreloadPromise;
+
+  rpcPreloadPromise = (async () => {
+    const stored = await readRpcProbeFromStorage();
+    if (stored) {
+      openOrderSnapshotFastRpcCompatibility = stored;
+      return;
+    }
+
+    try {
+      const client = getSupabaseClient();
+      const { error } = await client.rpc('list_open_order_snapshot_fast', {
+        p_order_id: '00000000-0000-0000-0000-000000000000',
+      });
+
+      if (error) {
+        if (isMissingListOpenOrderSnapshotFastRpcError(error)) {
+          openOrderSnapshotFastRpcCompatibility = 'unsupported';
+        } else {
+          openOrderSnapshotFastRpcCompatibility = 'supported';
+        }
+      } else {
+        openOrderSnapshotFastRpcCompatibility = 'supported';
+      }
+    } catch {
+      openOrderSnapshotFastRpcCompatibility = 'unknown';
+      return;
+    }
+
+    if (openOrderSnapshotFastRpcCompatibility === 'supported' || openOrderSnapshotFastRpcCompatibility === 'unsupported') {
+      await persistRpcProbeToStorage(openOrderSnapshotFastRpcCompatibility);
+    }
+  })();
+
+  return rpcPreloadPromise;
 }
 
 function normalizeJsonArray(value: unknown): Record<string, unknown>[] {
@@ -144,33 +224,6 @@ async function listOrderItemsBase(orderId: string) {
     )
     .eq('order_id', orderId)
     .order('id', { ascending: true });
-}
-
-export function preloadRpcCompatibility(): Promise<void> {
-  if (rpcPreloadPromise) return rpcPreloadPromise;
-
-  rpcPreloadPromise = (async () => {
-    try {
-      const client = getSupabaseClient();
-      const { error } = await client.rpc('list_open_order_snapshot_fast', {
-        p_order_id: '00000000-0000-0000-0000-000000000000',
-      });
-
-      if (error) {
-        if (isMissingListOpenOrderSnapshotFastRpcError(error)) {
-          openOrderSnapshotFastRpcCompatibility = 'unsupported';
-        } else {
-          openOrderSnapshotFastRpcCompatibility = 'supported';
-        }
-      } else {
-        openOrderSnapshotFastRpcCompatibility = 'supported';
-      }
-    } catch {
-      openOrderSnapshotFastRpcCompatibility = 'unknown';
-    }
-  })();
-
-  return rpcPreloadPromise;
 }
 
 export function invalidateOrderItemsCache(orderId?: string) {

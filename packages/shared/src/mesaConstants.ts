@@ -13,4 +13,4 @@ export const MESA_LOCK_TTL_MS = MESA_LOCK_TTL_SECONDS * 1000;
 export const MESA_LOCK_HEARTBEAT_MS = 20_000;
 
 /** Intervalo del poll de fallback de mesas (ms). */
-export const MESAS_REMOTE_FALLBACK_POLL_MS = 5_000;
+export const MESAS_REMOTE_FALLBACK_POLL_MS = 15_000;

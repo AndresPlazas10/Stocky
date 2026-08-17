@@ -22,7 +22,7 @@ import {
   resolveMesaSyncVersion,
   type MesaRecord,
 } from '../../../services/mesasService';
-import { resetOrderFlow } from '../utils/mesaHelpers';
+import { resetOrderFlow, mesaInUseMessage } from '../utils/mesaHelpers';
 
 type UseMesaOrderStateSnapshot = {
   showOrderModal: boolean;
@@ -105,7 +105,10 @@ type UseMesaOrderMutationsParams = {
       tableId: string;
       lockToken: string | null;
     } | null>;
-    acquireMesaLockForEdition: (mesa: MesaRecord) => Promise<boolean>;
+    acquireMesaLockForEdition: (mesa: MesaRecord) => Promise<{
+      granted: boolean;
+      ownerName?: string | null;
+    }>;
     releaseHeldMesaLock: (
       lockSnapshot?: {
         businessId: string;
@@ -808,13 +811,13 @@ export function useMesaOrderMutations({
           orderItemsCacheRef.current.set(orderId, []);
         }
         if (!skipLockAcquire) {
-          acquireMesaLockForEdition(mesa).then((granted) => {
-            if (!granted) {
+          acquireMesaLockForEdition(mesa).then((lockResult) => {
+            if (!lockResult?.granted) {
               setLoadingOrder(false);
               setShowOrderModal(false);
               setSelectedMesa(null);
               setOrderItems([]);
-              setError('Alguien esta usando esta mesa.');
+              setError(mesaInUseMessage(lockResult?.ownerName));
             }
           });
         }
@@ -829,14 +832,14 @@ export function useMesaOrderMutations({
         });
 
         Promise.all([lockPromise, snapshotPromise])
-          .then(([lockGranted, snapshot]) => {
-            if (!lockGranted) {
+          .then(([lockResult, snapshot]) => {
+            if (!lockResult?.granted) {
               setLoadingOrder(false);
               setShowOrderModal(false);
               setSelectedMesa(null);
               setOrderItems([]);
               setSearchCatalog('');
-              setError('Alguien esta usando esta mesa.');
+              setError(mesaInUseMessage(lockResult?.ownerName));
               return;
             }
 

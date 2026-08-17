@@ -63,6 +63,8 @@
     "defaults": {
         "generalSale": "General sale",
         "someoneUsingTable": "Someone is using this table.",
+        "mesaInUseByUser": "{{name}} is using this table.",
+        "ownerName": "Administrator",
         "user": "User",
         "item": "Product",
         "unknownError": "Unknown error",

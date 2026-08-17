@@ -78,11 +78,9 @@ export const employeesAdapter = {
       .maybeSingle();
   },
 
-  async getEmployeeByUserId(userId, selectSql = 'id, business_id') {
-    return supabase
-      .from('employees')
-      .select(selectSql)
-      .eq('user_id', userId)
-      .maybeSingle();
+  async getEmployeeByUserId(userId, selectSql = 'id, business_id', businessId?) {
+    let query = supabase.from('employees').select(selectSql).eq('user_id', userId);
+    if (businessId) query = query.eq('business_id', businessId);
+    return query.maybeSingle();
   },
 };

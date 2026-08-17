@@ -70,6 +70,7 @@ export function DashboardProvider({ session, children }: PropsWithChildren<{ ses
   useEffect(() => {
     let cancelled = false;
     let fallbackTimer: ReturnType<typeof setInterval> | null = null;
+    let realtimeHealthy = false;
 
     let client;
     try {
@@ -78,11 +79,15 @@ export function DashboardProvider({ session, children }: PropsWithChildren<{ ses
       return undefined;
     }
 
-    const scheduleContextRefresh = () => {
+    // El refresco disparado por un evento realtime fuerza la lectura (hubo un
+    // cambio real). El poll de 30s es solo un fallback para cuando el canal
+    // realtime no está conectado: respeta el cache de contexto (30s) y evita
+    // queries en estado estable.
+    const scheduleContextRefresh = (force = false) => {
       if (cancelled || contextRealtimeRefreshTimerRef.current) return;
       contextRealtimeRefreshTimerRef.current = setTimeout(() => {
         contextRealtimeRefreshTimerRef.current = null;
-        void refreshBusinessContext({ silent: true, forceRefresh: true });
+        void refreshBusinessContext({ silent: true, forceRefresh: force });
       }, 150);
     };
 
@@ -96,7 +101,7 @@ export function DashboardProvider({ session, children }: PropsWithChildren<{ ses
           table: 'employees',
           filter: `user_id=eq.${session.user.id}`,
         },
-        scheduleContextRefresh,
+        () => scheduleContextRefresh(true),
       )
       .on(
         'postgres_changes',
@@ -106,17 +111,19 @@ export function DashboardProvider({ session, children }: PropsWithChildren<{ ses
           table: 'businesses',
           filter: `created_by=eq.${session.user.id}`,
         },
-        scheduleContextRefresh,
+        () => scheduleContextRefresh(true),
       );
 
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        scheduleContextRefresh();
+        realtimeHealthy = true;
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        realtimeHealthy = false;
       }
     });
 
     fallbackTimer = setInterval(() => {
-      scheduleContextRefresh();
+      if (!realtimeHealthy) scheduleContextRefresh(true);
     }, 30000);
 
     return () => {

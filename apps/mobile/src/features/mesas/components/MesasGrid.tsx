@@ -14,6 +14,7 @@ type HeldMesaLock = {
 type MesaMeta = {
   occupied: boolean;
   lockedByOther: boolean;
+  lockOwnerName: string | null;
   total: number;
   isBusy: boolean;
 };
@@ -70,9 +71,10 @@ export const MesasGrid = React.memo(function MesasGrid({
       const lockedByOther = Boolean(
         mesaLock && (lockOwnerId ? !isOwnedByCurrentUser : lockToken ? !isSameClientLock : true),
       );
+      const lockOwnerName = String(mesaLock?.lock_owner_name || '').trim() || null;
       const total = Number(mesa?.orders?.total || 0);
 
-      map.set(mesa.id, { occupied, lockedByOther, total, isBusy });
+      map.set(mesa.id, { occupied, lockedByOther, lockOwnerName, total, isBusy });
     }
     return map;
   }, [mesas, actingMesaId, mesaLocksByTableId, heldMesaLock, contextBusinessId, sessionUserId]);
@@ -90,6 +92,7 @@ export const MesasGrid = React.memo(function MesasGrid({
       const meta = mesaMetaMap.get(mesa.id);
       const occupied = meta?.occupied ?? false;
       const lockedByOther = meta?.lockedByOther ?? false;
+      const lockOwnerName = meta?.lockOwnerName ?? null;
       const total = meta?.total ?? 0;
       const isBusy = meta?.isBusy ?? false;
       const callActive = isCallActive(mesa);
@@ -99,6 +102,7 @@ export const MesasGrid = React.memo(function MesasGrid({
           mesa={mesa}
           occupied={occupied}
           lockedByOther={lockedByOther}
+          lockOwnerName={lockOwnerName}
           isBusy={isBusy}
           total={total}
           callActive={callActive}

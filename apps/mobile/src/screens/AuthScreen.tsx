@@ -35,6 +35,7 @@ type SignInForm = {
 
 type SignUpForm = {
   name: string;
+  email: string;
   nit: string;
   address: string;
   phone: string;
@@ -229,6 +230,7 @@ export function AuthScreen() {
 
   const [signUpForm, setSignUpForm] = useState<SignUpForm>({
     name: '',
+    email: '',
     nit: '',
     address: '',
     phone: '',
@@ -254,6 +256,7 @@ export function AuthScreen() {
 
     return (
       signUpForm.name.trim().length > 1 &&
+      signUpForm.email.trim().length > 3 &&
       signUpForm.username.trim().length >= 3 &&
       signUpForm.password.trim().length >= 6 &&
       signUpForm.confirmPassword.trim().length >= 6
@@ -285,9 +288,18 @@ export function AuthScreen() {
     const username = normalizeUsername(signUpForm.username);
     const password = signUpForm.password;
     const confirmPassword = signUpForm.confirmPassword;
+    const cleanEmail = signUpForm.email.trim().toLowerCase();
 
     if (!name || !username || !password) {
       throw new Error('⚠️ Por favor completa todos los campos requeridos');
+    }
+
+    if (!cleanEmail) {
+      throw new Error('⚠️ El correo electrónico es obligatorio');
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      throw new Error('❌ El formato del correo es inválido');
     }
 
     if (/^\d+$/.test(name)) {
@@ -387,7 +399,7 @@ export function AuthScreen() {
         nit: signUpForm.nit,
         address: signUpForm.address,
         phone: signUpForm.phone,
-        email,
+        email: cleanEmail,
         username,
         t,
       })
@@ -547,6 +559,16 @@ export function AuthScreen() {
                       placeholder={t('auth.businessNamePlaceholder')}
                       icon="storefront-outline"
                       autoCapitalize="words"
+                    />
+
+                    <AuthInput
+                      label={t('auth.email')}
+                      value={signUpForm.email}
+                      onChangeText={(next) => setSignUpForm((prev) => ({ ...prev, email: next }))}
+                      placeholder={t('auth.emailPlaceholder')}
+                      icon="mail-outline"
+                      autoCapitalize="none"
+                      keyboardType="email-address"
                     />
 
                     <AuthInput

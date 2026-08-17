@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { logger } from '@/utils/logger';
 import {
   getAuthenticatedUser,
-  getBusinessByEmail,
+  getBusinessByUsername,
   getOwnedBusinessByUserId,
   getCurrentSession,
   isBusinessUsernameTaken
@@ -13,7 +13,6 @@ import {
 import {
   createBusinessRecord,
   createEmployeeRecord,
-  normalizeUsernameToEmail,
   signInWithUsernamePassword,
   signOutSession,
   signUpBusinessOwner
@@ -25,13 +24,14 @@ import { Label } from '@/components/ui/label';
 import { SaleErrorAlert } from '@/components/ui/SaleErrorAlert';
 import { SaleSuccessAlert } from '@/components/ui/SaleSuccessAlert';
 
-import { Store, Building2, MapPin, Phone, User, Lock, ArrowLeft, Loader2, Eye, EyeOff, Globe, Clock } from 'lucide-react';
+import { Store, Building2, MapPin, Phone, User, Lock, Mail, ArrowLeft, Loader2, Eye, EyeOff, Globe, Clock } from 'lucide-react';
 import { COUNTRIES } from '../config/countries';
 import { redirectAfterRegistration } from '../utils/deviceDetection';
 
 
 interface RegisterForm {
   name: string;
+  email: string;
   nit: string;
   address: string;
   phone: string;
@@ -47,6 +47,7 @@ function Register() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<RegisterForm>({
     name: '',
+    email: '',
     nit: '',
     address: '',
     phone: '',
@@ -75,6 +76,14 @@ function Register() {
       
       if (!name || !username || !password || !country) {
         throw new Error(t('register.fillAllFields'));
+      }
+
+      const cleanEmail = formData.email.trim().toLowerCase();
+      if (!cleanEmail) {
+        throw new Error(t('register.emailRequired'));
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        throw new Error(t('register.invalidEmail'));
       }
 
       if (country === 'US' && !formData.timezone) {
@@ -115,8 +124,6 @@ function Register() {
       if (usernameTaken) {
         throw new Error(t('register.usernameTaken'));
       }
-
-      const { email: cleanEmail } = normalizeUsernameToEmail(cleanUsername);
 
       let authData = null;
       try {
@@ -172,10 +179,10 @@ function Register() {
       try {
         businessData = await createBusinessRecord({
           name: name.trim(),
+          email: cleanEmail,
           nit: formData.nit.trim() || null,
           address: address.trim() || null,
           phone: phone.trim() || null,
-          email: cleanEmail,
           username: cleanUsername,
           created_by: activeUserId,
           country_code: formData.country,
@@ -220,13 +227,16 @@ function Register() {
     const checkSession = async () => {
       const session = await getCurrentSession();
       if (session) {
-        const [ownedBusiness, emailBusiness] = await Promise.all([
+        const metadataUsername = String(
+          (session.user.user_metadata as Record<string, unknown>)?.username || ''
+        ).trim();
+        const [ownedBusiness, usernameBusiness] = await Promise.all([
           getOwnedBusinessByUserId(session.user.id, 'id'),
-          session.user.email
-            ?           getBusinessByEmail(session.user.email as string, 'id')
+          metadataUsername
+            ? getBusinessByUsername(metadataUsername, 'id')
             : Promise.resolve(null)
         ]);
-        const business = ownedBusiness || emailBusiness || null;
+        const business = ownedBusiness || usernameBusiness || null;
 
         if (business) {
           redirectAfterRegistration();
@@ -326,6 +336,26 @@ function Register() {
                       type="text"
                       placeholder={t('register.businessNameExample')}
                       value={formData.name}
+                      onChange={handleChange}
+                      className="pl-10 h-10 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1 lg:col-span-2">
+                  <Label htmlFor="email" className="text-sm font-semibold text-primary-800">
+                    {t('register.email')} <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-primary-400" />
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      placeholder={t('register.emailPlaceholder')}
+                      value={formData.email}
                       onChange={handleChange}
                       className="pl-10 h-10 border border-primary-200 bg-primary-50/50 focus:border-primary focus-visible:ring-primary/20 transition-colors duration-200"
                       required

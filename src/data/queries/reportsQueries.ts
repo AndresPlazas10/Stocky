@@ -12,6 +12,13 @@ interface ReportsSnapshot {
   purchaseProducts: unknown[];
 }
 
+// El snapshot de reportes son 9 queries en paralelo: se cachea por negocio y
+// rango (inicio del periodo) para que cambiar de pestaña y volver no las
+// re-ejecute. El `end` de cada llamada es "ahora" y varía, pero dentro del TTL
+// la diferencia es despreciable para un dashboard de reportes.
+const REPORTS_SNAPSHOT_CACHE_TTL_MS = 30_000;
+const reportsSnapshotCache = new Map<string, { cachedAt: number; data: ReportsSnapshot }>();
+
 export async function getReportsSnapshot({
   businessId,
   start,
@@ -21,6 +28,12 @@ export async function getReportsSnapshot({
   start: string;
   end: string;
 }): Promise<ReportsSnapshot> {
+  const cacheKey = `${businessId}|${start}`;
+  const cached = reportsSnapshotCache.get(cacheKey);
+  if (cached && Date.now() - cached.cachedAt <= REPORTS_SNAPSHOT_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
   const [
     { data: ventas, error: ventasError },
     { data: compras, error: comprasError },
@@ -53,7 +66,7 @@ export async function getReportsSnapshot({
   if (combosError) throw combosError;
   if (purchaseProductsError) throw purchaseProductsError;
 
-  return {
+  const snapshot: ReportsSnapshot = {
     sales: ventas || [],
     purchases: compras || [],
     products: productos || [],
@@ -64,4 +77,7 @@ export async function getReportsSnapshot({
     combos: combos || [],
     purchaseProducts: purchaseProducts || []
   };
+
+  reportsSnapshotCache.set(cacheKey, { cachedAt: Date.now(), data: snapshot });
+  return snapshot;
 }

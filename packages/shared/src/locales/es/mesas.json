@@ -63,6 +63,8 @@
   "defaults": {
     "generalSale": "Venta general",
     "someoneUsingTable": "Alguien está usando esta mesa.",
+    "mesaInUseByUser": "{{name}} está usando esta mesa.",
+    "ownerName": "Administrador",
     "user": "Usuario",
     "item": "Producto",
     "unknownError": "Error desconocido",

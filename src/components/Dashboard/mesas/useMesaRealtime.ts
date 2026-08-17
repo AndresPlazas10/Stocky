@@ -224,7 +224,12 @@ export function useMesaRealtime({
   const scheduleOrderRealtimeRefresh = useCallback((orderId, mesaId) => {
     if (!orderId || !mesaId) return;
     if (justCompletedSaleRef.current) return;
-    if (normalizeEntityId(selectedMesaRef.current?.current_order_id) === normalizeEntityId(orderId)
+    const isSelectedOrder = normalizeEntityId(selectedMesaRef.current?.current_order_id) === normalizeEntityId(orderId);
+    // La reconciliación completa (releer orden + items) solo aplica a la orden
+    // que el usuario tiene abierta en el modal: el resto de tarjetas se
+    // reconcilia con el poll de mesas, sin re-lectura por cada evento.
+    if (!isSelectedOrder) return;
+    if (isSelectedOrder
       && orderItemsDirtyRef.current) {
       return;
     }
@@ -366,7 +371,7 @@ export function useMesaRealtime({
       } catch (err) {
         logger.warn('mesas:realtime:refresh_order_after_realtime failed', err);
       }
-    }, 100);
+    }, 250);
   }, [
     justCompletedSaleRef,
     selectedMesaRef,

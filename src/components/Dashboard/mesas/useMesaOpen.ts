@@ -51,9 +51,10 @@ interface UseMesaOpenParams {
   pendingQuantityUpdatesRef: React.MutableRefObject<Record<string, number>>;
   getMesaLockState: (tableId: string) => MesaLockState | null;
   activeMesaBroadcastRef: React.MutableRefObject<MesaBroadcastState | null>;
-  publishMesaLockBroadcast: (params: { tableId: string; locked: boolean; mode: string; lockToken: string | null }) => void;
+  publishMesaLockBroadcast: (params: { tableId: string; locked: boolean; mode: string; lockToken: string | null; lockOwnerName?: string | null }) => void;
   mesaSyncClientIdRef: React.MutableRefObject<string>;
-  acquireMesaEditLockWeb: (params: { targetBusinessId: string; tableId: string; lockToken: string }) => Promise<MesaLockResult>;
+  acquireMesaEditLockWeb: (params: { targetBusinessId: string; tableId: string; lockToken: string; lockOwnerName?: string | null }) => Promise<MesaLockResult>;
+  resolveWebUserName: () => Promise<string>;
   heldMesaLockRef: React.MutableRefObject<{ businessId: string; tableId: string; lockToken: string } | null>;
   ensureCatalogWarmup: () => Promise<void>;
   showError: (title: string, message?: string) => void;
@@ -83,6 +84,7 @@ export function useMesaOpen({
   publishMesaLockBroadcast,
   mesaSyncClientIdRef,
   acquireMesaEditLockWeb,
+  resolveWebUserName,
   heldMesaLockRef,
   ensureCatalogWarmup,
   showError,
@@ -430,7 +432,7 @@ export function useMesaOpen({
       const lockState = getMesaLockState(normalizedMesa?.id);
       if (lockState?.lockedByOther) {
         setMesaOpenDebugStage('open:lock-blocked');
-        showError('Error',getMesaInUseMessage(t));
+        showError('Error', getMesaInUseMessage(t, lockState?.lockOwnerName));
         return;
       }
     }
@@ -438,7 +440,7 @@ export function useMesaOpen({
     const resolvedUserId = await ensureCurrentUser();
     if (!resolvedUserId) {
       setMesaOpenDebugStage('open:user-missing');
-      showError('Error',t('mesas:errors.sessionFailed'));
+      showError('Error', t('mesas:errors.sessionFailed'));
       return;
     }
 
@@ -446,6 +448,7 @@ export function useMesaOpen({
       setMesaOpenDebugStage('open:lock-acquire');
       const nextMesaId = normalizeEntityId(normalizedMesa.id);
       if (nextMesaId) {
+        const resolvedLockOwnerName = await resolveWebUserName();
         const previousActive = activeMesaBroadcastRef.current;
         if (previousActive?.tableId && previousActive.tableId !== nextMesaId) {
           publishMesaLockBroadcast({
@@ -460,13 +463,15 @@ export function useMesaOpen({
           tableId: nextMesaId,
           locked: true,
           mode: 'optimistic',
-          lockToken
+          lockToken,
+          lockOwnerName: resolvedLockOwnerName,
         });
         activeMesaBroadcastRef.current = { tableId: nextMesaId, lockToken, locked: true, mode: 'optimistic' };
         const result = await acquireMesaEditLockWeb({
           targetBusinessId: businessId,
           tableId: nextMesaId,
-          lockToken
+          lockToken,
+          lockOwnerName: resolvedLockOwnerName,
         });
 
         if (result?.unsupported) {
@@ -481,7 +486,8 @@ export function useMesaOpen({
             tableId: nextMesaId,
             locked: true,
             mode: 'confirmed',
-            lockToken: result.lockToken || lockToken
+            lockToken: result.lockToken || lockToken,
+            lockOwnerName: result.lockOwnerName || resolvedLockOwnerName,
           });
         } else {
           setMesaOpenDebugStage('open:lock-rejected');
@@ -493,7 +499,7 @@ export function useMesaOpen({
           });
           activeMesaBroadcastRef.current = null;
           heldMesaLockRef.current = null;
-          showError('Error',getMesaInUseMessage(t));
+          showError('Error', getMesaInUseMessage(t, result?.lockOwnerName));
           return;
         }
       }
@@ -525,6 +531,7 @@ export function useMesaOpen({
     businessId,
     isOfflineFirstRuntime,
     acquireMesaEditLockWeb,
+    resolveWebUserName,
     createNewOrder,
     ensureCatalogWarmup,
     loadOrderDetails,

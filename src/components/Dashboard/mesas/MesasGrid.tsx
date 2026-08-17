@@ -16,6 +16,7 @@ import { ElapsedTimer } from './ElapsedTimer';
 
 interface MesaLockState {
   lockedByOther?: boolean;
+  lockOwnerName?: string | null;
 }
 
 interface MesasGridProps {
@@ -31,6 +32,16 @@ interface MesasGridProps {
   selectedMesaUnits?: number | null;
   lowMotionMode?: boolean;
   isKitchen?: boolean;
+  resolveItemName?: (item: {
+    id?: string;
+    quantity?: number;
+    price?: number;
+    subtotal?: number;
+    product_id?: string | null;
+    combo_id?: string | null;
+    products?: { name?: string } | null;
+    combos?: { nombre?: string } | null;
+  }) => string;
   businessId?: string;
   getMesaLockState?: ((mesaId: string) => MesaLockState | null) | null;
   mostRecentOrderId?: string | null;
@@ -54,6 +65,7 @@ const MesasGrid = memo(function MesasGrid({
   selectedMesaUnits = null,
   lowMotionMode = false,
   isKitchen = false,
+  resolveItemName,
   businessId,
   getMesaLockState = null,
   mostRecentOrderId = null,
@@ -132,6 +144,7 @@ const MesasGrid = memo(function MesasGrid({
           const units = shouldUseSelectedUnits ? selectedMesaUnits : getMesaProductUnits(mesa);
           const lockState = typeof getMesaLockState === 'function' ? getMesaLockState(mesa.id) : null;
           const lockedByOther = Boolean(lockState?.lockedByOther);
+          const lockOwnerName = lockState?.lockOwnerName ?? null;
           const isOccupied = mesa.status === 'occupied';
           const mesaOrderItems = Array.isArray(mesa.orders?.order_items) ? mesa.orders.order_items : [];
           const mesaOrderTotal = mesaOrderItems.length > 0
@@ -252,7 +265,7 @@ const MesasGrid = memo(function MesasGrid({
                                 className="flex items-center justify-between gap-2"
                               >
                                 <span className="text-sm font-semibold text-gray-800 truncate">
-                                  {item.products?.name || item.combos?.nombre || t('mesas:defaults.item')}
+                                  {resolveItemName?.(item) ?? (item.products?.name || item.combos?.nombre || t('mesas:defaults.item'))}
                                 </span>
                                 <span className="shrink-0 inline-flex items-center justify-center min-w-7 h-7 px-1.5 rounded-lg bg-primary-100 text-primary-800 text-sm font-bold">
                                   x{item.quantity ?? 1}
@@ -291,7 +304,7 @@ const MesasGrid = memo(function MesasGrid({
                   {lockedByOther ? (
                     <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-white/85 backdrop-blur-sm">
                       <div className="max-w-[85%] rounded-lg border border-red-200 bg-red-100/90 px-3 py-2 text-sm font-semibold text-red-700 shadow-sm">
-                        {getMesaInUseMessage(t)}
+                        {getMesaInUseMessage(t, lockOwnerName)}
                       </div>
                     </div>
                   ) : null}

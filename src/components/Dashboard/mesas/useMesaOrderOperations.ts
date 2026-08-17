@@ -23,8 +23,9 @@ interface UseMesaOrderOperationsParams {
   pendingRemoteOrderTotalsRef: React.MutableRefObject<Record<string, number>>;
   orderTotalSyncQueueRef: React.MutableRefObject<Record<string, Promise<void>>>;
   lastSyncedOrderTotalsRef: React.MutableRefObject<Record<string, number>>;
-  acquireMesaEditLockWeb: (params: { targetBusinessId: string; tableId: string; lockToken: string }) => Promise<MesaLockResult>;
-  publishMesaLockBroadcast: (params: { tableId: string; locked: boolean; mode: string; lockToken: string | null }) => void;
+  acquireMesaEditLockWeb: (params: { targetBusinessId: string; tableId: string; lockToken: string; lockOwnerName?: string | null }) => Promise<MesaLockResult>;
+  resolveWebUserName: () => Promise<string>;
+  publishMesaLockBroadcast: (params: { tableId: string; locked: boolean; mode: string; lockToken: string | null; lockOwnerName?: string | null }) => void;
   ensureCatalogWarmup: () => Promise<void>;
   isOfflineFirstRuntime: boolean;
   setMesaOpenDebugStage: (stage: string) => void;
@@ -71,6 +72,7 @@ export function useMesaOrderOperations({
   orderTotalSyncQueueRef,
   lastSyncedOrderTotalsRef,
   acquireMesaEditLockWeb,
+  resolveWebUserName,
   publishMesaLockBroadcast,
   ensureCatalogWarmup,
   isOfflineFirstRuntime,
@@ -133,6 +135,7 @@ export function useMesaOrderOperations({
     isOfflineFirstRuntime, setMesaOpenDebugStage, buildMesaOpenDebugTag,
     isOpeningTableRef, pendingQuantityUpdatesRef, showError,
     acquireMesaEditLockWeb,
+    resolveWebUserName,
     activeMesaBroadcastRef, publishMesaLockBroadcast,
     mesaSyncClientIdRef, heldMesaLockRef, getMesaLockState,
     ensureCatalogWarmup, orderDetailsRequestRef,

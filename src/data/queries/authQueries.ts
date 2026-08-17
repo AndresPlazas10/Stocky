@@ -59,8 +59,12 @@ export async function getBusinessOwnerById(businessId: string): Promise<{ id: st
   return data || null;
 }
 
-export async function getEmployeeByUserId(userId: string, selectSql: string = '*'): Promise<Employee | null> {
-  const { data, error } = await readAdapter.getEmployeeByUserId(userId, selectSql);
+export async function getEmployeeByUserId(
+  userId: string,
+  selectSql: string = '*',
+  businessId?: string | null
+): Promise<Employee | null> {
+  const { data, error } = await readAdapter.getEmployeeByUserId(userId, selectSql, businessId);
   if (error) throw error;
   return data || null;
 }
@@ -90,6 +94,15 @@ export async function isBusinessUsernameTaken(username: string): Promise<boolean
   const { data, error } = await supabaseAdapter.getBusinessByUsername(username, 'id');
   if (error) throw error;
   return Boolean((data as { id?: string })?.id);
+}
+
+export async function getBusinessByUsername(
+  username: string,
+  selectSql: string = 'id'
+): Promise<Business | null> {
+  const { data, error } = await supabaseAdapter.getBusinessByUsername(username, selectSql);
+  if (error) throw error;
+  return (data as unknown as Business) || null;
 }
 
 interface SalesSeller {

@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -377,10 +377,11 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
     void refreshCatalogSilently();
   }, [refreshCatalogSilently]);
 
-  useSupabaseRealtime({
-    channelKey: 'ventas',
-    businessId,
-    tables: [
+  // La lista de suscripciones debe ser estable: un literal inline cambiaría de
+  // identidad en cada render y re-crearía el canal realtime (y re-dispararía
+  // onSubscribed) en cada re-render del panel.
+  const realtimeTables = useMemo(
+    () => [
       {
         table: 'sales',
         filter: businessId ? `business_id=eq.${businessId}` : undefined,
@@ -398,6 +399,16 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
         onEvent: scheduleCatalogRefresh,
       },
     ],
+    // Las funciones de evento son estables (useCallback con [] internamente);
+    // los deps cubren businessId, que es lo único que puede variar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [businessId],
+  );
+
+  useSupabaseRealtime({
+    channelKey: 'ventas',
+    businessId,
+    tables: realtimeTables,
     onSubscribed: scheduleSalesRefresh,
     onPollTick: scheduleSalesRefresh,
   });
@@ -406,7 +417,7 @@ export function VentasPanel({ businessId, businessName, source }: Props) {
     useCallback(() => {
       setLoadingSales(true);
       setError(null);
-      listRecentVentas(businessId, 50, { forceRefresh: true })
+      listRecentVentas(businessId, 50)
         .then(setVentas)
         .catch((err) => setError(err instanceof Error ? err.message : t('errors.refreshFailed')))
         .finally(() => setLoadingSales(false));

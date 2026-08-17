@@ -4,13 +4,14 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { StockyMoneyText } from '../../../ui/StockyMoneyText';
 import { StatusPill } from './StatusPill';
-import { MESA_IN_USE_MESSAGE, mesaDisplayName } from '../utils/mesaHelpers';
+import { mesaInUseMessage, mesaDisplayName } from '../utils/mesaHelpers';
 import type { MesaRecord } from '../../../services/mesasService';
 
 interface MesaCardProps {
   mesa: MesaRecord;
   occupied: boolean;
   lockedByOther: boolean;
+  lockOwnerName?: string | null;
   isBusy?: boolean;
   total?: number;
   callActive?: boolean;
@@ -25,6 +26,7 @@ export const MesaCard = React.memo(function MesaCard({
   mesa,
   occupied,
   lockedByOther,
+  lockOwnerName = null,
   isBusy = false,
   total = 0,
   callActive = false,
@@ -130,7 +132,7 @@ export const MesaCard = React.memo(function MesaCard({
         <View pointerEvents="none" style={styles.lockOverlay}>
           <View style={styles.lockScrimStrong} />
           <View style={styles.lockScrim} />
-          <Text style={styles.lockText}>{MESA_IN_USE_MESSAGE}</Text>
+          <Text style={styles.lockText}>{mesaInUseMessage(lockOwnerName)}</Text>
         </View>
       ) : null}
     </Pressable>

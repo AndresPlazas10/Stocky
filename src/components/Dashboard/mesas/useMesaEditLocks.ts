@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   normalizeEntityId,
@@ -8,6 +8,10 @@ import {
   isMissingTableEditLocksColumnError,
   MESA_LOCK_TTL_SECONDS,
 } from './mesaHelpers';
+import {
+  getOwnedBusinessByUserId,
+  getEmployeeByUserId,
+} from '../../../data/queries/authQueries';
 import { supabase } from '../../../supabase/Client';
 import { logger } from '../../../utils/logger';
 
@@ -27,9 +31,80 @@ export function useMesaEditLocks({
     [currentUser?.id],
   );
 
+  // Nombre visible del usuario actual para los locks de mesa:
+  // 1. Dueño del negocio -> rol de propietario (i18n)
+  // 2. Empleado -> employees.full_name
+  // 3. Fallback -> user_metadata.full_name / name / email
+  const webUserNameCacheRef = useRef<string | null>(null);
+  const webUserNameInFlightRef = useRef<Promise<string> | null>(null);
+
   const resolveWebUserName = useCallback(
-    () => normalizeDisplayName(currentUser?.email || currentUser?.name || 'Admin', t),
-    [currentUser?.email, currentUser?.name, t],
+    async (): Promise<string> => {
+      if (webUserNameCacheRef.current) return webUserNameCacheRef.current;
+      if (webUserNameInFlightRef.current) return webUserNameInFlightRef.current;
+
+      const promise = (async () => {
+        const userId = resolveWebUserId();
+        const normalizedBusinessId = String(businessId || '').trim();
+        const currentUserAny = currentUser as unknown as {
+          email?: string;
+          name?: string;
+          user_metadata?: Record<string, unknown>;
+        };
+        const meta =
+          currentUserAny?.user_metadata &&
+          typeof currentUserAny.user_metadata === 'object'
+            ? currentUserAny.user_metadata
+            : {};
+        const metaName = String(meta?.full_name || meta?.name || '').trim();
+
+        if (!userId) {
+          const fallback = normalizeDisplayName(metaName, t);
+          webUserNameCacheRef.current = fallback;
+          return fallback;
+        }
+
+        if (normalizedBusinessId) {
+          try {
+            const owned = await getOwnedBusinessByUserId(userId, 'id');
+            if (owned) {
+              const name = t('mesas:defaults.ownerName');
+              webUserNameCacheRef.current = name;
+              return name;
+            }
+          } catch {
+            // sigue al siguiente intento de resolución
+          }
+          try {
+            const employee = (await getEmployeeByUserId(userId, 'full_name', normalizedBusinessId)) as unknown as {
+              full_name?: string;
+            } | null;
+            const fullName = String(employee?.full_name || '').trim();
+            if (fullName) {
+              webUserNameCacheRef.current = fullName;
+              return fullName;
+            }
+          } catch {
+            // sigue al fallback
+          }
+        }
+
+        const fallbackRaw =
+          metaName ||
+          String(currentUserAny?.email || currentUserAny?.name || '').trim();
+        const name = normalizeDisplayName(fallbackRaw, t);
+        webUserNameCacheRef.current = name;
+        return name;
+      })();
+
+      webUserNameInFlightRef.current = promise;
+      try {
+        return await promise;
+      } finally {
+        webUserNameInFlightRef.current = null;
+      }
+    },
+    [businessId, currentUser, resolveWebUserId, t],
   );
 
   useEffect(() => {
@@ -196,6 +271,7 @@ export function useMesaEditLocks({
         ? Math.min(parsedExpiresAt, nowMs + lockTtlMs)
         : nowMs + lockTtlMs;
       const lockExpiresAt = new Date(safeExpiresAtMs).toISOString();
+      const carriedOwnerName = String(payload?.lock_owner_name || '').trim();
 
       setMesaLocksByTableId((prev) => ({
         ...prev,
@@ -203,7 +279,10 @@ export function useMesaEditLocks({
           table_id: mesaId,
           business_id: resolvedBusinessId || String(prev[mesaId]?.business_id || '').trim(),
           lock_owner_user_id: ownerUserId,
-          lock_owner_name: 'Alguien',
+          lock_owner_name:
+            carriedOwnerName ||
+            String(prev[mesaId]?.lock_owner_name || '').trim() ||
+            'Alguien',
           lock_token: lockToken,
           lock_expires_at: lockExpiresAt,
           updated_at: new Date().toISOString(),
@@ -292,13 +371,15 @@ export function useMesaEditLocks({
   );
 
   const acquireMesaEditLockWeb = useCallback(
-    async ({ targetBusinessId, tableId, lockToken }) => {
+    async ({ targetBusinessId, tableId, lockToken, lockOwnerName }) => {
       const normalizedBusinessId = String(targetBusinessId || '').trim();
       const normalizedTableId = String(tableId || '').trim();
       const resolvedUserId = resolveWebUserId();
-      const resolvedUserName = resolveWebUserName();
+      const resolvedUserName = lockOwnerName
+        ? String(lockOwnerName || '').trim()
+        : await resolveWebUserName();
       if (!normalizedBusinessId || !normalizedTableId || !resolvedUserId) {
-        return { ok: false, unsupported: false, lock: null, lockToken: null };
+        return { ok: false, unsupported: false, lock: null, lockToken: null, lockOwnerName: null };
       }
 
       const now = new Date();
@@ -314,7 +395,13 @@ export function useMesaEditLocks({
       const isExpired = existing ? isMesaLockExpired(existing) : true;
 
       if (existing && !isExpired && String(existing.lock_owner_user_id || '').trim() !== resolvedUserId) {
-        return { ok: false, unsupported: false, lock: existing, lockToken: null };
+        return {
+          ok: false,
+          unsupported: false,
+          lock: existing,
+          lockToken: null,
+          lockOwnerName: String(existing?.lock_owner_name || '').trim() || null,
+        };
       }
 
       if (existing && isExpired) {
@@ -389,7 +476,7 @@ export function useMesaEditLocks({
             .maybeSingle();
 
           if (!fallbackUpdate.error && fallbackUpdate.data) {
-            return { ok: true, unsupported: false, lock: fallbackUpdate.data, lockToken: null };
+            return { ok: true, unsupported: false, lock: fallbackUpdate.data, lockToken: null, lockOwnerName: resolvedUserName };
           }
           if (fallbackUpdate.error) throw fallbackUpdate.error;
         }
@@ -413,12 +500,13 @@ export function useMesaEditLocks({
           unsupported: false,
           lock: insertResult.data,
           lockToken: normalizedLockToken,
+          lockOwnerName: resolvedUserName,
         };
       }
 
       if (insertResult.error) {
         if (isMissingTableEditLocksRelationError(insertResult.error)) {
-          return { ok: true, unsupported: true, lock: null, lockToken: null };
+          return { ok: true, unsupported: true, lock: null, lockToken: null, lockOwnerName: resolvedUserName };
         }
 
         if (isMissingTableEditLocksColumnError(insertResult.error, 'lock_token')) {
@@ -431,7 +519,7 @@ export function useMesaEditLocks({
             .maybeSingle();
 
           if (!fallbackInsert.error && fallbackInsert.data) {
-            return { ok: true, unsupported: false, lock: fallbackInsert.data, lockToken: null };
+            return { ok: true, unsupported: false, lock: fallbackInsert.data, lockToken: null, lockOwnerName: resolvedUserName };
           }
 
           if (fallbackInsert.error) {
@@ -451,7 +539,7 @@ export function useMesaEditLocks({
                 .select('table_id,business_id,lock_owner_user_id,lock_owner_name')
                 .maybeSingle();
               if (!legacyInsert.error && legacyInsert.data) {
-                return { ok: true, unsupported: false, lock: legacyInsert.data, lockToken: null };
+                return { ok: true, unsupported: false, lock: legacyInsert.data, lockToken: null, lockOwnerName: resolvedUserName };
               }
               if (legacyInsert.error) throw legacyInsert.error;
             }
@@ -475,7 +563,7 @@ export function useMesaEditLocks({
             .select('table_id,business_id,lock_owner_user_id,lock_owner_name')
             .maybeSingle();
           if (!legacyInsert.error && legacyInsert.data) {
-            return { ok: true, unsupported: false, lock: legacyInsert.data, lockToken: null };
+            return { ok: true, unsupported: false, lock: legacyInsert.data, lockToken: null, lockOwnerName: resolvedUserName };
           }
           if (legacyInsert.error) throw legacyInsert.error;
         }
@@ -483,17 +571,19 @@ export function useMesaEditLocks({
         throw insertResult.error;
       }
 
-      return { ok: false, unsupported: false, lock: null, lockToken: null };
+      return { ok: false, unsupported: false, lock: null, lockToken: null, lockOwnerName: resolvedUserName };
     },
     [resolveWebUserId, resolveWebUserName, selectMesaEditLockByTableId],
   );
 
   const refreshMesaEditLockHeartbeatWeb = useCallback(
-    async ({ targetBusinessId, tableId, lockToken }) => {
+    async ({ targetBusinessId, tableId, lockToken, lockOwnerName }) => {
       const normalizedBusinessId = String(targetBusinessId || '').trim();
       const normalizedTableId = String(tableId || '').trim();
       const resolvedUserId = resolveWebUserId();
-      const resolvedUserName = resolveWebUserName();
+      const resolvedUserName = lockOwnerName
+        ? String(lockOwnerName || '').trim()
+        : await resolveWebUserName();
       if (!normalizedBusinessId || !normalizedTableId || !resolvedUserId) {
         return { ok: false, unsupported: false, lock: null, lost: true };
       }
@@ -612,5 +702,6 @@ export function useMesaEditLocks({
     refreshMesaLocks,
     applyRealtimeMesaLockRow,
     applyRealtimeMesaLockBroadcast,
+    resolveWebUserName,
   };
 }

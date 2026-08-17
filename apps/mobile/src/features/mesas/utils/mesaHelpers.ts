@@ -27,6 +27,21 @@ import {
 
 export const MESA_IN_USE_MESSAGE = 'Alguien esta usando esta mesa.';
 
+/**
+ * Mensaje de "mesa en uso" con el nombre real del usuario que la tiene abierta.
+ * Si el nombre no está disponible o es genérico, cae al mensaje por defecto.
+ */
+export function mesaInUseMessage(ownerName?: string | null): string {
+  const normalized = String(ownerName || '').trim();
+  if (
+    normalized &&
+    !['alguien', 'usuario', 'user'].includes(normalized.toLowerCase())
+  ) {
+    return `${normalized} está usando esta mesa.`;
+  }
+  return MESA_IN_USE_MESSAGE;
+}
+
 export {
   CALL_WINDOW_MS,
   MESA_LOCK_TTL_MS,

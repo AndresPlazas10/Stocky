@@ -86,3 +86,11 @@ export {
 
 // Order Reconciliation
 export { reconcileOrderItemsFromServer } from './orderReconciliation.js';
+
+// Kitchen Alerts
+export type { KitchenAlertKind, KitchenAlertCoalescer, KitchenAlertCoalescerOptions } from './kitchenAlerts.js';
+export {
+  KITCHEN_ALERT_WINDOW_MS,
+  KITCHEN_ALERT_PRIORITY,
+  createKitchenAlertCoalescer
+} from './kitchenAlerts.js';

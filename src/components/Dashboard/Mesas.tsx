@@ -10,13 +10,15 @@ import { Button } from '../ui/button';
 import { AsyncStateWrapper } from '../../ui/system/async-state/index.js';
 import { useAppToast, TOAST_DEFAULT_DURATION } from '../../hooks/useAppToast';
 import { playNewOrderBeep } from '../../utils/notificationSound';
-import { getTotalProductUnits, getOrderItemRenderKey, getOrderItemName } from './mesas/mesaHelpers';
+import { getTotalProductUnits, getOrderItemRenderKey, getOrderItemName, resolveOrderItemDisplayNameFrom } from './mesas/mesaHelpers';
+import { isAdminRole } from '../../utils/roles';
 import MesasGrid from './mesas/MesasGrid';
 import { useMesaEditLocks } from './mesas/useMesaEditLocks.js';
 import { useMesaRealtime } from './mesas/useMesaRealtime.js';
 import { useMesaOrderOperations } from './mesas/useMesaOrderOperations';
 import { useMesaPayment } from './mesas/useMesaPayment.js';
 import { useMesasState } from './mesas/useMesasState.js';
+import { useKitchenOrderAlerts } from './mesas/useKitchenOrderAlerts';
 import { useMesasRefs } from './mesas/useMesasRefs.js';
 import { useMesasEffects } from './mesas/useMesasEffects.js';
 import { useMesasCatalog } from './mesas/useMesasCatalog.js';
@@ -37,9 +39,9 @@ import { PrintReceiptConfirmModal } from '../ui/PrintReceiptConfirmModal';
 function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRole?: string }) {
   const { t } = useTranslation(['mesas', 'common']);
   const config = useBusinessConfig();
-  const { showError, showSuccess, showInfo, ToastComponent } = useAppToast();
-  const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
   const isKitchenRole = userRole === 'kitchen' || userRole === 'cocina';
+  const { showError, showSuccess, showInfo, ToastComponent } = useAppToast({ large: isKitchenRole });
+  const priceConfig = { locale: config.locale, currency: config.currency, currencySymbol: config.currencySymbol, decimals: config.decimals };
   
   const state = useMesasState(businessId, userRole);
   const refs = useMesasRefs({
@@ -47,7 +49,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     currentUser: state.currentUser,
   });
 
-  const { loadCombos, ensureCatalogWarmup } = useMesaCatalog({
+  const { loadProductos, loadCombos, ensureCatalogWarmup } = useMesaCatalog({
     businessId,
     setProducts: state.setProducts,
     setCombos: state.setCombos,
@@ -64,6 +66,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     refreshMesaLocks,
     applyRealtimeMesaLockBroadcast,
     refreshMesaEditLockHeartbeatWeb,
+    resolveWebUserName,
   } = useMesaEditLocks({
     businessId,
     currentUser: state.currentUser,
@@ -239,6 +242,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     orderTotalSyncQueueRef: refs.orderTotalSyncQueueRef,
     lastSyncedOrderTotalsRef: refs.lastSyncedOrderTotalsRef,
     acquireMesaEditLockWeb,
+    resolveWebUserName,
     publishMesaLockBroadcast: refs.publishMesaLockBroadcast,
     ensureCatalogWarmup,
     isOfflineFirstRuntime: refs.isOfflineFirstRuntime,
@@ -268,6 +272,15 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     dismissedCallsRef,
   });
 
+  const handleKitchenOrderChanged = useKitchenOrderAlerts({
+    isKitchenRole,
+    mesasRef: latestMesasRef,
+    recordOrderArrival,
+    playNewOrderBeep,
+    showInfo,
+    t,
+  });
+
   useMesaRealtime({
     businessId,
     setMesas: state.setMesas,
@@ -289,50 +302,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     comboCatalogByIdRef: refs.comboCatalogByIdRef,
     isOpeningTableRef,
     emptyReleaseInProgressRef: refs.emptyReleaseInProgressRef,
-    onOrderChanged: (kind, payload) => {
-      if (!isKitchenRole) return;
-      const itemRow = payload as { order_id?: string; id?: string } | null;
-      const orderId = String(itemRow?.order_id || itemRow?.id || '').trim();
-      const matchingMesa = orderId
-        ? (Array.isArray(state.mesas) ? state.mesas : []).find(
-            (m) => String((m.orders as unknown as Record<string, unknown>)?.id || '') === orderId
-          )
-        : null;
-      // No avisar si la orden ya no está activa: cerrada, liberada o sin mesa.
-      // En 'new' se tolera que la mesa aún no aparezca en el estado del kitchen
-      // (el INSERT del item puede llegar antes del UPDATE de la tabla): se
-      // notifica igual y se resuelve la mesa cuando esté disponible.
-      if (!matchingMesa) {
-        if (kind !== 'new') return;
-      } else {
-        const mesaOrderStatus = String(
-          (matchingMesa?.orders as unknown as Record<string, unknown>)?.status || ''
-        ).trim().toLowerCase();
-        if (mesaOrderStatus === 'closed') return;
-        if (kind !== 'new' && matchingMesa.status !== 'occupied') return;
-      }
-      playNewOrderBeep();
-      recordOrderArrival(orderId);
-      const tableNumber = matchingMesa?.table_number;
-      const mesaLabel = tableNumber
-        ? t('mesas:labels.tableNumber', { number: tableNumber })
-        : null;
-      if (kind === 'new') {
-        showInfo(
-          t('mesas:toast.newOrder.title'),
-          mesaLabel
-            ? t('mesas:toast.newOrder.message', { mesa: mesaLabel })
-            : t('mesas:toast.newOrder.messageGeneric')
-        );
-        return;
-      }
-      showInfo(
-        t('mesas:toast.updatedOrder.title'),
-        mesaLabel
-          ? t('mesas:toast.updatedOrder.message', { mesa: mesaLabel })
-          : t('mesas:toast.updatedOrder.messageGeneric')
-      );
-    },
+    onOrderChanged: handleKitchenOrderChanged,
   });
 
   const {
@@ -419,6 +389,45 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     });
     refs.comboCatalogByIdRef.current = comboMap;
   }, [state.combos]);
+
+  // La cocina nunca abre mesas, así que ensureCatalogWarmup (que se dispara al
+  // abrir) nunca corre para ella. Sin el catálogo de productos/combos, los items
+  // que llegan por realtime (payload crudo sin relación embebida) se renderizan
+  // con el fallback "Producto". Se precarga el catálogo al montar para que la
+  // cocina pueda resolver los nombres reales.
+  useEffect(() => {
+    if (!isKitchenRole || !businessId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await Promise.all([loadProductos(), loadCombos()]);
+      } catch (err) {
+        if (!cancelled) {
+          logger.warn('mesas:kitchen_catalog_warmup failed', err);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isKitchenRole, businessId, loadProductos, loadCombos]);
+
+  const catalogNameByIdentity = useMemo(() => {
+    const map = new Map<string, string>();
+    (Array.isArray(state.products) ? state.products : []).forEach((product) => {
+      const productId = product?.id;
+      if (productId) map.set(`p:${productId}`, String(product?.name || '').trim());
+    });
+    (Array.isArray(state.combos) ? state.combos : []).forEach((combo) => {
+      const comboId = combo?.id;
+      if (comboId) map.set(`c:${comboId}`, String(combo?.nombre || combo?.name || '').trim());
+    });
+    return map;
+  }, [state.products, state.combos]);
+  const resolveItemName = useCallback(
+    (item: any) => resolveOrderItemDisplayNameFrom(item, catalogNameByIdentity, t('mesas:defaults.item')),
+    [catalogNameByIdentity, t],
+  );
 
   useMesasEffects({
     businessId,
@@ -527,7 +536,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
         transition={{ duration: 0.3, delay: 0.1 }}
         className="space-y-6"
       >
-        {!isKitchenRole && (
+        {isAdminRole(userRole) && (
         <MesasHeader
           canManageTables={state.canManageTables}
           onToggleAddForm={() => state.setShowAddForm(!state.showAddForm)}
@@ -580,6 +589,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
             }
             lowMotionMode={state.lowMotionMode}
             isKitchen={isKitchenRole}
+            resolveItemName={isKitchenRole ? resolveItemName : undefined}
             businessId={businessId}
             getMesaLockState={getMesaLockState}
             mostRecentOrderId={mostRecentOrderId}

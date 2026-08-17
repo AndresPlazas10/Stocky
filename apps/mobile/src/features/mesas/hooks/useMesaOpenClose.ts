@@ -39,7 +39,10 @@ type UseMesaOpenCloseParams = {
   setActiveOrderId: (v: string | null) => void;
   closeOrderModal: () => void;
   openOrderModal: (mesa: MesaRecord, options?: Record<string, unknown>) => void;
-  acquireMesaLockForEdition: (mesa: MesaRecord) => Promise<boolean>;
+  acquireMesaLockForEdition: (mesa: MesaRecord) => Promise<{
+    granted: boolean;
+    ownerName?: string | null;
+  }>;
   ensureCatalogLoaded: (businessId: string, options?: { forceRefresh?: boolean }) => Promise<unknown[]>;
   publishMesaStateBroadcast: (mesa: MesaRecord, options?: Record<string, unknown>) => void;
   bumpMesaActionVersion: (mesaId: string) => number;
@@ -126,7 +129,7 @@ export function useMesaOpenClose({
 
       try {
         if (action === 'open') {
-          const [lockAcquired, updatedMesa] = await Promise.all([
+          const [lockResult, updatedMesa] = await Promise.all([
             acquireMesaLockForEdition(mesa),
             openCloseMesa({
               accessToken: session.access_token,
@@ -165,7 +168,7 @@ export function useMesaOpenClose({
                 : resolveMesaSyncVersion(mesa) + 1,
           };
 
-          if (!lockAcquired) {
+          if (!lockResult?.granted) {
             publishMesaStateBroadcast(mesa, {
               previousOrderId,
               mode: 'rollback',

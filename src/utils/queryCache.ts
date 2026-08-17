@@ -72,12 +72,12 @@ export const queryCache = new QueryCache();
 class RequestDeduplicator {
   private pending: Map<string, Promise<unknown>> = new Map();
 
-  async execute<T>(key: string, queryFn: () => Promise<T>): Promise<T> {
+  async execute<T>(key: string, queryFn: () => PromiseLike<T>): Promise<T> {
     if (this.pending.has(key)) {
       return this.pending.get(key) as Promise<T>;
     }
 
-    const promise = queryFn().finally(() => {
+    const promise = Promise.resolve(queryFn()).finally(() => {
       this.pending.delete(key);
     });
 

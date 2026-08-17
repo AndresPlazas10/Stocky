@@ -17,4 +17,5 @@ export { CALL_WINDOW_MS, MESA_LOCK_TTL_SECONDS, MESA_LOCK_TTL_MS, MESA_LOCK_HEAR
 export { normalizeOrderReference, normalizeOrderItemQuantity, normalizeOrderItemSubtotal, calculateOrderTotal, calculateOrderUnits, sumOrderItemsQuantity } from './orderNormalization.js';
 // Order Reconciliation
 export { reconcileOrderItemsFromServer } from './orderReconciliation.js';
+export { KITCHEN_ALERT_WINDOW_MS, KITCHEN_ALERT_PRIORITY, createKitchenAlertCoalescer } from './kitchenAlerts.js';
 //# sourceMappingURL=index.js.map
