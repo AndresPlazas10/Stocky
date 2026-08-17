@@ -18,6 +18,10 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Firebase config (se inyecta via GOOGLE_SERVICES_JSON_FILE en CI/EAS)
+google-services.json
+google-services.json.gradle
+
 # Metro
 .metro-health-check*
 

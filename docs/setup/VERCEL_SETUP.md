@@ -152,7 +152,7 @@ Aquí está la lista completa de variables que deberías tener configuradas:
 
 ```
 VITE_SUPABASE_URL=https://wngjyrkqxblnhxliakqj.supabase.co
-VITE_SUPABASE_ANON_KEY=REDACTED_SUPABASE_ANON_KEY
+VITE_SUPABASE_ANON_KEY=tu_anon_key_aqui
 ```
 
 ### Variables de EmailJS (fallback, opcional):

@@ -70,3 +70,6 @@ apps/mobile/credentials.json
 # Playwright test artifacts
 playwright-report/
 test-results/
+
+# k6 load-test results (generated artifacts, may contain tokens)
+testing/results/

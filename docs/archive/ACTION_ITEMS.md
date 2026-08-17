@@ -209,7 +209,7 @@ try {
 **Variables requeridas para producción**:
 ```env
 VITE_SUPABASE_URL=https://xxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+VITE_SUPABASE_ANON_KEY=tu_anon_key_aqui
 RESEND_API_KEY=re_xxx...
 VITE_FROM_EMAIL=noreply@tudominio.com
 ```

@@ -87,7 +87,7 @@ Los siguientes archivos **SÍ** tienen console.logs, pero están **protegidos po
 ```bash
 # OBLIGATORIAS
 VITE_SUPABASE_URL=https://xxxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+VITE_SUPABASE_ANON_KEY=tu_anon_key_aqui
 
 VITE_EMAILJS_SERVICE_ID=service_xxxxx
 VITE_EMAILJS_TEMPLATE_ID_INVOICE=template_xxxxx

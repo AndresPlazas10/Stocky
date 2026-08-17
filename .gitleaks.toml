@@ -1,0 +1,58 @@
+# Gitleaks config para Stocky
+# Añade reglas específicas del proyecto que los defaults no cubren:
+#   * Supabase anon/service_role key (JWT con ref de proyecto)
+#   * Firebase API key (AIzaSy...)
+#   * Resend API key (re_...)
+# La acción gitleaks-action@v2 detecta este archivo automáticamente
+# si está en la raíz del repo (GITLEAKS_CONFIG por defecto).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholders y archivos de ejemplo (seguros por diseño)"
+paths = [
+  '''\.env\.example$''',
+  '''\.env\.local\.example$''',
+  '''\.env\.production\.example$''',
+  '''google-services\.example\.json$''',
+  '''(^|/)dist/''',
+  '''(^|/)node_modules/''',
+  '''package-lock\.json$''',
+]
+regexes = [
+  '''PLACEHOLDER_''',
+  '''tu_[a-z_]+''',
+  '''your_[a-z_]+''',
+  '''re_xx+''',
+  '''AIzaSy[A-Za-z0-9_\-]{0,4}''',
+]
+
+[[rules]]
+id = "stocky-supabase-anon-key"
+description = "Supabase anon/service_role key (JWT con ref de proyecto)"
+regex = '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'''
+secret-group = 0
+tags = ["supabase", "jwt"]
+entropies = []
+
+[[rules]]
+id = "stocky-supabase-ref"
+description = "Supabase project ref + URL directa (indica credenciales embebidas)"
+regex = '''(https?://[a-z0-9]{20}\.supabase\.(co|com)|VITE_SUPABASE_URL\s*=\s*https://[a-z0-9]{20})'''
+secret-group = 0
+tags = ["supabase", "url"]
+
+[[rules]]
+id = "stocky-firebase-api-key"
+description = "Firebase/Google API key"
+regex = '''AIzaSy[A-Za-z0-9_\-]{33}'''
+secret-group = 0
+tags = ["firebase", "google"]
+
+[[rules]]
+id = "stocky-resend-api-key"
+description = "Resend API key"
+regex = '''\bre_[A-Za-z0-9]{20,}'''
+secret-group = 0
+tags = ["resend", "email"]
