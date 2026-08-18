@@ -53,7 +53,7 @@ export function useSaleDetails(t: (key: string, options?: any) => string) {
   return {
     selectedSale, setSelectedSale,
     showSaleDetailsModal, setShowSaleDetailsModal,
-    saleDetailsLoading, saleDetailsError,
+    saleDetailsLoading, saleDetailsError, setSaleDetailsError,
     fetchSaleDetails, openSaleDetailsModal, closeSaleDetailsModal,
   };
 }

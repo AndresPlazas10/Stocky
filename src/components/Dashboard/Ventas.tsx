@@ -132,10 +132,10 @@ function Ventas({ businessId, userRole = 'admin' }: DashboardModuleProps) {
   const { showDeleteModal, handleDeleteSale, confirmDeleteSale, cancelDelete } = deleteHook;
 
   const saleDetailsHook = useSaleDetails(t);
-  const { selectedSale, setSelectedSale, showSaleDetailsModal, saleDetailsLoading, saleDetailsError, fetchSaleDetails, openSaleDetailsModal } = saleDetailsHook;
+  const { selectedSale, setSelectedSale, showSaleDetailsModal, setShowSaleDetailsModal, saleDetailsLoading, saleDetailsError, setSaleDetailsError, fetchSaleDetails, openSaleDetailsModal } = saleDetailsHook;
 
   const invoiceHook = useInvoice(businessId, fetchSaleDetails, showSuccess, showError, t);
-  const { showInvoiceModal, invoiceCustomerName, setInvoiceCustomerName, invoiceCustomerEmail, setInvoiceCustomerEmail, invoiceCustomerIdNumber, setInvoiceCustomerIdNumber, generatingInvoice, generateInvoiceFromSale } = invoiceHook;
+  const { showInvoiceModal, setShowInvoiceModal, invoiceCustomerName, setInvoiceCustomerName, invoiceCustomerEmail, setInvoiceCustomerEmail, invoiceCustomerIdNumber, setInvoiceCustomerIdNumber, generatingInvoice, generateInvoiceFromSale } = invoiceHook;
 
   const printHook = usePrintReceipt(businessId, showError, t);
   const { showPrintModal, setShowPrintModal, printSaleData, setPrintSaleData, printSaleDetails, setPrintSaleDetails, isPrintingReceipt, printCustomerName, setPrintCustomerName, handlePrintConfirm, handlePrintCancel, handlePrintInvoice } = printHook;

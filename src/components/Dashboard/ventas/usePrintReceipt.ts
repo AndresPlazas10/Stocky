@@ -86,7 +86,7 @@ export function usePrintReceipt(
   }, [businessId, showError, t, config]);
 
   return {
-    showPrintModal,
+    showPrintModal, setShowPrintModal,
     printSaleData, setPrintSaleData,
     printSaleDetails, setPrintSaleDetails,
     isPrintingReceipt,
