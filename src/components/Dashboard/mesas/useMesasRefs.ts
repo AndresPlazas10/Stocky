@@ -8,6 +8,7 @@ export function useMesasRefs({
   currentUser,
 }) {
   const pendingQuantityUpdatesRef = useRef({});
+  const pendingItemDeletesRef = useRef<Record<string, string[]>>({});
   const orderItemsDirtyRef = useRef(false);
   const orderItemsRef = useRef([]);
   const selectedMesaRef = useRef(null);
@@ -124,6 +125,7 @@ export function useMesasRefs({
 
   return {
     pendingQuantityUpdatesRef,
+    pendingItemDeletesRef,
     orderItemsDirtyRef,
     orderItemsRef,
     selectedMesaRef,

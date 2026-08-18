@@ -17,6 +17,7 @@ interface UseMesaOrderOperationsParams {
   setOrderItems: SetState<any[]>;
   setPendingQuantityUpdatesSafe: SetState<any>;
   pendingQuantityUpdatesRef: React.MutableRefObject<Record<string, number>>;
+  pendingItemDeletesRef: React.MutableRefObject<Record<string, string[]>>;
   orderItemsDirtyRef: React.MutableRefObject<boolean>;
   orderItemsRef: React.MutableRefObject<any[]>;
   orderDetailsRequestRef: React.MutableRefObject<number>;
@@ -65,6 +66,7 @@ export function useMesaOrderOperations({
   setOrderItems,
   setPendingQuantityUpdatesSafe,
   pendingQuantityUpdatesRef,
+  pendingItemDeletesRef,
   orderItemsDirtyRef,
   orderItemsRef,
   orderDetailsRequestRef,
@@ -119,6 +121,7 @@ export function useMesaOrderOperations({
   } = useMesaItems({
     businessId, selectedMesa, orderItems, setOrderItems,
     setPendingQuantityUpdatesSafe, pendingQuantityUpdatesRef,
+    pendingItemDeletesRef,
     orderItemsRef, orderItemsDirtyRef,
     pendingRemoteOrderTotalsRef, lastSyncedOrderTotalsRef, orderTotalSyncQueueRef,
     showError, t, isOfflineFirstRuntime, quantityToAdd,
@@ -150,7 +153,8 @@ export function useMesaOrderOperations({
     businessId, selectedMesa, currentUser,
     emptyReleaseInProgressRef,
     pendingRemoteOrderTotalsRef, lastSyncedOrderTotalsRef,
-    pendingQuantityUpdatesRef, orderItemsRef, orderItemsDirtyRef,
+    pendingQuantityUpdatesRef, pendingItemDeletesRef,
+    orderItemsRef, orderItemsDirtyRef,
     setMesas, setShowOrderDetails, setModalOpenIntent,
     setSelectedMesa, setOrderItems, setSearchProduct,
     setPendingQuantityUpdatesSafe,

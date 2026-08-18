@@ -48,6 +48,7 @@ interface UseMesaCloseParams {
   pendingRemoteOrderTotalsRef: React.MutableRefObject<Record<string, number>>;
   lastSyncedOrderTotalsRef: React.MutableRefObject<Record<string, number>>;
   pendingQuantityUpdatesRef: React.MutableRefObject<Record<string, number>>;
+  pendingItemDeletesRef: React.MutableRefObject<Record<string, string[]>>;
   orderItemsRef: React.MutableRefObject<DynamicRow[]>;
   orderItemsDirtyRef: React.MutableRefObject<boolean>;
   setMesas: SetState<DynamicRow[]>;
@@ -73,6 +74,7 @@ export function useMesaClose({
   pendingRemoteOrderTotalsRef,
   lastSyncedOrderTotalsRef,
   pendingQuantityUpdatesRef,
+  pendingItemDeletesRef,
   orderItemsRef,
   orderItemsDirtyRef,
   setMesas,
@@ -102,6 +104,7 @@ export function useMesaClose({
     if (normalizedOrderId) {
       delete pendingRemoteOrderTotalsRef.current[normalizedOrderId];
       delete lastSyncedOrderTotalsRef.current[normalizedOrderId];
+      delete pendingItemDeletesRef.current[normalizedOrderId];
     }
 
     if (normalizedTableId) {
@@ -150,7 +153,7 @@ export function useMesaClose({
         emptyReleaseInProgressRef.current = null;
       }
     });
-  }, [businessId, clearClosedMesaCache, currentUser?.id, emptyReleaseInProgressRef, loadMesas, setPendingQuantityUpdatesSafe, setMesas, setShowOrderDetails, setModalOpenIntent, setSelectedMesa, setOrderItems, setSearchProduct, pendingRemoteOrderTotalsRef, lastSyncedOrderTotalsRef, orderItemsDirtyRef, orderItemsRef]);
+  }, [businessId, clearClosedMesaCache, currentUser?.id, emptyReleaseInProgressRef, loadMesas, setPendingQuantityUpdatesSafe, setMesas, setShowOrderDetails, setModalOpenIntent, setSelectedMesa, setOrderItems, setSearchProduct, pendingRemoteOrderTotalsRef, lastSyncedOrderTotalsRef, pendingItemDeletesRef, orderItemsDirtyRef, orderItemsRef]);
 
   const handleRefreshOrder = useCallback(async () => {
     if (!selectedMesa) return;
@@ -165,7 +168,7 @@ export function useMesaClose({
       let effectiveOrderItemsSnapshot = hasLocalEdits
         ? orderItemsSnapshot
         : (orderItemsSnapshot.length > 0 ? orderItemsSnapshot : mesaItemsSnapshot);
-      if (effectiveOrderItemsSnapshot.length === 0 && mesaSnapshot?.current_order_id) {
+      if (effectiveOrderItemsSnapshot.length === 0 && !hasLocalEdits && mesaSnapshot?.current_order_id) {
         try {
           let latestOrder = null;
           try {
@@ -213,6 +216,7 @@ export function useMesaClose({
           orderItemsRef.current = [];
           setOrderItems([]);
           setSearchProduct('');
+          delete pendingItemDeletesRef.current[normalizedSnapshotOrderId || ''];
           return;
         }
         releaseEmptyOrderAndCloseModal(mesaSnapshot);
@@ -301,6 +305,7 @@ export function useMesaClose({
     orderItemsRef,
     orderItemsDirtyRef,
     pendingQuantityUpdatesRef,
+    pendingItemDeletesRef,
     pendingRemoteOrderTotalsRef,
     t
   ]);
@@ -333,6 +338,9 @@ export function useMesaClose({
           orderItemsRef.current = [];
           setOrderItems([]);
           setPendingQuantityUpdatesSafe({});
+          if (normalizedSnapshotOrderId) {
+            delete pendingItemDeletesRef.current[normalizedSnapshotOrderId];
+          }
         });
         return;
       }
@@ -350,6 +358,9 @@ export function useMesaClose({
       orderItemsRef.current = [];
       setOrderItems([]);
       setPendingQuantityUpdatesSafe({});
+      if (normalizedSnapshotOrderId) {
+        delete pendingItemDeletesRef.current[normalizedSnapshotOrderId];
+      }
     });
   }, [
     selectedMesa,
@@ -360,6 +371,7 @@ export function useMesaClose({
     setSelectedMesa,
     setOrderItems,
     setPendingQuantityUpdatesSafe,
+    pendingItemDeletesRef,
     showError,
     orderItemsRef,
     orderItemsDirtyRef,

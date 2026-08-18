@@ -235,6 +235,7 @@ function Mesas({ businessId, userRole = 'admin' }: { businessId: string; userRol
     setOrderItems: state.setOrderItems,
     setPendingQuantityUpdatesSafe: refs.setPendingQuantityUpdatesSafe,
     pendingQuantityUpdatesRef: refs.pendingQuantityUpdatesRef,
+    pendingItemDeletesRef: refs.pendingItemDeletesRef,
     orderItemsDirtyRef: refs.orderItemsDirtyRef,
     orderItemsRef: refs.orderItemsRef,
     orderDetailsRequestRef: refs.orderDetailsRequestRef,

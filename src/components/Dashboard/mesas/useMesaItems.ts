@@ -4,6 +4,7 @@ import {
   persistOrderItemQuantities,
   persistOrderSnapshotWeb,
   updateOrderTotalById,
+  deleteOrderItemById,
 } from '@/data/commands/ordersCommands';
 import {
   ORDER_ITEMS_SELECT,
@@ -24,6 +25,7 @@ interface UseMesaItemsParams {
   setOrderItems: React.Dispatch<React.SetStateAction<any[]>>;
   setPendingQuantityUpdatesSafe: React.Dispatch<React.SetStateAction<any>>;
   pendingQuantityUpdatesRef: React.MutableRefObject<Record<string, number>>;
+  pendingItemDeletesRef: React.MutableRefObject<Record<string, string[]>>;
   orderItemsRef: React.MutableRefObject<any[]>;
   orderItemsDirtyRef: React.MutableRefObject<boolean>;
   pendingRemoteOrderTotalsRef: React.MutableRefObject<Record<string, number>>;
@@ -45,6 +47,7 @@ export function useMesaItems({
   setOrderItems,
   setPendingQuantityUpdatesSafe,
   pendingQuantityUpdatesRef,
+  pendingItemDeletesRef,
   orderItemsRef,
   orderItemsDirtyRef,
   pendingRemoteOrderTotalsRef,
@@ -137,8 +140,10 @@ export function useMesaItems({
     const nonTmpEntries = Object.entries(pendingMap).filter(
       ([key]) => !String(key || '').startsWith('tmp-')
     );
+    const orderIdKey = String(orderId || '').trim();
+    const pendingDeletes = orderIdKey ? (pendingItemDeletesRef.current[orderIdKey] || []) : [];
 
-    if (tmpItems.length === 0 && nonTmpEntries.length === 0) {
+    if (tmpItems.length === 0 && nonTmpEntries.length === 0 && pendingDeletes.length === 0) {
       setPendingQuantityUpdatesSafe({});
       return;
     }
@@ -154,6 +159,15 @@ export function useMesaItems({
         });
       } else {
         await persistOrderItemQuantities(nonTmpEntries, { businessId, orderId });
+      }
+
+      // Borrados diferidos de items ya persistidos en la DB: el snapshot RPC
+      // (rama tmp-) ya reconcilia, pero el path de cantidades no borra nada.
+      if (pendingDeletes.length > 0) {
+        await Promise.all(
+          pendingDeletes.map((itemId) => deleteOrderItemById(itemId, { businessId, orderId }))
+        );
+        delete pendingItemDeletesRef.current[orderIdKey];
       }
 
       if (refreshItems) {
@@ -180,16 +194,30 @@ export function useMesaItems({
       logger.warn('mesas:persist_pending_quantities failed', err);
       throw err;
     }
-  }, [setPendingQuantityUpdatesSafe, businessId, pendingQuantityUpdatesRef, orderItemsRef, setOrderItems]);
+  }, [setPendingQuantityUpdatesSafe, businessId, pendingQuantityUpdatesRef, pendingItemDeletesRef, orderItemsRef, setOrderItems]);
 
   const removeItem = useCallback(async (itemId: string) => {
-    // El borrado es local: el snapshot reconciliado al "Guardar" (persistOrderSnapshotWeb)
-    // elimina los items que ya no están en el estado de la orden.
+    // El borrado es local: al "Guardar" se persiste (deleteOrderItemById para
+    // items DB-backed, o el snapshot reconciliado para items tmp-).
     const currentOrderItems = Array.isArray(orderItemsRef.current) ? orderItemsRef.current : [];
+    const itemToRemove = currentOrderItems.find((item) => item.id === itemId);
     const nextOrderItems = currentOrderItems.filter((item) => item.id !== itemId);
     orderItemsDirtyRef.current = true;
     orderItemsRef.current = nextOrderItems;
     setOrderItems(nextOrderItems);
+    if (itemToRemove) {
+      const rawItemId = String(itemToRemove.id || '');
+      const isTempOrOfflineItem = rawItemId.startsWith('tmp-') || rawItemId.startsWith('offline-item-');
+      if (!isTempOrOfflineItem) {
+        const orderIdKey = String(selectedMesa?.current_order_id || '').trim();
+        if (orderIdKey) {
+          const current = pendingItemDeletesRef.current[orderIdKey] || [];
+          if (!current.includes(rawItemId)) {
+            pendingItemDeletesRef.current[orderIdKey] = [...current, rawItemId];
+          }
+        }
+      }
+    }
     setPendingQuantityUpdatesSafe((prev) => {
       const next = { ...(prev || {}) };
       delete next[itemId];
@@ -202,6 +230,7 @@ export function useMesaItems({
     selectedMesa,
     updateOrderTotal,
     setPendingQuantityUpdatesSafe,
+    pendingItemDeletesRef,
     setOrderItems,
     orderItemsRef,
     orderItemsDirtyRef,
