@@ -42,7 +42,31 @@ export const resolveEmailProvider = ({
   return resolveEmailProviderFromConfig({ providerHint, resendReady, emailJsReady });
 };
 
-export const sendInvoiceEmail = async (params) => {
+export interface SendEmailResult {
+  success: boolean;
+  provider?: string;
+  demo?: boolean;
+  testMode?: boolean;
+  targetEmail?: string;
+  originalEmail?: string;
+  data?: unknown;
+  error?: string;
+  message?: string;
+  fallbackBlocked?: boolean;
+  fallbackFrom?: string;
+  previousError?: string | null;
+}
+
+export const sendInvoiceEmail = async (params: {
+  email: string;
+  invoiceNumber: string;
+  customerName: string;
+  total: number;
+  items?: unknown[];
+  businessName?: string;
+  businessId: string | null;
+  issuedAt?: string | null;
+}): Promise<SendEmailResult> => {
   const provider = resolveEmailProvider();
   const enforceResendOnly = isResendOnlyEnforced();
   const allowEmailJsFallback = isEmailJsFallbackAllowed();

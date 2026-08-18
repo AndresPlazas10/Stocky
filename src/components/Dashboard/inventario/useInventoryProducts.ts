@@ -57,7 +57,7 @@ export function useInventoryProducts(businessId: string, userRole: string = 'adm
       }
     },
     loading: loadingMoreProducts,
-  } as Parameters<typeof useProgressiveList>[1]);
+  });
 
   const canLoadMoreProducts = hasMoreProducts || hasMoreProductsExternal;
 

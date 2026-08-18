@@ -138,7 +138,7 @@ export function useSaleProcessor({
 
       showSuccess(t('alerts.saleCreated'), `${t('labels.total', { ns: 'common' })}: ${fmtPrice(saleTotal)} | ${t('ventas:labels.paymentMethodLabel')}: ${getPaymentMethodLabel(paymentMethod, t)} | ${t('ventas:labels.time')}: ${elapsedMs.toFixed(0)}ms | ${t('ventas:labels.articles')}: ${cart.length}`);
 
-      if (result?.data?.pending_sync) {
+      if ((result?.data as { pending_sync?: boolean } | undefined)?.pending_sync) {
         const pendingSale = {
           id: result?.data?.id,
           business_id: businessId,
@@ -173,7 +173,7 @@ export function useSaleProcessor({
       }
 
       if (isAutoPrintReceiptEnabled()) {
-        const isPendingSync = !!result?.data?.pending_sync;
+        const isPendingSync = !!((result?.data as { pending_sync?: boolean } | undefined)?.pending_sync);
 
         let saleForPrint: any = null;
         let detailsForPrint: any[] = [];

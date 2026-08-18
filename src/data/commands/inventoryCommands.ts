@@ -28,13 +28,13 @@ interface CreateProductResult {
   localOnly: boolean;
 }
 
-interface ProductEventPayload {
+type ProductEventPayload = {
   product_id: string | null;
   supplier_id: string | null;
   manage_stock: boolean;
   stock: number;
   product: Partial<Product>;
-}
+};
 
 type ProductCreateEventPayload = ProductEventPayload;
 

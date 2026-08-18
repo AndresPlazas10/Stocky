@@ -121,7 +121,7 @@ function Compras({ businessId }: DashboardModuleProps) {
       // Crear mapa de empleados
       const employeeMap = new Map();
       employeesData?.forEach((emp) => {
-        const displayName = (emp as { full_name?: string; name: string }).full_name || emp.name || t('compras:labels.unknownUser');
+        const displayName = emp.full_name || t('compras:labels.unknownUser');
         employeeMap.set(emp.user_id, { full_name: displayName, role: emp.role });
       });
 

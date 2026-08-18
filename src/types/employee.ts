@@ -4,7 +4,7 @@ export interface Employee {
   id: string;
   business_id: string;
   user_id: string | null;
-  name: string;
+  full_name: string;
   email: string | null;
   phone: string | null;
   role: EmployeeRole;
