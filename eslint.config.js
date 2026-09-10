@@ -75,6 +75,10 @@ export default defineConfig([
       'no-empty': ['warn', { allowEmptyCatch: true }],
       'react-refresh/only-export-components': 'off',
       '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/ban-ts-comment': ['error', {
+        'ts-nocheck': 'allow-with-description',
+        minimumDescriptionLength: 3,
+      }],
     },
   },
   {

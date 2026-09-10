@@ -7,9 +7,9 @@ describe('parseCopAmount', () => {
     expect(parseCopAmount(undefined)).toBeNaN();
   });
 
-  it('returns rounded number for numeric input', () => {
+  it('returns numeric input as-is (sin redondeo)', () => {
     expect(parseCopAmount(1500)).toBe(1500);
-    expect(parseCopAmount(1500.75)).toBe(1501);
+    expect(parseCopAmount(1500.75)).toBe(1500.75);
   });
 
   it('parses es-CO format (dots as thousands, comma as decimal)', () => {
@@ -23,7 +23,7 @@ describe('parseCopAmount', () => {
 
   it('parses simple number strings', () => {
     expect(parseCopAmount('1500')).toBe(1500);
-    expect(parseCopAmount('1500.50')).toBe(1501);
+    expect(parseCopAmount('1500.50')).toBe(1500.5);
   });
 
   it('handles $ prefix', () => {

@@ -2,7 +2,7 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { resources, defaultNS, fallbackLng, ns } from '@stocky/shared/i18n';
 
-const savedLng = typeof window !== 'undefined' ? localStorage.getItem('i18nLng') : null;
+const savedLng = typeof window !== 'undefined' ? window.localStorage.getItem('i18nLng') : null;
 
 i18n
   .use(initReactI18next)
@@ -19,7 +19,7 @@ i18n
 
 i18n.on('languageChanged', (lng) => {
   if (typeof window !== 'undefined') {
-    localStorage.setItem('i18nLng', lng);
+    window.localStorage.setItem('i18nLng', lng);
   }
 });
 
