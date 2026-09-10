@@ -24,7 +24,16 @@ test.describe('Estado de la aplicación', () => {
   test('no tiene errores de consola fatales', async ({ page }) => {
     const errors = [];
     page.on('console', (msg) => {
-      if (msg.type() === 'error' && !msg.text().includes('favicon')) {
+      const locationUrl = msg.location()?.url || '';
+      const isKnownNoise =
+        msg.text().includes('favicon')
+        // Runtime de Spline (tercero) en la landing
+        || msg.text().includes('Missing property')
+        // Scripts de Vercel Analytics no existen fuera de Vercel
+        || locationUrl.includes('/_vercel/insights/')
+        || locationUrl.includes('/_vercel/speed-insights/');
+
+      if (msg.type() === 'error' && !isKnownNoise) {
         errors.push(msg.text());
       }
     });

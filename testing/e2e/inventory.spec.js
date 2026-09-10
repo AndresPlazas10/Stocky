@@ -1,19 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { signIn, waitForPageReady } from './helpers/test-utils.js';
+import { signIn, gotoSection, waitForPageReady } from './helpers/test-utils.js';
 
 const TEST_EMAIL = process.env.E2E_TEST_EMAIL;
 const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD;
 
 test.describe('Inventario', () => {
   test.beforeEach(async ({ page }) => {
-    if (TEST_EMAIL && TEST_PASSWORD) {
-      await signIn(page, TEST_EMAIL, TEST_PASSWORD);
-      await page.goto('/inventario');
-      await page.waitForLoadState('networkidle');
-    } else {
-      await page.goto('/inventario');
-      await page.waitForLoadState('networkidle');
-    }
+    test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'E2E_TEST_EMAIL/PASSWORD no definidas');
+    await signIn(page, TEST_EMAIL, TEST_PASSWORD);
+    await gotoSection(page, 'Inventario');
   });
 
   test('muestra la lista de productos', async ({ page }) => {

@@ -2,10 +2,10 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Páginas públicas', () => {
   test('la página de términos carga correctamente', async ({ page }) => {
-    await page.goto('/terminos');
+    await page.goto('/terms');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText(/Términos/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Términos y Condiciones/i })).toBeVisible();
     // Verify [Nombre de la Empresa] was replaced
     const content = await page.content();
     expect(content).not.toContain('[Nombre de la Empresa]');
@@ -13,7 +13,7 @@ test.describe('Páginas públicas', () => {
   });
 
   test('la página de términos usa el correo correcto', async ({ page }) => {
-    await page.goto('/terminos');
+    await page.goto('/terms');
     await page.waitForLoadState('networkidle');
 
     const content = await page.content();

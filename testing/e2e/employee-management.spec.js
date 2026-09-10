@@ -1,19 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { signIn, waitForPageReady } from './helpers/test-utils.js';
+import { signIn, gotoSection, waitForPageReady } from './helpers/test-utils.js';
 
 const TEST_EMAIL = process.env.E2E_TEST_EMAIL;
 const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD;
 
 test.describe('Gestion de Empleados', () => {
   test.beforeEach(async ({ page }) => {
-    if (TEST_EMAIL && TEST_PASSWORD) {
-      await signIn(page, TEST_EMAIL, TEST_PASSWORD);
-      await page.goto('/empleados');
-      await page.waitForLoadState('networkidle');
-    } else {
-      await page.goto('/empleados');
-      await page.waitForLoadState('networkidle');
-    }
+    test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'E2E_TEST_EMAIL/PASSWORD no definidas');
+    await signIn(page, TEST_EMAIL, TEST_PASSWORD);
+    await gotoSection(page, 'Empleados');
   });
 
   test('muestra la lista de empleados', async ({ page }) => {

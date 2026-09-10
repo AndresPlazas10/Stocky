@@ -87,6 +87,45 @@ export async function expectPagePath(page, path) {
 }
 
 /**
+ * Navigates to a dashboard section (the app uses internal sections, not routes).
+ * Handles both desktop (sidebar) and mobile (drawer) layouts.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} sectionName - Visible label, e.g. "Inventario"
+ */
+export async function gotoSection(page, sectionName) {
+  await page.goto('/dashboard');
+  await page.waitForLoadState('networkidle');
+
+  const sectionButton = page.getByRole('button', { name: sectionName }).first();
+  if (await isLocatorVisible(sectionButton)) {
+    await sectionButton.click();
+    await page.waitForLoadState('networkidle');
+    return;
+  }
+
+  const menuButton = page.getByRole('button', { name: /abrir menú|open menu/i }).first();
+  if (await isLocatorVisible(menuButton)) {
+    await menuButton.click();
+    await page.getByRole('button', { name: sectionName }).first().click();
+    await page.waitForLoadState('networkidle');
+  }
+}
+
+/**
+ * Returns true if the locator becomes visible within the timeout.
+ * @param {import('@playwright/test').Locator} locator
+ * @param {number} timeout
+ */
+export async function isLocatorVisible(locator, timeout = 3000) {
+  try {
+    await locator.waitFor({ state: 'visible', timeout });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Takes a screenshot with a descriptive name
  * @param {import('@playwright/test').Page} page
  * @param {string} name

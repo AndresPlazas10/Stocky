@@ -6,6 +6,7 @@ const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD;
 
 test.describe('Flujo de Mesas', () => {
   test.beforeEach(async ({ page }) => {
+    test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'E2E_TEST_USERNAME/PASSWORD no definidas');
     // El módulo de mesas vive en /dashboard (home) para el owner
     await signIn(page, TEST_EMAIL, TEST_PASSWORD);
     await page.goto('/dashboard');

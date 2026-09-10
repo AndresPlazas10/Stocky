@@ -1,28 +1,18 @@
 import { test, expect } from '@playwright/test';
-import { signIn, waitForPageReady } from './helpers/test-utils.js';
+import { signIn, gotoSection, waitForPageReady } from './helpers/test-utils.js';
 
 const TEST_EMAIL = process.env.E2E_TEST_EMAIL;
 const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD;
 
 test.describe('Impresora (driver del sistema)', () => {
   test.beforeEach(async ({ page }) => {
-    if (TEST_EMAIL && TEST_PASSWORD) {
-      await signIn(page, TEST_EMAIL, TEST_PASSWORD);
-      await page.goto('/dashboard');
-      await page.waitForLoadState('networkidle');
-    } else {
-      await page.goto('/dashboard');
-      await page.waitForLoadState('networkidle');
-    }
+    test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'E2E_TEST_EMAIL/PASSWORD no definidas');
+    await signIn(page, TEST_EMAIL, TEST_PASSWORD);
   });
 
   const openPrinterSection = async (page) => {
+    await gotoSection(page, 'Configuración');
     await waitForPageReady(page);
-    const settingsLink = page.locator('a:has-text("Configuracion"), a:has-text("Configuración")').first();
-    if (await settingsLink.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await settingsLink.click();
-      await page.waitForTimeout(500);
-    }
   };
 
   test('muestra la seccion de impresora en Configuracion', async ({ page }) => {
