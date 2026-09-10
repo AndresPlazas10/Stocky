@@ -201,47 +201,5 @@ export const ordersAdapter = {
       .select('id, status')
       .eq('table_id', tableId)
       .eq('business_id', businessId);
-  },
-
-  async getOrderItemsByBusinessSinceCursor({
-    businessId,
-    cursorColumn = 'created_at',
-    cursorValue = null,
-    limit = 200
-  }) {
-    const normalizedBusinessId = String(businessId || '').trim();
-    const normalizedCursorColumn = String(cursorColumn || 'created_at').trim() || 'created_at';
-    const normalizedLimit = Number.isFinite(Number(limit)) ? Math.max(1, Number(limit)) : 200;
-
-    if (!normalizedBusinessId) {
-      return {
-        data: [],
-        error: new Error('missing_business_id')
-      };
-    }
-
-    let query = supabase
-      .from('order_items')
-      .select(`
-        id,
-        order_id,
-        product_id,
-        combo_id,
-        quantity,
-        price,
-        subtotal,
-        created_at,
-        updated_at,
-        orders!inner(business_id)
-      `)
-      .eq('orders.business_id', normalizedBusinessId)
-      .order(normalizedCursorColumn, { ascending: true })
-      .limit(normalizedLimit);
-
-    if (cursorValue) {
-      query = query.gt(normalizedCursorColumn, cursorValue);
-    }
-
-    return query;
-  },
+  }
 };

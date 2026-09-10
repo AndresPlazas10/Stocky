@@ -53,7 +53,6 @@ const Empleados = lazy(() => import('../components/Dashboard/Empleados.jsx'));
 const Facturas = lazy(() => import('../components/Dashboard/Facturas.jsx'));
 const Reports = lazy(() => import('../components/Dashboard/Reports'));
 const Configuracion = lazy(() => import('../components/Dashboard/Configuracion.jsx'));
-const IncidentesSync = lazy(() => import('../components/Dashboard/IncidentesSync.jsx'));
 
 const SectionLoader = () => {
   const { t } = useTranslation('common');
@@ -318,9 +317,6 @@ function Dashboard() {
       case 'configuracion':
         return <Configuracion key="configuracion" user={user} business={business} onBusinessUpdate={setBusiness as (b: Business) => void} />;
 
-      case 'incidentes-sync':
-        return <IncidentesSync key="incidentes-sync" businessId={business?.id} />;
-      
       default:
         return <p>{t('dashboard.selectMenuOption')}</p>;
     }

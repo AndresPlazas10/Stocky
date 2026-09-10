@@ -24,9 +24,6 @@ export type {
   TFunction,
 } from './supabase';
 
-// Config types
-export type { LocalSyncConfig, LocalWritesConfig, LocalReadsConfig } from './config';
-
 // UI types
 export type { DashboardModule, UserRole } from './ui';
 

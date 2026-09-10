@@ -5,7 +5,8 @@ Indice principal de documentacion tecnica y operativa.
 ## Estado de referencia (Febrero 2026)
 
 - Stack actual: React 19, Vite 7, Supabase JS 2.x.
-- Arquitectura operativa: online-only (sin outbox/sync local en runtime).
+- Arquitectura operativa: online-first. El outbox de ventas y los snapshots offline quedan detrás de `VITE_ENABLE_OFFLINE_SNAPSHOT` (desactivado por defecto).
+- La infraestructura local-first (localdb/sync/ElectricSQL) fue retirada; ver `archive/`.
 - Facturacion operativa activa en app.
 - Integracion Siigo interna removida de runtime (estado sunset documentado).
 
@@ -30,8 +31,9 @@ Indice principal de documentacion tecnica y operativa.
 
 Documentación histórica (referencia, no runtime actual):
 
-- `ARQUITECTURA_LOCAL_FIRST_ELECTRICSQL.md`
-- `LOCAL_SYNC_DEV_CHECKLIST.md`
+- `archive/ARQUITECTURA_LOCAL_FIRST_ELECTRICSQL.md`
+- `archive/LOCAL_SYNC_DEV_CHECKLIST.md`
+- `archive/DIAGNOSTICO_LOCAL_FIRST_CONSISTENCIA.sql`
 
 ## 4. Despliegue
 
@@ -68,7 +70,7 @@ Estado esperado:
 ## 7. Pruebas
 
 - Carpeta: `../testing/`
-- Comando: `npm run test -- --run`
+- Comandos: `npm test` (node:test), `npm run test:offline`, `npm run test:unit` (Vitest), `npm run test:e2e` (Playwright)
 
 Nota: la cobertura actual es limitada frente al dominio. Priorizar tests de Mesas, facturacion y email.
 

@@ -6,7 +6,6 @@
 
 import { supabaseAdapter } from '../data/adapters/supabaseAdapter.js';
 import { isAdminRole } from '../utils/roles';
-import { enqueueOutboxMutation } from '../sync/outboxShadow.js';
 import { notifyAdminLowStockWeb, notifyAdminSaleRegisteredWeb } from './webNotificationsService.js';
 import { createSaleWithOutbox } from '../data/commands/salesCommands.js';
 import { logger } from '@/utils/logger';
@@ -18,20 +17,6 @@ function buildIdempotencyKey({ action, businessId, orderId, tableId }) {
   const o = String(orderId || '').trim();
   const t = String(tableId || '').trim();
   return `stocky:${normalizedAction}:${b}:${o}:${t}`;
-}
-
-async function enqueueOrderCloseOutbox({
-  businessId,
-  mutationType,
-  mutationId,
-  payload
-}) {
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType,
-    mutationId,
-    payload
-  });
 }
 
 function buildOfflineCloseUnavailableMessage() {
@@ -622,19 +607,6 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
       logger.warn('services:orders:fetch_recent_sale_ids_failed', err);
     }
 
-    await enqueueOrderCloseOutbox({
-      businessId,
-      mutationType: 'order.close.split',
-      mutationId: `${idempotencyKey}:atomic`,
-      payload: {
-        order_id: orderId,
-        table_id: tableId,
-        sales_count: atomicSalesCount,
-        total_sold: atomicTotalSold,
-        sale_ids: atomicSaleIds
-      }
-    });
-
     const productIds = collectProductIdsFromItems(
       subAccountsWithItems.flatMap((sub) => sub.items || [])
     );
@@ -778,19 +750,6 @@ export async function closeOrderAsSplit(businessId, { subAccounts, orderId, tabl
   if (!Number.isFinite(totalSold) || totalSold <= 0) {
     throw new Error('No se pudieron generar ventas en el cierre dividido.');
   }
-
-  await enqueueOrderCloseOutbox({
-    businessId,
-    mutationType: 'order.close.split',
-    mutationId: `${idempotencyKey}:fallback`,
-    payload: {
-      order_id: orderId,
-      table_id: tableId,
-      sales_count: saleIds.length,
-      total_sold: totalSold,
-      sale_ids: saleIds
-    }
-  });
 
   void maybeNotifyAdminSale({ businessId, saleTotal: totalSold });
   const fallbackProductIds = collectProductIdsFromItems(
@@ -996,20 +955,6 @@ export async function closeOrderSingle(
     saleTotal,
     amountReceived: normalizedAmountReceived,
     changeBreakdown: normalizedChangeBreakdown
-  });
-
-  await enqueueOrderCloseOutbox({
-    businessId,
-    mutationType: 'order.close.single',
-    mutationId: idempotencyKey,
-    payload: {
-      order_id: orderId,
-      table_id: tableId,
-      sale_id: resolvedSaleId,
-      total_sold: saleTotal,
-      payment_method: paymentMethod || 'cash',
-      amount_received: normalizedAmountReceived
-    }
   });
 
   void maybeNotifyAdminSale({ businessId, saleTotal });

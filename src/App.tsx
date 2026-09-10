@@ -41,7 +41,11 @@ function App() {
         const key = window.localStorage.key(i);
         if (
           typeof key === 'string'
-          && (key.startsWith('stocky.local_sync.') || key.startsWith('stocky.offline_snapshot.'))
+          && (
+            key.startsWith('stocky.local_sync.')
+            || key.startsWith('stocky.localdb.')
+            || key.startsWith('stocky.offline_snapshot.')
+          )
         ) {
           keysToDelete.push(key);
         }

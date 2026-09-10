@@ -1,6 +1,5 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
 import { invalidateInventoryCache } from '../adapters/cacheInvalidation';
-import { enqueueOutboxMutation } from '../../sync/outboxShadow';
 import { parsePriceInput } from '../../utils/formatters';
 import type { Product } from '../../types';
 
@@ -28,16 +27,6 @@ interface CreateProductResult {
   localOnly: boolean;
 }
 
-type ProductEventPayload = {
-  product_id: string | null;
-  supplier_id: string | null;
-  manage_stock: boolean;
-  stock: number;
-  product: Partial<Product>;
-};
-
-type ProductCreateEventPayload = ProductEventPayload;
-
 interface TypedError extends Error {
   code?: string;
 }
@@ -54,53 +43,8 @@ function isMissingAtomicCreateFunction(error: unknown): boolean {
   );
 }
 
-function buildMutationId(prefix: string, businessId: string | null = null): string {
-  const nonce = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
-  return `${businessId || 'unknown'}:${prefix}:${nonce}`;
-}
-
-function buildLocalProductCode(productId: string | null): string {
-  const suffix = String(productId || '').replace(/-/g, '').slice(0, 8) || Date.now().toString().slice(-8);
-  return `LCL-${suffix}`;
-}
-
-function normalizeNumber(value: unknown, fallback: number = 0): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 function normalizePriceAmount(value: unknown, fallback: number = 0): number {
   return parsePriceInput(value as string | number, fallback);
-}
-
-function buildProductCreateEventPayload(
-  productData: ProductData = {},
-  { productId, code }: { productId: string | null; code: string | null }
-): ProductCreateEventPayload {
-  const row: Partial<Product> = {
-    id: productId || undefined,
-    business_id: productData.business_id,
-    code: code || buildLocalProductCode(productId),
-    name: productData.name,
-    category: productData.category || undefined,
-    purchase_price: normalizePriceAmount(productData.purchase_price, 0),
-    sale_price: normalizePriceAmount(productData.sale_price, 0),
-    stock: normalizeNumber(productData.stock, 0),
-    min_stock: normalizeNumber(productData.min_stock, 0),
-    unit: productData.unit || 'unit',
-    supplier_id: productData.supplier_id || null,
-    is_active: productData.is_active !== false,
-    manage_stock: productData.manage_stock !== false,
-    created_at: productData.created_at || new Date().toISOString()
-  };
-
-  return {
-    product_id: row.id || null,
-    supplier_id: row.supplier_id || null,
-    manage_stock: row.manage_stock !== false,
-    stock: row.stock || 0,
-    product: row
-  };
 }
 
 export async function createProductWithFallback(productData: ProductData): Promise<CreateProductResult> {
@@ -165,16 +109,6 @@ export async function createProductWithFallback(productData: ProductData): Promi
     supplierId: normalizedProductData?.supplier_id || null
   });
 
-  await enqueueOutboxMutation({
-    businessId: normalizedProductData.business_id!,
-    mutationType: 'product.create',
-    payload: buildProductCreateEventPayload(normalizedProductData, {
-      productId: createdProduct?.id || null,
-      code: createdProduct?.code || normalizedProductData?.code || null
-    }),
-    mutationId: buildMutationId('product.create', normalizedProductData.business_id)
-  });
-
   return {
     usedFallback,
     createdProduct,
@@ -212,19 +146,6 @@ export async function updateProductById({
     supplierId: normalizedPayload?.supplier_id || null
   });
 
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'product.update',
-    payload: {
-      product_id: productId,
-      supplier_id: normalizedPayload?.supplier_id || null,
-      manage_stock: normalizedPayload?.manage_stock !== false,
-      is_active: normalizedPayload?.is_active !== false,
-      update: normalizedPayload || {}
-    },
-    mutationId: buildMutationId('product.update', businessId)
-  });
-
   return data || null;
 }
 
@@ -252,15 +173,6 @@ export async function deleteProductById({
     productId
   });
 
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'product.delete',
-    payload: {
-      product_id: productId
-    },
-    mutationId: buildMutationId('product.delete', businessId)
-  });
-
   return { localOnly: false };
 }
 
@@ -286,19 +198,6 @@ export async function setProductActiveStatus({
   await invalidateInventoryCache({
     businessId,
     productId
-  });
-
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'product.status.update',
-    payload: {
-      product_id: productId,
-      is_active: Boolean(isActive),
-      update: {
-        is_active: Boolean(isActive)
-      }
-    },
-    mutationId: buildMutationId('product.status.update', businessId)
   });
 
   return data || null;

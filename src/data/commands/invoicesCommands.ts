@@ -1,6 +1,5 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
 import { invalidateInvoiceCache } from '../adapters/cacheInvalidation';
-import { enqueueOutboxMutation } from '../../sync/outboxShadow';
 import type { Invoice, InvoiceItem } from '../../types';
 
 interface InvoiceItemInput {
@@ -9,11 +8,6 @@ interface InvoiceItemInput {
   quantity?: number;
   unit_price?: number;
   total?: number;
-}
-
-function buildMutationId(prefix: string, businessId: string | null = null): string {
-  const nonce = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
-  return `${businessId || 'unknown'}:${prefix}:${nonce}`;
 }
 
 function normalizeInvoiceItems(items: InvoiceItemInput[] = []): InvoiceItemInput[] {
@@ -113,20 +107,6 @@ export async function createInvoiceWithItemsAndStock({
       invoiceId: invoice?.id || null
     });
 
-    await enqueueOutboxMutation({
-      businessId,
-      mutationType: 'invoice.create',
-      payload: {
-        invoice_id: invoice.id,
-        invoice_number: invoiceNumber,
-        total: Number(total || 0),
-        items_count: invoiceItems.length,
-        invoice,
-        items: normalizedItems
-      },
-      mutationId: buildMutationId('invoice.create', businessId)
-    });
-
     return {
       invoice: invoice || null,
       invoiceNumber,
@@ -165,16 +145,6 @@ export async function markInvoiceAsSent({
   await invalidateInvoiceCache({
     businessId,
     invoiceId
-  });
-
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'invoice.sent',
-    payload: {
-      invoice_id: invoiceId,
-      sent_at: sentAt
-    },
-    mutationId: buildMutationId('invoice.sent', businessId)
   });
 
   return { localOnly: false };
@@ -227,19 +197,6 @@ export async function cancelInvoiceAndRestoreStock({
     invoiceId
   });
 
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'invoice.cancel',
-    payload: {
-      invoice_id: invoiceId,
-      items_count: productUpdates.length,
-      product_updates: productUpdates,
-      restore_stock_warning: Boolean(restoreError),
-      cancelled_at: cancelledAt
-    },
-    mutationId: buildMutationId('invoice.cancel', businessId)
-  });
-
   return {
     restoreError,
     localOnly: false
@@ -266,15 +223,6 @@ export async function deleteInvoiceCascade({
   await invalidateInvoiceCache({
     businessId,
     invoiceId
-  });
-
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'invoice.delete',
-    payload: {
-      invoice_id: invoiceId
-    },
-    mutationId: buildMutationId('invoice.delete', businessId)
   });
 
   return { localOnly: false };

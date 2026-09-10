@@ -93,8 +93,6 @@ export default defineConfig([
       'apps/mobile/app.config.js',
       'apps/mobile/plugins/withFirebaseAppInit.js',
       'apps/mobile/scripts/optimize-assets.js',
-      'src/config/localSync.js',
-      'src/sync/shapeRegistry.js',
     ],
     languageOptions: {
       globals: {

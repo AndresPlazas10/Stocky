@@ -1,16 +1,9 @@
 import { supabaseAdapter } from '../adapters/supabaseAdapter';
-import { enqueueOutboxMutation } from '../../sync/outboxShadow';
-import LOCAL_SYNC_CONFIG from '../../config/localSync';
 import { invalidateOrderCache } from '../adapters/cacheInvalidation';
 import { logger } from '@/utils/logger';
 import type { Order, OrderItem, Table } from '../../types';
 
 let openCloseRpcCompatibility: 'unknown' | 'supported' | 'unsupported' = 'unknown';
-
-function buildMutationId(prefix: string, businessId: string | null = null): string {
-  const nonce = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
-  return `${businessId || 'unknown'}:${prefix}:${nonce}`;
-}
 
 interface ErrorLike {
   message?: string;
@@ -130,18 +123,14 @@ interface PurgeOptions {
   businessId: string;
   tableId: string;
   orderIds?: string[];
-  preserveMutationIds?: string[];
 }
 
 async function purgeLocalTableCascadeArtifacts({
   businessId,
   tableId,
-  orderIds = [],
-  preserveMutationIds = []
+  orderIds = []
 }: PurgeOptions): Promise<void> {
   if (!businessId || !tableId) return;
-  if (!LOCAL_SYNC_CONFIG.enabled) return;
-  void preserveMutationIds;
 
   await invalidateOrderCache({ businessId, tableId });
   if (Array.isArray(orderIds) && orderIds.length > 0) {
@@ -166,16 +155,6 @@ export async function createTable({
     status: 'available'
   });
   if (error) throw error;
-
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'table.create',
-    payload: {
-      table_id: data?.id || null,
-      table_number: tableNumber
-    },
-    mutationId: buildMutationId('table.create', businessId)
-  });
 
   return {
     ...(data || {}),
@@ -215,19 +194,7 @@ export async function createOrderAndOccupyTable({
         throw new Error('open_close_table_transaction no devolvió current_order_id');
       }
 
-      await Promise.all([
-        enqueueOutboxMutation({
-          businessId,
-          mutationType: 'order.create',
-          payload: {
-            order_id: orderId,
-            table_id: tableId,
-            user_id: actorUserId
-          },
-          mutationId: buildMutationId('order.create', businessId)
-        }),
-        invalidateOrderCache({ businessId, tableId, orderId }),
-      ]);
+      await invalidateOrderCache({ businessId, tableId, orderId });
 
       return {
         id: orderId,
@@ -306,19 +273,7 @@ export async function createOrderAndOccupyTable({
     && !isMissingTablesOpenedAtColumnError(updateError)
   ) throw updateError;
 
-  await Promise.all([
-    enqueueOutboxMutation({
-      businessId,
-      mutationType: 'order.create',
-      payload: {
-        order_id: newOrder?.id || null,
-        table_id: tableId,
-        user_id: actorUserId
-      },
-      mutationId: buildMutationId('order.create', businessId)
-    }),
-    invalidateOrderCache({ businessId, tableId, orderId: newOrder?.id || null }),
-  ]);
+  await invalidateOrderCache({ businessId, tableId, orderId: newOrder?.id || null });
 
   return {
     ...newOrder,
@@ -341,15 +296,6 @@ export async function updateOrderTotalById({
     throw new Error(`orders_update_blocked_by_rls: order ${orderId} no fue actualizado (0 filas afectadas)`);
   }
 
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'order.total.update',
-    payload: {
-      order_id: orderId,
-      total: Number(total || 0)
-    },
-    mutationId: buildMutationId('order.total.update', businessId)
-  });
   await invalidateOrderCache({ businessId, orderId });
 
   return {
@@ -379,15 +325,6 @@ export async function updateOrderNotesById({
     throw new Error(`orders_update_blocked_by_rls: order ${orderId} no fue actualizado (0 filas afectadas)`);
   }
 
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'order.notes.update',
-    payload: {
-      order_id: orderId,
-      notes: cleanNotes
-    },
-    mutationId: buildMutationId('order.notes.update', businessId)
-  });
   await invalidateOrderCache({ businessId, orderId });
 
   return {
@@ -472,18 +409,6 @@ export async function persistOrderItemQuantities(
   const failedUpdate = updateResults.find((result) => result.error);
   if (failedUpdate?.error) throw failedUpdate.error;
 
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'order.item.bulk_quantity_update',
-    payload: {
-      order_id: orderId,
-      updates: pendingEntries.map(([itemId, quantity]) => ({
-        item_id: itemId,
-        quantity: Number(quantity || 0)
-      }))
-    },
-    mutationId: buildMutationId('order.item.bulk_quantity_update', businessId)
-  });
   await invalidateOrderCache({ businessId, orderId });
 
   return {
@@ -499,15 +424,6 @@ export async function deleteOrderItemById(
   const { error } = await supabaseAdapter.deleteOrderItemById(itemId);
   if (error) throw error;
 
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'order.item.delete',
-    payload: {
-      order_id: orderId,
-      item_id: itemId
-    },
-    mutationId: buildMutationId('order.item.delete', businessId)
-  });
   await invalidateOrderCache({ businessId, orderId });
 
   return {
@@ -534,16 +450,6 @@ export async function updateOrderItemQuantityById({
   const { error } = await supabaseAdapter.updateOrderItemById(itemId, { quantity });
   if (error) throw error;
 
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'order.item.update_quantity',
-    payload: {
-      order_id: orderId,
-      item_id: itemId,
-      quantity: Number(quantity || 0)
-    },
-    mutationId: buildMutationId('order.item.update_quantity', businessId)
-  });
   await invalidateOrderCache({ businessId, orderId });
 
   return {
@@ -666,19 +572,6 @@ export async function insertOrderItem({
     throw error;
   }
 
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'order.item.insert',
-    payload: {
-      order_id: row?.order_id || null,
-      item_id: (data as unknown as Record<string, unknown>)?.id || null,
-      product_id: row?.product_id || null,
-      combo_id: row?.combo_id || null,
-      quantity: Number(row?.quantity || 0),
-      price: Number(row?.price || 0)
-    },
-    mutationId: buildMutationId('order.item.insert', businessId)
-  });
   await invalidateOrderCache({ businessId, orderId: row?.order_id || null });
 
   return {
@@ -748,16 +641,7 @@ export async function deleteOrderAndReleaseTable({
   const { error: deleteOrderError } = await supabaseAdapter.deleteOrderById(orderId);
   if (deleteOrderError) throw deleteOrderError;
 
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'order.delete_and_release_table',
-    payload: {
-      order_id: orderId,
-      table_id: tableId
-    },
-    mutationId: buildMutationId('order.delete_and_release_table', businessId)
-  });
-  await invalidateOrderCache({ businessId, orderId, tableId, releaseMesaSnapshot: true });
+  await invalidateOrderCache({ businessId, orderId, tableId });
 
   return {
     order_id: orderId,
@@ -917,7 +801,7 @@ export async function persistOrderSnapshotWeb({
     );
 
     const failedUpserts = upsertResults.filter((result) => result.status === 'rejected');
-    if (failedUpserts.length > 0 && LOCAL_SYNC_CONFIG?.devtoolsEnabled) {
+    if (failedUpserts.length > 0) {
       logger.warn(
         'orders:persist_order_snapshot_fallback_upserts_failed',
         failedUpserts.map((result) => (result as PromiseRejectedResult).reason?.message || result)
@@ -930,7 +814,7 @@ export async function persistOrderSnapshotWeb({
         idsToDelete.map((itemId) => deleteOrderItemById(itemId, { businessId, orderId }))
       );
       const failedDeletes = deleteResults.filter((result) => result.status === 'rejected');
-      if (failedDeletes.length > 0 && LOCAL_SYNC_CONFIG?.devtoolsEnabled) {
+      if (failedDeletes.length > 0) {
         logger.warn(
           'orders:persist_order_snapshot_fallback_deletes_failed',
           failedDeletes.map((result) => (result as PromiseRejectedResult).reason?.message || result)
@@ -986,20 +870,10 @@ export async function deleteTableCascadeOrders(
     : await supabaseAdapter.deleteTableById(tableId);
   if (tableError) throw tableError;
 
-  const mutationId = buildMutationId('table.delete_cascade_orders', businessId);
-  await enqueueOutboxMutation({
-    businessId,
-    mutationType: 'table.delete_cascade_orders',
-    payload: {
-      table_id: tableId
-    },
-    mutationId
-  });
   await purgeLocalTableCascadeArtifacts({
     businessId: businessId!,
     tableId,
-    orderIds: associatedOrderIds,
-    preserveMutationIds: [mutationId]
+    orderIds: associatedOrderIds
   });
 
   return {

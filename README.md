@@ -288,11 +288,9 @@ Stocky/
 │   ├── services/                # Lógica de negocio
 │   ├── utils/                   # Utilidades
 │   ├── data/                    # Capa de datos
-│   │   ├── adapters/            # Adaptadores (Supabase, local)
+│   │   ├── adapters/            # Adaptadores (Supabase, cache de lectura)
 │   │   ├── queries/             # Consultas
 │   │   └── commands/            # Mutaciones
-│   ├── sync/                    # Sincronización offline
-│   ├── localdb/                 # Base de datos local
 │   └── supabase/                # Cliente Supabase
 │
 ├── apps/
@@ -355,12 +353,9 @@ VITE_APP_URL=https://stockypos.app
 VITE_APP_NAME=Stocky
 ```
 
-#### Local-First (Experimental)
+#### Offline (opcional)
 ```env
-VITE_LOCAL_SYNC_ENABLED=false
-VITE_LOCAL_SYNC_WRITE_SALES_ENABLED=false
-VITE_LOCAL_SYNC_WRITE_PURCHASES_ENABLED=false
-VITE_LOCAL_SYNC_WRITE_ORDERS_ENABLED=false
+VITE_ENABLE_OFFLINE_SNAPSHOT=false
 ```
 
 Ver referencia completa en [`.env.example`](.env.example)
@@ -391,9 +386,10 @@ npm run test:e2e:ui
 
 | Tipo | Tests | Status |
 |------|-------|--------|
-| **Unitarios** | 134 | ✅ Pasando |
-| **E2E** | 8 | ✅ Pasando |
-| **Offline** | 119 | ✅ Pasando |
+| **Unitarios (Vitest)** | 189 | ⚠️ 22 fallos preexistentes (formatters/i18n) |
+| **E2E (Playwright)** | 184 en 14 specs (4 navegadores) | — |
+| **Offline (outbox/snapshots)** | 28 | ✅ Pasando |
+| **Node (legacy)** | 40 | ✅ Pasando |
 
 ### Escribir Tests
 

@@ -31,7 +31,7 @@ npm test              # Run all legacy tests
 npm run test:offline  # Run offline-specific tests
 ```
 
-14 test files in `testing/` using Node.js native test runner.
+10 test files in `testing/` using Node.js native test runner.
 
 ## E2E Tests (Playwright)
 

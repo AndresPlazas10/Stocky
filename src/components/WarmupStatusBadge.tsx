@@ -60,15 +60,6 @@ function resolveBadgePresentation(
     };
   }
 
-  if (reason === "local_sync_disabled") {
-    return {
-      label: t('connectivity.online'),
-      className: "bg-green-100 text-green-800 border-green-200",
-      Icon: CheckCircle2,
-      spinning: false,
-    };
-  }
-
   return {
     label: t('connectivity.online'),
     className: "bg-green-100 text-green-800 border-green-200",
