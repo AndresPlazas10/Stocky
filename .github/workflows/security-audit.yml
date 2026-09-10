@@ -10,9 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
@@ -25,16 +25,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: apps/mobile/package-lock.json
+          cache-dependency-path: package-lock.json
       - name: Install
         run: npm ci
-        working-directory: apps/mobile
       - name: NPM Audit (critical)
-        run: npm audit --audit-level=critical
-        working-directory: apps/mobile
+        run: npm audit --audit-level=critical --workspace apps/mobile

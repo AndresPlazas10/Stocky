@@ -1,17 +1,8 @@
 name: Performance Budget
 
+# Pausado: requiere secrets (SUPABASE_URL, SUPABASE_ANON_KEY, REALTIME_*).
+# Reactivar agregando el trigger pull_request cuando estén configurados.
 on:
-  pull_request:
-    paths:
-      - "apps/mobile/**"
-      - "src/**"
-      - "scripts/perf/**"
-      - "scripts/realtime-audit/**"
-      - "testing/perf/**"
-      - "docs/perf/**"
-      - "supabase/migrations/**"
-      - "package.json"
-      - ".github/workflows/perf-budget.yml"
   workflow_dispatch:
 
 permissions:
@@ -35,10 +26,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "20"
           cache: "npm"
