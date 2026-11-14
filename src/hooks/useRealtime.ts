@@ -61,6 +61,7 @@ export function useRealtimeSubscription(table, options = {}) {
 
   const handlersRef = useRef({ onInsert, onUpdate, onDelete });
   const pollRef = useRef(onPoll);
+  const reconnectRef = useRef(onReconnect);
 
   const prevFilterRef = useRef(null);
   const filterKeyRef = useRef(JSON.stringify(filter || {}));
@@ -78,6 +79,10 @@ export function useRealtimeSubscription(table, options = {}) {
   useEffect(() => {
     pollRef.current = onPoll;
   }, [onPoll]);
+
+  useEffect(() => {
+    reconnectRef.current = onReconnect;
+  }, [onReconnect]);
 
   useEffect(() => {
     if (!enabled || !table) return;
@@ -235,8 +240,8 @@ export function useRealtimeSubscription(table, options = {}) {
                 channelName,
                 retryAttempts
               });
-              if (typeof onReconnect === 'function') {
-                onReconnect();
+              if (typeof reconnectRef.current === 'function') {
+                reconnectRef.current();
               }
             }
             retryAttempts = 0;
@@ -269,7 +274,7 @@ export function useRealtimeSubscription(table, options = {}) {
       stopPolling();
       removeActiveChannel();
     };
-  }, [table, enabled, filterKey, retryOnError, onReconnect, requireBusinessId, debounceMs, pollingIntervalMs, pollingMode]);
+  }, [table, enabled, filterKey, retryOnError, requireBusinessId, debounceMs, pollingIntervalMs, pollingMode]);
 }
 
 /**

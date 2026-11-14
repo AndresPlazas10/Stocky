@@ -46,6 +46,11 @@ export function useMesasEffects({
     refreshMesaLocks(businessId);
   }, [businessId, refreshMesaLocks]);
 
+  const applyRealtimeMesaLockBroadcastRef = useRef(applyRealtimeMesaLockBroadcast);
+  useEffect(() => {
+    applyRealtimeMesaLockBroadcastRef.current = applyRealtimeMesaLockBroadcast;
+  }, [applyRealtimeMesaLockBroadcast]);
+
   // Broadcast Channel
   useEffect(() => {
     if (!businessId) return undefined;
@@ -54,7 +59,7 @@ export function useMesasEffects({
       .channel(`private:mobile-mesas-sync:${businessId}`)
       .on('broadcast', { event: 'mesa_lock_changed' }, ({ payload }) => {
         logger.info('[Broadcast] Event received on channel', { mesaId: payload?.mesa_id });
-        applyRealtimeMesaLockBroadcast(payload);
+        applyRealtimeMesaLockBroadcastRef.current?.(payload);
       });
     channel.subscribe((status) => {
       logger.info('[Broadcast] Channel status changed', { status });
@@ -69,7 +74,7 @@ export function useMesasEffects({
         mesaSyncBroadcastChannelRef.current = null;
       }
     };
-  }, [applyRealtimeMesaLockBroadcast, businessId]);
+  }, [businessId, mesaSyncBroadcastChannelRef, mesaSyncBroadcastReadyRef]);
 
   // Remote Sync Polling — light-first: primero se consulta una huella barata
   // del estado de mesas (ids + último updated_at); el reload completo solo se

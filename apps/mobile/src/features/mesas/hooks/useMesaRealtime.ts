@@ -1082,9 +1082,42 @@ export function useMesaRealtime({
   // Main realtime useEffect (channel creation, subscription, fallback polling)
   // -------------------------------------------------------------------
 
+  const isFocusedRef = useRef(isFocused);
+  isFocusedRef.current = isFocused;
+  const syncMesasFallbackPollingRef = useRef<(() => void) | null>(null);
+
+  const realtimeCallbacksRef = useRef({
+    applyRealtimeMesaLockBroadcast,
+    applyRealtimeMesaBroadcast,
+    applyRealtimeMesaLockEvent,
+    applyRealtimeOrderEvent,
+    applyRealtimeTableEvent,
+    markRealtimeIngress,
+    scheduleOrderRealtimeSummaryHydration,
+    scheduleMesaLocksRefresh,
+    scheduleMesasRealtimeRefresh,
+    setMesaLocksByTableId,
+  });
+  realtimeCallbacksRef.current = {
+    applyRealtimeMesaLockBroadcast,
+    applyRealtimeMesaBroadcast,
+    applyRealtimeMesaLockEvent,
+    applyRealtimeOrderEvent,
+    applyRealtimeTableEvent,
+    markRealtimeIngress,
+    scheduleOrderRealtimeSummaryHydration,
+    scheduleMesaLocksRefresh,
+    scheduleMesasRealtimeRefresh,
+    setMesaLocksByTableId,
+  };
+
+  useEffect(() => {
+    syncMesasFallbackPollingRef.current?.();
+  }, [isFocused]);
+
   useEffect(() => {
     if (!businessId) {
-      setMesaLocksByTableId({});
+      realtimeCallbacksRef.current.setMesaLocksByTableId({});
       return undefined;
     }
 
@@ -1103,19 +1136,23 @@ export function useMesaRealtime({
 
     const scheduleRefresh = () => {
       if (cancelled) return;
-      scheduleMesasRealtimeRefresh();
+      realtimeCallbacksRef.current.scheduleMesasRealtimeRefresh();
     };
 
     const scheduleLocks = () => {
       if (cancelled) return;
-      scheduleMesaLocksRefresh(businessId);
+      realtimeCallbacksRef.current.scheduleMesaLocksRefresh(businessId);
     };
 
     function startFallbackPolling() {
-      if (fallbackTimer || cancelled || !isFocused) return;
+      if (fallbackTimer || cancelled || realtimeConnected || !isFocusedRef.current) return;
       const intervalMs = Math.max(MESAS_REMOTE_FALLBACK_POLL_MS, backoffMs);
       fallbackTimer = setInterval(() => {
         if (cancelled) return;
+        if (!isFocusedRef.current || realtimeConnected) {
+          stopFallbackPolling();
+          return;
+        }
         scheduleRefresh();
         scheduleLocks();
         backoffMs = Math.min(backoffMs * 2 || MESAS_REMOTE_FALLBACK_POLL_MS, BACKOFF_MAX_MS);
@@ -1130,6 +1167,18 @@ export function useMesaRealtime({
       }
     }
 
+    syncMesasFallbackPollingRef.current = () => {
+      if (cancelled || realtimeConnected) {
+        stopFallbackPolling();
+        return;
+      }
+      if (isFocusedRef.current) {
+        startFallbackPolling();
+      } else {
+        stopFallbackPolling();
+      }
+    };
+
     const channel = client
       .channel(`mobile-mesas:${businessId}:${userId}`)
       .on(
@@ -1142,8 +1191,8 @@ export function useMesaRealtime({
         },
         (payload: any) => {
           if (cancelled) return;
-          markRealtimeIngress('tables', payload);
-          applyRealtimeTableEvent(payload);
+          realtimeCallbacksRef.current.markRealtimeIngress('tables', payload);
+          realtimeCallbacksRef.current.applyRealtimeTableEvent(payload);
           scheduleRefresh();
         },
       )
@@ -1157,8 +1206,8 @@ export function useMesaRealtime({
         },
         (payload: any) => {
           if (cancelled) return;
-          markRealtimeIngress('orders', payload);
-          applyRealtimeOrderEvent(payload);
+          realtimeCallbacksRef.current.markRealtimeIngress('orders', payload);
+          realtimeCallbacksRef.current.applyRealtimeOrderEvent(payload);
           scheduleRefresh();
         },
       )
@@ -1172,8 +1221,8 @@ export function useMesaRealtime({
         },
         (payload: any) => {
           if (cancelled) return;
-          markRealtimeIngress('mesa_lock', payload);
-          applyRealtimeMesaLockEvent(payload);
+          realtimeCallbacksRef.current.markRealtimeIngress('mesa_lock', payload);
+          realtimeCallbacksRef.current.applyRealtimeMesaLockEvent(payload);
           scheduleLocks();
         },
       );
@@ -1187,7 +1236,7 @@ export function useMesaRealtime({
           rowRef: String(payload?.mesa_id || '').trim() || 'unknown',
           syncMode: String(payload?.mode || '').trim() || null,
         });
-        applyRealtimeMesaLockBroadcast(payload);
+        realtimeCallbacksRef.current.applyRealtimeMesaLockBroadcast(payload);
       })
       .on('broadcast', { event: 'mesa_state_changed' }, ({ payload }: { payload: any }) => {
         if (cancelled) return;
@@ -1204,7 +1253,7 @@ export function useMesaRealtime({
             ? Math.max(0, Date.now() - Number(payload.emitted_at))
             : null,
         });
-        applyRealtimeMesaBroadcast(payload);
+        realtimeCallbacksRef.current.applyRealtimeMesaBroadcast(payload);
         if (!isOwnBroadcast) {
           scheduleRefresh();
         }
@@ -1228,12 +1277,13 @@ export function useMesaRealtime({
     });
     mesasSyncBroadcastChannelRef.current = syncChannel;
 
-    if (!realtimeConnected && isFocused) {
+    if (!realtimeConnected && isFocusedRef.current) {
       startFallbackPolling();
     }
 
     return () => {
       cancelled = true;
+      syncMesasFallbackPollingRef.current = null;
       stopFallbackPolling();
       if (mesasRealtimeRefreshTimerRef.current) {
         clearTimeout(mesasRealtimeRefreshTimerRef.current);
@@ -1258,21 +1308,7 @@ export function useMesaRealtime({
       });
       mesaLockPlaceholderTimersRef.current = {};
     };
-  }, [
-    applyRealtimeMesaLockBroadcast,
-    applyRealtimeMesaBroadcast,
-    applyRealtimeMesaLockEvent,
-    applyRealtimeOrderEvent,
-    applyRealtimeTableEvent,
-    businessId,
-    isFocused,
-    markRealtimeIngress,
-    scheduleOrderRealtimeSummaryHydration,
-    scheduleMesaLocksRefresh,
-    scheduleMesasRealtimeRefresh,
-    setMesaLocksByTableId,
-    userId,
-  ]);
+  }, [businessId, userId]);
 
   // -------------------------------------------------------------------
   // Filtered order_items subscription (scoped to active order)
@@ -1302,7 +1338,7 @@ export function useMesaRealtime({
       },
       (payload: any) => {
         if (cancelled) return;
-        markRealtimeIngress('order_items', payload);
+        realtimeCallbacksRef.current.markRealtimeIngress('order_items', payload);
 
         const newRow = payload?.new as Record<string, unknown> | undefined;
         const oldRow = payload?.old as Record<string, unknown> | undefined;
@@ -1310,10 +1346,10 @@ export function useMesaRealtime({
         const previousOrderId = normalizeOrderReference(oldRow?.order_id);
 
         if (nextOrderId) {
-          scheduleOrderRealtimeSummaryHydration(nextOrderId);
+          realtimeCallbacksRef.current.scheduleOrderRealtimeSummaryHydration(nextOrderId);
         }
         if (previousOrderId && previousOrderId !== nextOrderId) {
-          scheduleOrderRealtimeSummaryHydration(previousOrderId);
+          realtimeCallbacksRef.current.scheduleOrderRealtimeSummaryHydration(previousOrderId);
         }
       },
     );
@@ -1325,12 +1361,7 @@ export function useMesaRealtime({
       traceMesaSync('order_items_unsubscribe', { orderId });
       void client.removeChannel(orderChannel);
     };
-  }, [
-    activeOrderId,
-    businessId,
-    markRealtimeIngress,
-    scheduleOrderRealtimeSummaryHydration,
-  ]);
+  }, [activeOrderId, businessId]);
 
   // -------------------------------------------------------------------
   // Return
